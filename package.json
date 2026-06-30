@@ -9,7 +9,7 @@
     "sync-renderer": "node scripts/renderer-sync-wizard.js",
     "sync-report": "node scripts/renderer-sync-check.js --json > renderer-sync-report.json",
     "start": "cross-env NODE_ENV=production node --experimental-vm-modules src/index.js",
-    "dev": "cross-env NODE_ENV=development node --watch --experimental-vm-modules src/index.js",
+    "dev": "cross-env NODE_ENV=development node --use-system-ca --watch --experimental-vm-modules src/index.js",
     "dev:staging": "cross-env NODE_ENV=staging node --watch --experimental-vm-modules src/index.js",
     "dev:prod": "cross-env NODE_ENV=production node --watch --experimental-vm-modules src/index.js",
     "dev:prod-local": "cross-env NODE_ENV=production-local node --watch --experimental-vm-modules src/index.js",

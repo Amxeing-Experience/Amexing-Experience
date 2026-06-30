@@ -123,10 +123,11 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    return res.status(401).json({
-      success: false,
-      error: 'Invalid or malformed token',
-    });
+    const payload = { success: false, error: 'Invalid or malformed token' };
+    // Surface the underlying reason outside production so auth failures are diagnosable from the
+    // client (e.g. "jwt expired" / "invalid signature" vs a downstream/network error).
+    if (process.env.NODE_ENV !== 'production') payload.detail = error.message;
+    return res.status(401).json(payload);
   }
 };
 

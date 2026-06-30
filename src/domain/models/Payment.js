@@ -155,6 +155,14 @@ class Payment extends BaseModel {
     this.set('validatedAt', validatedAt);
   }
 
+  getReceiptS3Key() {
+    return this.get('receiptS3Key');
+  }
+
+  setReceiptS3Key(key) {
+    this.set('receiptS3Key', key);
+  }
+
   // =================
   // STATIC HELPERS
   // =================
@@ -235,6 +243,7 @@ class Payment extends BaseModel {
         ? `${registeredBy.get('firstName') || ''} ${registeredBy.get('lastName') || ''}`.trim()
         : '',
       validatedAt: payment.get('validatedAt') || null,
+      receiptS3Key: payment.get('receiptS3Key') || null,
       createdAt: payment.createdAt || null,
       updatedAt: payment.updatedAt || null,
     };

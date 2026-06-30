@@ -101,23 +101,63 @@ describe('PaymentService pure helpers', () => {
   });
 
   describe('sumPayments', () => {
-    it('sums into a global total and a per-service breakdown', () => {
+    it('sums every payment amount into a single global total', () => {
+      const rows = [
+        { amount: 100 },
+        { amount: 50 },
+        { amount: 200 },
+        { amount: 30 },
+      ];
+      expect(PaymentService.sumPayments(rows)).toBe(380);
+    });
+
+    it('ignores any per-service tag — all amounts count toward the grand total', () => {
       const rows = [
         { amount: 100, reservationServiceId: 'a' },
-        { amount: 50, reservationServiceId: 'a' },
-        { amount: 200, reservationServiceId: 'b' },
-        { amount: 30, reservationServiceId: null },
+        { amount: 50, reservationServiceId: null },
       ];
-      const { paidGlobal, paidByService } = PaymentService.sumPayments(rows);
-      expect(paidGlobal).toBe(380);
-      expect(paidByService.a).toBe(150);
-      expect(paidByService.b).toBe(200);
-      expect(paidByService).not.toHaveProperty('null');
+      expect(PaymentService.sumPayments(rows)).toBe(150);
+    });
+
+    it('rounds the total to cents', () => {
+      expect(PaymentService.sumPayments([{ amount: 33.333 }, { amount: 0.007 }])).toBe(33.34);
     });
 
     it('handles empty/invalid input', () => {
-      expect(PaymentService.sumPayments([])).toEqual({ paidGlobal: 0, paidByService: {} });
-      expect(PaymentService.sumPayments(null)).toEqual({ paidGlobal: 0, paidByService: {} });
+      expect(PaymentService.sumPayments([])).toBe(0);
+      expect(PaymentService.sumPayments(null)).toBe(0);
+    });
+  });
+
+  describe('buildSummary', () => {
+    const computed = {
+      totals: {
+        subtotal: 200, adjustments: 0, iva: 32, tip: 0, total: 232,
+      },
+      paidGlobal: 100,
+    };
+
+    it('reports the grand total, paid amount and remaining balance', () => {
+      const summary = PaymentService.buildSummary('r1', computed);
+      expect(summary.reservationId).toBe('r1');
+      expect(summary.total).toBe(232);
+      expect(summary.paidAmount).toBe(100);
+      expect(summary.balance).toBe(132); // total − paid
+      expect(summary.paymentStatus).toBe('partial');
+    });
+
+    it('does not expose a per-service breakdown', () => {
+      const summary = PaymentService.buildSummary('r1', computed);
+      expect(summary).not.toHaveProperty('services');
+    });
+
+    it('is paid when payments cover the total and allows overpay (negative balance)', () => {
+      const paid = PaymentService.buildSummary('r1', { totals: { total: 232 }, paidGlobal: 232 });
+      expect(paid.paymentStatus).toBe('paid');
+      expect(paid.balance).toBe(0);
+      const over = PaymentService.buildSummary('r1', { totals: { total: 232 }, paidGlobal: 300 });
+      expect(over.paymentStatus).toBe('paid');
+      expect(over.balance).toBe(-68);
     });
   });
 });

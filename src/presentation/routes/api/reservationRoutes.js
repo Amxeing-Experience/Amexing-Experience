@@ -157,6 +157,18 @@ router.delete(
 );
 
 /**
+ * POST /api/reservations/:id/payments/:paymentId/receipt — Upload/replace a payment receipt
+ * (admin/superadmin). Separate from create/update so a slow S3 upload never blocks the save.
+ */
+router.post(
+  '/:id/payments/:paymentId/receipt',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRole(['admin', 'superadmin']),
+  (req, res) => PaymentController.uploadReceipt(req, res)
+);
+
+/**
  * PATCH /api/reservations/:id/services/:serviceId/status — Update service status.
  */
 router.patch(

@@ -3,9 +3,10 @@
  *
  * Pure helpers (servicePrice/computeTotals/deriveStatus) compute the amount due
  * and payment status without touching Parse, so they are trivially unit-testable.
- * Recalculate() loads the reservation, its services and existing payments, then
- * writes the payment rollup (paidAmount/balance/paymentStatus) onto the
- * Reservation and each ReservationService.
+ * Recalculate() loads the reservation and its existing payments, then writes the
+ * payment rollup (paidAmount/balance/paymentStatus) onto the Reservation. Payments
+ * are plain money amounts applied against the grand total (balance = total − paid);
+ * there is no per-service payment split.
  *
  * The IVA math mirrors PublicReservationController.preparePublicReservationData
  * (subtotal by paymentType -> 16% IVA -> total) so there is a single source of
@@ -61,11 +62,12 @@ class PaymentService {
    * @param {Array<object>} serviceItems - Plain items { id, includeInTotal, pricesByType, total }.
    * @param {string} paymentType - Pricing tier (efectivo|transferencia|tarjeta).
    * @param {number} [reservationTip] - Reservation-level tip, added on top (no IVA).
-   * @returns {object} { subtotal, iva, servicesTotal, tip, total, perService }.
+   * @param {number} [adjustmentsNet] - Net reservation adjustments (charges − discounts, pre-IVA).
+   * @returns {object} { subtotal, adjustments, adjustedSubtotal, iva, servicesTotal, tip, total, perService }.
    * @example
    * PaymentService.computeTotals([{ id: 'a', pricesByType: { efectivo: 100 } }], 'efectivo')
    */
-  static computeTotals(serviceItems, paymentType, reservationTip = 0) {
+  static computeTotals(serviceItems, paymentType, reservationTip = 0, adjustmentsNet = 0) {
     const items = Array.isArray(serviceItems) ? serviceItems : [];
     const perService = {};
     let subtotal = 0;
@@ -80,13 +82,17 @@ class PaymentService {
     }
 
     subtotal = round2(subtotal);
-    const iva = round2(subtotal * IVA_RATE);
-    const servicesTotal = round2(subtotal + iva);
+    // Reservation-level adjustments (charges/discounts) apply to the pre-IVA subtotal, then IVA is
+    // computed on the adjusted subtotal — mirrors the "Total Final" the admin sees + IVA on top.
+    const adjustments = round2(Number(adjustmentsNet) || 0);
+    const adjustedSubtotal = round2(subtotal + adjustments);
+    const iva = round2(adjustedSubtotal * IVA_RATE);
+    const servicesTotal = round2(adjustedSubtotal + iva);
     const tip = round2(reservationTip);
     const total = round2(servicesTotal + tip);
 
     return {
-      subtotal, iva, servicesTotal, tip, total, perService,
+      subtotal, adjustments, adjustedSubtotal, iva, servicesTotal, tip, total, perService,
     };
   }
 
@@ -129,31 +135,25 @@ class PaymentService {
   }
 
   /**
-   * Sum payment rows into a global total and a per-service breakdown (MXN).
-   * @param {Array<object>} rows - Plain rows { amount, reservationServiceId }.
-   * @returns {object} { paidGlobal, paidByService }.
+   * Sum all payment amounts into the global paid total. Payments are plain money
+   * amounts applied against the reservation grand total (no per-service split).
+   * @param {Array<object>} rows - Plain rows { amount }.
+   * @returns {number} Total paid (MXN), rounded to cents.
    * @example
-   * PaymentService.sumPayments([{ amount: 100, reservationServiceId: 'a' }])
+   * PaymentService.sumPayments([{ amount: 100 }, { amount: 50 }]) // 150
    */
   static sumPayments(rows) {
     const list = Array.isArray(rows) ? rows : [];
-    const paidByService = {};
     let paidGlobal = 0;
-    for (const row of list) {
-      const amt = Number(row.amount) || 0;
-      paidGlobal += amt;
-      if (row.reservationServiceId) {
-        paidByService[row.reservationServiceId] = round2((paidByService[row.reservationServiceId] || 0) + amt);
-      }
-    }
-    return { paidGlobal: round2(paidGlobal), paidByService };
+    for (const row of list) paidGlobal += Number(row.amount) || 0;
+    return round2(paidGlobal);
   }
 
   /**
    * Load a reservation, its existing services and payments, and compute the
-   * totals + payment rollup (without persisting). Shared by summarize/recalculate.
+   * totals + global paid amount (without persisting). Shared by summarize/recalculate.
    * @param {string} reservationId - Reservation objectId.
-   * @returns {Promise<object>} { reservation, services, totals, paidGlobal, paidByService }.
+   * @returns {Promise<object>} { reservation, services, totals, paidGlobal }.
    * @example
    * const data = await PaymentService.loadAndCompute(reservationId);
    */
@@ -174,57 +174,44 @@ class PaymentService {
 
     const paymentType = reservation.get('paymentType') || 'efectivo';
     const reservationTip = reservation.get('tip') || 0;
-    const totals = this.computeTotals(this.toServiceItems(services), paymentType, reservationTip);
+    // Net reservation adjustments (charges add, discounts subtract) flow into the amount due.
+    const adjustmentsList = reservation.get('adjustments') || [];
+    const adjustmentsNet = adjustmentsList.reduce((sum, a) => {
+      const amt = Number(a && a.amount) || 0;
+      return a && a.type === 'discount' ? sum - amt : sum + amt;
+    }, 0);
+    const totals = this.computeTotals(this.toServiceItems(services), paymentType, reservationTip, adjustmentsNet);
 
-    const paymentRows = payments.map((payment) => {
-      const svcPtr = payment.get('reservationServicePtr');
-      return {
-        amount: payment.get('amount'),
-        reservationServiceId: svcPtr && svcPtr.id ? svcPtr.id : null,
-      };
-    });
-    const { paidGlobal, paidByService } = this.sumPayments(paymentRows);
+    const paidGlobal = this.sumPayments(payments.map((payment) => ({ amount: payment.get('amount') })));
 
     return {
-      reservation, services, totals, paidGlobal, paidByService,
+      reservation, services, totals, paidGlobal,
     };
   }
 
   /**
-   * Build the payment summary (global + per-service rollups) from computed data.
+   * Build the payment summary (grand-total rollup) from computed data. Payments are
+   * exact money amounts subtracted from the reservation total: balance = total − paid.
    * @param {string} reservationId - Reservation objectId.
-   * @param {object} computed - { totals, paidGlobal, paidByService, services }.
-   * @returns {object} Summary { paymentStatus, paidAmount, balance, total, ..., services[] }.
+   * @param {object} computed - { totals, paidGlobal }.
+   * @returns {object} Summary { paymentStatus, paidAmount, balance, subtotal, adjustments, iva, tip, total }.
    * @example
    * PaymentService.buildSummary(id, await PaymentService.loadAndCompute(id))
    */
   static buildSummary(reservationId, computed) {
-    const {
-      totals, paidGlobal, paidByService, services,
-    } = computed;
-
-    const perService = services.map((svc) => {
-      const total = totals.perService[svc.id] || 0;
-      const paidAmount = round2(paidByService[svc.id] || 0);
-      return {
-        id: svc.id,
-        total,
-        paidAmount,
-        balance: round2(total - paidAmount),
-        paymentStatus: this.deriveStatus(total, paidAmount),
-      };
-    });
+    const { totals, paidGlobal } = computed;
+    const paid = round2(paidGlobal);
 
     return {
       reservationId,
-      paymentStatus: this.deriveStatus(totals.total, paidGlobal),
-      paidAmount: paidGlobal,
-      balance: round2(totals.total - paidGlobal),
+      paymentStatus: this.deriveStatus(totals.total, paid),
+      paidAmount: paid,
+      balance: round2(totals.total - paid),
       subtotal: totals.subtotal,
+      adjustments: totals.adjustments,
       iva: totals.iva,
       tip: totals.tip,
       total: totals.total,
-      services: perService,
     };
   }
 
@@ -241,9 +228,10 @@ class PaymentService {
   }
 
   /**
-   * Recalculate and persist the payment rollup for a reservation and its services.
-   * Triggered on payment create/edit/delete. Does NOT touch recalculateTotal() or
-   * the operational status; paymentStatus is a separate field.
+   * Recalculate and persist the payment rollup for a reservation. Triggered on
+   * payment create/edit/delete. Payments subtract from the grand total, so only the
+   * Reservation carries the rollup (paidAmount/balance/paymentStatus); there is no
+   * per-service split. Does NOT touch recalculateTotal() or the operational status.
    * @param {string} reservationId - Reservation objectId.
    * @returns {Promise<object>} Payment summary.
    * @example
@@ -252,23 +240,14 @@ class PaymentService {
   static async recalculate(reservationId) {
     try {
       const computed = await this.loadAndCompute(reservationId);
-      const { reservation, services } = computed;
+      const { reservation } = computed;
       const summary = this.buildSummary(reservationId, computed);
 
       reservation.set('paidAmount', summary.paidAmount);
       reservation.set('balance', summary.balance);
       reservation.set('paymentStatus', summary.paymentStatus);
 
-      const byId = {};
-      for (const s of summary.services) byId[s.id] = s;
-      for (const svc of services) {
-        const s = byId[svc.id];
-        svc.set('paidAmount', s.paidAmount);
-        svc.set('balance', s.balance);
-        svc.set('paymentStatus', s.paymentStatus);
-      }
-
-      await Parse.Object.saveAll([reservation, ...services], { useMasterKey: true });
+      await reservation.save(null, { useMasterKey: true });
 
       logger.info('Reservation payment status recalculated', {
         reservationId,

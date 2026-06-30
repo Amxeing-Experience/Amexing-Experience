@@ -15,11 +15,25 @@ const logger = require('../../../infrastructure/logger');
 const Payment = require('../../../domain/models/Payment');
 const ExchangeRate = require('../../../domain/models/ExchangeRate');
 const PaymentService = require('../../services/PaymentService');
+const ClientProfileController = require('./ClientProfileController');
+const FileStorageService = require('../../services/FileStorageService');
+const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 
 // Supported currencies. Non-MXN amounts convert with the system USD/MXN rate.
 const CURRENCIES = ['MXN', 'USD'];
 const REFERENCE_MAX = 100;
 const NOTES_MAX = 300;
+// Upper bound for a single payment amount / tip — blocks absurd values (e.g. 1e19).
+const AMOUNT_MAX = 100000000; // 100,000,000
+
+// Payment receipt (proof of payment) — base64-in-JSON upload, same caps/MIME as client documents.
+// The (?!svg) excludes image/svg+xml: SVG can carry script that runs when the presigned URL opens.
+const RECEIPT_MAX_BYTES = 10 * 1024 * 1024; // 10MB
+const RECEIPT_MIME = /^(image\/(?!svg)|application\/pdf$)/;
+
+// Image variants go through the optimizer; PDFs use FileStorageService's direct S3 upload.
+const fileStorageService = new FileStorageService();
+const serverOptimizationService = new ServerImageOptimizationService();
 
 /**
  * PaymentController - CRUD for reservation payments.
@@ -81,12 +95,13 @@ class PaymentController {
       const payments = await Payment.getExistingForReservation(id);
       const summary = await PaymentService.summarize(id);
 
+      const data = await Promise.all(
+        payments.map((p) => PaymentController.formatPaymentWithReceipt(p))
+      );
+
       return res.json({
         success: true,
-        data: {
-          payments: payments.map((p) => Payment.formatPayment(p)),
-          summary,
-        },
+        data: { payments: data, summary },
       });
     } catch (error) {
       logger.error('Error listing payments', { error: error.message });
@@ -107,8 +122,19 @@ class PaymentController {
       const { id } = req.params;
       const {
         amount, currency, method, reference, notes, tip, paidAt,
-        reservationServiceId, paymentInfoId,
+        reservationServiceId, paymentInfoId, fileBase64, fileName, mimeType,
       } = req.body || {};
+
+      logger.info('[addPayment] DEBUG entry', {
+        reservationId: id,
+        amount,
+        currency,
+        method,
+        hasReceipt: !!fileBase64,
+        receiptBytes: fileBase64 ? fileBase64.length : 0,
+        reservationServiceId: reservationServiceId || null,
+        userId: req.user?.id,
+      });
 
       const validation = PaymentController.validatePaymentInput({
         amount, currency, method, tip,
@@ -154,6 +180,27 @@ class PaymentController {
       payment.set('exists', true);
       await payment.save(null, { useMasterKey: true });
 
+      // Optional proof-of-payment receipt — stored after the first save so the key carries payment.id.
+      // A bad file (400) rolls back the just-saved payment; a storage/network failure (e.g. S3
+      // unreachable) is NON-fatal — the payment is kept and a warning is returned so it isn't lost.
+      let receiptWarning = null;
+      if (fileBase64) {
+        try {
+          const s3Key = await PaymentController.storeReceiptFile(id, payment.id, {
+            fileBase64, fileName, mimeType,
+          });
+          payment.setReceiptS3Key(s3Key);
+          await payment.save(null, { useMasterKey: true });
+        } catch (receiptErr) {
+          if (receiptErr.status === 400) {
+            await payment.destroy({ useMasterKey: true }).catch(() => {});
+            return res.status(400).json({ success: false, error: receiptErr.message });
+          }
+          logger.warn('Payment saved but receipt upload failed', { paymentId: payment.id, error: receiptErr.message });
+          receiptWarning = 'El pago se registró, pero el comprobante no se pudo subir. Edita el pago para reintentarlo.';
+        }
+      }
+
       const summary = await PaymentService.recalculate(id);
 
       logger.info('Payment registered', {
@@ -166,8 +213,9 @@ class PaymentController {
 
       return res.json({
         success: true,
-        message: 'Pago registrado',
-        data: { payment: Payment.formatPayment(payment), summary },
+        message: receiptWarning || 'Pago registrado',
+        warning: receiptWarning,
+        data: { payment: await PaymentController.formatPaymentWithReceipt(payment), summary },
       });
     } catch (error) {
       logger.error('Error adding payment', { error: error.message, stack: error.stack });
@@ -188,6 +236,7 @@ class PaymentController {
       const { id, paymentId } = req.params;
       const {
         amount, currency, method, reference, notes, tip, paidAt, reservationServiceId,
+        fileBase64, fileName, mimeType,
       } = req.body || {};
 
       const reservation = await PaymentController.loadReservation(id);
@@ -229,6 +278,36 @@ class PaymentController {
         if (res.headersSent) return undefined;
       }
 
+      // Optional receipt replacement — store the new file, then best-effort delete the old one. A bad
+      // file (400) rejects; a storage/network failure (e.g. S3 unreachable) is NON-fatal: the field
+      // edits still save and the existing receipt is kept, with a warning returned.
+      let receiptWarning = null;
+      if (fileBase64) {
+        const oldKey = payment.getReceiptS3Key();
+        let newKey = null;
+        try {
+          newKey = await PaymentController.storeReceiptFile(id, payment.id, {
+            fileBase64, fileName, mimeType,
+          });
+        } catch (receiptErr) {
+          if (receiptErr.status === 400) {
+            return res.status(400).json({ success: false, error: receiptErr.message });
+          }
+          logger.warn('Payment updated but receipt upload failed', { paymentId: payment.id, error: receiptErr.message });
+          receiptWarning = 'El pago se actualizó, pero el comprobante no se pudo subir. Reintenta editando el pago.';
+        }
+        if (newKey) {
+          payment.setReceiptS3Key(newKey);
+          if (oldKey && oldKey !== newKey) {
+            try {
+              await fileStorageService.deleteFile(oldKey);
+            } catch (e) {
+              logger.warn('Failed to delete replaced receipt file from S3', { s3Key: oldKey, error: e.message });
+            }
+          }
+        }
+      }
+
       payment.set('modifiedBy', req.user);
       await payment.save(null, { useMasterKey: true });
 
@@ -238,8 +317,9 @@ class PaymentController {
 
       return res.json({
         success: true,
-        message: 'Pago actualizado',
-        data: { payment: Payment.formatPayment(payment), summary },
+        message: receiptWarning || 'Pago actualizado',
+        warning: receiptWarning,
+        data: { payment: await PaymentController.formatPaymentWithReceipt(payment), summary },
       });
     } catch (error) {
       logger.error('Error updating payment', { error: error.message, stack: error.stack });
@@ -269,7 +349,17 @@ class PaymentController {
         return res.status(404).json({ success: false, error: 'Pago no encontrado' });
       }
 
+      const receiptKey = payment.getReceiptS3Key();
       await payment.softDelete(req.userId);
+
+      // Best-effort cleanup of the stored receipt (the payment row is already soft-deleted).
+      if (receiptKey) {
+        try {
+          await fileStorageService.deleteFile(receiptKey);
+        } catch (e) {
+          logger.warn('Failed to delete receipt file from S3', { s3Key: receiptKey, error: e.message });
+        }
+      }
 
       const summary = await PaymentService.recalculate(id);
 
@@ -282,9 +372,146 @@ class PaymentController {
     }
   }
 
+  /**
+   * POST /api/reservations/:id/payments/:paymentId/receipt — Upload/replace a payment receipt.
+   * Decoupled from create/update so the (potentially slow) S3 upload never blocks or risks losing
+   * the payment save: the payment is already persisted, this only attaches the proof of payment.
+   * @param {object} req - Express request; body { fileBase64, fileName, mimeType }.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} JSON { success, data: { payment } }.
+   * @example
+   * POST /api/reservations/abc/payments/pay1/receipt { fileBase64, fileName, mimeType }
+   */
+  static async uploadReceipt(req, res) {
+    try {
+      const { id, paymentId } = req.params;
+      const { fileBase64, fileName, mimeType } = req.body || {};
+
+      const reservation = await PaymentController.loadReservation(id);
+      if (!reservation) {
+        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      }
+      const payment = await PaymentController.loadPayment(paymentId, reservation);
+      if (!payment) {
+        return res.status(404).json({ success: false, error: 'Pago no encontrado' });
+      }
+      if (!fileBase64) {
+        return res.status(400).json({ success: false, error: 'No se recibió ningún comprobante' });
+      }
+
+      const oldKey = payment.getReceiptS3Key();
+      let s3Key;
+      try {
+        s3Key = await PaymentController.storeReceiptFile(id, payment.id, { fileBase64, fileName, mimeType });
+      } catch (receiptErr) {
+        // 400 = bad file (rejected); anything else = storage/network failure → 502 so the client can retry.
+        const status = receiptErr.status === 400 ? 400 : 502;
+        logger.warn('Payment receipt upload failed', { paymentId: payment.id, error: receiptErr.message });
+        return res.status(status).json({ success: false, error: receiptErr.message || 'Error al subir el comprobante' });
+      }
+
+      payment.setReceiptS3Key(s3Key);
+      payment.set('modifiedBy', req.user);
+      await payment.save(null, { useMasterKey: true });
+
+      // Best-effort cleanup of a replaced receipt.
+      if (oldKey && oldKey !== s3Key) {
+        try {
+          await fileStorageService.deleteFile(oldKey);
+        } catch (e) {
+          logger.warn('Failed to delete replaced receipt file from S3', { s3Key: oldKey, error: e.message });
+        }
+      }
+
+      logger.info('Payment receipt uploaded', { reservationId: id, paymentId: payment.id, performedBy: req.userId });
+
+      return res.json({
+        success: true,
+        message: 'Comprobante subido',
+        data: { payment: await PaymentController.formatPaymentWithReceipt(payment) },
+      });
+    } catch (error) {
+      logger.error('Error uploading payment receipt', { error: error.message, stack: error.stack });
+      return res.status(500).json({ success: false, error: 'Error al subir el comprobante' });
+    }
+  }
+
   // =========================
   // HELPERS
   // =========================
+
+  /**
+   * Validate a base64 receipt payload and store it via the same S3 pipeline as the
+   * client documents (images → optimizer, PDFs → direct upload). Returns the s3Key.
+   * Throws an Error with `.status` 400 on bad input (the caller's catch turns it into a 400).
+   * @param {string} reservationId - Reservation objectId (S3 path segment).
+   * @param {string} paymentId - Payment objectId (key prefix).
+   * @param {object} file - { fileBase64, fileName, mimeType }.
+   * @param file.fileBase64
+   * @param file.fileName
+   * @param file.mimeType
+   * @returns {Promise<string>} The stored object's s3Key.
+   * @example
+   * const key = await PaymentController.storeReceiptFile(resId, payId, { fileBase64, fileName, mimeType });
+   */
+  static async storeReceiptFile(reservationId, paymentId, { fileBase64, fileName, mimeType }) {
+    const fail = (msg) => Object.assign(new Error(msg), { status: 400 });
+
+    if (!fileBase64) throw fail('No se recibió ningún archivo');
+    if (!mimeType || !RECEIPT_MIME.test(mimeType)) throw fail('Tipo de archivo no permitido. Solo imágenes o PDF.');
+    // Reject clearly-oversized payloads before allocating the Buffer (base64 is ~1.37× the bytes).
+    if (typeof fileBase64 !== 'string' || fileBase64.length > Math.ceil(RECEIPT_MAX_BYTES * 1.4)) {
+      throw fail('El archivo supera el límite de 10MB');
+    }
+
+    const buffer = Buffer.from(fileBase64, 'base64');
+    if (!buffer.length) throw fail('Archivo inválido');
+    if (buffer.length > RECEIPT_MAX_BYTES) throw fail('El archivo supera el límite de 10MB');
+    // The declared mimeType can lie; verify the real content by magic bytes (shared helper).
+    if (!ClientProfileController.contentMatchesMime(buffer, mimeType)) {
+      logger.warn('Rejected payment receipt with mismatched content', {
+        mimeType, first8Hex: buffer.slice(0, 8).toString('hex'), fileName,
+      });
+      throw fail('El archivo no es un PDF o imagen válido.');
+    }
+
+    const entityPath = `receipts/${reservationId}`;
+    const safeName = (fileName || 'comprobante').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const uniqueName = `receipt-${paymentId}-${Date.now()}-${safeName}`;
+
+    let s3Key;
+    if (mimeType.startsWith('image/')) {
+      const result = await serverOptimizationService.uploadOptimizedImage(
+        buffer,
+        uniqueName,
+        mimeType,
+        { entityPath, entityId: paymentId }
+      );
+      s3Key = result && result.originalS3Key;
+    } else {
+      const result = await fileStorageService.uploadFile(buffer, uniqueName, mimeType, {
+        entityId: entityPath,
+      });
+      s3Key = result && result.s3Key;
+    }
+    if (!s3Key) throw new Error('Error al subir el comprobante');
+    return s3Key;
+  }
+
+  /**
+   * Format a payment and resolve its presigned receipt URL from the stored s3Key.
+   * @param {Payment} payment - Payment object.
+   * @returns {Promise<object>} The formatted DTO with receiptS3Key and (when set) receiptUrl.
+   * @example
+   * const dto = await PaymentController.formatPaymentWithReceipt(payment);
+   */
+  static async formatPaymentWithReceipt(payment) {
+    const dto = Payment.formatPayment(payment);
+    if (dto.receiptS3Key) {
+      dto.receiptUrl = await fileStorageService.getPresignedUrl(dto.receiptS3Key);
+    }
+    return dto;
+  }
 
   /**
    * Load an existing payment that belongs to the reservation (null otherwise).
@@ -347,6 +574,9 @@ class PaymentController {
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
       return { error: 'El monto debe ser un número mayor a 0' };
     }
+    if (amountNum > AMOUNT_MAX) {
+      return { error: `El monto no puede exceder ${AMOUNT_MAX.toLocaleString('es-MX')}` };
+    }
     if (!Payment.isValidMethod(method)) {
       return { error: `Método inválido. Use: ${Payment.METHODS.join(', ')}` };
     }
@@ -357,6 +587,9 @@ class PaymentController {
     const tipNum = tip === undefined || tip === null || tip === '' ? 0 : Number(tip);
     if (!Number.isFinite(tipNum) || tipNum < 0) {
       return { error: 'La propina debe ser un número mayor o igual a 0' };
+    }
+    if (tipNum > AMOUNT_MAX) {
+      return { error: `La propina no puede exceder ${AMOUNT_MAX.toLocaleString('es-MX')}` };
     }
     return {
       amount: amountNum, currency: cur, method, tip: tipNum,
