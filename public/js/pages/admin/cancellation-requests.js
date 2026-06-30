@@ -407,9 +407,10 @@ function showRequestDetails(request) {
 function reviewRequest(requestId, action) {
     currentRequestId = requestId;
     currentAction = action;
-    
-    // First load the request details
-    viewRequest(requestId);
+
+    // Ir directo al diálogo de confirmación (con comentarios), sin pasar por el
+    // modal de detalle — para revisar primero está el botón "Ver".
+    showApprovalModal(action);
 }
 
 /**
@@ -436,9 +437,14 @@ function showApprovalModal(action) {
     confirmBtn.removeClass('btn-success btn-danger').addClass(isApproval ? 'btn-success' : 'btn-danger');
     confirmBtn.html(`<i class="ti ${isApproval ? 'ti-check' : 'ti-x'} me-2"></i>${isApproval ? 'Aprobar' : 'Rechazar'}`);
     
-    // Clear previous comments
+    // Clear previous comments and reflect that rejecting requires a comment.
     $('#adminComments').val('');
-    
+    if (isApproval) {
+        $('label[for="adminComments"]').text('Comentarios (opcional)');
+    } else {
+        $('label[for="adminComments"]').html('Comentarios <span class="text-danger">*</span> <small class="text-muted">(requerido para rechazar)</small>');
+    }
+
     $('#reviewModal').modal('hide');
     $('#approvalModal').modal('show');
 }
@@ -453,9 +459,19 @@ async function processReviewAction() {
     }
 
     const comments = $('#adminComments').val().trim();
+
+    // Rechazar requiere un comentario (lo valida también el backend); avisar aquí
+    // evita un viaje al servidor para fallar.
+    const isReject = currentAction === 'reject' || currentAction === 'rejected';
+    if (isReject && !comments) {
+        showAlert('Debes agregar un comentario para rechazar la solicitud', 'error');
+        $('#adminComments').focus();
+        return;
+    }
+
     const confirmBtn = $('#confirmActionBtn');
     const originalText = confirmBtn.html();
-    
+
     // Show loading state
     confirmBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>Procesando...');
     confirmBtn.prop('disabled', true);
