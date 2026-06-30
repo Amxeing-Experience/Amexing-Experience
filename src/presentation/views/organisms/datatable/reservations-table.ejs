@@ -476,9 +476,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         return getAgentUnifiedStatusBadge(row.quoteStatus, row.status) + pendingCancelBadge;
                     }
                     // Admin: estado de cotización + estado operativo de la reserva.
-                    const quoteBadge = getQuoteStatusBadge(row.quoteStatus);
+                    // Si la reserva ya está cancelada, se omite el badge de la cotización
+                    // (siempre sería "cancelled") para no duplicar con "Cancelada".
+                    const quoteBadge = row.status === 'cancelled' ? '' : getQuoteStatusBadge(row.quoteStatus);
                     const reservationBadge = getReservationStatusBadge(row.status);
-                    return `${quoteBadge} ${reservationBadge}${pendingCancelBadge}`;
+                    return `${quoteBadge} ${reservationBadge}${pendingCancelBadge}`.trim();
                 }
             },
             {
