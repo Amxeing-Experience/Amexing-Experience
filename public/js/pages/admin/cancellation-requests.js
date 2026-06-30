@@ -176,29 +176,31 @@ function initializeCancellationRequestsTable() {
                 orderable: false,
                 searchable: false,
                 render: function(data, type, row) {
+                    // CSP no permite handlers inline (onclick); se usan data-attrs +
+                    // delegación de eventos (ver listener tras inicializar la tabla).
                     let actions = `
-                        <button type="button" class="btn btn-sm btn-outline-primary me-1" 
-                                onclick="viewRequest('${row.id}')" 
+                        <button type="button" class="btn btn-sm btn-outline-primary me-1"
+                                data-action="view" data-id="${row.id}"
                                 title="Ver detalles">
                             <i class="ti ti-eye"></i>
                         </button>
                     `;
-                    
+
                     if (row.status === 'pending') {
                         actions += `
-                            <button type="button" class="btn btn-sm btn-outline-success me-1" 
-                                    onclick="reviewRequest('${row.id}', 'approve')" 
+                            <button type="button" class="btn btn-sm btn-outline-success me-1"
+                                    data-action="approve" data-id="${row.id}"
                                     title="Aprobar">
                                 <i class="ti ti-check"></i>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-danger" 
-                                    onclick="reviewRequest('${row.id}', 'reject')" 
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-action="reject" data-id="${row.id}"
                                     title="Rechazar">
                                 <i class="ti ti-x"></i>
                             </button>
                         `;
                     }
-                    
+
                     return actions;
                 }
             }
@@ -218,6 +220,19 @@ function initializeCancellationRequestsTable() {
  * Attach event listeners
  */
 function attachEventListeners() {
+    // Action buttons (Ver / Aprobar / Rechazar): delegación de eventos en el tbody
+    // en lugar de onclick inline, que la CSP bloquea (no hay 'unsafe-inline').
+    $('#cancellationRequestsTable tbody').on('click', 'button[data-action]', function() {
+        const id = this.getAttribute('data-id');
+        const action = this.getAttribute('data-action');
+        if (!id) return;
+        if (action === 'view') {
+            viewRequest(id);
+        } else if (action === 'approve' || action === 'reject') {
+            reviewRequest(id, action);
+        }
+    });
+
     // Filter change handlers
     $('input[name="statusFilter"], input[name="typeFilter"]').on('change', function() {
         cancellationRequestsTable.ajax.reload();
