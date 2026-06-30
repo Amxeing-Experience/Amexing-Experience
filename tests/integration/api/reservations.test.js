@@ -292,17 +292,9 @@ describe('Reservation Controller Integration Tests', () => {
         .put('/api/reservations/testReservationId/services/batch-assign')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          assignments: [
-            {
-              serviceId: 'service1',
-              employeeId: 'employee1',
-              vehicleId: 'vehicle1'
-            },
-            {
-              serviceId: 'service2',
-              employeeId: 'employee2'
-            }
-          ]
+          serviceIds: ['service1', 'service2'],
+          driverId: 'employee1',
+          vehicleId: 'vehicle1'
         });
 
       expect([200, 404]).toContain(response.status);
@@ -370,7 +362,7 @@ describe('Reservation Controller Integration Tests', () => {
         .post('/api/reservations/testReservationId/adjustments')
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
-          type: 'extra_charge',
+          type: 'charge',
           description: 'Late checkout fee',
           amount: 500,
           currency: 'MXN'
