@@ -436,6 +436,7 @@ function showApprovalModal(action) {
     const confirmBtn = $('#confirmActionBtn');
     confirmBtn.removeClass('btn-success btn-danger').addClass(isApproval ? 'btn-success' : 'btn-danger');
     confirmBtn.html(`<i class="ti ${isApproval ? 'ti-check' : 'ti-x'} me-2"></i>${isApproval ? 'Aprobar' : 'Rechazar'}`);
+    confirmBtn.prop('disabled', false);
     
     // Clear previous comments and reflect that rejecting requires a comment.
     $('#adminComments').val('');
@@ -505,11 +506,11 @@ async function processReviewAction() {
     } catch (error) {
         console.error('Error processing review:', error);
         showAlert(`Error: ${error.message}`, 'error');
-        
-        // Restore button state
+    } finally {
+        // Restaurar el botón SIEMPRE (éxito o error); antes solo se restauraba en el
+        // catch, así que tras aprobar/rechazar quedaba deshabilitado en "Procesando…".
         confirmBtn.html(originalText);
         confirmBtn.prop('disabled', false);
-    } finally {
         // Reset current values
         currentRequestId = null;
         currentAction = null;
