@@ -879,11 +879,13 @@ ItineraryBuilder.prototype.setNoRouteDurationWarning = function (show) {
 };
 
 ItineraryBuilder.prototype.updateVehicleCapacityNote = function () {
-    const noteEl = document.getElementById('vehicleCapacityNote');
-    const noteTextEl = document.getElementById('vehicleCapacityNoteText');
+    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+    // A-disposición usa su propio elemento de nota (el de transporte vive en transport-main-field).
+    const isADisp = serviceType === 'a-disposicion';
+    const noteEl = document.getElementById(isADisp ? 'aDisposicionVehicleCapacityNote' : 'vehicleCapacityNote');
+    const noteTextEl = document.getElementById(isADisp ? 'aDisposicionVehicleCapacityNoteText' : 'vehicleCapacityNoteText');
     if (!noteEl || !noteTextEl) return;
 
-    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
     const includeGuide = document.getElementById('includeGuide')?.checked;
     const includeGreeter = document.getElementById('includeGreeter')?.checked;
     const greeterInVehicle = document.getElementById('greeterInVehicle')?.checked;
@@ -908,6 +910,19 @@ ItineraryBuilder.prototype.updateVehicleCapacityNote = function () {
         seatsOccupied = 1;
         occupantLabel = 'El guía ocupa 1 lugar';
       } else if (includeGreeter && greeterInVehicle) {
+        seatsOccupied = 1;
+        occupantLabel = 'El greeter ocupa 1 lugar';
+      }
+    } else if (isADisp) {
+      // A-disposición: guía y greeter son mutuamente excluyentes. El guía siempre ocupa
+      // asiento; el greeter solo si "viaja en el vehículo".
+      const adGuide = document.getElementById('aDisposicionGuide')?.checked;
+      const adGreeter = document.getElementById('aDisposicionGreeter')?.checked;
+      const adGreeterInVehicle = document.getElementById('aDisposicionGreeterInVehicle')?.checked;
+      if (adGuide) {
+        seatsOccupied = 1;
+        occupantLabel = 'El guía ocupa 1 lugar';
+      } else if (adGreeter && adGreeterInVehicle) {
         seatsOccupied = 1;
         occupantLabel = 'El greeter ocupa 1 lugar';
       }
