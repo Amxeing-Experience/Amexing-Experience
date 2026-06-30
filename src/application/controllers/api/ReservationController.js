@@ -384,14 +384,16 @@ class ReservationController {
         const innerQuote = new Parse.Query('Quote');
         let has = false;
         if (type === 'client') {
+          // Clientes directos: ahora viven en quote.client (AmexingUser end_client) con
+          // clientType 'direct'. (Antes eran companyClientPtr → Client legado, ya migrado.)
           if (id) {
-            const ClientCls = Parse.Object.extend('Client');
-            const clientObj = new ClientCls();
-            clientObj.id = id;
-            innerQuote.equalTo('companyClientPtr', clientObj);
+            const UserCls = Parse.Object.extend('AmexingUser');
+            const userObj = new UserCls();
+            userObj.id = id;
+            innerQuote.equalTo('client', userObj);
+            innerQuote.equalTo('clientType', 'direct');
           } else {
-            innerQuote.exists('companyClientPtr');
-            innerQuote.doesNotExist('client');
+            innerQuote.equalTo('clientType', 'direct');
           }
           has = true;
         } else if (type === 'agency') {
@@ -401,7 +403,9 @@ class ReservationController {
             userObj.id = id;
             innerQuote.equalTo('client', userObj);
           } else {
+            // Agencia = tiene client (AmexingUser) y NO es directo.
             innerQuote.exists('client');
+            innerQuote.notEqualTo('clientType', 'direct');
           }
           has = true;
         }

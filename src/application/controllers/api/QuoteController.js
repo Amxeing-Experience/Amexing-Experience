@@ -611,15 +611,16 @@ class QuoteController {
       const applyQuoteClientFilter = (q) => {
         if (clientTypeFilter !== 'agency' && clientTypeFilter !== 'client') return;
         if (clientTypeFilter === 'client') {
+          // Clientes directos: ahora viven en quote.client (AmexingUser end_client) con
+          // clientType 'direct'. (Antes eran companyClientPtr → Client legado, ya migrado.)
           if (clientIdFilter) {
-            const ClientCls = Parse.Object.extend('Client');
-            const c = new ClientCls();
-            c.id = clientIdFilter;
-            q.equalTo('companyClientPtr', c);
+            const UserCls = Parse.Object.extend('AmexingUser');
+            const u = new UserCls();
+            u.id = clientIdFilter;
+            q.equalTo('client', u);
+            q.equalTo('clientType', 'direct');
           } else {
-            // Cliente directo: companyClientPtr existe y client no (la agencia tiene prioridad)
-            q.exists('companyClientPtr');
-            q.doesNotExist('client');
+            q.equalTo('clientType', 'direct');
           }
         } else if (clientIdFilter) {
           const UserCls = Parse.Object.extend('AmexingUser');
@@ -627,7 +628,9 @@ class QuoteController {
           u.id = clientIdFilter;
           q.equalTo('client', u);
         } else {
+          // Agencia = tiene client (AmexingUser) y NO es directo.
           q.exists('client');
+          q.notEqualTo('clientType', 'direct');
         }
       };
 
