@@ -214,6 +214,20 @@ class ClientPassport extends BaseModel {
   static validate(data) {
     const errors = [];
     if (!data.client && !data.ownerId) errors.push('Owner (client or user) is required');
+
+    // Shared date standard (utils/dateValidation): the issue date is past-only, the expiration may
+    // be in the future (that's the point), and expiration must be after issue when both are set.
+    const { validateDate } = require('../../application/utils/dateValidation');
+    const issueError = validateDate(data.dateOfIssue, { fieldName: 'Fecha de emisión', allowFuture: false });
+    if (issueError) errors.push(issueError);
+    const expError = validateDate(data.expirationDate, { fieldName: 'Fecha de expiración', allowFuture: true });
+    if (expError) errors.push(expError);
+
+    const issue = ClientPassport.toDate(data.dateOfIssue);
+    const expiration = ClientPassport.toDate(data.expirationDate);
+    if (issue && expiration && expiration <= issue) {
+      errors.push('La fecha de expiración debe ser posterior a la de emisión');
+    }
     return errors;
   }
 

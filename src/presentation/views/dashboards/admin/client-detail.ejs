@@ -321,6 +321,7 @@ const tarifarioTabs = [
                             <div class="col-md-6 mb-3"><label class="form-label text-muted small">Apellido</label><p class="fw-semibold mb-0"><%= clientData.lastName || 'N/A' %></p></div>
                             <div class="col-md-6 mb-3"><label class="form-label text-muted small">Email</label><p class="mb-0"><a href="mailto:<%= clientData.email %>"><i class="ti ti-mail me-1"></i><%= clientData.email %></a></p></div>
                             <div class="col-md-6 mb-3"><label class="form-label text-muted small">Teléfono</label><p class="mb-0"><% if (clientData.phone) { %><a href="tel:<%= clientData.phone %>"><i class="ti ti-phone me-1"></i><%= clientData.phone %></a><% } else { %>N/A<% } %></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Fecha de nacimiento</label><p class="mb-0"><% if (clientData.birthDate && !isNaN(new Date(clientData.birthDate))) { %><i class="ti ti-cake me-1"></i><%= new Date(clientData.birthDate).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }) %><% } else { %>N/A<% } %></p></div>
                         </div>
                     </div>
                     <div class="mb-4">
@@ -4271,7 +4272,9 @@ function setupExperienceFilters() {
                                     name: 'birthDate',
                                     label: 'Fecha de nacimiento',
                                     value: (clientData.birthDate && !isNaN(new Date(clientData.birthDate))) ? new Date(clientData.birthDate).toISOString().split('T')[0] : '',
-                                    required: false
+                                    required: false,
+                                    min: '1900-01-01',
+                                    max: new Date().toISOString().split('T')[0]
                                 }) %>
                             </div>
                         </div>

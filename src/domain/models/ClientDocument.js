@@ -24,12 +24,16 @@ const DOCUMENT_LABELS = [
   'Otro documento',
 ];
 
-// Labels that hold personally sensitive data → isSensitive=true.
+// Labels that hold personally sensitive data → isSensitive=true. Financial (Comprobante de pago:
+// CLABE/cuenta/tarjeta) and health-adjacent (Seguro de viaje: declaraciones médicas) documents carry
+// the same identity-theft/legal-sensitive-data risk as the identity docs already on this list.
 const SENSITIVE_LABELS = [
   'Identificación oficial (INE)',
   'Pasaporte',
   'Visa',
   'Datos fiscales (RFC)',
+  'Comprobante de pago',
+  'Seguro de viaje',
 ];
 
 /**

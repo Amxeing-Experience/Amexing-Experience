@@ -18,6 +18,7 @@ const PaymentService = require('../../services/PaymentService');
 const ClientProfileController = require('./ClientProfileController');
 const FileStorageService = require('../../services/FileStorageService');
 const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
+const { validateDate } = require('../../utils/dateValidation');
 
 // Supported currencies. Non-MXN amounts convert with the system USD/MXN rate.
 const CURRENCIES = ['MXN', 'USD'];
@@ -145,6 +146,10 @@ class PaymentController {
         }
       }
 
+      // Payment date — shared standard: future allowed (reservations later), 1900 .. today + 20y.
+      const paidAtError = validateDate(paidAt, { fieldName: 'Fecha de pago', allowFuture: true });
+      if (paidAtError) return res.status(400).json({ success: false, error: paidAtError });
+
       const { amountMXN, rate } = await PaymentController.toMXN(validation.amount, validation.currency);
 
       const payment = new Payment();
@@ -248,6 +253,12 @@ class PaymentController {
       });
       if (validation.error) {
         return res.status(400).json({ success: false, error: validation.error });
+      }
+
+      // Payment date — shared standard (future allowed). Only validated when a new value is sent.
+      if (paidAt !== undefined) {
+        const paidAtError = validateDate(paidAt, { fieldName: 'Fecha de pago', allowFuture: true });
+        if (paidAtError) return res.status(400).json({ success: false, error: paidAtError });
       }
 
       if (amount !== undefined || currency !== undefined) {

@@ -1774,6 +1774,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         const existing = paymentId ? paymentsCache.find((p) => p.id === paymentId) : null;
         const curr = existing?.origCurrency || 'MXN';
         const paidAt = existing?.paidAt ? new Date(existing.paidAt).toISOString().slice(0, 10) : '';
+        // Payment date allows the future (reservations later); shared standard 1900 .. today + 20y.
+        const paidAtMax = (() => { const dt = new Date(); dt.setFullYear(dt.getFullYear() + 20); return dt.toISOString().slice(0, 10); })();
         const opt = (v, label, sel) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${label}</option>`;
         const method = existing?.method || 'efectivo';
         const receiptLink = existing?.receiptUrl
@@ -1797,7 +1799,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
-                    <input type="date" class="form-control form-control-sm" id="paymentPaidAt" value="${paidAt}">
+                    <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}">
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentTip">Propina</label>
@@ -1821,8 +1823,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelPaymentBtn">Cancelar</button>
                 <button type="button" class="btn btn-sm btn-primary px-4" id="savePaymentBtn"><i class="ti ti-check me-1"></i>Guardar</button>
             </div>`;
-        wrap.style.display = '';
-        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        // Make the inline form obvious (it lives above the payments table): a clearly bordered panel
+        // centered in the viewport, so opening "Editar/Registrar pago" no longer desconcierta.
+        wrap.style.cssText = 'border:2px solid #0d6efd;border-radius:.5rem;padding:1rem 1.25rem;background:#f5f9ff';
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
         document.getElementById('cancelPaymentBtn').addEventListener('click', () => { wrap.style.display = 'none'; wrap.innerHTML = ''; });
         document.getElementById('savePaymentBtn').addEventListener('click', () => savePayment(existing ? existing.id : ''));
         attachThousands(document.getElementById('paymentAmount'));

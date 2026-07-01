@@ -250,6 +250,10 @@ window.initProfileSection = function (root) {
     }
 
     function dateInput(v) { return v ? new Date(v).toISOString().slice(0, 10) : ''; }
+    // Shared date standard (mirrors server utils/dateValidation): issue = past-only, expiry = future-ok.
+    const DATE_MIN = '1900-01-01';
+    const DATE_MAX_TODAY = new Date().toISOString().slice(0, 10);
+    const DATE_MAX_FUTURE = (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 20); return d.toISOString().slice(0, 10); })();
 
     function passportForm(p = {}) {
         return `
@@ -258,8 +262,8 @@ window.initProfileSection = function (root) {
                 <div class="col-md-6"><label class="form-label small">Passport Number</label><input class="form-control" data-f="number" maxlength="${FIELD_LIMITS.passportNumber}" placeholder="${p.hasNumber ? 'Dejar vacío para conservar' : ''}"></div>
                 <div class="col-md-6"><label class="form-label small">Country of Issue</label>${countrySelect('countryOfIssue', p.countryOfIssue)}</div>
                 <div class="col-md-6"><label class="form-label small">Nationality</label>${nationalitySelect('nationality', p.nationality)}</div>
-                <div class="col-md-6"><label class="form-label small">Date of Issue</label><input type="date" class="form-control" data-f="dateOfIssue" value="${dateInput(p.dateOfIssue)}"></div>
-                <div class="col-md-6"><label class="form-label small">Expiration Date</label><input type="date" class="form-control" data-f="expirationDate" value="${dateInput(p.expirationDate)}"></div>
+                <div class="col-md-6"><label class="form-label small">Date of Issue</label><input type="date" class="form-control" data-f="dateOfIssue" min="${DATE_MIN}" max="${DATE_MAX_TODAY}" value="${dateInput(p.dateOfIssue)}"></div>
+                <div class="col-md-6"><label class="form-label small">Expiration Date</label><input type="date" class="form-control" data-f="expirationDate" min="${DATE_MIN}" max="${DATE_MAX_FUTURE}" value="${dateInput(p.expirationDate)}"></div>
                 <div class="col-12"><label class="form-label small">Copia del Pasaporte (foto o PDF)</label><input type="file" class="form-control" data-f-file="passportDocument" accept="image/*,application/pdf">${p.passportDocument ? ` <a href="${esc(p.passportDocument)}" target="_blank" class="small d-inline-block mt-1"><i class="ti ti-file me-1"></i>Ver documento actual</a>` : ''}</div>
                 <div class="col-12 form-check ms-1 mt-1"><input class="form-check-input" type="checkbox" data-f="verified" id="ppVerified" ${p.verified ? 'checked' : ''}><label class="form-check-label small" for="ppVerified">Documento verificado (es un pasaporte válido)</label></div>
             </div>`;

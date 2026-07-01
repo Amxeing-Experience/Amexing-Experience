@@ -502,6 +502,15 @@ class ClientProfileController {
       await this.validateOwnerExists(owner);
       const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
 
+      // Validate incoming date changes against the shared standard, merging with the stored values so
+      // the expiry-after-issue check still holds when only one of the two dates is edited.
+      const dateErrors = ClientPassport.validate({
+        ownerId: owner.ownerId,
+        dateOfIssue: req.body.dateOfIssue !== undefined ? req.body.dateOfIssue : passport.getDateOfIssue(),
+        expirationDate: req.body.expirationDate !== undefined ? req.body.expirationDate : passport.getExpirationDate(),
+      });
+      if (dateErrors.length) return this.sendError(res, dateErrors.join(', '), 400);
+
       const setters = {
         label: 'setLabel',
         countryOfIssue: 'setCountryOfIssue',
