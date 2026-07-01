@@ -524,8 +524,6 @@ class ClientsController {
    */
   buildEndClientQuery({ isCategoryTab, type, includeInactive }) {
     const Parse = require('parse/node');
-    // TEMP: hidden per direction; empty this array to re-activate these client types.
-    const HIDDEN_CATEGORIES = ['wedding_planner', 'concierge', 'home_owner'];
     const query = new Parse.Query('AmexingUser');
     query.equalTo('role', 'end_client');
     query.equalTo('exists', true);
@@ -533,10 +531,13 @@ class ClientsController {
     // (owned-clients) y NO deben aparecer en el listado/picker de clientes directos Amexing.
     query.notEqualTo('clientCategory', 'agency_client');
     if (isCategoryTab) {
+      // Tab de categoría específica (wedding_planner/concierge/home_owner/direct_client).
       query.equalTo('clientCategory', type);
-    } else if (HIDDEN_CATEGORIES.length) {
-      query.notContainedIn('clientCategory', HIDDEN_CATEGORIES);
+    } else if (type === 'clients') {
+      // Tab "Clientes Directos" = solo direct_client; cada categoría especial tiene su tab.
+      query.equalTo('clientCategory', 'direct_client');
     }
+    // type === 'all' → sin filtro de categoría (todas las personas), agency_client ya excluido.
     if (!includeInactive) {
       query.equalTo('active', true);
     }
