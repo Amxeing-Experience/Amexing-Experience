@@ -1165,13 +1165,15 @@ class ClientsController {
    */
   /**
    * Base query for an agency's sub-clients (AmexingUser end_client, clientCategory
-   * 'agency_client') scoped to the owning agency via organizationId.
+   * 'agency_client') scoped to the owning agency via organizationId. When createdById
+   * is given (agente), se restringe además a los clientes que ese usuario dio de alta.
    * @param {string} agencyId - The owning agency id (department_manager objectId).
+   * @param {string} [createdById] - Optional creator id to scope to (an agent's own clients).
    * @returns {Parse.Query} A configured, active/exists AmexingUser query.
    * @example
    * const q = this.buildAgencySubClientQuery(agencyId);
    */
-  buildAgencySubClientQuery(agencyId) {
+  buildAgencySubClientQuery(agencyId, createdById = null) {
     const Parse = require('parse/node');
     const q = new Parse.Query('AmexingUser');
     q.equalTo('role', 'end_client');
@@ -1179,6 +1181,12 @@ class ClientsController {
     q.equalTo('organizationId', agencyId);
     q.equalTo('active', true);
     q.equalTo('exists', true);
+    // Un agente (role 'client') solo ve SUS clientes (createdBy, guardado como pointer).
+    if (createdById) {
+      const ptr = new (Parse.Object.extend('AmexingUser'))();
+      ptr.id = createdById;
+      q.equalTo('createdBy', ptr);
+    }
     return q;
   }
 
@@ -1232,17 +1240,20 @@ class ClientsController {
 
       // Sub-clients de una agencia: ahora viven en AmexingUser (role 'end_client',
       // clientCategory 'agency_client') con organizationId = id de la agencia (clientId).
+      // Un agente (role 'client') solo ve SUS clientes (createdBy); DM/admin ven todos.
       const Parse = require('parse/node');
+      const requesterRole = req.userRole || (currentUser.get && currentUser.get('role'));
+      const scopeCreatedBy = requesterRole === 'client' ? currentUser.id : null;
 
       let finalQuery;
       if (searchTerm) {
         finalQuery = Parse.Query.or(
-          this.buildAgencySubClientQuery(clientId).matches('firstName', searchTerm, 'i'),
-          this.buildAgencySubClientQuery(clientId).matches('lastName', searchTerm, 'i'),
-          this.buildAgencySubClientQuery(clientId).matches('email', searchTerm, 'i')
+          this.buildAgencySubClientQuery(clientId, scopeCreatedBy).matches('firstName', searchTerm, 'i'),
+          this.buildAgencySubClientQuery(clientId, scopeCreatedBy).matches('lastName', searchTerm, 'i'),
+          this.buildAgencySubClientQuery(clientId, scopeCreatedBy).matches('email', searchTerm, 'i')
         );
       } else {
-        finalQuery = this.buildAgencySubClientQuery(clientId);
+        finalQuery = this.buildAgencySubClientQuery(clientId, scopeCreatedBy);
       }
 
       const totalCount = await finalQuery.count({ useMasterKey: true });
