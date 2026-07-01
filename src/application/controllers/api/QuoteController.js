@@ -623,6 +623,12 @@ class QuoteController {
             q.equalTo('client', u);
             q.equalTo('clientType', 'direct');
           } else {
+            // 'Cliente' sin id: solo clientes DIRECTOS reales (clientCategory
+            // 'direct_client'), no las categorías especiales (home_owner/
+            // wedding_planner/concierge), que se filtran por su propia categoría.
+            const innerClient = new Parse.Query('AmexingUser');
+            innerClient.equalTo('clientCategory', 'direct_client');
+            q.matchesQuery('client', innerClient);
             q.equalTo('clientType', 'direct');
           }
         } else if (clientIdFilter) {
