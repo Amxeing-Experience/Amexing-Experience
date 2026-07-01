@@ -598,13 +598,24 @@ class QuoteController {
       // Agency/Client filter (molecule client-agency-filter). On quotes the link is
       // direct: 'agency' → quote.client (AmexingUser); 'client' → quote.companyClientPtr (Client).
       // Empty type = no filter; with type but no id, filter by type. With id, by entity.
-      const clientTypeFilter = req.query.clientTypeFilter || ''; // '', 'agency', 'client'
+      // '', 'agency', 'client', o una categoría de persona (wedding_planner/concierge/home_owner)
+      const clientTypeFilter = req.query.clientTypeFilter || '';
       const clientIdFilter = req.query.clientIdFilter || '';
+      // Mapea el tipo de filtro de persona → clientCategory en AmexingUser.
+      // 'client' = clientes directos; las categorías especiales usan su propio nombre.
+      const PERSON_CATEGORY_BY_FILTER = {
+        client: 'direct_client',
+        wedding_planner: 'wedding_planner',
+        concierge: 'concierge',
+        home_owner: 'home_owner',
+      };
       /**
        * Apply the agency/client filter to a quotes query based on the request's
        * clientTypeFilter and clientIdFilter. For 'agency' it filters on the
-       * AmexingUser pointer (quote.client); for 'client' it filters on the Client
-       * pointer (quote.companyClientPtr). With no ID, filters by type presence.
+       * AmexingUser pointer (quote.client, clientType != 'direct'); for 'client'
+       * and the specialty person categories (wedding_planner/concierge/home_owner)
+       * it filters on quote.client (AmexingUser end_client, clientType 'direct')
+       * scoped by clientCategory. With no ID, filters by type/category presence.
        * Mutates the query in place; no-op when no valid type filter is set.
        * @param {Parse.Query} q - The quotes query to constrain.
        * @returns {void}
@@ -612,9 +623,11 @@ class QuoteController {
        *   applyQuoteClientFilter(query); // narrows query to the selected agency/client
        */
       const applyQuoteClientFilter = (q) => {
-        if (clientTypeFilter !== 'agency' && clientTypeFilter !== 'client') return;
-        if (clientTypeFilter === 'client') {
-          // Clientes directos: ahora viven en quote.client (AmexingUser end_client) con
+        const personCategory = PERSON_CATEGORY_BY_FILTER[clientTypeFilter];
+        if (clientTypeFilter !== 'agency' && !personCategory) return;
+        if (personCategory) {
+          // Clientes directos y categorías especiales (wedding_planner/concierge/
+          // home_owner): viven en quote.client (AmexingUser end_client) con
           // clientType 'direct'. (Antes eran companyClientPtr → Client legado, ya migrado.)
           if (clientIdFilter) {
             const UserCls = Parse.Object.extend('AmexingUser');
@@ -623,11 +636,10 @@ class QuoteController {
             q.equalTo('client', u);
             q.equalTo('clientType', 'direct');
           } else {
-            // 'Cliente' sin id: solo clientes DIRECTOS reales (clientCategory
-            // 'direct_client'), no las categorías especiales (home_owner/
-            // wedding_planner/concierge), que se filtran por su propia categoría.
+            // Sin id: acota a la categoría seleccionada (direct_client / wedding_planner
+            // / concierge / home_owner) vía subquery sobre el pointer client.
             const innerClient = new Parse.Query('AmexingUser');
-            innerClient.equalTo('clientCategory', 'direct_client');
+            innerClient.equalTo('clientCategory', personCategory);
             q.matchesQuery('client', innerClient);
             q.equalTo('clientType', 'direct');
           }

@@ -233,7 +233,8 @@ class ReservationController {
 
       // Agency/Client filter (molecule client-agency-filter). Empty type = no filter;
       // 'agency'/'client' filter by type (even without a specific entity).
-      const clientTypeFilter = req.query.clientTypeFilter || ''; // '', 'agency', 'client'
+      // '', 'agency', 'client', o categoría de persona (wedding_planner/concierge/home_owner)
+      const clientTypeFilter = req.query.clientTypeFilter || '';
       const clientIdFilter = req.query.clientIdFilter || '';
 
       // Get role-based filter pointers (null = no filter for admins)
@@ -363,7 +364,7 @@ class ReservationController {
        * without id → any direct-client reservation (companyClientPtr exists and
        * client doesn't, to match the display where agency takes priority).
        * @param {Parse.Query} q - Reservation query to constrain.
-       * @param {string} type - '' | 'agency' | 'client'.
+       * @param {string} type - '' | 'agency' | 'client' | 'wedding_planner' | 'concierge' | 'home_owner'.
        * @param {string} id - ObjectId of the agency (AmexingUser) or Client (optional).
        * @returns {void}
        * @example
@@ -373,7 +374,7 @@ class ReservationController {
        * molecule filter with the quote-status (hold) filter in a SINGLE inner Quote
        * query + one matchesQuery, so the two don't overwrite each other on `quotePtr`.
        * @param {Parse.Query} q - Reservation query to constrain.
-       * @param {string} type - '' | 'agency' | 'client'.
+       * @param {string} type - '' | 'agency' | 'client' | 'wedding_planner' | 'concierge' | 'home_owner'.
        * @param {string} id - ObjectId of the agency (AmexingUser) or Client (optional).
        * @param {string|null} holdFilter - 'only' = solo cotización en hold; 'exclude' = saca las hold; null = sin filtro de estado.
        * @returns {void}
@@ -381,11 +382,21 @@ class ReservationController {
        *   applyQuoteConstraint(query, 'agency', 'abc', 'exclude');
        */
       const applyQuoteConstraint = (q, type, id, holdFilter) => {
+        // Mapea el tipo de filtro de persona → clientCategory. 'client' = directos;
+        // las categorías especiales usan su propio nombre.
+        const PERSON_CATEGORY_BY_FILTER = {
+          client: 'direct_client',
+          wedding_planner: 'wedding_planner',
+          concierge: 'concierge',
+          home_owner: 'home_owner',
+        };
+        const personCategory = PERSON_CATEGORY_BY_FILTER[type];
         const innerQuote = new Parse.Query('Quote');
         let has = false;
-        if (type === 'client') {
-          // Clientes directos: ahora viven en quote.client (AmexingUser end_client) con
-          // clientType 'direct'. (Antes eran companyClientPtr → Client legado, ya migrado.)
+        if (personCategory) {
+          // Clientes directos y categorías especiales (wedding_planner/concierge/
+          // home_owner): viven en quote.client (AmexingUser end_client) con clientType
+          // 'direct'. (Antes eran companyClientPtr → Client legado, ya migrado.)
           if (id) {
             const UserCls = Parse.Object.extend('AmexingUser');
             const userObj = new UserCls();
@@ -393,11 +404,10 @@ class ReservationController {
             innerQuote.equalTo('client', userObj);
             innerQuote.equalTo('clientType', 'direct');
           } else {
-            // 'Cliente' sin id: solo clientes DIRECTOS reales (clientCategory
-            // 'direct_client'), no categorías especiales (home_owner/wedding_planner/
-            // concierge), que se filtran por su propia categoría.
+            // Sin id: acota a la categoría seleccionada (direct_client / wedding_planner
+            // / concierge / home_owner) vía subquery sobre el pointer client.
             const innerClient = new Parse.Query('AmexingUser');
-            innerClient.equalTo('clientCategory', 'direct_client');
+            innerClient.equalTo('clientCategory', personCategory);
             innerQuote.matchesQuery('client', innerClient);
             innerQuote.equalTo('clientType', 'direct');
           }

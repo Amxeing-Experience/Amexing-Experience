@@ -383,11 +383,9 @@ const currentPath = '/dashboard/admin/clients';
                                     <label class="form-label" for="directClientCategory">Tipo de Cliente</label>
                                     <select class="form-select" id="directClientCategory" name="clientCategory">
                                         <option value="direct_client" selected>Cliente Directo</option>
-                                        <!-- TEMP: hidden per direction — uncomment to re-activate these client types
                                         <option value="wedding_planner">Wedding Planner</option>
                                         <option value="concierge">Concierge</option>
                                         <option value="home_owner">Home Owner</option>
-                                        -->
                                     </select>
                                 </div>
                             </div>
@@ -1249,6 +1247,9 @@ const currentPath = '/dashboard/admin/clients';
                 console.log('Client form validation passed');
 
                 const formData = {
+                    // Tipo de cliente directo (direct_client | wedding_planner | concierge | home_owner)
+                    clientCategory: document.getElementById('directClientCategory').value || undefined,
+
                     // Basic information
                     firstName: document.getElementById('directClientFirstName').value.trim(),
                     lastName: document.getElementById('directClientLastName').value.trim(),
