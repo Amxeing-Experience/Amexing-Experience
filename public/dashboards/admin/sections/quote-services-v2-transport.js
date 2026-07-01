@@ -552,6 +552,13 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                                     </span>
                                 </div>
                             ` : ''}
+                            ${service.priceePending ? `
+                                <div class="mt-1">
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="ti ti-alert-triangle me-1"></i>Precio pendiente
+                                    </span>
+                                </div>
+                            ` : ''}
                             <!-- Notes Section -->
                             ${service.notes ? `
                                 <div class="service-notes mt-1 text-muted small d-flex align-items-start">

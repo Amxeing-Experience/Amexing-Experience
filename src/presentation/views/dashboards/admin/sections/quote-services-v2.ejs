@@ -101,6 +101,11 @@
                             <span class="fw-bold">Total:</span>
                             <span class="fw-bold fs-5 text-primary" id="totalAmount">$0.00</span>
                         </div>
+                        <!-- Aviso: servicios con "precio pendiente" (transporte sin precio de catálogo).
+                             Cuentan como $0 en el total hasta que el admin defina el precio. Parte D. -->
+                        <div class="alert alert-warning py-2 px-3 mb-3 d-none" id="pendingPriceTotalNotice" role="alert">
+                            <i class="ti ti-alert-triangle me-1"></i><span id="pendingPriceTotalNoticeText"></span>
+                        </div>
                         <div class="bg-light rounded p-2">
                             <div class="d-flex justify-content-between align-items-center">
                                 <small class="text-muted">Por persona:</small>
