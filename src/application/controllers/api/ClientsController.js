@@ -529,6 +529,9 @@ class ClientsController {
     const query = new Parse.Query('AmexingUser');
     query.equalTo('role', 'end_client');
     query.equalTo('exists', true);
+    // Los clientes de agencia (clientCategory 'agency_client') se gestionan aparte
+    // (owned-clients) y NO deben aparecer en el listado/picker de clientes directos Amexing.
+    query.notEqualTo('clientCategory', 'agency_client');
     if (isCategoryTab) {
       query.equalTo('clientCategory', type);
     } else if (HIDDEN_CATEGORIES.length) {
@@ -1057,12 +1060,16 @@ class ClientsController {
         query.equalTo('role', 'end_client');
         query.equalTo('active', true);
         query.equalTo('exists', true);
+        // Excluir clientes de agencia del picker de directos Amexing.
+        query.notEqualTo('clientCategory', 'agency_client');
       } else {
         // Create basic query without search
         query = new Parse.Query(AmexingUserClass);
         query.equalTo('role', 'end_client');
         query.equalTo('active', true);
         query.equalTo('exists', true);
+        // Excluir clientes de agencia del picker de directos Amexing.
+        query.notEqualTo('clientCategory', 'agency_client');
       }
 
       if (filterByCategory) {
