@@ -28,50 +28,43 @@ router.get('/', authenticateToken, async (req, res) => {
       });
     }
 
+    // clientPtr apunta a AmexingUser (NO ClientCompanies). Antes usaba la clase equivocada, así que
+    // la consulta SIEMPRE devolvía 0 → los ClientPrices nunca cargaban en el front (tours).
+    const AmexingUser = Parse.Object.extend('AmexingUser');
+    const clientPointer = new AmexingUser();
+    clientPointer.id = clientId;
+
     const query = new Parse.Query('ClientPrices');
-    query.equalTo('clientPtr', {
-      __type: 'Pointer',
-      className: 'ClientCompanies',
-      objectId: clientId,
-    });
+    query.equalTo('clientPtr', clientPointer);
 
     if (itemType) {
       query.equalTo('itemType', itemType);
     }
 
-    query.doesNotExist('valid_until'); // Only active prices
-    query.include('itemPtr');
+    query.equalTo('active', true);
+    query.equalTo('exists', true);
+    query.doesNotExist('valid_until'); // Only active (non-historical) prices
     query.include('ratePtr');
     query.include('vehiclePtr');
     query.limit(10000);
 
     const clientPrices = await query.find({ useMasterKey: true });
 
-    const result = clientPrices.map((cp) => {
-      const vehiclePtr = cp.get('vehiclePtr');
-      let vehicleName = null;
-
-      // Handle vehiclePtr as either string or pointer
-      if (vehiclePtr) {
-        if (typeof vehiclePtr === 'string') {
-          vehicleName = vehiclePtr;
-        } else if (typeof vehiclePtr === 'object') {
-          // If it's a pointer, get the name or type field
-          vehicleName = vehiclePtr.get?.('name') || vehiclePtr.get?.('type') || vehiclePtr.id || vehiclePtr;
-        }
-      }
-
-      return {
-        id: cp.id,
-        itemPtr: cp.get('itemPtr')?.id,
-        ratePtr: cp.get('ratePtr')?.id,
-        vehiclePtr: vehicleName,
-        price: cp.get('price'),
-        valid_until: cp.get('valid_until'),
-        clientPtr: clientId,
-        itemType: cp.get('itemType'),
-      };
-    });
+    const result = clientPrices.map((cp) => ({
+      id: cp.id,
+      // itemPtr = id del item (tour). El campo real es `itemId` (string), NO un pointer `itemPtr`.
+      // El front lo usa como tourId. Antes leía cp.get('itemPtr')?.id → undefined → se descartaba.
+      itemPtr: cp.get('itemId'),
+      ratePtr: cp.get('ratePtr')?.id,
+      // vehiclePtr = id del VehicleType (el front compara contra el id del vehículo del dropdown).
+      // Antes devolvía el nombre, que no matcheaba con el id del vehículo seleccionado.
+      vehiclePtr: cp.get('vehiclePtr')?.id,
+      // El campo de precio es `precio`. Antes leía `price` (inexistente) → undefined.
+      price: cp.get('precio'),
+      valid_until: cp.get('valid_until'),
+      clientPtr: clientId,
+      itemType: cp.get('itemType'),
+    }));
 
     res.json({
       success: true,

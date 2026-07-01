@@ -954,28 +954,24 @@ ItineraryBuilder.prototype.handleConceptoScheduleToggle = function (hasSchedule)
 };
 
 ItineraryBuilder.prototype.extractVehicleTypesFromPrices = function (tourPrices, clientPrices) {
-    const vehicleTypesMap = new Map(); // Use Map to store unique vehicleTypeId -> vehicleTypeName
+    // Devuelve NOMBRES de vehículo únicos. Los precios de tour identifican el vehículo por nombre
+    // ("SEDAN") y los client prices por id (vehiclePtr, p. ej. "dehZQoFrDL"); antes no se fusionaban
+    // → el dropdown mostraba el objectId y duplicaba la opción. Resolvemos el id del client price a
+    // su nombre (vía vehicleTypesMap) para que ambos coincidan y quede UNA sola opción por vehículo.
+    const names = new Set();
 
-    // Add vehicle types from tour prices
     tourPrices.forEach((price) => {
-      const { vehicleType } = price;
-      const vehicleTypeId = price.vehicleTypeId || price.vehicleType; // fallback to vehicleType if no ID
-
-      if (vehicleType) {
-        vehicleTypesMap.set(vehicleTypeId, vehicleType);
-      }
+      if (price.vehicleType) names.add(price.vehicleType);
     });
 
-    // Add vehicle types from client prices
     clientPrices.forEach((price) => {
-      const vehicleType = price.vehiclePtr;
-      // For client prices, vehiclePtr is the vehicle type name/ID
-      if (vehicleType) {
-        vehicleTypesMap.set(vehicleType, vehicleType);
-      }
+      const raw = price.vehiclePtr;
+      if (!raw) return;
+      const name = this.getVehicleTypeInfo(raw)?.name || raw;
+      names.add(name);
     });
 
-    return Array.from(vehicleTypesMap.values());
+    return Array.from(names);
 };
 
 ItineraryBuilder.prototype.reconcileBreakdownItemsToTotal = function (items, total) {

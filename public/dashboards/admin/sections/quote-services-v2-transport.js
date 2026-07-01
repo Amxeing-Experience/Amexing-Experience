@@ -983,7 +983,8 @@ ItineraryBuilder.prototype.populateTransportVehicleDropdown = function (vehicles
 
       const pax = vehicle.capacity || 0;
       const trunk = vehicle.trunkCapacity || 0;
-      const clientIndicator = vehicle.isClientPrice ? ' *' : '';
+      // El asterisco (precio de cliente) SOLO lo ven admin/superadmin.
+      const clientIndicator = (vehicle.isClientPrice && this.canEditPrices) ? ' *' : '';
       option.textContent = `${vehicle.vehicleType} - ${pax} pax, ${trunk} carry-on${clientIndicator}`;
 
       vehicleSelect.appendChild(option);

@@ -205,7 +205,7 @@ class ItineraryBuilder {
   getClientId() {
     // Try to get client ID from the quote information section
     const clientIdInput = document.getElementById('clientId');
-    if (clientIdInput) {
+    if (clientIdInput && clientIdInput.value) {
       return clientIdInput.value;
     }
 
@@ -213,13 +213,17 @@ class ItineraryBuilder {
     try {
       const clientTS = document.querySelector('#clientId.tomselect');
       if (clientTS && clientTS.tomselect) {
-        return clientTS.tomselect.getValue();
+        const tsValue = clientTS.tomselect.getValue();
+        if (tsValue) return tsValue;
       }
     } catch (error) {
       console.debug('TomSelect not available for client ID');
     }
 
-    return null;
+    // Fallback: la sección Servicios NO renderiza el dropdown #clientId (solo la sección
+    // Información). Usamos el clientId del quote, que loadQuoteData setea desde data.client.id.
+    // Sin esto, this.clientId quedaba null y los ClientPrices (tours/transporte) nunca cargaban.
+    return this.clientId || null;
   }
 
   /**
@@ -292,13 +296,15 @@ class ItineraryBuilder {
       }
 
       // Load all data concurrently for better performance
+      // NOTA: loadAllClientPrices() se movió a DESPUÉS de `await quoteReady` porque depende de
+      // this.clientId, que se setea al cargar el quote. Aquí (antes del quote) clientId es null y
+      // la carga salía vacía → los ClientPrices nunca se poblaban.
       await Promise.all([
         this.loadVehicles(),
         this.loadAllRates(),
         this.loadAllExperiences(),
         this.loadAllTours(),
         this.loadAllTourPrices(),
-        this.loadAllClientPrices(),
         this.loadVehicleTypes(),
         this.loadProviderExperiences(),
         this.loadDriverTourRate(),
@@ -321,9 +327,14 @@ class ItineraryBuilder {
         this.renderItinerary(); // Re-render services now that rates are available
       }
 
-      // Load client-specific pricing if client is available
+      // Load client-specific pricing if client is available. clientId ya está seteado desde el
+      // quote (loadQuoteData), así que aquí sí carga los ClientPrices de tours (clientPricesMap)
+      // y el pricing por tour (clientTourPricesCache).
       if (this.clientId) {
-        await this.loadClientSpecificPricing();
+        await Promise.all([
+          this.loadAllClientPrices(),
+          this.loadClientSpecificPricing(),
+        ]);
       }
 
       // Setup UI
@@ -7818,7 +7829,7 @@ class ItineraryBuilder {
     if (this.clientId) {
       const clientPrices = this.getClientPricesFromCache(tourId, null);
       qsDevLog('🔍 Client prices from cache:', clientPrices);
-      const clientPrice = clientPrices.find((price) => price.vehiclePtr === vehicleType);
+      const clientPrice = this._clientPriceForVehicle(clientPrices, vehicleType);
       if (clientPrice && clientPrice.price !== undefined) {
         qsDevLog('✅ Found client price:', clientPrice.price);
         return clientPrice.price;
@@ -7863,7 +7874,7 @@ class ItineraryBuilder {
     if (this.clientId) {
       const clientPrices = this.getClientPricesFromCache(tourId, rateId);
       qsDevLog('🔍 Client prices from cache:', clientPrices);
-      const clientPrice = clientPrices.find((price) => price.vehiclePtr === vehicleType);
+      const clientPrice = this._clientPriceForVehicle(clientPrices, vehicleType);
       qsDevLog('🔍 Client price found:', clientPrice);
       if (clientPrice && clientPrice.price !== undefined) {
         qsDevLog('✅ Using client price:', clientPrice.price);
@@ -9712,7 +9723,7 @@ class ItineraryBuilder {
     // First try client-specific pricing
     if (this.clientId) {
       const clientPrices = this.getClientPricesFromCache(tourId, rateId);
-      const clientPrice = clientPrices.find((price) => price.vehiclePtr === vehicleType);
+      const clientPrice = this._clientPriceForVehicle(clientPrices, vehicleType);
       if (clientPrice) {
         // Always return basePrice (efectivo rate) - surcharges calculated separately
         const baseRate = clientPrice.basePrice || clientPrice.price || 0;
@@ -11516,6 +11527,13 @@ class ItineraryBuilder {
         const result = await response.json();
 
         if (result.success && result.data) {
+          // clientId del quote → indispensable para ClientPrices. La sección Servicios no tiene el
+          // dropdown #clientId, así que sin esto this.clientId quedaba null y NUNCA cargaban los
+          // precios personalizados del cliente (tours y transporte). data.client.id es el AmexingUser.
+          if (result.data.client && result.data.client.id) {
+            this.clientId = result.data.client.id;
+          }
+
           // Cache numberOfPeople from quote data
           this.numberOfPeople = result.data.numberOfPeople || 0;
 
@@ -14443,7 +14461,7 @@ class ItineraryBuilder {
       qsDevLog('vehicleInfo');
       qsDevLog(vehicleInfo);
       qsDevLog(vehicleType);
-      option.value = vehicleInfo.id;
+      option.value = vehicleInfo?.id || vehicleType;
 
       // Format capacity display
       let capacityDisplay = '';
@@ -14455,11 +14473,32 @@ class ItineraryBuilder {
         capacityDisplay = 'Capacidad no disponible';
       }
 
-      const clientIndicator = isClientPrice ? ' ⭐' : '';
-      option.textContent = `${vehicleType} - ${capacityDisplay}${clientIndicator}`;
+      // El asterisco (precio de cliente) SOLO lo ven admin/superadmin.
+      const clientIndicator = (isClientPrice && this.canEditPrices) ? ' *' : '';
+      option.textContent = `${vehicleInfo?.name || vehicleType} - ${capacityDisplay}${clientIndicator}`;
 
       vehicleSelect.appendChild(option);
     });
+  }
+
+  /**
+   * Encuentra el ClientPrice que corresponde a un vehículo, aceptando que `vehicleKey` sea el
+   * nombre ("SEDAN") o el id ("dehZQoFrDL"). Los client prices guardan vehiclePtr = id del vehículo,
+   * pero el dropdown de tours identifica los vehículos por nombre — este resolvedor tolera ambos.
+   * @param {Array} clientPrices - Client prices del caché para tour+rate.
+   * @param {string} vehicleKey - Nombre o id del vehículo.
+   * @returns {object|null} El client price o null.
+   * @example
+   * this._clientPriceForVehicle(clientPrices, 'SEDAN');
+   */
+  _clientPriceForVehicle(clientPrices, vehicleKey) {
+    if (!Array.isArray(clientPrices) || !vehicleKey) return null;
+    const info = this.getVehicleTypeInfo(vehicleKey);
+    const id = info?.id;
+    const name = info?.name;
+    return clientPrices.find((p) => p.vehiclePtr === vehicleKey
+      || (id && p.vehiclePtr === id)
+      || (name && p.vehiclePtr === name)) || null;
   }
 
   /**
@@ -14473,7 +14512,7 @@ class ItineraryBuilder {
     // First try client price (highest priority)
     if (this.clientId) {
       const clientPrices = this.getClientPricesFromCache(tourId, rateId);
-      const clientPrice = clientPrices.find((price) => price.vehiclePtr === vehicleType);
+      const clientPrice = this._clientPriceForVehicle(clientPrices, vehicleType);
       if (clientPrice && clientPrice.price !== undefined) {
         return clientPrice.price;
       }
@@ -14516,7 +14555,7 @@ class ItineraryBuilder {
     }
 
     const clientPrices = this.getClientPricesFromCache(tourId, rateId);
-    return clientPrices.some((price) => price.vehiclePtr === vehicleType);
+    return !!this._clientPriceForVehicle(clientPrices, vehicleType);
   }
 
   /**
@@ -16913,7 +16952,7 @@ class ItineraryBuilder {
       qsDevLog('vehicleInfoAdditional');
       qsDevLog(vehicleInfo);
       qsDevLog(vehicleType);
-      option.value = vehicleInfo.id;
+      option.value = vehicleInfo?.id || vehicleType;
 
       // Format capacity display (same as main dropdown)
       let capacityDisplay = '';
@@ -16925,8 +16964,9 @@ class ItineraryBuilder {
         capacityDisplay = 'Capacidad no disponible';
       }
 
-      const clientIndicator = isClientPrice ? ' ⭐' : '';
-      option.textContent = `${vehicleType} - ${capacityDisplay}${clientIndicator}`;
+      // El asterisco (precio de cliente) SOLO lo ven admin/superadmin.
+      const clientIndicator = (isClientPrice && this.canEditPrices) ? ' *' : '';
+      option.textContent = `${vehicleInfo?.name || vehicleType} - ${capacityDisplay}${clientIndicator}`;
       // Cache the per-hour list (catalog) price so the custom-price UI can show "Lista: $X"
       // and default the editable input (the tour breakdown multiplies by duration later).
       const perHour = this.getVehiclePriceWithPriority(vehicleType, tourId, rateId) || 0;
@@ -17026,7 +17066,8 @@ class ItineraryBuilder {
 
         const pax = vehicle.capacity || 0;
         const trunk = vehicle.trunkCapacity || 0;
-        const clientIndicator = vehicle.isClientPrice ? ' *' : '';
+        // El asterisco (precio de cliente) SOLO lo ven admin/superadmin.
+      const clientIndicator = (vehicle.isClientPrice && this.canEditPrices) ? ' *' : '';
         const vehicleType = vehicle.vehicleType || 'Vehículo desconocido';
 
         // En tours se omite el carry-on en el dropdown de vehículos adicionales (solo en tours).
