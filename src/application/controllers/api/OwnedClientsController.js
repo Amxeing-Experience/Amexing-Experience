@@ -264,15 +264,17 @@ class OwnedClientsController {
         return {
           id: client.id,
           name: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
-          firstName: client.get('firstName'),
-          lastName: client.get('lastName'),
-          email: client.get('email'),
-          phone: client.get('phone'),
-          contactPerson: client.get('contactPerson'),
-          companyType: client.get('companyType'),
-          active: client.get('active'),
-          clientCategory: client.get('clientCategory'),
-          organizationId: client.get('organizationId'),
+          firstName: client.get('firstName') || '',
+          lastName: client.get('lastName') || '',
+          // Defaults a '' para que la llave SIEMPRE exista en el JSON (si no, DataTables
+          // lanza "Requested unknown parameter 'phone'" cuando el campo está vacío).
+          email: client.get('email') || '',
+          phone: client.get('phone') || '',
+          contactPerson: client.get('contactPerson') || '',
+          companyType: client.get('companyType') || '',
+          active: client.get('active') === true,
+          clientCategory: client.get('clientCategory') || '',
+          organizationId: client.get('organizationId') || '',
           // Quién lo creó (DM o agente) — para distinguir clientes por agente.
           createdByUser: creatorMap[cbId] || (cbId ? { id: cbId } : null),
           createdAt: client.get('createdAt'),
@@ -331,9 +333,9 @@ class OwnedClientsController {
       const formattedClients = clients.map((client) => ({
         value: client.id,
         label: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
-        email: client.get('email'),
-        contactPerson: client.get('contactPerson'),
-        phone: client.get('phone'),
+        email: client.get('email') || '',
+        contactPerson: client.get('contactPerson') || '',
+        phone: client.get('phone') || '',
       }));
 
       return res.json({
