@@ -393,6 +393,12 @@ class ReservationController {
             innerQuote.equalTo('client', userObj);
             innerQuote.equalTo('clientType', 'direct');
           } else {
+            // 'Cliente' sin id: solo clientes DIRECTOS reales (clientCategory
+            // 'direct_client'), no categorías especiales (home_owner/wedding_planner/
+            // concierge), que se filtran por su propia categoría.
+            const innerClient = new Parse.Query('AmexingUser');
+            innerClient.equalTo('clientCategory', 'direct_client');
+            innerQuote.matchesQuery('client', innerClient);
             innerQuote.equalTo('clientType', 'direct');
           }
           has = true;
