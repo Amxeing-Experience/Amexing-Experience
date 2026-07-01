@@ -559,6 +559,13 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                                     </span>
                                 </div>
                             ` : ''}
+                            ${service.guideGreeterPending ? `
+                                <div class="mt-1">
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="ti ti-alert-triangle me-1"></i>Guía/greeter pendiente (falta duración de ruta)
+                                    </span>
+                                </div>
+                            ` : ''}
                             <!-- Notes Section -->
                             ${service.notes ? `
                                 <div class="service-notes mt-1 text-muted small d-flex align-items-start">

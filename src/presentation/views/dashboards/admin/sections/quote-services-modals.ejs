@@ -1027,6 +1027,11 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <label class="form-check-label small text-muted" for="greeterInVehicle">Viaja en el vehículo</label>
                                 </div>
                             </div>
+                            <!-- Aviso: guía/greeter marcado pero la ruta SIN duración → el costo no se
+                                 puede calcular y queda pendiente hasta capturar la "Duración de ruta". -->
+                            <small class="text-warning d-block mt-2 d-none" id="guideGreeterDurationNotice">
+                                <i class="ti ti-alert-triangle me-1"></i>Falta la <strong>duración de la ruta</strong> para calcular el costo de guía/greeter. Ingrésala en “Duración de ruta”; si no, ese costo quedará <strong>pendiente</strong>.
+                            </small>
                         </div>
                     </div>
 

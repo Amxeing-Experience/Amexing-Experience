@@ -789,6 +789,14 @@ class ItineraryBuilder {
       this.serviceModified = true; // Mark as modified when user changes tour selection
       this.resetMainPriceManualEdit(); // nuevo tour → reautollenar precio de catálogo
       this.handleTourSelection(e.target.value);
+      // Bug fix: al cambiar de tour con un segmento YA seleccionado, los vehículos quedaban los del
+      // tour anterior (handleTourSelection no repuebla el dropdown). Rates son globales, así que
+      // recargamos vehículos/precios del NUEVO tour reusando el segmento actual. Si el nuevo tour no
+      // tiene precios para ese segmento, handleRateSelection limpia el dropdown ("Sin vehículos").
+      const currentSegment = document.getElementById('transportCategory')?.value;
+      if (e.target.value && currentSegment) {
+        this.handleRateSelection(currentSegment);
+      }
     });
 
     // Price Override Toggle Handlers (Admin Only)
@@ -875,6 +883,8 @@ class ItineraryBuilder {
         if (greeterInVehicle) greeterInVehicle.checked = false;
       }
       this.handleIncludeGuideChange(e.target.checked);
+      // Guía requiere duración de ruta: si falta, marcar pendiente + avisar.
+      this._updateGuideGreeterDurationState();
     });
 
     // Include greeter checkbox listener
@@ -899,6 +909,8 @@ class ItineraryBuilder {
         }
       }
       this.handleIncludeGreeterChange(e.target.checked);
+      // Greeter requiere duración de ruta: si falta, marcar pendiente + avisar.
+      this._updateGuideGreeterDurationState();
     });
 
     // Greeter in vehicle checkbox listener - update capacity note
@@ -1171,6 +1183,8 @@ class ItineraryBuilder {
         // Route time feeds the local estimated-arrival calc.
         this.updateTransferArrivalEstimate();
         this.updateRouteDurationRoundTripHint();
+        // Al capturar/borrar la duración, recalcular si guía/greeter queda pendiente.
+        this._updateGuideGreeterDurationState();
         setTimeout(() => this.updateServicePriceBreakdown(), 50);
       });
     });
@@ -4396,6 +4410,11 @@ class ItineraryBuilder {
         // Persist route duration for pricing calculations (Guía/Greeter surcharges)
         data.routeDuration = this.getRouteDurationMinutes();
 
+        // Costo de guía/greeter PENDIENTE: marcado pero SIN duración de ruta → no se puede calcular
+        // (el cálculo depende de la duración). Se persiste para mostrar el badge/aviso; en cuanto se
+        // captura la duración deja de estar pendiente.
+        data.guideGreeterPending = (data.includeGuide || data.includeGreeter) && !data.routeDuration;
+
         // Store base vehicle price separately so calculateServicePrice can add surcharges
         // (the price field may already include surcharges from recalculateTransportPrice)
         if (vehicleSelectValue) {
@@ -7517,6 +7536,13 @@ class ItineraryBuilder {
                                         <div class="mt-1">
                                             <span class="badge bg-warning text-dark">
                                                 <i class="ti ti-alert-triangle me-1"></i>Precio pendiente
+                                            </span>
+                                        </div>
+                                    ` : ''}
+                                    ${service.guideGreeterPending ? `
+                                        <div class="mt-1">
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="ti ti-alert-triangle me-1"></i>Guía/greeter pendiente (falta duración de ruta)
                                             </span>
                                         </div>
                                     ` : ''}
@@ -11378,6 +11404,14 @@ class ItineraryBuilder {
     this.cachedRouteDuration = null;
     this.setRouteDurationFields(null);
 
+    // Reset del estado "guía/greeter pendiente por falta de duración" al abrir el modal, para que
+    // el aviso/resaltado no se filtre de un servicio a otro. Se re-evalúa con la carga de la ruta.
+    this.guideGreeterPending = false;
+    document.getElementById('guideGreeterDurationNotice')?.classList.add('d-none');
+    ['routeDurationHours', 'routeDurationMinutes'].forEach((id) => {
+      document.getElementById(id)?.classList.remove('field-price-pending');
+    });
+
     // Vehículo adicional (transporte / vehicle tour)
     const addCheckbox = document.getElementById('additionalVehicleCheckbox');
     if (addCheckbox) addCheckbox.checked = false;
@@ -11662,6 +11696,7 @@ class ItineraryBuilder {
             duration: subconcept.duration || 1,
             includeGuide: subconcept.includeGuide || false,
             includeGreeter: subconcept.includeGreeter || false,
+            guideGreeterPending: subconcept.guideGreeterPending || false,
             greeterInVehicle: subconcept.greeterInVehicle || false,
             availabilityPending: subconcept.availabilityPending || false,
             priceePending: subconcept.priceePending || false,
@@ -16202,6 +16237,8 @@ class ItineraryBuilder {
       if (!this._populatingTransportForm) {
         this.setRouteDurationFields(result.data.routeDuration);
       }
+      // La ruta acaba de cargar (o no trae duración): reevaluar si guía/greeter queda pendiente.
+      this._updateGuideGreeterDurationState();
 
       qsDevLog('🚗 Route duration received:', {
         origin: apiOrigin,
@@ -16249,6 +16286,37 @@ class ItineraryBuilder {
 
     const priceGroup = document.getElementById('servicePrice')?.closest('.input-group');
     if (priceGroup) priceGroup.classList.toggle('field-price-pending', isPending);
+  }
+
+  /**
+   * En transporte, el costo de guía/greeter se calcula a partir de la duración de la ruta. Si el
+   * usuario marca guía o greeter pero la ruta no tiene duración (ni capturada a mano), ese costo no
+   * se puede calcular y queda PENDIENTE. Este método muestra el aviso, resalta el campo de duración
+   * y setea el flag this.guideGreeterPending (se persiste y se marca con un badge en el itinerario).
+   * @returns {boolean} true si guía/greeter quedó pendiente por falta de duración.
+   * @example
+   * this._updateGuideGreeterDurationState();
+   */
+  _updateGuideGreeterDurationState() {
+    const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
+    const includeGuide = document.getElementById('includeGuide')?.checked || false;
+    const includeGreeter = document.getElementById('includeGreeter')?.checked || false;
+    const wants = serviceType === 'transport' && (includeGuide || includeGreeter);
+    const hasDuration = !!this.getRouteDurationMinutes();
+    const pending = wants && !hasDuration;
+
+    this.guideGreeterPending = pending;
+
+    const notice = document.getElementById('guideGreeterDurationNotice');
+    if (notice) notice.classList.toggle('d-none', !pending);
+
+    // Resalta los campos de duración para guiar al usuario a llenarlos.
+    ['routeDurationHours', 'routeDurationMinutes'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('field-price-pending', pending);
+    });
+
+    return pending;
   }
 
   /**
@@ -19641,6 +19709,7 @@ class ItineraryBuilder {
             duration: service.duration || null,
             includeGuide: service.includeGuide || false,
             includeGreeter: service.includeGreeter || false,
+            guideGreeterPending: service.guideGreeterPending || false,
             greeterInVehicle: service.greeterInVehicle || false,
             includeInTotal: service.includeInTotal !== false,
             // Transport-specific fields
