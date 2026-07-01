@@ -1218,6 +1218,16 @@ class QuoteOwnershipManager {
 
     // Capture the originally saved client ID when page loads
     captureOriginalClient() {
+        // El dropdown #clientId solo se renderiza en la sección "Información". El panel de ownership
+        // se incluye en TODAS las secciones (Información/Servicios/Resumen), así que en Servicios y
+        // Resumen el campo no existe: no hay cliente que capturar y NO es un error. Salimos en
+        // silencio para no ensuciar la consola con 5 reintentos + warning (las secciones son
+        // server-rendered: si el campo no está en el primer intento, no aparecerá después).
+        if (!document.getElementById('clientId')) {
+            console.log('captureOriginalClient: sección sin #clientId (no es Información); se omite.');
+            return;
+        }
+
         console.log('Starting captureOriginalClient...');
 
         // Try multiple times with increasing delays to ensure dropdown is ready
