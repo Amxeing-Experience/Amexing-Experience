@@ -775,7 +775,8 @@ class Client extends BaseModel {
 }
 
 // Allowed values for the clientCategory field, reused by the controller and table UI.
-Client.CATEGORIES = ['agency', 'direct_client', 'wedding_planner', 'concierge', 'home_owner'];
+// 'agency' = la agencia misma; 'agency_client' = un cliente que pertenece a una agencia.
+Client.CATEGORIES = ['agency', 'agency_client', 'direct_client', 'wedding_planner', 'concierge', 'home_owner'];
 
 // Register the class with Parse
 if (typeof Parse !== 'undefined') {

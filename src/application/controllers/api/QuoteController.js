@@ -405,38 +405,41 @@ class QuoteController {
         contactPhone: contactPhone || '',
       };
 
-      // If clientFinalId is provided, fetch the Client data and use it for contact fields
+      // Cliente Final: los clientes (directos y de agencia) ahora viven en AmexingUser
+      // (role 'end_client'); fallback a Client legado para data pre-migración.
       if (clientFinalId) {
+        // Guardar la referencia SIEMPRE, aunque no se pueda leer su data de contacto.
+        quote.set('clientFinalId', clientFinalId);
         try {
-          const finalClientQuery = new Parse.Query('Client');
-          const finalClientRecord = await finalClientQuery.get(clientFinalId, { useMasterKey: true });
-
-          // Use final client's data for contact fields (unless explicitly overridden)
-          finalContactData.contactFirstName = contactFirstName || finalClientRecord.get('firstName') || finalClientRecord.get('contactFirstName') || '';
-          finalContactData.contactLastName = contactLastName || finalClientRecord.get('lastName') || finalClientRecord.get('contactLastName') || '';
-          finalContactData.contactEmail = contactEmail || finalClientRecord.get('email') || '';
-          finalContactData.contactPhone = contactPhone || finalClientRecord.get('phone') || '';
-
-          // Build contactPerson from final client data if not explicitly provided
-          if (!contactPerson && (finalContactData.contactFirstName || finalContactData.contactLastName)) {
-            finalContactData.contactPerson = `${finalContactData.contactFirstName} ${finalContactData.contactLastName}`.trim();
-          } else if (!contactPerson) {
-            finalContactData.contactPerson = finalClientRecord.get('contactPerson') || finalClientRecord.get('name') || '';
+          let finalClientRecord = await new Parse.Query('AmexingUser')
+            .get(clientFinalId, { useMasterKey: true }).catch(() => null);
+          if (!finalClientRecord) {
+            finalClientRecord = await new Parse.Query('Client')
+              .get(clientFinalId, { useMasterKey: true }).catch(() => null);
           }
 
-          // Store clientFinalId in the quote
-          quote.set('clientFinalId', clientFinalId);
+          if (finalClientRecord) {
+            // Use final client's data for contact fields (unless explicitly overridden)
+            finalContactData.contactFirstName = contactFirstName || finalClientRecord.get('firstName') || finalClientRecord.get('contactFirstName') || '';
+            finalContactData.contactLastName = contactLastName || finalClientRecord.get('lastName') || finalClientRecord.get('contactLastName') || '';
+            finalContactData.contactEmail = contactEmail || finalClientRecord.get('email') || '';
+            finalContactData.contactPhone = contactPhone || finalClientRecord.get('phone') || '';
 
-          logger.info('QuoteController.createQuote - Using Cliente Final data for contact fields', {
-            clientFinalId,
-            finalContactData,
-            userId: currentUser.id,
-          });
+            if (!contactPerson && (finalContactData.contactFirstName || finalContactData.contactLastName)) {
+              finalContactData.contactPerson = `${finalContactData.contactFirstName} ${finalContactData.contactLastName}`.trim();
+            } else if (!contactPerson) {
+              finalContactData.contactPerson = finalClientRecord.get('contactPerson') || finalClientRecord.get('name') || '';
+            }
+
+            logger.info('QuoteController.createQuote - Cliente Final data applied', {
+              clientFinalId, userId: currentUser.id,
+            });
+          } else {
+            logger.warn('QuoteController.createQuote - Cliente Final no encontrado (AmexingUser/Client)', { clientFinalId });
+          }
         } catch (error) {
           logger.warn('QuoteController.createQuote - Error fetching Cliente Final data, using provided values', {
-            error: error.message,
-            clientFinalId,
-            userId: currentUser.id,
+            error: error.message, clientFinalId, userId: currentUser.id,
           });
         }
       }
@@ -1160,7 +1163,10 @@ class QuoteController {
       data.clientFinal = null;
       if (data.clientFinalId) {
         try {
-          const cf = await new Parse.Query('Client').get(data.clientFinalId, { useMasterKey: true });
+          // Cliente final ahora vive en AmexingUser (end_client); fallback a Client legado.
+          let cf = await new Parse.Query('AmexingUser').get(data.clientFinalId, { useMasterKey: true }).catch(() => null);
+          if (!cf) cf = await new Parse.Query('Client').get(data.clientFinalId, { useMasterKey: true }).catch(() => null);
+          if (!cf) throw new Error('Cliente final no encontrado');
           const companyName = cf.get('contextualData')?.companyName || '';
           const firstName = cf.get('firstName') || cf.get('contactFirstName') || '';
           const lastName = cf.get('lastName') || cf.get('contactLastName') || '';

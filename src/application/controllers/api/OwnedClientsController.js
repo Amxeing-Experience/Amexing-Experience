@@ -34,6 +34,38 @@ class OwnedClientsController {
   }
 
   /**
+   * Resolve the owning agency id for a client created by a DM or agent.
+   * - department_manager: su propio objectId ES la agencia.
+   * - client (agente): su organizationId apunta al objectId del DM (la agencia).
+   * @param {object} currentUser - The AmexingUser creating/owning the client.
+   * @param {string} userRole - Role of currentUser.
+   * @returns {string} The agency id (department_manager objectId, o el organizationId del agente).
+   */
+  getAgencyId(currentUser, userRole) {
+    if (userRole === 'department_manager') return currentUser.id;
+    return currentUser.get ? currentUser.get('organizationId') : currentUser.organizationId;
+  }
+
+  /**
+   * Base query for agency-owned clients (AmexingUser end_client, clientCategory
+   * 'agency_client'), scoped to the caller's agency via organizationId. Admins/superadmins
+   * see all agency clients (no org scope).
+   * @param {object} currentUser - The caller.
+   * @param {string} userRole - Role of the caller.
+   * @returns {Parse.Query} A configured AmexingUser query (exists=true).
+   */
+  buildAgencyClientQuery(currentUser, userRole) {
+    const q = new Parse.Query(Parse.Object.extend('AmexingUser'));
+    q.equalTo('role', 'end_client');
+    q.equalTo('clientCategory', 'agency_client');
+    q.equalTo('exists', true);
+    if (userRole === 'department_manager' || userRole === 'client') {
+      q.equalTo('organizationId', this.getAgencyId(currentUser, userRole));
+    }
+    return q;
+  }
+
+  /**
    * Create a people-type client as an AmexingUser (role 'end_client') so they can log in.
    * Username derives from email, or a placeholder when none is given; a random password is
    * set (these accounts don't log in until invited). Mirrors the migration script.
@@ -51,7 +83,9 @@ class OwnedClientsController {
       firstName: data.firstName,
       lastName: data.lastName,
       role: 'end_client',
-      organizationId: 'amexing',
+      // organizationId = la agencia dueña (id del DM) para clientes de agencia;
+      // 'amexing' para clientes directos de Amexing.
+      organizationId: data.organizationId || 'amexing',
       phone: data.phone,
       notes: data.notes,
       contextualData: {},
@@ -173,30 +207,18 @@ class OwnedClientsController {
       const search = req.query.search?.trim() || '';
       const active = req.query.active !== undefined ? req.query.active === 'true' : null;
 
-      // Build hierarchical query based on role and clientId relationships
-      let query;
-
-      if (userRole === 'admin' || userRole === 'superadmin') {
-        // Admins can see all clients or filter by ownership
-        query = this.createClientQuery();
-        if (req.query.ownerFilter === 'owned') {
-          query.equalTo('ownedBy', currentUser);
-        } else if (req.query.ownerFilter === 'admin') {
-          query.equalTo('ownerType', 'admin');
-        }
-      } else {
-        // Use hierarchical query for department managers and client users
-        query = await this.buildHierarchicalQuery(currentUser, userRole);
-
-        // Apply ownerType filtering for backward compatibility using containedIn
-        if (userRole === 'department_manager') {
-          // Department managers see clients with their ownerType or client ownerType
-          query.containedIn('ownerType', ['department_manager', 'client']);
-        } else if (userRole === 'client') {
-          // Client users see clients with client or department_manager ownerType
-          query.containedIn('ownerType', ['client', 'department_manager']);
-        }
+      // Owned clients now live in AmexingUser (role 'end_client', clientCategory
+      // 'agency_client'), scoped to the owning agency via organizationId. createdBy
+      // (string id) records who (DM o agente) los dio de alta.
+      const AmexingUserCls = Parse.Object.extend('AmexingUser');
+      const query = new Parse.Query(AmexingUserCls);
+      query.equalTo('role', 'end_client');
+      query.equalTo('clientCategory', 'agency_client');
+      if (userRole === 'department_manager' || userRole === 'client') {
+        const agencyId = this.getAgencyId(currentUser, userRole);
+        query.equalTo('organizationId', agencyId);
       }
+      // admin/superadmin: ven todos los clientes de agencia (sin filtro de organizationId).
 
       // Active filter
       if (active !== null) {
@@ -204,11 +226,9 @@ class OwnedClientsController {
       }
       query.equalTo('exists', true);
 
-      // Search filter - temporarily disable to avoid Parse.Query.or issues
+      // Search por nombre (firstName) — simple; email queda para búsqueda avanzada.
       if (search) {
-        // For now, just search by name to avoid Parse.Query.or issues
-        // TODO: Implement full text search using Parse Server's full text search capability
-        query.matches('name', search, 'i');
+        query.matches('firstName', search, 'i');
       }
 
       // Get total count
@@ -218,62 +238,50 @@ class OwnedClientsController {
       query.skip(skip);
       query.limit(limit);
       query.descending('createdAt');
-      query.include('ownedBy');
 
-      // Debug: Check what we're querying for
-      logger.info(`Querying for ownedBy=${currentUser.id}, ownerType=${userRole}`);
-
-      // Debug: Show the complete query constraints
-      logger.info(`Query constraints: ${JSON.stringify({
-        ownedBy: currentUser.id,
-        ownerType: userRole,
-        active: active !== null ? active : 'not filtered',
-        exists: true,
-        search: search || 'no search',
-      })}`);
-
-      // Debug: Check all clients in database first
-      const allClientsQuery = this.createClientQuery();
-      allClientsQuery.limit(10);
-      const allClients = await allClientsQuery.find({ useMasterKey: true });
-      logger.info(`Total clients in database: ${allClients.length}`);
-      allClients.forEach((client) => {
-        const ownedBy = client.get('ownedBy');
-        logger.info(`All Client ${client.id}: name=${client.get('name')}, ownedBy=${ownedBy ? (ownedBy.id || ownedBy) : 'null'}, ownerType=${client.get('ownerType')}, active=${client.get('active')}, exists=${client.get('exists')}`);
-      });
-
-      // Execute query
       const clients = await query.find({ useMasterKey: true });
 
-      // Debug: Check what we found and log details
-      logger.info(`Found ${clients.length} owned clients for user ${currentUser.id} with role ${userRole}`);
-      if (clients.length > 0) {
-        clients.forEach((client) => {
-          logger.info(`Client ${client.id}: name=${client.get('name')}, ownedBy=${client.get('ownedBy')}, ownerType=${client.get('ownerType')}`);
+      // Resolver en lote los creadores (createdBy es un string id).
+      const creatorIds = [...new Set(clients.map((c) => c.get('createdBy')).filter(Boolean))];
+      const creatorMap = {};
+      if (creatorIds.length) {
+        const creators = await new Parse.Query(AmexingUserCls)
+          .containedIn('objectId', creatorIds).find({ useMasterKey: true });
+        creators.forEach((u) => {
+          creatorMap[u.id] = {
+            id: u.id,
+            name: `${u.get('firstName') || ''} ${u.get('lastName') || ''}`.trim(),
+            role: u.get('role'),
+          };
         });
       }
 
+      logger.info(`Found ${clients.length} owned (agency) clients for user ${currentUser.id} role ${userRole}`);
+
       // Format response
-      const formattedClients = clients.map((client) => ({
-        id: client.id,
-        name: client.get('name'),
-        email: client.get('email'),
-        phone: client.get('phone'),
-        contactPerson: client.get('contactPerson'),
-        companyType: client.get('companyType'),
-        active: client.get('active'),
-        ownerType: client.get('ownerType'),
-        ownedBy: client.get('ownedBy') ? {
-          id: client.get('ownedBy').id,
-          name: `${client.get('ownedBy').get('firstName')} ${client.get('ownedBy').get('lastName')}`,
-          email: client.get('ownedBy').get('email'),
-        } : null,
-        createdAt: client.get('createdAt'),
-        updatedAt: client.get('updatedAt'),
-      }));
+      const formattedClients = clients.map((client) => {
+        const cbId = client.get('createdBy');
+        return {
+          id: client.id,
+          name: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+          firstName: client.get('firstName'),
+          lastName: client.get('lastName'),
+          email: client.get('email'),
+          phone: client.get('phone'),
+          contactPerson: client.get('contactPerson'),
+          companyType: client.get('companyType'),
+          active: client.get('active'),
+          clientCategory: client.get('clientCategory'),
+          organizationId: client.get('organizationId'),
+          // Quién lo creó (DM o agente) — para distinguir clientes por agente.
+          createdByUser: creatorMap[cbId] || (cbId ? { id: cbId } : null),
+          createdAt: client.get('createdAt'),
+          updatedAt: client.get('updatedAt'),
+        };
+      });
 
       // Log bulk read access
-      logBulkReadAccess(req, 'Client', clients.length, { ownerFilter: req.query.ownerFilter });
+      logBulkReadAccess(req, 'AmexingUser', clients.length, { clientCategory: 'agency_client' });
 
       return res.json({
         success: true,
@@ -307,22 +315,14 @@ class OwnedClientsController {
 
       const userRole = req.userRole || currentUser.role || currentUser.get?.('role');
 
-      // Build hierarchical query for active clients
-      let query;
-
-      if (userRole === 'admin' || userRole === 'superadmin') {
-        // Admins see all active clients
-        query = this.createClientQuery();
-      } else if (userRole === 'department_manager' || userRole === 'client') {
-        // Use hierarchical query for department managers and client users
-        query = await this.buildHierarchicalQuery(currentUser, userRole);
-      } else {
+      if (!['department_manager', 'client', 'admin', 'superadmin'].includes(userRole)) {
         return res.json({ success: true, data: [] });
       }
 
+      // Agency clients (AmexingUser end_client, agency_client) scoped to the agency.
+      const query = this.buildAgencyClientQuery(currentUser, userRole);
       query.equalTo('active', true);
-      query.equalTo('exists', true);
-      query.ascending('name');
+      query.ascending('firstName');
       query.limit(500);
 
       const clients = await query.find({ useMasterKey: true });
@@ -330,7 +330,7 @@ class OwnedClientsController {
       // Format for dropdown
       const formattedClients = clients.map((client) => ({
         value: client.id,
-        label: client.get('name'),
+        label: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
         email: client.get('email'),
         contactPerson: client.get('contactPerson'),
         phone: client.get('phone'),
@@ -372,27 +372,9 @@ class OwnedClientsController {
         return this.sendError(res, 'Client ID is required', 400);
       }
 
-      // Build hierarchical query based on role
-      let query;
-
-      if (userRole === 'admin' || userRole === 'superadmin') {
-        // Admins can see any client
-        query = this.createClientQuery();
-        query.equalTo('objectId', clientId);
-      } else {
-        // Use hierarchical query for department managers and client users
-        query = await this.buildHierarchicalQuery(currentUser, userRole);
-        query.equalTo('objectId', clientId);
-
-        // Apply ownerType filtering for security
-        if (userRole === 'department_manager') {
-          query.containedIn('ownerType', ['department_manager', 'client']);
-        } else if (userRole === 'client') {
-          query.containedIn('ownerType', ['client', 'department_manager']);
-        }
-      }
-
-      query.equalTo('exists', true);
+      // Agency client scoped to the caller's agency (AmexingUser end_client, agency_client).
+      const query = this.buildAgencyClientQuery(currentUser, userRole);
+      query.equalTo('objectId', clientId);
 
       const client = await query.first({ useMasterKey: true });
 
@@ -524,12 +506,6 @@ class OwnedClientsController {
         return this.sendError(res, 'First name and last name are required', 400);
       }
 
-      // Combine names for backward compatibility
-      const name = `${firstName} ${lastName}`.trim();
-      const contactPerson = contactFirstName || contactLastName
-        ? `${contactFirstName || ''} ${contactLastName || ''}`.trim()
-        : null;
-
       // Process allergies and dietary restrictions into arrays
       const processedAllergies = allergies
         ? allergies.split('\n').map((item) => item.trim()).filter((item) => item.length > 0)
@@ -590,14 +566,18 @@ class OwnedClientsController {
         });
       }
 
-      // Create client with ownership and all new fields
-      const clientData = {
-        name,
+      // Agency-owned clients also live in AmexingUser (role 'end_client') now, tagged
+      // 'agency_client' and scoped to the owning agency via organizationId. createdBy
+      // records WHO (the DM or a specific agent) gave the client de alta.
+      const agencyId = this.getAgencyId(currentUser, userRole);
+      if (!agencyId) {
+        return this.sendError(res, 'No se pudo resolver la agencia del usuario', 400);
+      }
+      const created = await this.createEndClientUser({
         firstName,
         lastName,
-        email: email || '',
+        email,
         phone,
-        contactPerson,
         contactFirstName,
         contactLastName,
         emergencyContactName,
@@ -606,35 +586,30 @@ class OwnedClientsController {
         taxId,
         website,
         notes,
-        // Use structured address if available, fall back to legacy address
         address: structuredAddress || address,
         preferredLanguage,
         accessibilityRequirements,
         allergies: processedAllergies,
         dietaryRestrictions: processedDietaryRestrictions,
-        ownedBy: currentUser.id,
-        ownerType: userRole,
+        clientCategory: 'agency_client',
+        organizationId: agencyId,
         createdBy: currentUser.id,
-        // Default direct clients to 'direct_client' when no category is chosen.
-        clientCategory: finalCategory,
-      };
+      });
 
-      const client = Client.create(clientData);
-      await client.save(null, { useMasterKey: true });
-
-      logger.info('Owned client created', {
-        clientId: client.id,
-        ownerId: currentUser.id,
-        ownerType: clientData.ownerType,
+      logger.info('Agency owned client created (end_client)', {
+        userId: created.id,
+        agencyId,
+        createdBy: currentUser.id,
+        createdByRole: userRole,
       });
 
       return res.status(201).json({
         success: true,
         message: 'Client created successfully',
         data: {
-          id: client.id,
-          name: client.get('name'),
-          email: client.get('email'),
+          id: created.id,
+          name: created.getFullName ? created.getFullName() : `${firstName} ${lastName}`.trim(),
+          email: created.get('email'),
         },
       });
     } catch (error) {
@@ -673,40 +648,38 @@ class OwnedClientsController {
         return this.sendError(res, 'First name and last name are required', 400);
       }
 
-      const name = companyName || `${firstName} ${lastName}`;
-
-      // Create client with ownership
-      const clientData = {
-        name,
-        email: email || '',
+      // Quick create as end_client: admin/superadmin → directo Amexing; DM/agente → cliente de agencia.
+      const isAmexing = ['admin', 'superadmin'].includes(userRole);
+      const organizationId = isAmexing ? 'amexing' : this.getAgencyId(currentUser, userRole);
+      if (!organizationId) {
+        return this.sendError(res, 'No se pudo resolver la agencia del usuario', 400);
+      }
+      const created = await this.createEndClientUser({
+        firstName,
+        lastName,
+        email,
         phone,
-        contactPerson: `${firstName} ${lastName}`,
         companyType: companyName ? 'corporate' : 'individual',
-        ownedBy: currentUser.id,
-        ownerType: userRole === 'admin' || userRole === 'superadmin' ? 'admin' : userRole,
+        clientCategory: isAmexing ? 'direct_client' : 'agency_client',
+        organizationId,
         createdBy: currentUser.id,
-        // Mark clients created by admin/superadmin as belonging to Amexing
-        clientBelongsTo: userRole === 'admin' || userRole === 'superadmin' ? 'amexing' : undefined,
-      };
+      });
 
-      const client = Client.create(clientData);
-      await client.save(null, { useMasterKey: true });
-
-      logger.info('Quick owned client created', {
-        clientId: client.id,
-        ownerId: currentUser.id,
-        ownerType: clientData.ownerType,
+      logger.info('Quick owned client created (end_client)', {
+        userId: created.id,
+        organizationId,
+        createdBy: currentUser.id,
       });
 
       return res.status(201).json({
         success: true,
         message: 'Client created successfully',
         data: {
-          value: client.id,
-          label: client.get('name'),
-          email: client.get('email'),
-          contactPerson: client.get('contactPerson'),
-          phone: client.get('phone'),
+          value: created.id,
+          label: companyName || `${firstName} ${lastName}`.trim(),
+          email: created.get('email'),
+          contactPerson: `${firstName} ${lastName}`.trim(),
+          phone: created.get('phone'),
         },
       });
     } catch (error) {
@@ -758,36 +731,26 @@ class OwnedClientsController {
         return this.sendError(res, 'Enterprise not found or invalid', 404);
       }
 
-      // Create the sub-client using the Client model
-
-      // Combine names
+      // Create the sub-client as an end_client owned by the selected enterprise/agency.
       const name = `${firstName} ${lastName}`.trim();
       const contactPerson = name; // Use the main client as contact person
 
-      // Create client data
-      const clientData = {
-        name,
+      const created = await this.createEndClientUser({
         firstName,
         lastName,
-        email: email || '',
-        phone: phone || '',
-        contactPerson,
+        email,
+        phone,
         contactFirstName: firstName,
         contactLastName: lastName,
-        companyName: companyName || '',
+        companyType: companyName ? 'corporate' : 'individual',
         preferredLanguage,
-        ownerType: 'amexing_user',
-        ownedBy: enterpriseId, // Set the enterprise as owner
-        active: true,
-        exists: true,
+        clientCategory: 'agency_client',
+        organizationId: enterpriseId, // the enterprise/agency owns this client
         createdBy: currentUser.id,
-      };
+      });
 
-      const client = Client.create(clientData);
-      await client.save(null, { useMasterKey: true });
-
-      logger.info('Admin created sub-client for enterprise', {
-        clientId: client.id,
+      logger.info('Admin created sub-client (end_client) for enterprise', {
+        userId: created.id,
         enterpriseId,
         adminId: currentUser.id,
         clientName: name,
@@ -795,7 +758,7 @@ class OwnedClientsController {
 
       // Return in Tom Select format
       const response = {
-        value: client.id,
+        value: created.id,
         label: companyName || name,
         email: email || '',
         contactPerson,
@@ -852,9 +815,12 @@ class OwnedClientsController {
         return this.sendError(res, 'Client not found', 404);
       }
 
-      // Check ownership
-      const ownedBy = client.get('ownedBy');
-      const isOwner = ownedBy && ownedBy.id === currentUser.id;
+      // Ownership: los clientes de agencia pertenecen a la agencia del que llama
+      // (organizationId). Admin/superadmin puede cualquiera. (Fallback a ownedBy legado.)
+      const clientOrg = client.get('organizationId');
+      const legacyOwnedBy = client.get('ownedBy');
+      const isOwner = (clientOrg && clientOrg === this.getAgencyId(currentUser, userRole))
+        || (legacyOwnedBy && legacyOwnedBy.id === currentUser.id);
       const isAdmin = ['admin', 'superadmin'].includes(userRole);
 
       if (!isOwner && !isAdmin) {
@@ -1017,9 +983,12 @@ class OwnedClientsController {
         return this.sendError(res, 'Client not found', 404);
       }
 
-      // Check ownership
-      const ownedBy = client.get('ownedBy');
-      const isOwner = ownedBy && ownedBy.id === currentUser.id;
+      // Ownership: los clientes de agencia pertenecen a la agencia del que llama
+      // (organizationId). Admin/superadmin puede cualquiera. (Fallback a ownedBy legado.)
+      const clientOrg = client.get('organizationId');
+      const legacyOwnedBy = client.get('ownedBy');
+      const isOwner = (clientOrg && clientOrg === this.getAgencyId(currentUser, userRole))
+        || (legacyOwnedBy && legacyOwnedBy.id === currentUser.id);
       const isAdmin = ['admin', 'superadmin'].includes(userRole);
 
       if (!isOwner && !isAdmin) {
@@ -1080,9 +1049,12 @@ class OwnedClientsController {
         return this.sendError(res, 'Client not found', 404);
       }
 
-      // Check ownership
-      const ownedBy = client.get('ownedBy');
-      const isOwner = ownedBy && ownedBy.id === currentUser.id;
+      // Ownership: los clientes de agencia pertenecen a la agencia del que llama
+      // (organizationId). Admin/superadmin puede cualquiera. (Fallback a ownedBy legado.)
+      const clientOrg = client.get('organizationId');
+      const legacyOwnedBy = client.get('ownedBy');
+      const isOwner = (clientOrg && clientOrg === this.getAgencyId(currentUser, userRole))
+        || (legacyOwnedBy && legacyOwnedBy.id === currentUser.id);
       const isAdmin = ['admin', 'superadmin'].includes(userRole);
 
       if (!isOwner && !isAdmin) {
