@@ -1030,6 +1030,11 @@ ItineraryBuilder.prototype.clearVehicleDropdown = function () {
     if (servicePriceField) {
       servicePriceField.value = '0.00';
     }
+
+    // Al limpiar vehículos ya no hay ruta seleccionada → ocultar aviso de "precio pendiente".
+    if (typeof this._setTransportRoutePending === 'function') {
+      this._setTransportRoutePending(false);
+    }
 };
 
 ItineraryBuilder.prototype.getTransportRouteNames = function () {

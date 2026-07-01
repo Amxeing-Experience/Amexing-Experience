@@ -3790,6 +3790,9 @@ class ItineraryBuilder {
       includeInTotal: document.getElementById('includeInTotal')?.checked !== false,
       greeterInVehicle: document.getElementById('greeterInVehicle')?.checked || false,
       availabilityPending: this.currentServiceAvailabilityPending || false,
+      // Parte C: "precio pendiente" = ruta de transporte sin precio de catálogo (routeFound:false)
+      // y precio en 0. Si el admin puso un precio ≠ 0, deja de estar pendiente.
+      priceePending: type === 'transport' && this.transportRoutePending === true && Number(finalServicePrice) === 0,
       // Preserve any user-accepted overlap. If the user edited the schedule the caller
       // resets this further down to surface a new conflict if one remains.
       overlapAccepted: this.currentServiceId && this.services.has(this.currentServiceId)
@@ -4559,8 +4562,9 @@ class ItineraryBuilder {
     if (data.type === 'tour' || data.type === 'experience') {
       // No price validation - can save with $0 or no price
       // Useful for placeholders or complimentary services
-    } else if (data.type === 'transport' && (!data.price || data.price <= 0)) {
-      // Transport should have a price
+    } else if (data.type === 'transport' && !data.priceePending && (!data.price || data.price <= 0)) {
+      // Transport should have a price — EXCEPTO cuando es "precio pendiente" (ruta sin precio de
+      // catálogo). En ese caso se permite guardar en $0; el admin definirá el precio después.
       this.showModalAlert('serviceModalAlert', 'Por favor ingresa un precio válido', 'warning');
       return false;
     }
@@ -7498,6 +7502,13 @@ class ItineraryBuilder {
                                             </span>
                                         </div>
                                     ` : ''}
+                                    ${service.priceePending ? `
+                                        <div class="mt-1">
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="ti ti-alert-triangle me-1"></i>Precio pendiente
+                                            </span>
+                                        </div>
+                                    ` : ''}
                                     ${service.isCustomPrice && this.canEditPrices ? `
                                         <div class="d-flex align-items-center text-info small mt-1">
                                             <i class="ti ti-edit me-1"></i>
@@ -8273,6 +8284,27 @@ class ItineraryBuilder {
    * Shows detailed breakdown for efectivo, transferencia, and tarjeta.
    * @example
    */
+  /**
+   * Limpia el desglose de transporte (totales + campos dev) para que refleje 0 en vez de dejar
+   * el último valor calculado. Se llama cuando no hay vehículo o el precio base es 0 (ruta
+   * pendiente / precio puesto en 0 por el admin). Evita el bug de desglose stale: editar 10 -> 0
+   * dejaba el desglose (y lo guardado vía _transportBreakdownTotals) en 10.
+   * @example
+   * this._clearTransportBreakdown();
+   */
+  _clearTransportBreakdown() {
+    this._transportBreakdownTotals = { efectivo: 0, transferencia: 0, tarjeta: 0 };
+    // currentServiceTotal es lo que collectServiceData usa como precio final. updateServicePrice
+    // Breakdown hace early-return al total 0 sin tocarlo, así que lo reseteamos aquí para que lo
+    // guardado sea 0 y no el último total calculado.
+    this.currentServiceTotal = 0;
+    ['devBreakdownEfectivo', 'devBreakdownTransferencia', 'devBreakdownTarjeta',
+      'devPriceEfectivo', 'devPriceTransferencia', 'devPriceTarjeta'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+  }
+
   updateDevPaymentBreakdown() {
     // Guarda contra re-entrancia (ver updateServicePriceBreakdown): rompe el ciclo render↔
     // cálculo que reventaba el stack y bloqueaba el hilo.
@@ -8647,6 +8679,7 @@ class ItineraryBuilder {
 
       if (!selectedVehicleId || !this.transportPriceData?.vehicles) {
         console.warn('⚠️ Transport breakdown: No vehicle selected or price data unavailable');
+        this._clearTransportBreakdown();
         return;
       }
 
@@ -8659,7 +8692,12 @@ class ItineraryBuilder {
         ? parseFloat(document.getElementById('servicePrice')?.value || 0)
         : (this.getTransportVehiclePrice(selectedVehicleId) || 0);
       if (efectivoBasePrice === 0) {
-        console.warn('⚠️ Transport breakdown: No base price found for selected vehicle');
+        // Precio base 0 (ruta pendiente, o el admin lo puso en 0): NO dejar el desglose stale.
+        // Antes esto solo hacía `return`, dejando `_transportBreakdownTotals` y los campos
+        // devBreakdown* con el último valor calculado. Repro: editar 10 -> 0 dejaba el desglose
+        // (y lo guardado) en 10. Limpiamos todo para que refleje 0.
+        console.warn('⚠️ Transport breakdown: precio base 0 — desglose limpiado (sin stale)');
+        this._clearTransportBreakdown();
         return;
       }
 
@@ -11216,6 +11254,9 @@ class ItineraryBuilder {
   updateTotals() {
     // CRITICAL FIX: Use getServiceDisplayPrice to respect pricesByType (like day totals and preview do)
     let totalMXN = 0;
+    // Parte D: contar servicios con "precio pendiente" (ruta de transporte sin precio de catálogo).
+    // Cuentan como $0 en el total (su precio ya es 0) hasta que el admin defina la tarifa.
+    let pendingPriceCount = 0;
 
     this.days.forEach((day) => {
       day.services.forEach((serviceId) => {
@@ -11224,6 +11265,7 @@ class ItineraryBuilder {
           // FIXED: Use getServiceDisplayPrice to match day totals and preview calculations
           const serviceDisplayPrice = this.getServiceDisplayPrice(service);
           totalMXN += serviceDisplayPrice;
+          if (service.priceePending) pendingPriceCount += 1;
         }
       });
     });
@@ -11263,6 +11305,23 @@ class ItineraryBuilder {
     document.getElementById('totalAmount').textContent = `${this.formatCurrency(finalTotal)}`;
     document.getElementById('perPersonAmount').textContent = `${this.formatCurrency(perPerson)}`;
     document.getElementById('personCount').textContent = `(${passengers} ${passengers === 1 ? 'persona' : 'personas'})`;
+
+    // Parte D: aviso de servicios con precio pendiente. El total mostrado NO incluye su precio
+    // (cuentan como $0); el admin lo definirá después.
+    const pendingNotice = document.getElementById('pendingPriceTotalNotice');
+    const pendingNoticeText = document.getElementById('pendingPriceTotalNoticeText');
+    if (pendingNotice) {
+      if (pendingPriceCount > 0) {
+        if (pendingNoticeText) {
+          pendingNoticeText.textContent = pendingPriceCount === 1
+            ? 'Falta 1 servicio para el precio final (su precio está pendiente y no se incluye en el total).'
+            : `Faltan ${pendingPriceCount} servicios para el precio final (sus precios están pendientes y no se incluyen en el total).`;
+        }
+        pendingNotice.classList.remove('d-none');
+      } else {
+        pendingNotice.classList.add('d-none');
+      }
+    }
   }
 
   showModalAlert(containerId, message, type = 'danger') {
@@ -11587,6 +11646,7 @@ class ItineraryBuilder {
             includeGreeter: subconcept.includeGreeter || false,
             greeterInVehicle: subconcept.greeterInVehicle || false,
             availabilityPending: subconcept.availabilityPending || false,
+            priceePending: subconcept.priceePending || false,
             overlapAccepted: subconcept.overlapAccepted || false,
             attendees: Array.isArray(subconcept.attendees) ? subconcept.attendees : [],
             additionalFlights: Array.isArray(subconcept.additionalFlights) ? subconcept.additionalFlights : [],
@@ -16062,6 +16122,7 @@ class ItineraryBuilder {
       if (!result.success || !result.data) {
         this.clearVehicleDropdown();
         this.transportPriceData = null;
+        this._setTransportRoutePending(false);
         return;
       }
 
@@ -16090,6 +16151,10 @@ class ItineraryBuilder {
 
       // Cache the transport price data for vehicle selection
       this.transportPriceData = result.data;
+      // Parte B: si la ruta no está en el catálogo, el backend devuelve TODOS los vehículos en $0
+      // y routeFound:false. Marcamos "precio pendiente" y mostramos el aviso; el admin definirá
+      // el precio después. Si la ruta sí tiene precio, se limpia el pendiente.
+      this._setTransportRoutePending(result.data.routeFound === false);
       // Cache routeDuration separately so it persists even if transportPriceData is cleared
       this.cachedRouteDuration = result.data.routeDuration || null;
       // Autollenar el campo editable "Duración de ruta" con la duración de ESTA ruta (vacío si
@@ -16118,9 +16183,33 @@ class ItineraryBuilder {
       console.error('Error looking up transport prices:', error);
       this.clearVehicleDropdown();
       this.transportPriceData = null;
+      this._setTransportRoutePending(false);
     } finally {
       vehicleSpinner?.classList.add('d-none');
     }
+  }
+
+  /**
+   * Marca/limpia el estado "precio pendiente" de la ruta de transporte (Parte B/C).
+   * Se activa cuando la ruta no está en el catálogo (routeFound:false → vehículos en $0).
+   * Guarda el flag en el estado del builder y muestra/oculta el aviso en el modal.
+   * @param {boolean} isPending - true si la ruta no tiene precio de catálogo.
+   * @example
+   * this._setTransportRoutePending(true);
+   */
+  _setTransportRoutePending(isPending) {
+    this.transportRoutePending = !!isPending;
+    const notice = document.getElementById('transportPricePendingNotice');
+    if (notice) notice.classList.toggle('d-none', !isPending);
+
+    // Resalta el dropdown de vehículo y el grupo del precio para que el aviso "abarque" ambos:
+    // así queda claro que tanto los vehículos como el $0 son de referencia hasta que el admin
+    // confirme la tarifa.
+    const vehicleSelect = document.getElementById('vehicleSelect');
+    if (vehicleSelect) vehicleSelect.classList.toggle('field-price-pending', isPending);
+
+    const priceGroup = document.getElementById('servicePrice')?.closest('.input-group');
+    if (priceGroup) priceGroup.classList.toggle('field-price-pending', isPending);
   }
 
   /**
@@ -19483,6 +19572,7 @@ class ItineraryBuilder {
             teamNotes: service.teamNotes || '',
             internalNotes: service.internalNotes || '',
             availabilityPending: service.availabilityPending || false,
+            priceePending: service.priceePending || false,
             hours: service.hours || null,
             total: serviceTotal,
             // Type-specific fields

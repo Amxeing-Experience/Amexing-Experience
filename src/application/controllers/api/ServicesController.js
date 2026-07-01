@@ -4031,7 +4031,14 @@ class ServicesController {
       });
 
       if (destinationPOIs.length === 0) {
-        return res.json({ success: true, data: { serviceId: null, vehicles: [] } });
+        // Destino no encontrado en el catálogo de POIs: tratar como ruta sin precio (pendiente).
+        const pendingVehicles = await this.buildZeroPriceVehicles();
+        return res.json({
+          success: true,
+          data: {
+            serviceId: null, vehicles: pendingVehicles, routeFound: false, routeDuration: null,
+          },
+        });
       }
 
       // Get all RatePrices for the specific rate (matching quotes system approach)
@@ -4104,7 +4111,17 @@ class ServicesController {
 
       if (ratePrices.length === 0) {
         console.log('No routes found in either direction');
-        return res.json({ success: true, data: { serviceId: null, vehicles: [] } });
+        // La ruta no está en el catálogo. En vez de dejar el dropdown vacío, devolvemos TODOS los
+        // tipos de vehículo activos con precio 0 y routeFound:false, para que el usuario pueda
+        // cotizar igual; el servicio queda marcado como "precio pendiente" (el admin definirá el
+        // precio después). Ver Parte B/C de docs/plans/transporte-origen-destino-libre.md.
+        const pendingVehicles = await this.buildZeroPriceVehicles();
+        return res.json({
+          success: true,
+          data: {
+            serviceId: null, vehicles: pendingVehicles, routeFound: false, routeDuration: null,
+          },
+        });
       }
 
       // Extract service IDs for logging and client prices
@@ -4211,6 +4228,7 @@ class ServicesController {
           serviceId: serviceIds[0],
           vehicles,
           routeDuration,
+          routeFound: true,
         },
       });
     } catch (error) {
@@ -4221,6 +4239,38 @@ class ServicesController {
       });
       return this.sendError(res, 'Error al obtener precios por ruta', 500);
     }
+  }
+
+  /**
+   * Build a list of ALL active vehicle types with price 0, used when a transport route has no
+   * price in the catalog ("precio pendiente"). Lets the user quote the route anyway; an admin
+   * sets the real price later. Shape matches the vehicles returned by getPricesByRoute.
+   * @returns {Promise<Array<object>>} Vehicles with finalPrice 0.
+   * @example
+   * const vehicles = await this.buildZeroPriceVehicles();
+   */
+  async buildZeroPriceVehicles() {
+    const vehicleTypeQuery = new Parse.Query('VehicleType');
+    vehicleTypeQuery.equalTo('active', true);
+    vehicleTypeQuery.equalTo('exists', true);
+    vehicleTypeQuery.ascending('name');
+    vehicleTypeQuery.limit(1000);
+
+    const vehicleTypes = await vehicleTypeQuery.find({ useMasterKey: true });
+
+    return vehicleTypes.map((vt) => ({
+      vehicleTypeId: vt.id,
+      vehicleType: vt.get('name'),
+      code: vt.get('code'),
+      capacity: vt.get('defaultCapacity') || 0,
+      trunkCapacity: vt.get('trunkCapacity') || 0,
+      basePrice: 0,
+      clientPrice: null,
+      finalPrice: 0,
+      currency: 'MXN',
+      isClientPrice: false,
+      serviceId: null,
+    }));
   }
 
   /**

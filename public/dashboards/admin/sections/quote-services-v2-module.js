@@ -78,6 +78,18 @@ async function loadActiveServicesForDropdowns() {
       // Store for global access
       window.servicesByTransportType = servicesByType;
 
+      // Cargar TODOS los POIs activos (no solo los de rutas en catálogo) para que origen/destino
+      // puedan ser CUALQUIER POI. Se usan en populateDropdownsForTransportType / round-trip.
+      try {
+        const poisResp = await fetch('/api/pois/active', { headers: { 'Content-Type': 'application/json' } });
+        const poisResult = poisResp.ok ? await poisResp.json() : null;
+        window.allActivePois = (poisResult && (poisResult.data || poisResult.pois))
+          || (Array.isArray(poisResult) ? poisResult : []);
+      } catch (poisErr) {
+        console.warn('[Services] No se pudieron cargar POIs activos:', poisErr);
+        window.allActivePois = window.allActivePois || [];
+      }
+
       // Initially populate with aeropuerto services (default)
       populateDropdownsForTransportType('aeropuerto');
     }
@@ -94,8 +106,8 @@ async function loadActiveServicesForDropdowns() {
  * @example
  */
 function populateDropdownsForTransportType(transportType, directionType) {
-  if (!window.servicesByTransportType) {
-    console.warn('[Services] No services data available for filtering');
+  if (!window.allActivePois || window.allActivePois.length === 0) {
+    console.warn('[Services] No hay POIs activos para poblar origen/destino');
     return;
   }
 
@@ -104,51 +116,13 @@ function populateDropdownsForTransportType(transportType, directionType) {
     directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
   }
 
-  const services = window.servicesByTransportType[transportType] || [];
+  // Origen/destino = CUALQUIER POI activo, en los 3 tipos (aeropuerto / punto-a-punto / local) y
+  // en ambas direcciones. El cliente pidió libertad total: cualquier POI de la BD en ambos lados.
+  const allPois = window.allActivePois || [];
+  const allNames = allPois.map((p) => p.label).filter(Boolean);
 
-  const origins = new Set();
-  const destinations = new Set();
-
-  services.forEach((service) => {
-    if (transportType === 'aeropuerto') {
-      if (directionType === 'departure') {
-        // Departure: user leaves FROM a local destination TO the airport
-        // origin dropdown = non-airport POIs (hotels, cities — same as arrival destinations)
-        // destination combo = airports
-        if (service.destination) {
-          origins.add(service.destination);
-        }
-        if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
-          destinations.add(service.origin);
-        }
-      } else {
-        // Arrival: user arrives FROM the airport TO a local destination
-        // origin dropdown = airports
-        // destination combo = non-airport destinations
-        if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
-          origins.add(service.origin);
-        }
-        if (service.destination) {
-          destinations.add(service.destination);
-        }
-      }
-    } else if (transportType === 'punto-a-punto') {
-      // Punto a Punto routes are bidirectional: either endpoint can be the
-      // origin or the destination, so both dropdowns list every endpoint.
-      // (e.g. a stored "Querétaro → San Miguel" route also enables "San Miguel → Querétaro")
-      if (service.origin) { origins.add(service.origin); destinations.add(service.origin); }
-      if (service.destination) { origins.add(service.destination); destinations.add(service.destination); }
-    } else if (directionType === 'departure') {
-      // Departure for non-aeropuerto: swap origins/destinations
-      // User departs FROM destination → TO origin (relative to DB)
-      if (service.destination) origins.add(service.destination);
-      if (service.origin) destinations.add(service.origin);
-    } else {
-      // Arrival for non-aeropuerto: origins and destinations as stored
-      if (service.origin) origins.add(service.origin);
-      if (service.destination) destinations.add(service.destination);
-    }
-  });
+  const origins = new Set(allNames);
+  const destinations = new Set(allNames);
 
   // Create mapping from slugified values to original names (make it global)
   window.slugToOriginalMapping = new Map();
@@ -238,39 +212,16 @@ function populateDropdownsForTransportType(transportType, directionType) {
  * @example
  */
 function populateRoundTripDropdowns(transportType) {
-  if (!window.servicesByTransportType) return;
+  if (!window.allActivePois || window.allActivePois.length === 0) return;
 
-  const services = window.servicesByTransportType[transportType] || [];
+  // Origen/destino = CUALQUIER POI activo en ambas direcciones (ida y vuelta) para los 3 tipos.
+  const allPois = window.allActivePois || [];
+  const allNames = allPois.map((p) => p.label).filter(Boolean);
 
-  // Collect origins/destinations for both directions
-  const arrivalOrigins = new Set();
-  const arrivalDestinations = new Set();
-  const departureOrigins = new Set();
-  const departureDestinations = new Set();
-
-  services.forEach((service) => {
-    if (transportType === 'aeropuerto') {
-      // Arrival: airports → origins, destinations → destinations
-      if (service.originServiceType && service.originServiceType.toLowerCase().includes('aeropuerto')) {
-        arrivalOrigins.add(service.origin);
-        departureDestinations.add(service.origin); // Departure dest = airports
-      }
-      if (service.destination) {
-        arrivalDestinations.add(service.destination);
-        departureOrigins.add(service.destination); // Departure origin = hotels/cities
-      }
-    } else {
-      // Punto a Punto / Local
-      if (service.origin) {
-        arrivalOrigins.add(service.origin);
-        departureDestinations.add(service.origin);
-      }
-      if (service.destination) {
-        arrivalDestinations.add(service.destination);
-        departureOrigins.add(service.destination);
-      }
-    }
-  });
+  const arrivalOrigins = new Set(allNames);
+  const arrivalDestinations = new Set(allNames);
+  const departureOrigins = new Set(allNames);
+  const departureDestinations = new Set(allNames);
 
   // Ensure slug mapping exists
   if (!window.slugToOriginalMapping) window.slugToOriginalMapping = new Map();
@@ -370,57 +321,26 @@ function updateOptionsIndicator(datalistId, indicatorId) {
 function updateDestinationsForOrigin(selectedOrigin = null) {
   qsDevLog('🔍 updateDestinationsForOrigin called with origin:', selectedOrigin);
 
-  if (!window.servicesByTransportType || !selectedOrigin) {
-    qsDevLog('❌ No services data or origin, returning');
-    return; // No filtering if no origin selected
-  }
-
-  // Convert slugified value back to original name
-  const originalOriginName = window.slugToOriginalMapping?.get(selectedOrigin) || selectedOrigin;
-  qsDevLog(`🔄 Converting slug "${selectedOrigin}" to original name: "${originalOriginName}"`);
-
+  // Origen/destino libre: el destino ya NO se filtra por la ruta del catálogo ni por el tipo. Los
+  // destinos son siempre TODOS los POIs activos. Repoblamos la lista completa para que quede
+  // consistente aunque haya cambiado el origen; excluimos solo el POI ya elegido como origen
+  // para no ofrecer "mismo origen = destino".
   const transportType = document.querySelector('input[name="transportType"]:checked')?.value || 'aeropuerto';
   const directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
-  const services = window.servicesByTransportType[transportType] || [];
-
-  // For departure: user's origin is a local place stored as service.destination in DB
-  // So filter by service.destination and return service.origin as destination options
   const isDeparture = directionType === 'departure';
   const isDepartureWithSelect = isDeparture && (transportType === 'aeropuerto' || transportType === 'punto-a-punto');
-  // Punto a Punto routes are bidirectional: match the selected origin against
-  // either endpoint and offer the opposite endpoint as the destination.
   const isBidirectional = transportType === 'punto-a-punto';
 
-  const relevantServices = services.filter((service) => {
-    if (isBidirectional) {
-      return service.origin === originalOriginName || service.destination === originalOriginName;
-    }
-    return isDeparture ? service.destination === originalOriginName : service.origin === originalOriginName;
-  });
+  const originalOriginName = selectedOrigin
+    ? (window.slugToOriginalMapping?.get(selectedOrigin) || selectedOrigin)
+    : null;
 
-  if (relevantServices.length === 0) {
-    return;
-  }
+  const allPois = window.allActivePois || [];
+  const allNames = allPois.map((p) => p.label).filter(Boolean);
 
-  // Get matching destinations
-  const destinations = new Set();
-  relevantServices.forEach((service) => {
-    if (isBidirectional) {
-      // Offer whichever endpoint is NOT the selected origin
-      if (service.origin === originalOriginName && service.destination) {
-        destinations.add(service.destination);
-      } else if (service.destination === originalOriginName && service.origin) {
-        destinations.add(service.origin);
-      }
-    } else if (isDeparture) {
-      // Departure: show matching origins as destination options
-      if (service.origin) {
-        destinations.add(service.origin);
-      }
-    } else if (service.destination) {
-      destinations.add(service.destination);
-    }
-  });
+  const destinations = new Set(
+    allNames.filter((name) => name !== originalOriginName),
+  );
 
   if (isDepartureWithSelect || isBidirectional) {
     // Aeropuerto / Punto a Punto departure: update destination SELECT

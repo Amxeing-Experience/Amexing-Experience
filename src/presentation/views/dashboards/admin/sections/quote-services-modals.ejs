@@ -36,6 +36,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
     #extraAdditionalVehiclesHeader small {
         font-size: 0.9rem;
     }
+    /* Resalta el dropdown de vehículo y el input de precio cuando la ruta no tiene precio de
+       catálogo ("precio pendiente"): borde amarillo para que se entienda que $0 es de referencia. */
+    .field-price-pending,
+    .field-price-pending:focus {
+        border-color: #ffc107 !important;
+        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.35) !important;
+    }
+    /* Cuando el precio está dentro de un .input-group, resaltamos todo el grupo. */
+    .input-group.field-price-pending .form-control,
+    .input-group.field-price-pending .input-group-text {
+        border-color: #ffc107 !important;
+    }
 </style>
 
 <!-- Day Modal -->
@@ -980,6 +992,20 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 <option value="">-- Sin vehículo --</option>
                             </select>
                             <small id="vehicleCapacityNote" class="text-info d-none"><i class="ti ti-info-circle me-1"></i><span id="vehicleCapacityNoteText"></span></small>
+                        </div>
+                    </div>
+
+                    <!-- Aviso full-width: ruta sin precio en catálogo -> "precio pendiente" (Parte B/C).
+                         Banda ancha debajo del vehículo (arriba de Opcionales) para que abarque ambos campos. -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 mb-3 d-none" id="transportPricePendingNotice" role="alert">
+                                <i class="ti ti-alert-triangle mt-1"></i>
+                                <div>
+                                    <strong>Precio pendiente</strong>
+                                    <span class="d-block small" id="transportPricePendingNoticeText">Esta ruta no está en el catálogo de precios. Los vehículos y el precio mostrados ($0) son solo de referencia; el administrador confirmará la tarifa. El servicio se guarda igual.</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
