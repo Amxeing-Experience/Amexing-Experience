@@ -62,6 +62,13 @@ class OwnedClientsController {
     if (userRole === 'department_manager' || userRole === 'client') {
       q.equalTo('organizationId', this.getAgencyId(currentUser, userRole));
     }
+    // Un agente (role 'client') solo ve SUS clientes (los que él dio de alta, por
+    // createdBy). El DM ve todos los de su agencia. createdBy se guarda como pointer.
+    if (userRole === 'client') {
+      const creatorPtr = new (Parse.Object.extend('AmexingUser'))();
+      creatorPtr.id = currentUser.id;
+      q.equalTo('createdBy', creatorPtr);
+    }
     return q;
   }
 
@@ -241,8 +248,8 @@ class OwnedClientsController {
 
       const clients = await query.find({ useMasterKey: true });
 
-      // Resolver en lote los creadores (createdBy es un string id).
-      const creatorIds = [...new Set(clients.map((c) => c.get('createdBy')).filter(Boolean))];
+      // Resolver en lote los creadores (createdBy es un pointer a AmexingUser).
+      const creatorIds = [...new Set(clients.map((c) => c.get('createdBy')?.id).filter(Boolean))];
       const creatorMap = {};
       if (creatorIds.length) {
         const creators = await new Parse.Query(AmexingUserCls)
@@ -260,7 +267,7 @@ class OwnedClientsController {
 
       // Format response
       const formattedClients = clients.map((client) => {
-        const cbId = client.get('createdBy');
+        const cbId = client.get('createdBy')?.id;
         return {
           id: client.id,
           name: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
@@ -817,13 +824,19 @@ class OwnedClientsController {
         return this.sendError(res, 'Client not found', 404);
       }
 
-      // Ownership: los clientes de agencia pertenecen a la agencia del que llama
-      // (organizationId). Admin/superadmin puede cualquiera. (Fallback a ownedBy legado.)
+      // Ownership: un agente (role 'client') solo administra SUS clientes (createdBy);
+      // el DM administra todos los de su agencia (organizationId). Admin: cualquiera.
       const clientOrg = client.get('organizationId');
       const legacyOwnedBy = client.get('ownedBy');
-      const isOwner = (clientOrg && clientOrg === this.getAgencyId(currentUser, userRole))
-        || (legacyOwnedBy && legacyOwnedBy.id === currentUser.id);
+      const clientCreator = client.get('createdBy');
       const isAdmin = ['admin', 'superadmin'].includes(userRole);
+      let isOwner;
+      if (userRole === 'client') {
+        isOwner = clientCreator && clientCreator.id === currentUser.id;
+      } else {
+        isOwner = (clientOrg && clientOrg === this.getAgencyId(currentUser, userRole))
+          || (legacyOwnedBy && legacyOwnedBy.id === currentUser.id);
+      }
 
       if (!isOwner && !isAdmin) {
         return this.sendError(res, 'Access denied', 403);
@@ -985,13 +998,19 @@ class OwnedClientsController {
         return this.sendError(res, 'Client not found', 404);
       }
 
-      // Ownership: los clientes de agencia pertenecen a la agencia del que llama
-      // (organizationId). Admin/superadmin puede cualquiera. (Fallback a ownedBy legado.)
+      // Ownership: un agente (role 'client') solo administra SUS clientes (createdBy);
+      // el DM administra todos los de su agencia (organizationId). Admin: cualquiera.
       const clientOrg = client.get('organizationId');
       const legacyOwnedBy = client.get('ownedBy');
-      const isOwner = (clientOrg && clientOrg === this.getAgencyId(currentUser, userRole))
-        || (legacyOwnedBy && legacyOwnedBy.id === currentUser.id);
+      const clientCreator = client.get('createdBy');
       const isAdmin = ['admin', 'superadmin'].includes(userRole);
+      let isOwner;
+      if (userRole === 'client') {
+        isOwner = clientCreator && clientCreator.id === currentUser.id;
+      } else {
+        isOwner = (clientOrg && clientOrg === this.getAgencyId(currentUser, userRole))
+          || (legacyOwnedBy && legacyOwnedBy.id === currentUser.id);
+      }
 
       if (!isOwner && !isAdmin) {
         return this.sendError(res, 'Access denied', 403);
@@ -1051,13 +1070,19 @@ class OwnedClientsController {
         return this.sendError(res, 'Client not found', 404);
       }
 
-      // Ownership: los clientes de agencia pertenecen a la agencia del que llama
-      // (organizationId). Admin/superadmin puede cualquiera. (Fallback a ownedBy legado.)
+      // Ownership: un agente (role 'client') solo administra SUS clientes (createdBy);
+      // el DM administra todos los de su agencia (organizationId). Admin: cualquiera.
       const clientOrg = client.get('organizationId');
       const legacyOwnedBy = client.get('ownedBy');
-      const isOwner = (clientOrg && clientOrg === this.getAgencyId(currentUser, userRole))
-        || (legacyOwnedBy && legacyOwnedBy.id === currentUser.id);
+      const clientCreator = client.get('createdBy');
       const isAdmin = ['admin', 'superadmin'].includes(userRole);
+      let isOwner;
+      if (userRole === 'client') {
+        isOwner = clientCreator && clientCreator.id === currentUser.id;
+      } else {
+        isOwner = (clientOrg && clientOrg === this.getAgencyId(currentUser, userRole))
+          || (legacyOwnedBy && legacyOwnedBy.id === currentUser.id);
+      }
 
       if (!isOwner && !isAdmin) {
         return this.sendError(res, 'Access denied', 403);
