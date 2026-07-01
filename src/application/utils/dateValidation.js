@@ -3,8 +3,8 @@
  *
  * Two categories, with bounds recomputed on every call so "today" always advances (never
  * hardcoded):
- *  - PAST-ONLY  (birth dates, passport issue dates): 1900-01-01 .. today. No future.
- *  - FUTURE-OK  (passport expiration, payment/reservation dates): 1900-01-01 .. today + MAX_FUTURE_YEARS.
+ * PAST-ONLY (birth dates, passport issue dates): 1900-01-01 .. today. No future.
+ * FUTURE-OK (passport expiration, payment/reservation dates): 1900-01-01 .. today + MAX_FUTURE_YEARS.
  *
  * The SERVER is the source of truth (validateDate); the <input> min/max attributes built with
  * todayISO()/maxFutureISO() are UX only and can be bypassed, so both layers must be applied.
@@ -51,7 +51,8 @@ function validateDate(value, {
     const endOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
     if (d > endOfToday) return `${fieldName} no puede ser una fecha futura`;
   } else {
-    const maxDate = new Date(Date.UTC(now.getUTCFullYear() + maxFutureYears, now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+    const maxYear = now.getUTCFullYear() + maxFutureYears;
+    const maxDate = new Date(Date.UTC(maxYear, now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
     if (d > maxDate) return `${fieldName} es demasiado lejana`;
   }
   return null;
