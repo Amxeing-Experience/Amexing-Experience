@@ -1247,6 +1247,9 @@ const currentPath = '/dashboard/admin/clients';
                 console.log('Client form validation passed');
 
                 const formData = {
+                    // Tipo de cliente directo (direct_client | wedding_planner | concierge | home_owner)
+                    clientCategory: document.getElementById('directClientCategory').value || undefined,
+
                     // Basic information
                     firstName: document.getElementById('directClientFirstName').value.trim(),
                     lastName: document.getElementById('directClientLastName').value.trim(),
