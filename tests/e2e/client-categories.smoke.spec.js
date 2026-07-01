@@ -61,8 +61,8 @@ function readToken(page) {
 test.describe('Clientes por categoría + cotización — smoke', () => {
   test.skip(!EMAIL || !PASSWORD, 'Faltan E2E_EMAIL / E2E_PASSWORD');
 
-  // Alta de 4 clientes + 4 cotizaciones a través de la UI: subir el timeout.
-  test.setTimeout(180_000);
+  // Alta de 4 clientes + 4 cotizaciones (+ service-items) por UI: subir el timeout.
+  test.setTimeout(240_000);
 
   test('da de alta cada tipo de cliente, lo persiste en su categoría y cotiza', async ({ page }) => {
     const pageErrors = [];
@@ -71,6 +71,9 @@ test.describe('Clientes por categoría + cotización — smoke', () => {
     });
 
     const stamp = Date.now();
+    // Fecha futura (YYYY-MM-DD) para el día de servicio de cada cotización, así la
+    // tabla las muestra bajo su filtro por defecto ('future' oculta las sin fechas).
+    const futureDate = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10);
     const created = [];
 
     // --- Login ---
@@ -192,6 +195,29 @@ test.describe('Clientes por categoría + cotización — smoke', () => {
       const json = await resp.json();
       expect(json.success, `cotización ${c.value} success`).toBeTruthy();
       expect(json.data && json.data.id, `cotización ${c.value} id`).toBeTruthy();
+
+      // Agregar un día de servicio con fecha futura para que la cotización sea
+      // VISIBLE en la tabla (el filtro por defecto 'future' oculta las cotizaciones
+      // sin fechas de servicio). Día mínimo válido: dayTotal 0 = suma de 0 subconcepts.
+      const quoteId = json.data.id;
+      const svc = await page.evaluate(async ({ id, date, bearer }) => {
+        const r = await fetch(`/api/quotes/${id}/service-items`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${bearer}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            days: [{
+              dayNumber: 1, dayTitle: 'Smoke', date, subconcepts: [], dayTotal: 0,
+            }],
+            subtotal: 0, iva: 0, total: 0, currency: 'MXN', paymentType: 'efectivo',
+          }),
+        });
+        const j = await r.json().catch(() => ({}));
+        return { status: r.status, success: !!j.success };
+      }, { id: quoteId, date: futureDate, bearer: token });
+      expect(svc.success, `service-items ${c.value} (status ${svc.status})`).toBeTruthy();
     }
 
     // Ningún error de página no ignorado durante el flujo.
