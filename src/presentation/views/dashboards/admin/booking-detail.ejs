@@ -156,23 +156,31 @@
         </div>
     </div>
 
-    <!-- Pagos — sección propia, separada de Cargos Adicionales (antes vivían en la misma tarjeta). -->
+    <!-- Pagos — sección propia, separada de Cargos Adicionales (antes vivían en la misma tarjeta).
+         Colapsable: se auto-colapsa una vez cargados los pagos si ya hay al menos uno registrado
+         (ver loadPayments), para no obligar a hacer scroll por una tabla que el usuario ya conoce. -->
     <div class="card border-0 shadow-sm mb-4" id="paymentsCard" style="display:none;">
         <div class="card-header" style="background: linear-gradient(135deg, #0d6efd 0%, #6ea8fe 100%); border: none;">
             <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-cash me-2"></i>Pagos
-                </h5>
+                <div class="d-flex align-items-center flex-grow-1" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#paymentsCollapse" aria-expanded="true" aria-controls="paymentsCollapse">
+                    <h5 class="card-title mb-0 text-white">
+                        <i class="ti ti-cash me-2"></i>Pagos
+                        <span class="badge bg-light text-primary ms-2 d-none" id="paymentsCountBadge"></span>
+                    </h5>
+                    <i class="ti ti-chevron-up text-white ms-2" id="paymentsChevron"></i>
+                </div>
                 <button class="btn btn-sm btn-light d-none" id="addPaymentBtn">
                     <i class="ti ti-plus me-1"></i>Agregar pago
                 </button>
             </div>
         </div>
-        <div class="card-body">
-            <!-- Inline payment form (replaces the old modal) -->
-            <div id="paymentFormWrap" class="border rounded p-3 mb-3 bg-light" style="display:none;"></div>
-            <div id="paymentsBody">
-                <!-- Payments table — rendered by JS -->
+        <div class="collapse show" id="paymentsCollapse">
+            <div class="card-body">
+                <!-- Inline payment form (replaces the old modal) -->
+                <div id="paymentFormWrap" class="border rounded p-3 mb-3 bg-light" style="display:none;"></div>
+                <div id="paymentsBody">
+                    <!-- Payments table — rendered by JS -->
+                </div>
             </div>
         </div>
     </div>
@@ -1661,6 +1669,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     // ===== PAYMENTS =====
 
     let paymentsCache = [];
+    // Auto-collapse only once (first load) — re-collapsing after every add/edit save would fight the user.
+    let paymentsAutoCollapseDone = false;
+
+    function paymentsCollapseInstance() {
+        const el = document.getElementById('paymentsCollapse');
+        return el ? bootstrap.Collapse.getOrCreateInstance(el, { toggle: false }) : null;
+    }
 
     const PAYMENT_METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
 
@@ -1695,6 +1710,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         const curr = d.currency || 'MXN';
 
         if (addBtn) { if (canEdit) addBtn.classList.remove('d-none'); else addBtn.classList.add('d-none'); }
+
+        const countBadge = document.getElementById('paymentsCountBadge');
+        if (countBadge) {
+            if (paymentsCache.length) {
+                countBadge.textContent = paymentsCache.length;
+                countBadge.classList.remove('d-none');
+            } else {
+                countBadge.classList.add('d-none');
+            }
+        }
+
+        // First load only: collapse the section when there's already data (nothing new to review),
+        // keep it open when empty (invites registering the first payment).
+        if (!paymentsAutoCollapseDone) {
+            paymentsAutoCollapseDone = true;
+            if (paymentsCache.length) paymentsCollapseInstance()?.hide();
+        }
 
         if (!paymentsCache.length) {
             body.innerHTML = '<div class="text-center py-3 text-muted">Sin pagos registrados</div>';
@@ -1784,6 +1816,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     function renderPaymentForm(paymentId) {
         const wrap = document.getElementById('paymentFormWrap');
         if (!wrap) return;
+        // The form lives inside the collapsible Pagos section — expand it so the form is actually visible.
+        paymentsCollapseInstance()?.show();
         const existing = paymentId ? paymentsCache.find((p) => p.id === paymentId) : null;
         const curr = existing?.origCurrency || 'MXN';
         const paidAt = existing?.paidAt ? new Date(existing.paidAt).toISOString().slice(0, 10) : '';
@@ -1855,6 +1889,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     document.getElementById('addPaymentBtn')?.addEventListener('click', () => renderPaymentForm(null));
+
+    // Flip the chevron with the actual collapse state (works whether it was toggled by the header
+    // click or programmatically via paymentsCollapseInstance()).
+    document.getElementById('paymentsCollapse')?.addEventListener('show.bs.collapse', () => {
+        document.getElementById('paymentsChevron')?.classList.replace('ti-chevron-down', 'ti-chevron-up');
+    });
+    document.getElementById('paymentsCollapse')?.addEventListener('hide.bs.collapse', () => {
+        document.getElementById('paymentsChevron')?.classList.replace('ti-chevron-up', 'ti-chevron-down');
+    });
 
     async function savePayment(paymentId) {
         const amount = parseAmount(document.getElementById('paymentAmount').value);
