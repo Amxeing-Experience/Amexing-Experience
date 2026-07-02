@@ -36,6 +36,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
     #extraAdditionalVehiclesHeader small {
         font-size: 0.9rem;
     }
+    /* Resalta el dropdown de vehículo y el input de precio cuando la ruta no tiene precio de
+       catálogo ("precio pendiente"): borde amarillo para que se entienda que $0 es de referencia. */
+    .field-price-pending,
+    .field-price-pending:focus {
+        border-color: #ffc107 !important;
+        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.35) !important;
+    }
+    /* Cuando el precio está dentro de un .input-group, resaltamos todo el grupo. */
+    .input-group.field-price-pending .form-control,
+    .input-group.field-price-pending .input-group-text {
+        border-color: #ffc107 !important;
+    }
 </style>
 
 <!-- Day Modal -->
@@ -823,6 +835,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <i class="ti ti-user-check me-1"></i>Incluir Greeter
                                         </label>
                                     </div>
+                                    <!-- Sub-opción: el greeter viaja en el vehículo (ocupa 1 asiento). Espejo de transporte. -->
+                                    <div class="form-check ms-3 d-none" id="aDisposicionGreeterInVehicleContainer">
+                                        <input class="form-check-input" type="checkbox" id="aDisposicionGreeterInVehicle">
+                                        <label class="form-check-label small text-muted" for="aDisposicionGreeterInVehicle">Viaja en el vehículo</label>
+                                    </div>
+                                </div>
+                                <!-- Nota de capacidad (a-disposición): el guía/greeter que viaja ocupa un asiento -->
+                                <div class="col-12">
+                                    <small id="aDisposicionVehicleCapacityNote" class="text-info d-none d-block mt-1"><i class="ti ti-info-circle me-1"></i><span id="aDisposicionVehicleCapacityNoteText"></span></small>
                                 </div>
                             </div>
 
@@ -974,6 +995,20 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         </div>
                     </div>
 
+                    <!-- Aviso full-width: ruta sin precio en catálogo -> "precio pendiente" (Parte B/C).
+                         Banda ancha debajo del vehículo (arriba de Opcionales) para que abarque ambos campos. -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 mb-3 d-none" id="transportPricePendingNotice" role="alert">
+                                <i class="ti ti-alert-triangle mt-1"></i>
+                                <div>
+                                    <strong>Precio pendiente</strong>
+                                    <span class="d-block small" id="transportPricePendingNoticeText">Esta ruta no está en el catálogo de precios. Los vehículos y el precio mostrados ($0) son solo de referencia; el administrador confirmará la tarifa. El servicio se guarda igual.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Opcionales (transporte / tour): guía + greeter -->
                     <div class="row" id="transportOptionsRow">
                         <div class="col-12 mb-3">
@@ -992,6 +1027,11 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <label class="form-check-label small text-muted" for="greeterInVehicle">Viaja en el vehículo</label>
                                 </div>
                             </div>
+                            <!-- Aviso: guía/greeter marcado pero la ruta SIN duración → el costo no se
+                                 puede calcular y queda pendiente hasta capturar la "Duración de ruta". -->
+                            <small class="text-warning d-block mt-2 d-none" id="guideGreeterDurationNotice">
+                                <i class="ti ti-alert-triangle me-1"></i>Falta la <strong>duración de la ruta</strong> para calcular el costo de guía/greeter. Ingrésala en “Duración de ruta”; si no, ese costo quedará <strong>pendiente</strong>.
+                            </small>
                         </div>
                     </div>
 

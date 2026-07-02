@@ -161,7 +161,8 @@ describe('TemplateService Integration Tests', () => {
       expect(html).toBeDefined();
       expect(html).toContain('Juan Pérez');
       expect(html).toContain('AMX-12345');
-      expect(html).toContain('Traslado Aeropuerto');
+      // La plantilla de reserva ya no incluye TIPO_SERVICIO ni LUGAR (por diseño;
+      // difiere de la cotización).
       expect(html).not.toContain('{{NOMBRE_CLIENTE}}');
       expect(html).not.toContain('{{NUMERO_RESERVA}}');
 
@@ -245,7 +246,7 @@ describe('TemplateService Integration Tests', () => {
       const logoUrl = TemplateService.getLogoUrl();
 
       expect(logoUrl).toBeDefined();
-      expect(logoUrl).toContain('img/amexing_logo_horizontal.avif');
+      expect(logoUrl).toContain('img/amexing_logo_hblanco.avif');
     });
 
     it('should include development base URL', () => {
@@ -254,7 +255,7 @@ describe('TemplateService Integration Tests', () => {
       const expectedBaseUrl = process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 1337}`;
 
       expect(logoUrl).toContain(expectedBaseUrl);
-      expect(logoUrl).toBe(`${expectedBaseUrl}/img/amexing_logo_horizontal.avif`);
+      expect(logoUrl).toBe(`${expectedBaseUrl}/img/amexing_logo_hblanco.avif`);
     });
 
     it('should generate asset URL', () => {
@@ -286,8 +287,8 @@ describe('TemplateService Integration Tests', () => {
     it('should have correct contact information', () => {
       const vars = TemplateService.getCommonVariables();
 
-      expect(vars.TELEFONO).toBe('+52 (415) 167 39 90');
-      expect(vars.TELEFONO_EMERGENCIAS).toBe('+52 (415) 153 50 67');
+      expect(vars.TELEFONO).toBe('+52 (415) 153 38 18');
+      expect(vars.TELEFONO_EMERGENCIAS).toBe('+52 (415) 153 38 18');
       expect(vars.EMAIL_CONTACTO).toBe('contact@amexingexperience.com');
       expect(vars.SITIO_WEB).toBe('https://www.amexingexperience.com');
     });

@@ -405,38 +405,41 @@ class QuoteController {
         contactPhone: contactPhone || '',
       };
 
-      // If clientFinalId is provided, fetch the Client data and use it for contact fields
+      // Cliente Final: los clientes (directos y de agencia) ahora viven en AmexingUser
+      // (role 'end_client'); fallback a Client legado para data pre-migración.
       if (clientFinalId) {
+        // Guardar la referencia SIEMPRE, aunque no se pueda leer su data de contacto.
+        quote.set('clientFinalId', clientFinalId);
         try {
-          const finalClientQuery = new Parse.Query('Client');
-          const finalClientRecord = await finalClientQuery.get(clientFinalId, { useMasterKey: true });
-
-          // Use final client's data for contact fields (unless explicitly overridden)
-          finalContactData.contactFirstName = contactFirstName || finalClientRecord.get('firstName') || finalClientRecord.get('contactFirstName') || '';
-          finalContactData.contactLastName = contactLastName || finalClientRecord.get('lastName') || finalClientRecord.get('contactLastName') || '';
-          finalContactData.contactEmail = contactEmail || finalClientRecord.get('email') || '';
-          finalContactData.contactPhone = contactPhone || finalClientRecord.get('phone') || '';
-
-          // Build contactPerson from final client data if not explicitly provided
-          if (!contactPerson && (finalContactData.contactFirstName || finalContactData.contactLastName)) {
-            finalContactData.contactPerson = `${finalContactData.contactFirstName} ${finalContactData.contactLastName}`.trim();
-          } else if (!contactPerson) {
-            finalContactData.contactPerson = finalClientRecord.get('contactPerson') || finalClientRecord.get('name') || '';
+          let finalClientRecord = await new Parse.Query('AmexingUser')
+            .get(clientFinalId, { useMasterKey: true }).catch(() => null);
+          if (!finalClientRecord) {
+            finalClientRecord = await new Parse.Query('Client')
+              .get(clientFinalId, { useMasterKey: true }).catch(() => null);
           }
 
-          // Store clientFinalId in the quote
-          quote.set('clientFinalId', clientFinalId);
+          if (finalClientRecord) {
+            // Use final client's data for contact fields (unless explicitly overridden)
+            finalContactData.contactFirstName = contactFirstName || finalClientRecord.get('firstName') || finalClientRecord.get('contactFirstName') || '';
+            finalContactData.contactLastName = contactLastName || finalClientRecord.get('lastName') || finalClientRecord.get('contactLastName') || '';
+            finalContactData.contactEmail = contactEmail || finalClientRecord.get('email') || '';
+            finalContactData.contactPhone = contactPhone || finalClientRecord.get('phone') || '';
 
-          logger.info('QuoteController.createQuote - Using Cliente Final data for contact fields', {
-            clientFinalId,
-            finalContactData,
-            userId: currentUser.id,
-          });
+            if (!contactPerson && (finalContactData.contactFirstName || finalContactData.contactLastName)) {
+              finalContactData.contactPerson = `${finalContactData.contactFirstName} ${finalContactData.contactLastName}`.trim();
+            } else if (!contactPerson) {
+              finalContactData.contactPerson = finalClientRecord.get('contactPerson') || finalClientRecord.get('name') || '';
+            }
+
+            logger.info('QuoteController.createQuote - Cliente Final data applied', {
+              clientFinalId, userId: currentUser.id,
+            });
+          } else {
+            logger.warn('QuoteController.createQuote - Cliente Final no encontrado (AmexingUser/Client)', { clientFinalId });
+          }
         } catch (error) {
           logger.warn('QuoteController.createQuote - Error fetching Cliente Final data, using provided values', {
-            error: error.message,
-            clientFinalId,
-            userId: currentUser.id,
+            error: error.message, clientFinalId, userId: currentUser.id,
           });
         }
       }
@@ -595,13 +598,24 @@ class QuoteController {
       // Agency/Client filter (molecule client-agency-filter). On quotes the link is
       // direct: 'agency' → quote.client (AmexingUser); 'client' → quote.companyClientPtr (Client).
       // Empty type = no filter; with type but no id, filter by type. With id, by entity.
-      const clientTypeFilter = req.query.clientTypeFilter || ''; // '', 'agency', 'client'
+      // '', 'agency', 'client', o una categoría de persona (wedding_planner/concierge/home_owner)
+      const clientTypeFilter = req.query.clientTypeFilter || '';
       const clientIdFilter = req.query.clientIdFilter || '';
+      // Mapea el tipo de filtro de persona → clientCategory en AmexingUser.
+      // 'client' = clientes directos; las categorías especiales usan su propio nombre.
+      const PERSON_CATEGORY_BY_FILTER = {
+        client: 'direct_client',
+        wedding_planner: 'wedding_planner',
+        concierge: 'concierge',
+        home_owner: 'home_owner',
+      };
       /**
        * Apply the agency/client filter to a quotes query based on the request's
        * clientTypeFilter and clientIdFilter. For 'agency' it filters on the
-       * AmexingUser pointer (quote.client); for 'client' it filters on the Client
-       * pointer (quote.companyClientPtr). With no ID, filters by type presence.
+       * AmexingUser pointer (quote.client, clientType != 'direct'); for 'client'
+       * and the specialty person categories (wedding_planner/concierge/home_owner)
+       * it filters on quote.client (AmexingUser end_client, clientType 'direct')
+       * scoped by clientCategory. With no ID, filters by type/category presence.
        * Mutates the query in place; no-op when no valid type filter is set.
        * @param {Parse.Query} q - The quotes query to constrain.
        * @returns {void}
@@ -609,17 +623,25 @@ class QuoteController {
        *   applyQuoteClientFilter(query); // narrows query to the selected agency/client
        */
       const applyQuoteClientFilter = (q) => {
-        if (clientTypeFilter !== 'agency' && clientTypeFilter !== 'client') return;
-        if (clientTypeFilter === 'client') {
+        const personCategory = PERSON_CATEGORY_BY_FILTER[clientTypeFilter];
+        if (clientTypeFilter !== 'agency' && !personCategory) return;
+        if (personCategory) {
+          // Clientes directos y categorías especiales (wedding_planner/concierge/
+          // home_owner): viven en quote.client (AmexingUser end_client) con
+          // clientType 'direct'. (Antes eran companyClientPtr → Client legado, ya migrado.)
           if (clientIdFilter) {
-            const ClientCls = Parse.Object.extend('Client');
-            const c = new ClientCls();
-            c.id = clientIdFilter;
-            q.equalTo('companyClientPtr', c);
+            const UserCls = Parse.Object.extend('AmexingUser');
+            const u = new UserCls();
+            u.id = clientIdFilter;
+            q.equalTo('client', u);
+            q.equalTo('clientType', 'direct');
           } else {
-            // Cliente directo: companyClientPtr existe y client no (la agencia tiene prioridad)
-            q.exists('companyClientPtr');
-            q.doesNotExist('client');
+            // Sin id: acota a la categoría seleccionada (direct_client / wedding_planner
+            // / concierge / home_owner) vía subquery sobre el pointer client.
+            const innerClient = new Parse.Query('AmexingUser');
+            innerClient.equalTo('clientCategory', personCategory);
+            q.matchesQuery('client', innerClient);
+            q.equalTo('clientType', 'direct');
           }
         } else if (clientIdFilter) {
           const UserCls = Parse.Object.extend('AmexingUser');
@@ -627,7 +649,9 @@ class QuoteController {
           u.id = clientIdFilter;
           q.equalTo('client', u);
         } else {
+          // Agencia = tiene client (AmexingUser) y NO es directo.
           q.exists('client');
+          q.notEqualTo('clientType', 'direct');
         }
       };
 
@@ -1157,7 +1181,10 @@ class QuoteController {
       data.clientFinal = null;
       if (data.clientFinalId) {
         try {
-          const cf = await new Parse.Query('Client').get(data.clientFinalId, { useMasterKey: true });
+          // Cliente final ahora vive en AmexingUser (end_client); fallback a Client legado.
+          let cf = await new Parse.Query('AmexingUser').get(data.clientFinalId, { useMasterKey: true }).catch(() => null);
+          if (!cf) cf = await new Parse.Query('Client').get(data.clientFinalId, { useMasterKey: true }).catch(() => null);
+          if (!cf) throw new Error('Cliente final no encontrado');
           const companyName = cf.get('contextualData')?.companyName || '';
           const firstName = cf.get('firstName') || cf.get('contactFirstName') || '';
           const lastName = cf.get('lastName') || cf.get('contactLastName') || '';
@@ -3213,9 +3240,10 @@ class QuoteController {
         return true;
       }
 
-      // For all other roles, check if they created the quote
+      // For non-client roles, having created the quote grants access.
+      // Clients are gated strictly by current ownership below (created == owner unless transferred).
       const createdBy = quote.get('createdBy');
-      if (createdBy && createdBy.id === currentUser.id) {
+      if (userRole !== 'client' && createdBy && createdBy.id === currentUser.id) {
         return true;
       }
 
@@ -3255,17 +3283,15 @@ class QuoteController {
         }
       }
 
-      // Clients can access quotes in their organization
+      // Clients can access ONLY quotes they currently own. Collaboration-shared quotes
+      // are granted earlier in getQuoteById via collaborationService.hasAccess.
       if (userRole === 'client') {
-        const userClientId = currentUser.clientId || currentUser.get('clientId');
-        const clientPtr = quote.get('client');
-
-        // Check if client pointer matches the org owner
-        if (clientPtr && userClientId && clientPtr.id === userClientId) {
+        const ownerPtr = quote.get('owner');
+        if (ownerPtr && ownerPtr.id === currentUser.id) {
           return true;
         }
-        // Check if client pointer matches current user
-        if (clientPtr && clientPtr.id === currentUser.id) {
+        // Legacy quotes without an owner pointer: creator is the de-facto owner.
+        if (!ownerPtr && createdBy && createdBy.id === currentUser.id) {
           return true;
         }
       }
@@ -3391,157 +3417,63 @@ class QuoteController {
         return;
       }
 
-      // Clients see quotes FOR their organization + quotes they created
-      // Match by role name OR by having a clientId (client org members may have non-client roles)
+      // Clients see ONLY quotes they currently own (creator = initial owner; updated on
+      // transfer via the denormalized `owner` pointer) PLUS quotes explicitly shared with
+      // them via collaboration (QuoteAccess editor/viewer). No org-wide visibility.
       const userClientId = currentUser.clientId || currentUser.get('clientId');
       if (userRole === 'client' || userClientId) {
-        const effectiveClientId = userClientId || currentUser.id;
-
-        // Find all users in the same client organization
-        const clientUsersQuery = new Parse.Query('AmexingUser');
-        clientUsersQuery.equalTo('clientId', effectiveClientId);
-        clientUsersQuery.equalTo('exists', true);
-        clientUsersQuery.equalTo('active', true);
-
-        const clientUsers = await clientUsersQuery.find({ useMasterKey: true });
-
-        // Build list of client pointers (organization users)
-        const clientUserPointers = clientUsers.map((user) => ({
-          __type: 'Pointer',
-          className: 'AmexingUser',
-          objectId: user.id,
-        }));
-
-        // Also include the "parent" client user (the one whose objectId IS the clientId)
-        // This covers cases where the client pointer on quotes points to the org owner
-        if (effectiveClientId && !clientUserPointers.find((p) => p.objectId === effectiveClientId)) {
-          clientUserPointers.push({
-            __type: 'Pointer',
-            className: 'AmexingUser',
-            objectId: effectiveClientId,
-          });
-        }
-
-        // Always include current user pointer
         const currentUserPointer = {
           __type: 'Pointer',
           className: 'AmexingUser',
           objectId: currentUser.id,
         };
-        if (!clientUserPointers.find((p) => p.objectId === currentUser.id)) {
-          clientUserPointers.push(currentUserPointer);
-        }
 
-        // Query 3: Quotes where client has collaboration access OR ownership
+        // Quotes explicitly shared with this user via collaboration
         const accessQuery = new Parse.Query('QuoteAccess');
         accessQuery.equalTo('agent', currentUserPointer);
         accessQuery.equalTo('active', true);
         accessQuery.equalTo('exists', true);
         const accessRecords = await accessQuery.find({ useMasterKey: true });
-
-        // Check for ownership
-        const ownershipQuery = new Parse.Query('QuoteOwnership');
-        ownershipQuery.equalTo('owner', currentUserPointer);
-        ownershipQuery.equalTo('isCurrent', true);
-        ownershipQuery.equalTo('exists', true);
-        const ownershipRecords = await ownershipQuery.find({ useMasterKey: true });
-
-        // Separate quotes into owned vs unowned for proper access control precedence
-        const allOwnershipQuery = new Parse.Query('QuoteOwnership');
-        allOwnershipQuery.equalTo('isCurrent', true);
-        allOwnershipQuery.equalTo('exists', true);
-        allOwnershipQuery.select('quote');
-        const allOwnedQuotes = await allOwnershipQuery.find({ useMasterKey: true });
-        const ownedQuoteIds = allOwnedQuotes
-          .map((ownership) => ownership.get('quote')?.id)
+        const now = new Date();
+        const sharedQuoteIds = accessRecords
+          // Match QuoteAccess.isValid(): exclude revoked and expired shares so the list
+          // never shows a quote the open-gate (hasAccess) would 403.
+          .filter((access) => access.get('revoked') !== true)
+          .filter((access) => {
+            const expiresAt = access.get('expiresAt');
+            return !expiresAt || expiresAt > now;
+          })
+          .map((access) => access.get('quote')?.id)
           .filter((id) => id);
-
-        console.log('=== CLIENT ACCESS CONTROL REBUILD ===');
-        console.log('Total quotes with ownership:', ownedQuoteIds.length);
-        console.log('Current user ID:', currentUser.id);
-        console.log('User owns quotes directly:', ownershipRecords.length);
-        console.log('User has collaboration access:', accessRecords.length);
 
         const queries = [];
 
-        // PATH B: Quotes WITHOUT established ownership - use legacy access (client + creator)
-        // Only for quotes that have no ownership records at all
-        if (ownedQuoteIds.length > 0) {
-          // Only check unowned quotes for client assignment
-          const queryByClient = new Parse.Query('Quote');
-          queryByClient.containedIn('client', clientUserPointers);
-          queryByClient.notContainedIn('objectId', ownedQuoteIds);
-          queries.push(queryByClient);
+        // Current owner (creator = initial owner; pointer updated on transfer)
+        const queryByOwner = new Parse.Query('Quote');
+        queryByOwner.equalTo('owner', currentUserPointer);
+        queries.push(queryByOwner);
 
-          // Only check unowned quotes for creator access
-          const queryByCreator = new Parse.Query('Quote');
-          queryByCreator.equalTo('createdBy', currentUserPointer);
-          queryByCreator.notContainedIn('objectId', ownedQuoteIds);
-          queries.push(queryByCreator);
+        // Fallback for legacy quotes without an `owner` pointer: the creator is the
+        // de-facto owner (mirrors QuoteOwnershipService.transferOwnership fallback).
+        const queryByCreator = new Parse.Query('Quote');
+        queryByCreator.equalTo('createdBy', currentUserPointer);
+        queryByCreator.doesNotExist('owner');
+        queries.push(queryByCreator);
 
-          logger.info('Added legacy access filters (excluding owned quotes) for client', {
-            userId: currentUser.id,
-            excludedOwnedQuotes: ownedQuoteIds.length,
-          });
-        } else {
-          // No ownership system in use, use standard legacy queries
-          const queryByClient = new Parse.Query('Quote');
-          queryByClient.containedIn('client', clientUserPointers);
-          queries.push(queryByClient);
-
-          const queryByCreator = new Parse.Query('Quote');
-          queryByCreator.equalTo('createdBy', currentUserPointer);
-          queries.push(queryByCreator);
-
-          logger.info('Added legacy access filters (no ownership system) for client', {
-            userId: currentUser.id,
-          });
+        // Quotes explicitly shared with this user via collaboration
+        if (sharedQuoteIds.length > 0) {
+          const queryByCollaboration = new Parse.Query('Quote');
+          queryByCollaboration.containedIn('objectId', sharedQuoteIds);
+          queries.push(queryByCollaboration);
         }
 
-        // Add collaboration-based quotes (only for quotes WITH ownership)
-        if (accessRecords.length > 0 && ownedQuoteIds.length > 0) {
-          const collaborativeQuotePointers = accessRecords
-            .map((access) => access.get('quote'))
-            .filter((quote) => quote && quote.id && ownedQuoteIds.includes(quote.id));
-
-          if (collaborativeQuotePointers.length > 0) {
-            const queryByCollaboration = new Parse.Query('Quote');
-            queryByCollaboration.containedIn('objectId', collaborativeQuotePointers.map((q) => q.id));
-            queries.push(queryByCollaboration);
-
-            logger.info('Added collaboration filter for owned quotes (client)', {
-              userId: currentUser.id,
-              collaborativeOwnedQuotesCount: collaborativeQuotePointers.length,
-            });
-          }
-        }
-
-        // Add ownership-based quotes (only for quotes the user directly owns)
-        if (ownershipRecords.length > 0) {
-          const ownedQuotePointers = ownershipRecords
-            .map((ownership) => ownership.get('quote'))
-            .filter((quote) => quote && quote.id);
-
-          if (ownedQuotePointers.length > 0) {
-            const queryByOwnership = new Parse.Query('Quote');
-            queryByOwnership.containedIn('objectId', ownedQuotePointers.map((q) => q.id));
-            queries.push(queryByOwnership);
-
-            logger.info('Added ownership filter for client', {
-              userId: currentUser.id,
-              ownedQuotesCount: ownedQuotePointers.length,
-            });
-          }
-        }
-
-        // Combine with OR — client sees quotes assigned to their org OR created by them OR shared via collaboration
         // eslint-disable-next-line no-underscore-dangle
         query._orQuery(queries);
 
-        logger.info('Applied client filter to quotes query (client)', {
+        logger.info('Applied owner + collaboration filter to quotes query (client)', {
           userId: currentUser.id,
           clientId: userClientId,
-          clientUsersCount: clientUsers.length,
+          sharedQuotesCount: sharedQuoteIds.length,
         });
 
         return;

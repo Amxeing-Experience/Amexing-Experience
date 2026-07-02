@@ -764,14 +764,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         const exportBtnHtml = folio
             ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir vista pública (incluye Exportar a PDF)"><i class="ti ti-file-export me-1"></i>Exportar</a>`
             : '';
-        const cancelBtnHtml = canAssign ? `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>` : '';
-        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
-        if (canAssign) {
-            document.getElementById('cancelResBtn')?.addEventListener('click', () => {
-                // Use shared utility with existing reservation data and loadReservation callback
-                openReservationCancelModalWithData(reservationData, loadReservation);
-            });
+        // En vez del botón de cancelar: si ya está cancelada, mostrar etiqueta
+        // "Cancelada"; si tiene una solicitud de cancelación pendiente, mostrar
+        // "Pendiente de cancelación" (evita además crear solicitudes duplicadas).
+        let cancelBtnHtml = '';
+        if (d.status === 'cancelled') {
+            cancelBtnHtml = `<span class="badge bg-danger text-white"><i class="ti ti-x me-1"></i>Cancelada</span>`;
+        } else if (d.hasPendingCancellation) {
+            cancelBtnHtml = `<span class="badge bg-warning text-dark border border-danger-subtle" title="Tiene una solicitud de cancelación pendiente de aprobación"><i class="ti ti-clock me-1"></i>Pendiente de cancelación</span>`;
+        } else if (canAssign) {
+            cancelBtnHtml = `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>`;
         }
+        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
+        // El listener solo aplica cuando se renderizó el botón (no en las etiquetas).
+        document.getElementById('cancelResBtn')?.addEventListener('click', () => {
+            // Use shared utility with existing reservation data and loadReservation callback
+            openReservationCancelModalWithData(reservationData, loadReservation);
+        });
 
         renderServices(d.services);
         renderFinancialSummary();

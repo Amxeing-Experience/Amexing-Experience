@@ -284,6 +284,12 @@ document.addEventListener('DOMContentLoaded', function() {
         return `<span class="badge ${s.cls}" title="Estado de la reservación">${s.label}</span>`;
     }
 
+    // Una cancelación <24h crea una solicitud pendiente de aprobación; la reserva
+    // sigue en su estatus real, así que se muestra un badge extra para señalarlo.
+    function getPendingCancellationBadge() {
+        return `<span class="badge bg-warning text-dark border border-danger-subtle" title="Tiene una solicitud de cancelación pendiente de aprobación"><i class="ti ti-clock me-1"></i>Pendiente de cancelación</span>`;
+    }
+
     function formatDate(dateStr) {
         if (!dateStr) return '—';
         const d = new Date(dateStr);
@@ -463,15 +469,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 responsivePriority: 1,  // High priority - always show
                 render: function(data, type, row) {
                     const isAdminView = <%= (typeof basePath !== 'undefined' && basePath === 'admin') ? 'true' : 'false' %>;
+                    const pendingCancelBadge = row.hasPendingCancellation ? ' ' + getPendingCancellationBadge() : '';
                     // Agentes (DM/client): un solo badge de alto nivel (Bloqueado →
                     // Agendado → Confirmado), sin el detalle operativo.
                     if (!isAdminView) {
-                        return getAgentUnifiedStatusBadge(row.quoteStatus, row.status);
+                        return getAgentUnifiedStatusBadge(row.quoteStatus, row.status) + pendingCancelBadge;
                     }
                     // Admin: estado de cotización + estado operativo de la reserva.
-                    const quoteBadge = getQuoteStatusBadge(row.quoteStatus);
+                    // Si la reserva ya está cancelada, se omite el badge de la cotización
+                    // (siempre sería "cancelled") para no duplicar con "Cancelada".
+                    const quoteBadge = row.status === 'cancelled' ? '' : getQuoteStatusBadge(row.quoteStatus);
                     const reservationBadge = getReservationStatusBadge(row.status);
-                    return `${quoteBadge} ${reservationBadge}`;
+                    return `${quoteBadge} ${reservationBadge}${pendingCancelBadge}`.trim();
                 }
             },
             {
@@ -494,7 +503,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-text"></i></a>`;
                         <% } %>
                     }
-                    if (row.status !== 'cancelled' && row.status !== 'completed') {
+                    // No mostrar "Cancelar" si ya hay una solicitud de cancelación
+                    // pendiente (evita solicitudes duplicadas), ni si ya está
+                    // cancelada/completada.
+                    if (row.status !== 'cancelled' && row.status !== 'completed' && !row.hasPendingCancellation) {
                         actions += `<button class="btn btn-sm btn-outline-danger cancel-res-btn" data-id="${row.id}" title="Cancelar"><i class="ti ti-x"></i></button>`;
                     }
                     return actions;

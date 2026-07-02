@@ -83,12 +83,16 @@ class ClientProfileController {
   /**
    * Derive the owner (type and id) from the request route params.
    * @param {object} req - Express request.
-   * @returns {{ownerType: string, ownerId: string}} The resolved owner descriptor.
+   * @returns {Promise<{ownerType: string, ownerId: string}>} The resolved owner descriptor.
    * @example
    */
-  resolveOwner(req) {
+  async resolveOwner(req) {
     if (req.params.agentId) return { ownerType: 'amexingUser', ownerId: req.params.agentId };
-    return { ownerType: 'client', ownerId: req.params.clientId };
+    const ownerId = req.params.clientId;
+    // El cliente puede ser AmexingUser (end_client, modelo nuevo) o Client legado.
+    const isAmexingUser = await new Parse.Query('AmexingUser')
+      .get(ownerId, { useMasterKey: true }).then(() => true).catch(() => false);
+    return { ownerType: isAmexingUser ? 'amexingUser' : 'client', ownerId };
   }
 
   // Validate the owner exists, branching on type. Returns the Parse object.
@@ -184,7 +188,7 @@ class ClientProfileController {
   // ---------- addresses ----------
 
   async getAddresses(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const addresses = await ClientAddress.getByOwner(owner.ownerType, owner.ownerId);
@@ -203,7 +207,7 @@ class ClientProfileController {
    * @example
    */
   async createAddress(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
 
@@ -224,7 +228,7 @@ class ClientProfileController {
   }
 
   async updateAddress(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const address = await this.findOwnedRecord('ClientAddress', req.params.id, owner);
@@ -254,7 +258,7 @@ class ClientProfileController {
    * @example
    */
   async deleteAddress(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const address = await this.findOwnedRecord('ClientAddress', req.params.id, owner);
@@ -279,7 +283,7 @@ class ClientProfileController {
   // ---------- travel preferences ----------
 
   async getTravelPreferences(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const prefs = await TravelPreference.getByOwner(owner.ownerType, owner.ownerId);
@@ -298,7 +302,7 @@ class ClientProfileController {
    * @example
    */
   async createTravelPreference(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
 
@@ -316,7 +320,7 @@ class ClientProfileController {
   }
 
   async updateTravelPreference(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const pref = await this.findOwnedRecord('TravelPreference', req.params.id, owner);
@@ -338,7 +342,7 @@ class ClientProfileController {
    * @example
    */
   async deleteTravelPreference(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const pref = await this.findOwnedRecord('TravelPreference', req.params.id, owner);
@@ -352,7 +356,7 @@ class ClientProfileController {
 
   // Replace the owner's whole preference set in one save (the UI sends all categories at once).
   async saveTravelPreferences(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
 
@@ -381,7 +385,7 @@ class ClientProfileController {
   // ---------- loyalty programs (loyaltyPrograms array of { type, number } on the owner) ----------
 
   async getLoyaltyPrograms(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       const ownerObj = await this.validateOwnerExists(owner);
       this.sendSuccess(res, { loyaltyPrograms: ownerObj.get('loyaltyPrograms') || [] }, 'Loyalty programs retrieved successfully');
@@ -400,7 +404,7 @@ class ClientProfileController {
    * @example
    */
   async saveLoyaltyPrograms(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       const ownerObj = await this.validateOwnerExists(owner);
 
@@ -453,7 +457,7 @@ class ClientProfileController {
   }
 
   async getPassports(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passports = await ClientPassport.getByOwner(owner.ownerType, owner.ownerId);
@@ -475,7 +479,7 @@ class ClientProfileController {
    * @example
    */
   async createPassport(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
 
@@ -497,7 +501,7 @@ class ClientProfileController {
   }
 
   async updatePassport(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
@@ -538,7 +542,7 @@ class ClientProfileController {
 
   // Upload the passport copy via the S3 pipeline: images → optimizer, PDFs → direct S3 upload.
   async uploadPassportDocument(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
@@ -613,7 +617,7 @@ class ClientProfileController {
    * @example
    */
   async deletePassport(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
@@ -634,7 +638,7 @@ class ClientProfileController {
    * @example
    */
   async revealPassportNumber(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
@@ -842,7 +846,7 @@ class ClientProfileController {
   // ---------- trips (read-only: quotes/reservations linked to this client) ----------
 
   async getTrips(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       const ownerObj = await this.validateOwnerExists(owner);
 
@@ -874,7 +878,11 @@ class ClientProfileController {
         byClient.equalTo('client', userPtr);
         byClient.equalTo('clientType', 'direct');
 
-        const subQueries = [byClient];
+        // Clientes de agencia se referencian en la quote como clientFinalId (string).
+        const byFinal = new Parse.Query('Quote');
+        byFinal.equalTo('clientFinalId', owner.ownerId);
+
+        const subQueries = [byClient, byFinal];
         const legacyClientId = ownerObj.get('legacyClientId');
         if (legacyClientId) {
           const Client = Parse.Object.extend('Client');

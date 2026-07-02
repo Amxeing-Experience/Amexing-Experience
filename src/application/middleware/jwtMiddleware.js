@@ -565,7 +565,9 @@ const extractUser = (req, res, next) => {
  */
 const authRateLimit = expressRateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 requests per windowMs for auth endpoints
+  // Prod: 10 intentos/15min (seguridad). Dev: alto, para no bloquear pruebas locales / e2e
+  // (los demás limiters ya están gateados así en securityMiddleware.js; este faltaba).
+  max: process.env.NODE_ENV === 'development' ? 1000 : 10,
   message: {
     success: false,
     error: 'Too many authentication attempts, please try again later',
