@@ -18,6 +18,7 @@ const Client = require('../../../domain/models/Client');
 const AmexingUser = require('../../../domain/models/AmexingUser');
 const logger = require('../../../infrastructure/logger');
 const { logBulkReadAccess } = require('../../utils/auditHelper');
+const { validateDate } = require('../../utils/dateValidation');
 
 /**
  * RESTful controller for hierarchical, ownership-scoped client management.
@@ -53,6 +54,7 @@ class OwnedClientsController {
       role: 'end_client',
       organizationId: 'amexing',
       phone: data.phone,
+      birthDate: data.birthDate,
       notes: data.notes,
       contextualData: {},
       clientCategory: data.clientCategory,
@@ -513,6 +515,8 @@ class OwnedClientsController {
         preferredLanguage, accessibilityRequirements,
         allergies, dietaryRestrictions,
         notes,
+        // Person fields (Cliente Directo / sub-clientes son personas, no empresas)
+        birthDate,
         // Direct-client category (direct_client | wedding_planner | concierge | home_owner)
         clientCategory,
         // Legacy address field for backward compatibility
@@ -522,6 +526,12 @@ class OwnedClientsController {
       // Validate required fields
       if (!firstName || !lastName) {
         return this.sendError(res, 'First name and last name are required', 400);
+      }
+
+      // Birth date — shared standard: past-only (1900..hoy). Clients are people, so no future.
+      const birthDateError = validateDate(birthDate, { fieldName: 'Fecha de nacimiento', allowFuture: false });
+      if (birthDateError) {
+        return this.sendError(res, birthDateError, 400);
       }
 
       // Combine names for backward compatibility
@@ -580,6 +590,7 @@ class OwnedClientsController {
           allergies: processedAllergies,
           dietaryRestrictions: processedDietaryRestrictions,
           clientCategory: finalCategory,
+          birthDate,
           createdBy: currentUser.id,
         });
         logger.info('End-client user created', { userId: created.id, category: finalCategory });
@@ -612,6 +623,8 @@ class OwnedClientsController {
         accessibilityRequirements,
         allergies: processedAllergies,
         dietaryRestrictions: processedDietaryRestrictions,
+        // Sub-clients are people (an agency's own clients), so they carry a birthday too.
+        birthDate,
         ownedBy: currentUser.id,
         ownerType: userRole,
         createdBy: currentUser.id,

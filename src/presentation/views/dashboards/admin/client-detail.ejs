@@ -33,6 +33,10 @@ const clientData = {
     clientCategory: client.clientCategory || null,
     isAmexingUser: client.isAmexingUser === true,
     roleName: client.roleName || null,
+    // Person-type fields (present for Cliente Directo / agentes; agencies won't have them). Copied
+    // here because the render + edit form read clientData.*, not the raw client.* passed by the controller.
+    birthDate: client.birthDate || null,
+    anniversary: client.anniversary || null,
     createdAt: client.createdAt || null,
     updatedAt: client.updatedAt || null
 };

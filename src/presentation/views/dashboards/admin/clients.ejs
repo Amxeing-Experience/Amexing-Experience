@@ -261,19 +261,8 @@ const currentPath = '/dashboard/admin/clients';
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <%- include('../../atoms/form/datepicker', {
-                                    name: 'birthDate',
-                                    id: 'clientBirthDate',
-                                    label: 'Fecha de nacimiento',
-                                    required: false,
-                                    min: '1900-01-01',
-                                    max: new Date().toISOString().split('T')[0]
-                                }) %>
-                            </div>
-                        </div>
-
+                        <%# Una Agencia es una empresa, no una persona: no lleva fecha de nacimiento.
+                            El cumpleaños vive en Cliente Directo y en los Agentes de la agencia. %>
                         <%- include('../../molecules/common/form-field', {
                             type: 'url',
                             name: 'website',
@@ -1254,8 +1243,7 @@ const currentPath = '/dashboard/admin/clients';
                         zipCode: document.getElementById('addressZipCode').value.trim() || '',
                         country: document.getElementById('addressCountry').value.trim() || 'México'
                     },
-                    notes: document.getElementById('clientNotes').value.trim() || '',
-                    birthDate: document.getElementById('clientBirthDate')?.value || undefined
+                    notes: document.getElementById('clientNotes').value.trim() || ''
                 };
 
                 // Remove undefined values
