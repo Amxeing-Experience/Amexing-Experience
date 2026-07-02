@@ -30,8 +30,9 @@ class ReservationController {
    * Parse's Query.get() throws OBJECT_NOT_FOUND (101) for missing/invalid ids; without
    * this the surrounding catch blocks turn a legitimate "not found" into a 500.
    * @param {Parse.Query} query - Configured query (includes/constraints already set).
-   * @param {string} id - objectId to fetch.
+   * @param {string} id - ObjectId to fetch.
    * @returns {Promise<Parse.Object|null>} The object, or null if not found.
+   * @example
    */
   static async safeGet(query, id) {
     try {
@@ -1697,6 +1698,7 @@ class ReservationController {
    * so the table can flag reservations awaiting cancellation approval.
    * @param {Array<Parse.Object>} reservations - Reservation page results.
    * @returns {Promise<Set<string>>} Set of quoteId strings with a pending request.
+   * @example
    */
   static async getPendingCancellationQuoteIds(reservations) {
     const quotes = reservations.map((r) => r.get('quotePtr')).filter(Boolean);

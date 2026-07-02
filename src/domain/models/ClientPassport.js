@@ -185,7 +185,7 @@ class ClientPassport extends BaseModel {
   /**
    * Safe serialization for API responses: the passport number is returned masked only,
    * never the raw or encrypted value.
-   * @param {object} [ctx] - Context forwarded to the vault for the masked read (e.g. user, audit info).
+   * @param {object} [ctx] - Context forwarded to the vault for the masked read (e.g. User, audit info).
    * @returns {Promise<object>} Plain object with id, clientId, ownerType, label, hasNumber, numberMasked, countryOfIssue, nationality, dateOfIssue, expirationDate and passportDocument URL.
    * @example
    * const json = await passport.toSafeJSON({ user });

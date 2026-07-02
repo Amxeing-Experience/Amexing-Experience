@@ -111,6 +111,7 @@ async function batchFetchPrimaryImages(imageClass, pointerField, parentClass, id
  * @param {string} parentClass - Parse class name ('Tour' or 'Experience').
  * @param {Array<string>} ids - Array of parent object IDs.
  * @returns {Promise<object>} Map of parentId to { includes, notincludes }.
+ * @example
  */
 async function batchFetchIncludes(parentClass, ids) {
   const map = {};
@@ -139,8 +140,9 @@ async function batchFetchIncludes(parentClass, ids) {
  * Enrich each tour/experience subconcept with its catalog "incluye" / "no incluye"
  * text so the unified renderer (summary + public quote) can display it without
  * needing client-side catalog caches. Mutates the provided serviceItems in place.
- * @param {object} serviceItems - serviceItems object with days[].subconcepts[].
+ * @param {object} serviceItems - ServiceItems object with days[].subconcepts[].
  * @returns {Promise<void>}
+ * @example
  */
 async function injectServiceIncludes(serviceItems) {
   if (!serviceItems || !Array.isArray(serviceItems.days)) return;
