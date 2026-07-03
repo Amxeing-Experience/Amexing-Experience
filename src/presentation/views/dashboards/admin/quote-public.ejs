@@ -26,8 +26,9 @@
             padding: 2rem 0;
         }
 
-        /* PDF export: 2px smaller base font (puppeteer sets body.pdf-export-mode). */
-        html:has(body.pdf-export-mode) { font-size: 14px; }
+        /* PDF export base font (puppeteer sets body.pdf-export-mode). Sube el tamaño raíz;
+           casi todo el contenido usa rem, así que escala proporcionalmente en el PDF. */
+        html:has(body.pdf-export-mode) { font-size: 17px; }
 
         .public-quote-container {
             max-width: 1200px;
