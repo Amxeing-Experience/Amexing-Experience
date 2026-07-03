@@ -427,7 +427,18 @@
             // Hide price section for concepto services with $0 price
             if (!service) return true;
             if (service.type === 'concepto') {
-                const price = service.price || service.total || 0;
+                // El precio efectivo del concepto puede vivir SOLO en pricesByType: un concepto por
+                // persona con el precio unitario borrado guarda price/total = 0, pero el total real
+                // (el componente por-persona) queda en pricesByType. Antes esto se ocultaba mostrando
+                // "sin precio" aunque el concepto sí cuesta (y sí suma al total). Consideramos ambos.
+                let price = service.price || service.total || 0;
+                if (!price && service.pricesByType && typeof service.pricesByType === 'object') {
+                    price = Math.max(
+                        Number(service.pricesByType.efectivo) || 0,
+                        Number(service.pricesByType.transferencia) || 0,
+                        Number(service.pricesByType.tarjeta) || 0
+                    );
+                }
                 return price > 0;
             }
             return true;
