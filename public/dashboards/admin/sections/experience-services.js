@@ -1644,6 +1644,11 @@ class ExperienceServicesBuilder {
     const noAlcPriceEl = document.getElementById('noAlcoholPrice');
     if (noAlcPriceEl) noAlcPriceEl.value = isProvider ? (exp.price_no_alcohol || '') : (exp.noAlcoholPrice || '');
 
+    // Pre-cargar "Horas" con la duración configurada de la experiencia (editable);
+    // esto alimenta la "duración sugerida" (suma de tiempos de los servicios).
+    const hoursEl = document.getElementById('hoursQuantity');
+    if (hoursEl && exp.duration) hoursEl.value = parseFloat(exp.duration) || '';
+
     // Store experience data for later use
     this.selectedExperienceData = exp;
 
@@ -3426,7 +3431,10 @@ class ExperienceServicesBuilder {
     const service = {
       experienceId,
       concept: exp ? exp.name : 'Experiencia',
-      durationHours: exp && exp.duration ? (parseFloat(exp.duration) || 0) : 0, // para duración sugerida
+      // Horas editables del modal (default = duración de la experiencia); alimenta
+      // la duración sugerida. durationHours queda como respaldo.
+      hours: parseFloat(document.getElementById('hoursQuantity')?.value) || null,
+      durationHours: exp && exp.duration ? (parseFloat(exp.duration) || 0) : 0,
       isProviderExperience: isProvider,
       price: total,
       quantity: 1,
