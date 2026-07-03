@@ -10972,31 +10972,36 @@ class ItineraryBuilder {
       return result;
     }
 
-    // Availability array (objects with day keys + time data)
+    // Availability array. Se normaliza IGUAL que el modal de detalle de experiencias
+    // (que sí muestra los horarios): se agrupa por día y se leen las franjas directo de
+    // `item.times` ({start,end}) o de las formas legacy (start_time/startTime). Antes se
+    // delegaba en extractTimesFromScheduleData, que en la práctica devolvía franjas vacías
+    // y por eso una experiencia con horarios (p.ej. Cata Horizontal) caía a "Todos los días".
     if (Array.isArray(item.availability)) {
-      const dayTimesMap = new Map();
-      for (const obj of item.availability) {
-        if (!obj || typeof obj !== 'object') continue;
-        for (let d = 0; d < 7; d++) {
-          const keys = [d.toString(), dayNamesEn[d], dayNamesEs[d]];
-          for (const key of keys) {
-            if (obj.hasOwnProperty(key) && obj[key]) {
-              if (!dayTimesMap.has(d)) dayTimesMap.set(d, []);
-              const extracted = this.extractTimesFromScheduleData(obj[key], 0);
-              extracted.forEach((t) => dayTimesMap.get(d).push(t.label));
-              break;
-            }
-          }
-          if (obj.day === d) {
-            if (!dayTimesMap.has(d)) dayTimesMap.set(d, []);
-            const extracted = this.extractTimesFromScheduleData(obj, 0);
-            extracted.forEach((t) => dayTimesMap.get(d).push(t.label));
-          }
+      const byDay = new Map();
+      const pushSlot = (day, start, end) => {
+        if (typeof day !== 'number') return;
+        if (!byDay.has(day)) byDay.set(day, []);
+        if (start && end) {
+          const label = `${this.formatTime(start)} - ${this.formatTime(end)}`;
+          if (!byDay.get(day).includes(label)) byDay.get(day).push(label);
         }
-      }
-      for (const [d, times] of dayTimesMap) {
-        result.push({ day: dayAbbrevs[d], times });
-      }
+      };
+      item.availability.forEach((obj) => {
+        if (typeof obj === 'number') { pushSlot(obj); return; }
+        if (!obj || typeof obj !== 'object') return;
+        if (Array.isArray(obj.times)) {
+          if (obj.times.length === 0) pushSlot(obj.day);
+          obj.times.forEach((t) => pushSlot(obj.day, t.start || t.startTime, t.end || t.endTime));
+        } else {
+          pushSlot(obj.day, obj.start_time || obj.startTime, obj.end_time || obj.endTime);
+        }
+      });
+      // Orden lunes-primero (1..6, luego 0=domingo al final), como en el detalle.
+      const weekOrder = (d) => (d + 6) % 7;
+      Array.from(byDay.keys()).sort((a, b) => weekOrder(a) - weekOrder(b)).forEach((d) => {
+        result.push({ day: dayAbbrevs[d], times: byDay.get(d) });
+      });
       return result;
     }
 
