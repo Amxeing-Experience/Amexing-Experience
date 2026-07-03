@@ -3906,8 +3906,56 @@ class ExperienceServicesBuilder {
     return `<div class="text-muted small mt-1"><i class="ti ti-users me-1"></i>${parts.join(' + ')}</div>`;
   }
 
+  // Desglose por grupos del tour a pie para la tarjeta del servicio: reparte las
+  // personas en tramos (rangos del tour) y muestra cada grupo × horas.
+  renderWalkingTourBreakdown(service) {
+    const tour = this.toursCache.get(service.tourId);
+    if (!tour) return '';
+    const peopleCount = Math.max(1, parseInt(service.walkingPeopleCount, 10) || 1);
+    const hours = parseFloat(service.hours) || 1;
+    const priceOf = (svc, fb) => (parseFloat(svc) || parseFloat(fb) || 0);
+    const tiers = [
+      { label: tour.walkingRangeSmall, range: this.parseWalkingTourRange(tour.walkingRangeSmall), price: priceOf(service.walkingPriceSmall, tour.walkingPriceSmall) },
+      { label: tour.walkingRangeMedium, range: this.parseWalkingTourRange(tour.walkingRangeMedium), price: priceOf(service.walkingPriceMedium, tour.walkingPriceMedium) },
+      { label: tour.walkingRangeLarge, range: this.parseWalkingTourRange(tour.walkingRangeLarge), price: priceOf(service.walkingPriceLarge, tour.walkingPriceLarge) },
+    ].filter((t) => t.range);
+    if (!tiers.length) return '';
+
+    const sorted = [...tiers].sort((a, b) => (b.range.max === Infinity ? 999 : b.range.max) - (a.range.max === Infinity ? 999 : a.range.max));
+    const groups = [];
+    let remaining = peopleCount;
+    while (remaining > 0 && sorted.length) {
+      let best = null;
+      for (const t of sorted) { if (remaining >= t.range.min) { best = t; break; } }
+      if (!best) best = sorted[sorted.length - 1];
+      const alloc = Math.min(remaining, best.range.max === Infinity ? remaining : best.range.max);
+      groups.push({ tier: best, count: alloc });
+      remaining -= alloc;
+    }
+    if (!groups.length) return '';
+
+    const hoursLabel = hours > 1 ? ` × ${hours} h` : '';
+    const lines = groups.map((g) => `
+        <div class="d-flex justify-content-between small">
+          <span>Grupo ${g.tier.label || ''} (${g.count} pax)${hoursLabel}</span>
+          <span class="fw-semibold">$${(g.tier.price * hours).toFixed(2)}</span>
+        </div>
+      `);
+    return `
+      <div class="price-breakdown mt-2 p-2 bg-light rounded">
+        <div class="small fw-bold mb-1">${peopleCount} ${peopleCount > 1 ? 'personas' : 'persona'}:</div>
+        ${lines.join('')}
+      </div>
+    `;
+  }
+
   renderPriceBreakdown(service) {
     if (service.type !== 'experience' && service.type !== 'tour') return '';
+
+    // Tour a pie: desglose por GRUPOS (no usa precio por persona).
+    if (service.type === 'tour' && service.isWalkingTour) {
+      return this.renderWalkingTourBreakdown(service);
+    }
 
     const adults = service.adultsQuantity || 0;
     const children = service.childrenQuantity || 0;
