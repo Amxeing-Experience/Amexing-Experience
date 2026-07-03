@@ -7628,7 +7628,8 @@ class ItineraryBuilder {
       }).join('')}
                                         </div>
                                     ` : ''}
-                                    ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide ? `
+                                    ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide
+                                      && !(service.type === 'tour' && this.serviceIncludesMentionGuide(service)) ? `
                                         <div class="row g-2 text-success small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-user me-1"></i>
@@ -7673,7 +7674,15 @@ class ItineraryBuilder {
                                         </div>
                                     ` : ''}
                                     ${(service.type === 'tour' || service.type === 'experience') ? (() => {
-        const { includes, notIncludes } = this.getServiceIncludesInfo(service);
+        const info = this.getServiceIncludesInfo(service);
+        let includes = info.includes;
+        const notIncludes = info.notIncludes;
+        // Tour con guía cuya lista "Incluye" ya menciona guía: agregamos "Driver" como ítem
+        // (el label aparte se ocultó para no duplicar). Solo si aún no trae driver/chofer.
+        if (service.type === 'tour' && service.includeGuide && this.serviceIncludesMentionGuide(service)
+            && !/driver|chofer/i.test(includes || '')) {
+          includes = includes ? `${includes}\nDriver` : 'Driver';
+        }
         if (!includes && !notIncludes) return '';
         const col = (icon, label, value) => (value ? `
                                             <div class="col-12 col-md-6">
@@ -11312,6 +11321,15 @@ class ItineraryBuilder {
   // These fields live on the tour/experience catalog (not on the service itself),
   // so we look them up from the cache by id. Returns normalized strings preserving
   // line breaks (arrays are joined with newlines), or null when there's nothing to show.
+  // ¿La lista "Incluye" del servicio ya menciona un guía? (guía/guías/guiado, sin importar
+  // acentos). Se usa para no duplicar el label "Incluye Guía + Driver" cuando el Incluye ya
+  // trae guía, y para agregar "Driver" a esa lista en su lugar.
+  serviceIncludesMentionGuide(service) {
+    const info = this.getServiceIncludesInfo(service);
+    const lower = String(info.includes || '').toLowerCase();
+    return lower.includes('guia') || lower.includes('guía');
+  }
+
   getServiceIncludesInfo(service) {
     const empty = { includes: null, notIncludes: null };
     if (!service) return empty;

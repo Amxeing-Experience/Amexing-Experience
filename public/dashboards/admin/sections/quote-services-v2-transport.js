@@ -537,7 +537,7 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                             ${service.includeGuide ? `
                                 <div class="d-flex align-items-center text-success small mt-1">
                                     <i class="ti ti-user me-1"></i>
-                                    <strong>${service.type === 'a-disposicion' ? 'Incluye Chofer' : (service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía')}</strong>
+                                    <strong>${service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía'}</strong>
                                 </div>
                             ` : ''}
                             ${service.includeGreeter ? `
