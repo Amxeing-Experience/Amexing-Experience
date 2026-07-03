@@ -3767,6 +3767,12 @@ class ExperienceServicesBuilder {
       priceBreakdownHtml = this.renderPriceBreakdown(service);
     }
 
+    // Duración del servicio (para ver/verificar la suma de la "duración sugerida").
+    const svcDurationHours = this.getServiceDurationHours(service);
+    const svcDurationHtml = svcDurationHours > 0
+      ? `<div class="col-auto"><i class="ti ti-clock-hour-3 me-1"></i>${svcDurationHours} h</div>`
+      : '';
+
     return `
       <div class="service-item mb-3 p-3 border rounded hover-shadow${overlapClass}" data-service-id="${service.id}" style="animation: fadeInUp 0.3s ease;">
         <div class="d-flex justify-content-between align-items-start">
@@ -3783,6 +3789,7 @@ class ExperienceServicesBuilder {
                 ${service.vehicleTypeName ? `
                   <div class="col-auto"><i class="ti ti-car me-1"></i>${service.vehicleTypeName}${service.quantity > 1 ? ` x${service.quantity}` : ''}</div>
                 ` : ''}
+                ${svcDurationHtml}
               </div>
               ${this.renderPeopleQuantities(service)}
               ${priceBreakdownHtml}
