@@ -7,7 +7,11 @@
   "about": {
     "title": "About Us - Amexing Experience",
     "description": "With over 30 years of excellence in premium transportation in San Miguel de Allende. Discover our history, mission and the values that set us apart as the region's leading luxury transport provider.",
-    "keywords": "about us, amexing experience, history, san miguel de allende, premium transport, luxury travel"
+    "keywords": "about us, amexing experience, history, san miguel de allende, premium transport, luxury travel",
+    "team": {
+      "bannerHint": "Hover or tap each team member",
+      "since": "Since"
+    }
   },
   "services": {
     "title": "Services - Amexing Experience",
@@ -92,7 +96,8 @@
     "heroTitle": "Weddings & Events",
     "imageAlt": "Image {{n}}",
     "logistica": {
-      "title": "Event-day logistics and a personalized landing page for the wedding"
+      "title": "Flawless operation for extraordinary celebrations",
+      "body": "At Amexing Experience we provide comprehensive operations for weddings, private events and high-level groups in San Miguel de Allende and the Bajío region.\nWe coordinate private transfers from airports, cities and hotels, as well as local movements between venues, haciendas, restaurants, vineyards, private homes and special locations. Our team organizes routes, schedules, vehicles, drivers, meeting points and waiting times, ensuring that every movement is punctual, comfortable and perfectly aligned with the event's program.\nWe work hand in hand with wedding planners, event planners, concierges, hotels and agencies to integrate naturally into the planning and operation of the event. We understand the importance of discretion, service delivery, clear communication and personalized attention for every guest.\nBeyond private transportation, we can support with guest experiences, tours, cultural activities, vineyard visits, culinary experiences, artisan workshops, special dinners, flights, accommodation and complementary services, creating a seamless operation consistent with the style of each celebration.\nOur goal is to be a trusted extension of the organizing team, taking care of the visible and invisible details that allow each event to unfold with elegance, precision and peace of mind from start to finish."
     },
     "novios": {
       "w1": "Discover",
@@ -155,8 +160,8 @@
     "naturaleza": "Nature",
     "deTemporada": "Seasonal"
   },
-  "tours": { "title": "Tours" },
-  "experiencias": { "title": "Experiences" },
+  "tours": { "title": "Tours", "intro": "Designed to discover the history, culture and soul of San Miguel de Allende and its surroundings, through personalized journeys that connect each traveler with our traditions, our heritage and the stories that bring this destination to life." },
+  "experiencias": { "title": "Experiences", "intro": "Each one invites you to experience up close the love, passion and pride with which our people preserve their crafts, share their stories and bring our traditions to life. More than an activity, it's an opportunity to connect with the people who make this destination a place profoundly rich in culture, history and identity." },
   "categoryDetail": {
     "bookNow": "Book Now",
     "placeholderTitle": "Vineyard Tours",

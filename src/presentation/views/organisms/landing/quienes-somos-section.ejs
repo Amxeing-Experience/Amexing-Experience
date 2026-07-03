@@ -43,18 +43,10 @@ Created by Denisse Maldonado
             <%# Columna derecha: galería de fotos provisionales (placeholders) %>
             <div class="quienes-somos__gallery">
                 <div class="quienes-somos__grid">
-                    <div class="quienes-somos__photo quienes-somos__photo--portrait" role="img" aria-label="Foto provisional">
-                        <i class="fa-solid fa-camera" aria-hidden="true"></i>
-                    </div>
-                    <div class="quienes-somos__photo quienes-somos__photo--small-a" role="img" aria-label="Foto provisional">
-                        <i class="fa-solid fa-camera" aria-hidden="true"></i>
-                    </div>
-                    <div class="quienes-somos__photo quienes-somos__photo--small-b" role="img" aria-label="Foto provisional">
-                        <i class="fa-solid fa-camera" aria-hidden="true"></i>
-                    </div>
-                    <div class="quienes-somos__photo quienes-somos__photo--wide" role="img" aria-label="Foto provisional">
-                        <i class="fa-solid fa-camera" aria-hidden="true"></i>
-                    </div>
+                    <div class="quienes-somos__photo quienes-somos__photo--portrait" role="img" aria-label="Experiencias Amexing" style="background-image: url('/images/DSC_7954.jpg')"></div>
+                    <div class="quienes-somos__photo quienes-somos__photo--small-a" role="img" aria-label="San Miguel de Allende" style="background-image: url('/images/SMA-151.jpg')"></div>
+                    <div class="quienes-somos__photo quienes-somos__photo--small-b" role="img" aria-label="Amexing Experience" style="background-image: url('/images/AMEXING80.jpg')"></div>
+                    <div class="quienes-somos__photo quienes-somos__photo--wide" role="img" aria-label="Experiencias Amexing" style="background-image: url('/images/DSC_2858.jpg')"></div>
                 </div>
             </div>
         </div>
@@ -145,6 +137,9 @@ Created by Denisse Maldonado
 
 .quienes-somos__photo {
     background: linear-gradient(135deg, #d8d8d3 0%, #c9c9c3 100%);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
     border: 1px solid rgba(0, 0, 0, 0.08);
     display: flex;
     align-items: center;

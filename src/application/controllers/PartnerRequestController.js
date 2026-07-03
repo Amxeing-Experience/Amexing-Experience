@@ -5,7 +5,6 @@ const PartnerRequestService = require('../services/PartnerRequestService');
  * Partner Request Controller - Renders the email-driven approve/reject flow.
  * Admins arrive here from a signed link inside the notification email. The review
  * page (GET) has no side effects; the decision is applied via a CSRF-protected POST.
- *
  * @class PartnerRequestController
  * @author Created by Denisse Maldonado
  */
@@ -16,7 +15,9 @@ class PartnerRequestController {
 
   /**
    * Maps a Parse PartnerRequest into a plain object for the views.
+   * @param request
    * @private
+   * @example
    */
   static toView(request) {
     const type = request.get('collaboratorType');
@@ -44,6 +45,9 @@ class PartnerRequestController {
   /**
    * GET /partner-requests/:id/review?token=...
    * Renders the request summary with Approve/Reject buttons. No side effects.
+   * @param req
+   * @param res
+   * @example
    */
   async showReview(req, res) {
     const { id } = req.params;
@@ -88,6 +92,9 @@ class PartnerRequestController {
   /**
    * POST /partner-requests/:id/:action  (action = approve | reject)
    * Applies the decision after validating the signed token.
+   * @param req
+   * @param res
+   * @example
    */
   async handleAction(req, res) {
     const { id, action } = req.params;

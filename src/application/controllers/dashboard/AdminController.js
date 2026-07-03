@@ -781,6 +781,7 @@ class AdminController extends RoleBasedController {
       let reservationFolio = '';
       let reservationId = '';
       let reservationStatus = '';
+      let hasPendingCancellation = false;
       if (isReservation && !isNewQuote) {
         try {
           const Parse = require('parse/node');
@@ -793,6 +794,17 @@ class AdminController extends RoleBasedController {
             reservationFolio = reservation.get('folio') || '';
             reservationId = reservation.id;
             reservationStatus = reservation.get('status') || '';
+          }
+          // A <24h cancellation creates a pending CancellationRequest instead of
+          // cancelling immediately; surface it so the status control can show
+          // "Cancelación solicitada" instead of silently staying "Confirmada".
+          if (reservationStatus !== 'cancelled') {
+            const pendingQuery = new Parse.Query('CancellationRequest');
+            pendingQuery.equalTo('quote', { __type: 'Pointer', className: 'Quote', objectId: quoteId });
+            pendingQuery.equalTo('status', 'pending');
+            pendingQuery.equalTo('exists', true);
+            const pendingCount = await pendingQuery.count({ useMasterKey: true });
+            hasPendingCancellation = pendingCount > 0;
           }
         } catch (e) {
           reservationFolio = '';
@@ -811,6 +823,7 @@ class AdminController extends RoleBasedController {
         reservationFolio,
         reservationId,
         reservationStatus,
+        hasPendingCancellation,
         currentSection: section,
         pageStyles: ['https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css'],
         footerScripts: `

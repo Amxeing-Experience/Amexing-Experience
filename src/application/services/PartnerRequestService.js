@@ -9,7 +9,6 @@ const logger = require('../../infrastructure/logger');
  * configured operations recipient using the existing EmailService (MailerSend).
  *
  * Workflow: pending -> approved | rejected (managed later from the admin dashboard).
- *
  * @class PartnerRequestService
  * @author Created by Denisse Maldonado
  * @version 1.0.0
@@ -39,6 +38,7 @@ class PartnerRequestService {
    * Lazy-loads EmailService to avoid circular dependencies.
    * @private
    * @returns {object} EmailService instance.
+   * @example
    */
   getEmailService() {
     if (!this.emailService) {
@@ -53,6 +53,7 @@ class PartnerRequestService {
    * @param {string} type - Collaborator type key.
    * @param {string} [other] - Free text when type is "other".
    * @returns {string} Display label.
+   * @example
    */
   static collaboratorTypeLabel(type, other) {
     const labels = {
@@ -76,6 +77,7 @@ class PartnerRequestService {
    * @function processPartnerRequest
    * @param {object} formData - Partner request data.
    * @returns {Promise<object>} Result object with success status and details.
+   * @example
    */
   async processPartnerRequest(formData) {
     try {
@@ -125,6 +127,7 @@ class PartnerRequestService {
    * @function storePartnerRequest
    * @param {object} formData - Partner request data to store.
    * @returns {Promise<object>} Saved Parse object with generated ID.
+   * @example
    */
   async storePartnerRequest(formData) {
     try {
@@ -185,6 +188,7 @@ class PartnerRequestService {
    * @param {object} formData - Partner request data for email content.
    * @param {string} submissionId - Database submission ID for reference.
    * @returns {Promise<object>} Email send result.
+   * @example
    */
   async sendPartnerNotification(formData, submissionId) {
     try {
@@ -253,6 +257,7 @@ class PartnerRequestService {
    * @param {object} formData - Partner request data.
    * @param {string} submissionId - Database submission ID.
    * @returns {Promise<object>} Email send result.
+   * @example
    */
   async sendApplicantConfirmation(formData, submissionId) {
     try {
@@ -316,6 +321,7 @@ class PartnerRequestService {
    * @param {object} formData - Partner request data.
    * @param {boolean} isEn - Whether to render the English version.
    * @returns {string} HTML email content.
+   * @example
    */
   generateApplicantConfirmationHTML(formData, isEn) {
     const firstName = formData.firstName || '';
@@ -379,6 +385,7 @@ class PartnerRequestService {
    * @param {object} formData - Partner request data.
    * @param {boolean} isEn - Whether to render the English version.
    * @returns {string} Plain text email content.
+   * @example
    */
   generateApplicantConfirmationText(formData, isEn) {
     const firstName = formData.firstName || '';
@@ -431,6 +438,7 @@ Esta es una confirmación automática de Amexing CRM. Por favor no respondas a e
    * @param {object} formData - Partner request data.
    * @param {string} submissionId - Database submission ID.
    * @returns {string} Formatted HTML email content.
+   * @example
    */
   generateNotificationHTML(formData, submissionId) {
     const submissionTime = (formData.timestamp || new Date()).toLocaleString('es-MX', {
@@ -530,6 +538,7 @@ Esta es una confirmación automática de Amexing CRM. Por favor no respondas a e
    * @param {object} formData - Partner request data.
    * @param {string} submissionId - Database submission ID.
    * @returns {string} Formatted plain text email content.
+   * @example
    */
   generateNotificationText(formData, submissionId) {
     const submissionTime = (formData.timestamp || new Date()).toLocaleString('es-MX', {
@@ -580,6 +589,7 @@ Enviado automáticamente desde el formulario de solicitud de acceso de Amexing C
    * Secret used to sign approve/reject action links embedded in admin emails.
    * @private
    * @returns {string} Signing secret.
+   * @example
    */
   static getSigningSecret() {
     return process.env.JWT_SECRET
@@ -591,6 +601,7 @@ Enviado automáticamente desde el formulario de solicitud de acceso de Amexing C
    * Generates an HMAC token that authorizes reviewing/acting on a request from email.
    * @param {string} submissionId - PartnerRequest object id.
    * @returns {string} Hex-encoded HMAC token.
+   * @example
    */
   static generateActionToken(submissionId) {
     return crypto
@@ -604,6 +615,7 @@ Enviado automáticamente desde el formulario de solicitud de acceso de Amexing C
    * @param {string} submissionId - PartnerRequest object id.
    * @param {string} token - Token to verify.
    * @returns {boolean} True when the token is valid.
+   * @example
    */
   static verifyActionToken(submissionId, token) {
     if (!token || typeof token !== 'string') return false;
@@ -618,6 +630,7 @@ Enviado automáticamente desde el formulario de solicitud de acceso de Amexing C
    * Builds the absolute review URL included in the admin notification email.
    * @param {string} submissionId - PartnerRequest object id.
    * @returns {string} Absolute URL to the review page.
+   * @example
    */
   static buildReviewUrl(submissionId) {
     const baseUrl = (process.env.PUBLIC_URL || 'http://localhost:3337').replace(/\/$/, '');
@@ -681,6 +694,7 @@ Enviado automáticamente desde el formulario de solicitud de acceso de Amexing C
    * Fetches a single PartnerRequest by id.
    * @param {string} submissionId - PartnerRequest object id.
    * @returns {Promise<Parse.Object|null>} The request or null if not found.
+   * @example
    */
   async getRequestById(submissionId) {
     try {
@@ -697,6 +711,7 @@ Enviado automáticamente desde el formulario de solicitud de acceso de Amexing C
    * @param {string} submissionId - PartnerRequest object id.
    * @param {string} status - New status: 'approved' or 'rejected'.
    * @returns {Promise<Parse.Object>} The updated request.
+   * @example
    */
   async updateStatus(submissionId, status) {
     // Fetch the full record first so the returned object keeps all fields

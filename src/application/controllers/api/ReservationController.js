@@ -26,6 +26,26 @@ const fileStorageService = new FileStorageService({
  */
 class ReservationController {
   /**
+   * Fetch an object by id, returning null when it does not exist instead of throwing.
+   * Parse's Query.get() throws OBJECT_NOT_FOUND (101) for missing/invalid ids; without
+   * this the surrounding catch blocks turn a legitimate "not found" into a 500.
+   * @param {Parse.Query} query - Configured query (includes/constraints already set).
+   * @param {string} id - ObjectId to fetch.
+   * @returns {Promise<Parse.Object|null>} The object, or null if not found.
+   * @example
+   */
+  static async safeGet(query, id) {
+    try {
+      return await query.get(id, { useMasterKey: true });
+    } catch (error) {
+      if (error.code === Parse.Error.OBJECT_NOT_FOUND) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Get the clientPtr-based visibility filter for reservations (DM and default roles).
    * Returns null for admin/superadmin (see all) and for clients (which are scoped by quote
    * ownership via getClientEligibleQuoteIds + applyQuoteConstraint instead).
@@ -214,7 +234,8 @@ class ReservationController {
 
       // Agency/Client filter (molecule client-agency-filter). Empty type = no filter;
       // 'agency'/'client' filter by type (even without a specific entity).
-      const clientTypeFilter = req.query.clientTypeFilter || ''; // '', 'agency', 'client'
+      // '', 'agency', 'client', o categoría de persona (wedding_planner/concierge/home_owner)
+      const clientTypeFilter = req.query.clientTypeFilter || '';
       const clientIdFilter = req.query.clientIdFilter || '';
 
       // Get role-based filter pointers (null = no filter for admins)
@@ -344,7 +365,7 @@ class ReservationController {
        * without id → any direct-client reservation (companyClientPtr exists and
        * client doesn't, to match the display where agency takes priority).
        * @param {Parse.Query} q - Reservation query to constrain.
-       * @param {string} type - '' | 'agency' | 'client'.
+       * @param {string} type - '' | 'agency' | 'client' | 'wedding_planner' | 'concierge' | 'home_owner'.
        * @param {string} id - ObjectId of the agency (AmexingUser) or Client (optional).
        * @returns {void}
        * @example
@@ -354,7 +375,7 @@ class ReservationController {
        * molecule filter with the quote-status (hold) filter in a SINGLE inner Quote
        * query + one matchesQuery, so the two don't overwrite each other on `quotePtr`.
        * @param {Parse.Query} q - Reservation query to constrain.
-       * @param {string} type - '' | 'agency' | 'client'.
+       * @param {string} type - '' | 'agency' | 'client' | 'wedding_planner' | 'concierge' | 'home_owner'.
        * @param {string} id - ObjectId of the agency (AmexingUser) or Client (optional).
        * @param {string|null} holdFilter - 'only' = solo cotización en hold; 'exclude' = saca las hold; null = sin filtro de estado.
        * @returns {void}
@@ -362,17 +383,34 @@ class ReservationController {
        *   applyQuoteConstraint(query, 'agency', 'abc', 'exclude');
        */
       const applyQuoteConstraint = (q, type, id, holdFilter) => {
+        // Mapea el tipo de filtro de persona → clientCategory. 'client' = directos;
+        // las categorías especiales usan su propio nombre.
+        const PERSON_CATEGORY_BY_FILTER = {
+          client: 'direct_client',
+          wedding_planner: 'wedding_planner',
+          concierge: 'concierge',
+          home_owner: 'home_owner',
+        };
+        const personCategory = PERSON_CATEGORY_BY_FILTER[type];
         const innerQuote = new Parse.Query('Quote');
         let has = false;
-        if (type === 'client') {
+        if (personCategory) {
+          // Clientes directos y categorías especiales (wedding_planner/concierge/
+          // home_owner): viven en quote.client (AmexingUser end_client) con clientType
+          // 'direct'. (Antes eran companyClientPtr → Client legado, ya migrado.)
           if (id) {
-            const ClientCls = Parse.Object.extend('Client');
-            const clientObj = new ClientCls();
-            clientObj.id = id;
-            innerQuote.equalTo('companyClientPtr', clientObj);
+            const UserCls = Parse.Object.extend('AmexingUser');
+            const userObj = new UserCls();
+            userObj.id = id;
+            innerQuote.equalTo('client', userObj);
+            innerQuote.equalTo('clientType', 'direct');
           } else {
-            innerQuote.exists('companyClientPtr');
-            innerQuote.doesNotExist('client');
+            // Sin id: acota a la categoría seleccionada (direct_client / wedding_planner
+            // / concierge / home_owner) vía subquery sobre el pointer client.
+            const innerClient = new Parse.Query('AmexingUser');
+            innerClient.equalTo('clientCategory', personCategory);
+            innerQuote.matchesQuery('client', innerClient);
+            innerQuote.equalTo('clientType', 'direct');
           }
           has = true;
         } else if (type === 'agency') {
@@ -382,7 +420,9 @@ class ReservationController {
             userObj.id = id;
             innerQuote.equalTo('client', userObj);
           } else {
+            // Agencia = tiene client (AmexingUser) y NO es directo.
             innerQuote.exists('client');
+            innerQuote.notEqualTo('clientType', 'direct');
           }
           has = true;
         }
@@ -505,9 +545,11 @@ class ReservationController {
         const results = await compoundQuery.find({ useMasterKey: true });
 
         // Get service counts for each reservation
+        const pendingCancelQuoteIds = await ReservationController.getPendingCancellationQuoteIds(results);
         const data = await Promise.all(results.map(async (reservation) => {
           const serviceCount = await ReservationController.getServiceCounts(reservation.id);
-          return ReservationController.formatReservationRow(reservation, serviceCount);
+          const hasPendingCancellation = pendingCancelQuoteIds.has(reservation.get('quotePtr')?.id);
+          return ReservationController.formatReservationRow(reservation, serviceCount, hasPendingCancellation);
         }));
 
         return res.json({
@@ -549,9 +591,11 @@ class ReservationController {
       const results = await query.find({ useMasterKey: true });
 
       // Get service counts for each reservation
+      const pendingCancelQuoteIds = await ReservationController.getPendingCancellationQuoteIds(results);
       const data = await Promise.all(results.map(async (reservation) => {
         const serviceCount = await ReservationController.getServiceCounts(reservation.id);
-        return ReservationController.formatReservationRow(reservation, serviceCount);
+        const hasPendingCancellation = pendingCancelQuoteIds.has(reservation.get('quotePtr')?.id);
+        return ReservationController.formatReservationRow(reservation, serviceCount, hasPendingCancellation);
       }));
 
       return res.json({
@@ -580,7 +624,7 @@ class ReservationController {
       query.include('clientPtr');
       query.include('createdBy');
       query.include('serviceCustomer');
-      const reservation = await query.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(query, id);
 
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
@@ -782,6 +826,22 @@ class ReservationController {
         }
       }
 
+      // Whether a <24h cancellation request is awaiting approval (the reservation
+      // stays in its real status until approved). Surfaced so the detail shows the
+      // "Pendiente de cancelación" label instead of the cancel button.
+      let hasPendingCancellation = false;
+      if (reservation.get('status') !== 'cancelled') {
+        const quotePtr = reservation.get('quotePtr');
+        if (quotePtr) {
+          const pendingQuery = new Parse.Query('CancellationRequest');
+          pendingQuery.equalTo('quote', quotePtr);
+          pendingQuery.equalTo('status', 'pending');
+          pendingQuery.equalTo('exists', true);
+          const pendingCount = await pendingQuery.count({ useMasterKey: true });
+          hasPendingCancellation = pendingCount > 0;
+        }
+      }
+
       return res.json({
         success: true,
         data: {
@@ -791,6 +851,7 @@ class ReservationController {
           quoteId: reservation.get('quotePtr')?.id || '',
           quoteStatus: reservation.get('quotePtr')?.get('status') || '',
           status: reservation.get('status'),
+          hasPendingCancellation,
           startDate: reservation.get('startDate'),
           endDate: reservation.get('endDate'),
           totalAmount: reservation.get('totalAmount'),
@@ -921,7 +982,7 @@ class ReservationController {
       const resQuery = new Parse.Query('Reservation');
       resQuery.equalTo('active', true);
       resQuery.equalTo('exists', true);
-      const reservation = await resQuery.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(resQuery, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -931,7 +992,7 @@ class ReservationController {
       svcQuery.equalTo('reservationPtr', reservation);
       svcQuery.equalTo('active', true);
       svcQuery.equalTo('exists', true);
-      const service = await svcQuery.get(serviceId, { useMasterKey: true });
+      const service = await ReservationController.safeGet(svcQuery, serviceId);
       if (!service) {
         return res.status(404).json({ success: false, error: 'Servicio no encontrado' });
       }
@@ -1044,7 +1105,7 @@ class ReservationController {
       const resQuery = new Parse.Query('Reservation');
       resQuery.equalTo('active', true);
       resQuery.equalTo('exists', true);
-      const reservation = await resQuery.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(resQuery, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1054,7 +1115,7 @@ class ReservationController {
       svcQuery.equalTo('reservationPtr', reservation);
       svcQuery.equalTo('active', true);
       svcQuery.equalTo('exists', true);
-      const service = await svcQuery.get(serviceId, { useMasterKey: true });
+      const service = await ReservationController.safeGet(svcQuery, serviceId);
       if (!service) {
         return res.status(404).json({ success: false, error: 'Servicio no encontrado' });
       }
@@ -1092,7 +1153,7 @@ class ReservationController {
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
       query.equalTo('exists', true);
-      const reservation = await query.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(query, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1174,7 +1235,7 @@ class ReservationController {
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
       query.equalTo('exists', true);
-      const reservation = await query.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(query, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1257,7 +1318,7 @@ class ReservationController {
       const resQuery = new Parse.Query('Reservation');
       resQuery.equalTo('active', true);
       resQuery.equalTo('exists', true);
-      const reservation = await resQuery.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(resQuery, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1359,7 +1420,7 @@ class ReservationController {
       const resQuery = new Parse.Query('Reservation');
       resQuery.equalTo('active', true);
       resQuery.equalTo('exists', true);
-      const reservation = await resQuery.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(resQuery, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1449,7 +1510,7 @@ class ReservationController {
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
       query.equalTo('exists', true);
-      const reservation = await query.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(query, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1526,7 +1587,7 @@ class ReservationController {
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
       query.equalTo('exists', true);
-      const reservation = await query.get(id, { useMasterKey: true });
+      const reservation = await ReservationController.safeGet(query, id);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -1631,7 +1692,28 @@ class ReservationController {
    * @param serviceCount
    * @example
    */
-  static formatReservationRow(reservation, serviceCount) {
+  /**
+   * For a page of reservations, return the Set of quote objectIds that have a
+   * pending CancellationRequest. One batched query instead of N per-row lookups,
+   * so the table can flag reservations awaiting cancellation approval.
+   * @param {Array<Parse.Object>} reservations - Reservation page results.
+   * @returns {Promise<Set<string>>} Set of quoteId strings with a pending request.
+   * @example
+   */
+  static async getPendingCancellationQuoteIds(reservations) {
+    const quotes = reservations.map((r) => r.get('quotePtr')).filter(Boolean);
+    if (quotes.length === 0) return new Set();
+    const query = new Parse.Query('CancellationRequest');
+    query.containedIn('quote', quotes);
+    query.equalTo('status', 'pending');
+    query.equalTo('exists', true);
+    query.select('quote');
+    query.limit(1000);
+    const requests = await query.find({ useMasterKey: true });
+    return new Set(requests.map((req) => req.get('quote')?.id).filter(Boolean));
+  }
+
+  static formatReservationRow(reservation, serviceCount, hasPendingCancellation = false) {
     // Cliente mostrado: se resuelve desde la cotización para reflejar el modelo real.
     // En una cotización 'direct' la persona es el cliente: nuevas llevan un AmexingUser
     // end_client en quotePtr.client; las legadas un Client en quotePtr.companyClientPtr.
@@ -1719,6 +1801,9 @@ class ReservationController {
       totalServices: serviceCount.totalCount,
       assignedServices: serviceCount.assignedCount,
       status,
+      // A <24h cancellation creates a pending request while the reservation stays
+      // in its real status; flag it so the table shows "Pendiente de cancelación".
+      hasPendingCancellation: !!hasPendingCancellation && status !== 'cancelled',
       owner: ownerName,
       ownerIsCreator: !hasUsableOwner, // true cuando se usó el creador como fallback
       createdAt: reservation.createdAt,

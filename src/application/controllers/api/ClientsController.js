@@ -524,16 +524,20 @@ class ClientsController {
    */
   buildEndClientQuery({ isCategoryTab, type, includeInactive }) {
     const Parse = require('parse/node');
-    // TEMP: hidden per direction; empty this array to re-activate these client types.
-    const HIDDEN_CATEGORIES = ['wedding_planner', 'concierge', 'home_owner'];
     const query = new Parse.Query('AmexingUser');
     query.equalTo('role', 'end_client');
     query.equalTo('exists', true);
+    // Los clientes de agencia (clientCategory 'agency_client') se gestionan aparte
+    // (owned-clients) y NO deben aparecer en el listado/picker de clientes directos Amexing.
+    query.notEqualTo('clientCategory', 'agency_client');
     if (isCategoryTab) {
+      // Tab de categoría específica (wedding_planner/concierge/home_owner/direct_client).
       query.equalTo('clientCategory', type);
-    } else if (HIDDEN_CATEGORIES.length) {
-      query.notContainedIn('clientCategory', HIDDEN_CATEGORIES);
+    } else if (type === 'clients') {
+      // Tab "Clientes Directos" = solo direct_client; cada categoría especial tiene su tab.
+      query.equalTo('clientCategory', 'direct_client');
     }
+    // type === 'all' → sin filtro de categoría (todas las personas), agency_client ya excluido.
     if (!includeInactive) {
       query.equalTo('active', true);
     }
@@ -1057,12 +1061,16 @@ class ClientsController {
         query.equalTo('role', 'end_client');
         query.equalTo('active', true);
         query.equalTo('exists', true);
+        // Excluir clientes de agencia del picker de directos Amexing.
+        query.notEqualTo('clientCategory', 'agency_client');
       } else {
         // Create basic query without search
         query = new Parse.Query(AmexingUserClass);
         query.equalTo('role', 'end_client');
         query.equalTo('active', true);
         query.equalTo('exists', true);
+        // Excluir clientes de agencia del picker de directos Amexing.
+        query.notEqualTo('clientCategory', 'agency_client');
       }
 
       if (filterByCategory) {
@@ -1156,6 +1164,33 @@ class ClientsController {
    * GET /api/clients/abc123/sub-clients
    * Response: {success: true, data: {clients: [...], total: 5}}
    */
+  /**
+   * Base query for an agency's sub-clients (AmexingUser end_client, clientCategory
+   * 'agency_client') scoped to the owning agency via organizationId. When createdById
+   * is given (agente), se restringe además a los clientes que ese usuario dio de alta.
+   * @param {string} agencyId - The owning agency id (department_manager objectId).
+   * @param {string} [createdById] - Optional creator id to scope to (an agent's own clients).
+   * @returns {Parse.Query} A configured, active/exists AmexingUser query.
+   * @example
+   * const q = this.buildAgencySubClientQuery(agencyId);
+   */
+  buildAgencySubClientQuery(agencyId, createdById = null) {
+    const Parse = require('parse/node');
+    const q = new Parse.Query('AmexingUser');
+    q.equalTo('role', 'end_client');
+    q.equalTo('clientCategory', 'agency_client');
+    q.equalTo('organizationId', agencyId);
+    q.equalTo('active', true);
+    q.equalTo('exists', true);
+    // Un agente (role 'client') solo ve SUS clientes (createdBy, guardado como pointer).
+    if (createdById) {
+      const ptr = new (Parse.Object.extend('AmexingUser'))();
+      ptr.id = createdById;
+      q.equalTo('createdBy', ptr);
+    }
+    return q;
+  }
+
   async getSubClients(req, res) {
     try {
       const currentUser = req.user;
@@ -1204,143 +1239,38 @@ class ClientsController {
         userRole: currentUser.get ? currentUser.get('role') : 'unknown',
       });
 
-      // Query Client table for records where ownedBy points to this clientId
+      // Sub-clients de una agencia: ahora viven en AmexingUser (role 'end_client',
+      // clientCategory 'agency_client') con organizationId = id de la agencia (clientId).
+      // Un agente (role 'client') solo ve SUS clientes (createdBy); DM/admin ven todos.
       const Parse = require('parse/node');
-      const Client = Parse.Object.extend('Client');
+      const requesterRole = req.userRole || (currentUser.get && currentUser.get('role'));
+      const scopeCreatedBy = requesterRole === 'client' ? currentUser.id : null;
 
-      // Set up the ownedBy conditions
-      // ownedBy can be a pointer to AmexingUser, so we check both:
-      // 1. ownedBy.objectId = clientId (direct pointer)
-      // 2. ownedBy.clientId = clientId (user's clientId field points to this client)
-
-      const AmexingUser = Parse.Object.extend('AmexingUser');
-
-      // Query 1: Direct pointer match (ownedBy.objectId = clientId)
-      const directOwnerQuery = new Parse.Query(Client);
-      const ownerPointer = new AmexingUser();
-      ownerPointer.id = clientId;
-
-      directOwnerQuery.equalTo('ownedBy', ownerPointer);
-      directOwnerQuery.equalTo('active', true);
-      directOwnerQuery.equalTo('exists', true);
-
-      // DEBUG: Execute Query 1 separately to see results
-      const directResults = await directOwnerQuery.find({ useMasterKey: true });
-      logger.info('DEBUG: Query 1 (direct owner) results', {
-        clientId,
-        count: directResults.length,
-        clientIds: directResults.map((c) => c.id),
-      });
-
-      // DEBUG: Also check without active/exists filters to see if data exists at all
-      const debugQuery = new Parse.Query(Client);
-      debugQuery.equalTo('ownedBy', ownerPointer);
-      const allOwnedClients = await debugQuery.find({ useMasterKey: true });
-      logger.info('DEBUG: All ownedBy clients (no active/exists filter)', {
-        clientId,
-        count: allOwnedClients.length,
-        clientIds: allOwnedClients.map((c) => c.id),
-      });
-
-      // Query 2: Match users where their clientId field = clientId
-      // First, find all AmexingUsers where clientId = clientId
-      const userQuery = new Parse.Query(AmexingUser);
-      userQuery.equalTo('clientId', clientId);
-      userQuery.equalTo('active', true);
-      userQuery.equalTo('exists', true);
-
-      // DEBUG: Check if any users match this clientId
-      const matchingUsers = await userQuery.find({ useMasterKey: true });
-      logger.info('DEBUG: Users with matching clientId', {
-        clientId,
-        userCount: matchingUsers.length,
-        userIds: matchingUsers.map((u) => u.id),
-      });
-
-      // Then find Clients where ownedBy matches any of these users
-      const indirectOwnerQuery = new Parse.Query(Client);
-      indirectOwnerQuery.matchesQuery('ownedBy', userQuery);
-      indirectOwnerQuery.equalTo('active', true);
-      indirectOwnerQuery.equalTo('exists', true);
-
-      // DEBUG: Execute Query 2 separately
-      const indirectResults = await indirectOwnerQuery.find({ useMasterKey: true });
-      logger.info('DEBUG: Query 2 (indirect owner) results', {
-        count: indirectResults.length,
-        clientId,
-        foundClients: indirectResults.map((c) => ({
-          id: c.id,
-          name: c.get('name'),
-          ownedById: c.get('ownedBy')?.id,
-        })),
-      });
-
-      // Combine both queries with OR
-      const ownerQuery = Parse.Query.or(directOwnerQuery, indirectOwnerQuery);
-
-      // If there's a search term, add search conditions
       let finalQuery;
       if (searchTerm) {
-        const searchQueries = [];
-
-        // Search in name field
-        const nameQuery = new Parse.Query(Client);
-        nameQuery.matches('name', searchTerm, 'i');
-        searchQueries.push(nameQuery);
-
-        // Search in email field
-        const emailQuery = new Parse.Query(Client);
-        emailQuery.matches('email', searchTerm, 'i');
-        searchQueries.push(emailQuery);
-
-        // Search in contactPerson field
-        const contactQuery = new Parse.Query(Client);
-        contactQuery.matches('contactPerson', searchTerm, 'i');
-        searchQueries.push(contactQuery);
-
-        // Combine search queries with OR
-        const searchQuery = Parse.Query.or(...searchQueries);
-
-        // We need to apply the search filter to the ownerQuery results
-        // Create a new query that combines both conditions
-        // Use Parse.Query.and to properly combine queries without accessing private properties
-        finalQuery = Parse.Query.and(ownerQuery, searchQuery);
+        finalQuery = Parse.Query.or(
+          this.buildAgencySubClientQuery(clientId, scopeCreatedBy).matches('firstName', searchTerm, 'i'),
+          this.buildAgencySubClientQuery(clientId, scopeCreatedBy).matches('lastName', searchTerm, 'i'),
+          this.buildAgencySubClientQuery(clientId, scopeCreatedBy).matches('email', searchTerm, 'i')
+        );
       } else {
-        // Use the owner query directly
-        finalQuery = ownerQuery;
+        finalQuery = this.buildAgencySubClientQuery(clientId, scopeCreatedBy);
       }
 
-      // Apply pagination
+      const totalCount = await finalQuery.count({ useMasterKey: true });
       finalQuery.limit(limit);
       finalQuery.skip((page - 1) * limit);
       finalQuery.descending('createdAt');
-
-      // Execute query
       const clients = await finalQuery.find({ useMasterKey: true });
-      const totalCount = await finalQuery.count({ useMasterKey: true });
 
-      // DEBUG: Log final results
-      console.log('=== FINAL QUERY RESULTS ===', {
-        clientId,
-        finalResultsCount: clients.length,
-        totalCount,
-        isDepartmentManager,
-        requestingClientSubClients,
-        clientNames: clients.map((c) => c.get('name') || c.get('companyName') || 'unnamed'),
-      });
-      logger.info('DEBUG: Final query results', {
-        clientId,
-        finalResultsCount: clients.length,
-        totalCount,
-        isDepartmentManager,
-        requestingClientSubClients,
-        clientNames: clients.map((c) => c.get('name') || c.get('companyName') || 'unnamed'),
+      logger.info('Sub-clients (agency end_clients) retrieved', {
+        clientId, count: clients.length, totalCount, isDepartmentManager,
       });
 
       // Transform clients to response format
       const clientsData = clients.map((client) => ({
         id: client.id,
-        name: client.get('name') || '',
+        name: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
         email: client.get('email') || '',
         phone: client.get('phone') || '',
         contactPerson: client.get('contactPerson') || '',

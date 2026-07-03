@@ -717,7 +717,7 @@ const e = __isRes ? 'reservación' : 'cotización';
                 </div>
                 <div class="sm-quote-info-divider"></div>
                 <div class="sm-quote-info-row">
-                    <div class="sm-quote-info-item">
+                    <div class="sm-quote-info-item" id="summaryClientItem">
                         <span class="sm-quote-info-label">Cliente</span>
                         <span class="sm-quote-info-value fw-semibold" id="summaryClientName">-</span>
                     </div>
@@ -740,6 +740,10 @@ const e = __isRes ? 'reservación' : 'cotización';
                     <div class="sm-quote-info-item">
                         <span class="sm-quote-info-label">Personas</span>
                         <span class="sm-quote-info-value" id="summaryNumberOfPeople">-</span>
+                    </div>
+                    <div class="sm-quote-info-item d-none" id="summaryServiceDatesRow">
+                        <span class="sm-quote-info-label">Fechas de servicios</span>
+                        <span class="sm-quote-info-value" id="summaryServiceDates">-</span>
                     </div>
                 </div>
             </div>
@@ -1215,11 +1219,13 @@ const e = __isRes ? 'reservación' : 'cotización';
                 ? 'Reservación'
                 : 'Cotización';
             document.getElementById('summaryLastUpdated').textContent = formatDateSpanish(quote.updatedAt);
-            // Atención a — defaults to the quote owner's full name. When the
-            // owner is an admin/superadmin the owner identity isn't meaningful
-            // to the client, so fall back to the contact person instead.
-            // "Atención a" = the quote OWNER (propietario / a quién pertenece la cotización).
-            // Falls back to the contact person only when the owner has no name.
+            // "Atención a":
+            //  - AGENCIA: el propietario del quote (el agente que lo gestiona). El "Cliente" (la
+            //    agencia) se muestra en su propio campo.
+            //  - CLIENTE DIRECTO (end_client): el CLIENTE mismo — el "Cliente" se oculta y el
+            //    destinatario del documento es el cliente. NO el propietario, que puede ser el
+            //    admin/agente que creó la cotización (p. ej. "Admin User").
+            //  Fallback en ambos: contactPerson → '-'.
             const summaryContactPersonElement = document.getElementById('summaryContactPerson');
             if (summaryContactPersonElement) {
                 const owner = quote.owner || {};
@@ -1232,7 +1238,15 @@ const e = __isRes ? 'reservación' : 'cotización';
                 const contactValue = contactPerson && contactPerson.toLowerCase() !== 'no especificado'
                     ? contactPerson
                     : '';
-                summaryContactPersonElement.textContent = ownerFullName || contactValue || '-';
+                let attnName = ownerFullName;
+                if (quote.clientType === 'direct' && quote.client) {
+                    const c = quote.client;
+                    const directClientName = (c.companyName
+                        || c.name
+                        || `${c.firstName || ''} ${c.lastName || ''}`.trim()).trim();
+                    if (directClientName) attnName = directClientName;
+                }
+                summaryContactPersonElement.textContent = attnName || contactValue || '-';
             }
 
             // Quote details — omit the "Motivo de viaje" row entirely when no event type was provided
@@ -1246,6 +1260,38 @@ const e = __isRes ? 'reservación' : 'cotización';
                 summaryEventTypeRow?.classList.add('d-none');
             }
             document.getElementById('summaryNumberOfPeople').textContent = quote.numberOfPeople || '0';
+
+            // Fechas de servicios: de la fecha del primer servicio a la del último. day.date es
+            // YYYY-MM-DD (ordena cronológico como string). Se parsea como fecha LOCAL para evitar el
+            // corrimiento de -1 día del UTC. Se oculta la fila si no hay días con fecha.
+            (() => {
+                const datesRow = document.getElementById('summaryServiceDatesRow');
+                const datesEl = document.getElementById('summaryServiceDates');
+                if (!datesRow || !datesEl) return;
+                const dayDates = ((quote.serviceItems && quote.serviceItems.days) || [])
+                    .map((d) => d && d.date)
+                    .filter(Boolean)
+                    .sort();
+                if (dayDates.length === 0) {
+                    datesEl.textContent = '-';
+                    datesRow.classList.add('d-none');
+                    return;
+                }
+                const fmtServiceDate = (s) => {
+                    let d;
+                    if (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+                        const [y, m, dd] = s.split('-').map(Number);
+                        d = new Date(y, m - 1, dd);
+                    } else {
+                        d = new Date(s);
+                    }
+                    return d.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+                };
+                const first = fmtServiceDate(dayDates[0]);
+                const last = fmtServiceDate(dayDates[dayDates.length - 1]);
+                datesEl.textContent = first === last ? first : `${first} – ${last}`;
+                datesRow.classList.remove('d-none');
+            })();
 
             // Idioma de preferencia — show only when set (maps the 2-letter code to a label).
             // Sits between Folio and Última actualización; widen the row to 3 columns
@@ -1335,6 +1381,12 @@ const e = __isRes ? 'reservación' : 'cotización';
                 }
             }
             document.getElementById('summaryClientName').textContent = clientName;
+
+            // Cliente directo (end_client, NO agencia): se oculta el campo "Cliente" y queda solo
+            // "Atención a" (que es el cliente). En agencia/otros se mantiene el campo.
+            const __isDirectClient = quote.clientType === 'direct';
+            const summaryClientItem = document.getElementById('summaryClientItem');
+            if (summaryClientItem) summaryClientItem.classList.toggle('d-none', __isDirectClient);
 
             // Load experience caches for establishment detection (only for authenticated views)
             <% if (!locals.isPublicView) { %>
@@ -1892,14 +1944,27 @@ const e = __isRes ? 'reservación' : 'cotización';
 
             doc.text(`ATENCIÓN A: ${contactPerson}`, margin, yPosition);
             yPosition += 5;
-            doc.text(`CLIENTE: ${clientName}`, margin, yPosition);
-            yPosition += 5;
+            // Cliente directo (end_client): se omite "CLIENTE" también en el PDF, igual que en
+            // pantalla (donde #summaryClientItem queda oculto). Solo queda "ATENCIÓN A".
+            const __clientHidden = document.getElementById('summaryClientItem')?.classList.contains('d-none');
+            if (!__clientHidden) {
+                doc.text(`CLIENTE: ${clientName}`, margin, yPosition);
+                yPosition += 5;
+            }
             if (eventType) {
                 doc.text(`EVENTO: ${eventType}`, margin, yPosition);
                 yPosition += 5;
             }
             doc.text(`PERSONAS: ${numberOfPeople}`, margin, yPosition);
-            yPosition += 10;
+            yPosition += 5;
+            // Fechas de servicios: solo si la fila está visible (hay días con fecha).
+            const __serviceDatesHidden = document.getElementById('summaryServiceDatesRow')?.classList.contains('d-none');
+            const __serviceDates = (document.getElementById('summaryServiceDates')?.textContent || '').trim();
+            if (!__serviceDatesHidden && __serviceDates && __serviceDates !== '-') {
+                doc.text(`FECHAS DE SERVICIOS: ${__serviceDates}`, margin, yPosition);
+                yPosition += 5;
+            }
+            yPosition += 5;
 
             // Services Section
             doc.setFontSize(12);

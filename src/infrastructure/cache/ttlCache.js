@@ -14,6 +14,7 @@
 class TtlCache {
   /**
    * @param {number} [ttlMs] - Tiempo de vida en ms (default 15 min).
+   * @example
    */
   constructor(ttlMs = 15 * 60 * 1000) {
     this.ttlMs = ttlMs;
@@ -23,6 +24,7 @@ class TtlCache {
   /**
    * Devuelve el valor cacheado si sigue fresco, o `undefined` si expiró/no existe.
    * @returns {*} Valor cacheado o undefined.
+   * @example
    */
   get() {
     if (this.entry && Date.now() < this.entry.expires) {
@@ -35,6 +37,7 @@ class TtlCache {
    * Guarda un valor con el TTL configurado y lo devuelve (para encadenar).
    * @param {*} value - Valor a cachear.
    * @returns {*} El mismo valor.
+   * @example
    */
   set(value) {
     this.entry = { value, expires: Date.now() + this.ttlMs };
@@ -44,6 +47,7 @@ class TtlCache {
   /**
    * Limpia el valor cacheado. Llamar tras cualquier write del dato.
    * @returns {void}
+   * @example
    */
   clear() {
     this.entry = null;
