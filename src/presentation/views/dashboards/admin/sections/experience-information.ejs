@@ -51,8 +51,8 @@
                         (experience-detail.ejs), obligatorio y visible en ambos tabs.
                         Info y Servicios leen ese único #experienceName. %>
                     <div class="mb-3">
-                        <label for="experienceDescription" class="form-label">Descripcion <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="experienceDescription" name="description" required rows="2" placeholder="Descripcion detallada de lo que incluye esta experiencia..."></textarea>
+                        <label for="experienceDescription" class="form-label">Descripcion <span class="text-muted small">(opcional)</span></label>
+                        <textarea class="form-control" id="experienceDescription" name="description" rows="2" placeholder="Descripcion detallada de lo que incluye esta experiencia..."></textarea>
                         <div class="invalid-feedback" id="description-error"></div>
                     </div>
                     <!-- Destino (Optional) -->
@@ -1675,7 +1675,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Use captured values as primary source, with direct reading as fallback
         const name = (capturedFormValues.name || directName || '').trim();
-        const description = (capturedFormValues.description || directDescription || '').trim();
+        // Solo el nombre es obligatorio: si no hay descripción, usa el nombre por
+        // defecto (el backend sí valida que description no sea vacío).
+        const description = (capturedFormValues.description || directDescription || '').trim() || name;
         const cost = parseFloat(capturedFormValues.cost || directCost) || 0;
 
         debugLog('Save Experience - Form Data', {
@@ -1699,7 +1701,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         if (!name) { showAlert('El nombre es requerido', 'warning'); return; }
-        if (!description) { showAlert('La descripcion es requerida', 'warning'); return; }
+        // Descripción ya NO es obligatoria (cae al nombre por defecto arriba).
         if (cost < 0) { showAlert('El costo debe ser mayor o igual a 0', 'warning'); return; }
         
         // Validate all numeric fields before saving

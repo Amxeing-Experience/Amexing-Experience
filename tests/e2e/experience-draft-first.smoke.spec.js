@@ -115,9 +115,9 @@ test.describe('Experiencias — F3 draft-first + nombre global (smoke)', () => {
     // Token (capturado ahora, en /new, con el builder presente) para la limpieza.
     const token = await page.evaluate(() => window.experienceServicesBuilder.getAccessToken());
 
-    // Ir a Información y llenar los requeridos (descripción + costo)
+    // Ir a Información y llenar el costo. NO llenamos descripción a propósito:
+    // solo el nombre es obligatorio; la descripción cae al nombre por defecto.
     await page.click('#tab-informacion-btn');
-    await page.fill('#experienceDescription', 'Descripción de smoke test (F3 finalize).');
     await page.fill('#experienceCost', '1000');
 
     // Guardar -> debe disparar un PUT al MISMO borrador (finalize, no un POST nuevo)
