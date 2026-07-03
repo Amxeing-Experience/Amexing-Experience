@@ -40,6 +40,18 @@ const experienceTitle = isNewExperience ? 'Nueva Experiencia' : 'Experiencia';
         </div>
     </div>
 
+    <!-- Nombre GLOBAL (obligatorio): fuente única para Información y Servicios (F3).
+         Al escribirlo se crea el borrador automáticamente; sin nombre no se guarda. -->
+    <div class="mb-3">
+        <label for="experienceName" class="form-label fw-semibold mb-1">
+            Nombre de la experiencia <span class="text-danger">*</span>
+        </label>
+        <input type="text" class="form-control form-control-lg" id="experienceName" name="name"
+               required maxlength="280" autocomplete="off"
+               placeholder="Ej: Tour Gastronómico en el Centro Histórico">
+        <div class="form-text" id="expNameHint">Obligatorio. Al escribirlo se guarda un borrador automáticamente.</div>
+    </div>
+
     <!-- Tabs: Servicios | Información (sustituyen al acordeón; cada sección a ancho completo) -->
     <ul class="nav nav-pills exp-tabs mb-3" role="tablist">
         <li class="nav-item" role="presentation">
@@ -145,6 +157,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const expSaveBtn = document.getElementById('expSaveBtn');
     if (expSaveBtn) {
         expSaveBtn.addEventListener('click', function() {
+            // Nombre obligatorio: sin él no se guarda; enfoca el campo.
+            if (isExpNameEmpty()) {
+                const nameEl = document.getElementById('experienceName');
+                if (nameEl) { nameEl.focus(); nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                return;
+            }
             const realSaveBtn = document.getElementById('saveExperienceInfoBtn');
             if (!realSaveBtn) return;
             const infoTabBtn = document.getElementById('tab-informacion-btn');
@@ -167,7 +185,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     expSaveBtn.disabled = true;
                     expSaveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Guardando…';
                 } else {
-                    expSaveBtn.disabled = false;
+                    // Respeta el requisito de nombre: sin nombre, sigue deshabilitado.
+                    expSaveBtn.disabled = isExpNameEmpty();
                     const ok = /guardado|completado/i.test(realSaveBtnForObs.textContent || '');
                     if (ok) {
                         expSaveBtn.innerHTML = '<i class="ti ti-check me-1"></i>Guardado';
@@ -179,6 +198,33 @@ document.addEventListener('DOMContentLoaded', function() {
             }).observe(realSaveBtnForObs, { attributes: true, attributeFilter: ['disabled'] });
         }
     }
+
+    // --- Nombre GLOBAL obligatorio (F3): habilita/deshabilita el guardado y crea el
+    //     borrador en cuanto se escribe el nombre (al salir del campo / blur). ---
+    function isExpNameEmpty() {
+        const el = document.getElementById('experienceName');
+        return !el || !el.value.trim();
+    }
+    function syncSaveDisabledByName() {
+        const realBtn = document.getElementById('saveExperienceInfoBtn');
+        if (realBtn && realBtn.disabled) return; // no pisar el estado "Guardando…"
+        const stickyBtn = document.getElementById('expSaveBtn');
+        if (stickyBtn) stickyBtn.disabled = isExpNameEmpty();
+    }
+    (function wireGlobalName() {
+        const nameInput = document.getElementById('experienceName');
+        if (!nameInput) return;
+        nameInput.addEventListener('input', syncSaveDisabledByName);
+        nameInput.addEventListener('blur', async function () {
+            syncSaveDisabledByName();
+            const name = nameInput.value.trim();
+            const builder = window.experienceServicesBuilder;
+            if (name && builder && !window.__experienceDraftId && builder.experienceId === 'new') {
+                try { await builder.ensureDraftExperience(); } catch (e) { console.warn('F3 draft-on-blur fallo:', e); }
+            }
+        });
+        syncSaveDisabledByName(); // estado inicial (nueva experiencia -> deshabilitado)
+    })();
 
     <% if (!isNewExperience) { %>
     async function loadExperienceName() {
@@ -213,6 +259,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const nameSpan = document.getElementById('experienceNameSpan');
                 if (nameSpan) nameSpan.textContent = name;
+
+                // Poblar el input GLOBAL de nombre y re-sincronizar el botón (si no,
+                // quedaría deshabilitado tras la carga async aunque ya haya nombre).
+                const nameInputEl = document.getElementById('experienceName');
+                if (nameInputEl && !nameInputEl.value.trim()) nameInputEl.value = name;
+                syncSaveDisabledByName();
 
                 const breadcrumbTitle = document.getElementById('breadcrumbExperienceTitle');
                 if (breadcrumbTitle) breadcrumbTitle.textContent = name;

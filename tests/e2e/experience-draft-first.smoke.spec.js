@@ -1,15 +1,14 @@
-// Smoke E2E de F3 (draft-first) en el editor de Experiencias.
-// Verifica el corazón de F3 contra el backend real, SIN depender del modal/UI:
-//   1. La página de "nueva experiencia" carga y expone window.experienceServicesBuilder
-//      con los métodos nuevos (ensureDraftExperience / showBasicInfoRequired).
-//   2. ensureDraftExperience() SIN nombre -> devuelve null y NO crea borrador (aviso).
-//   3. ensureDraftExperience() CON nombre -> crea un borrador REAL, marca
-//      window.__experienceDraftId y NO escribe localStorage (adiós flujo frágil).
-//   4. El borrador se crea active:false (oculto de listas). Luego se limpia (DELETE).
+// Smoke E2E de F3 (draft-first) + nombre GLOBAL obligatorio en el editor de Experiencias.
+// Verifica el flujo real contra el backend, SIN depender del modal de servicios:
+//   1. La página de "nueva experiencia" carga con el input de nombre GLOBAL en el
+//      header y el botón Guardar DESHABILITADO (aún sin nombre).
+//   2. Al escribir el nombre y salir del campo (blur) se crea automáticamente un
+//      BORRADOR real (active:false, oculto de listas) — sin usar localStorage.
+//   3. Tras nombrar, el botón Guardar queda HABILITADO.
+//   4. Limpieza: se borra el borrador de prueba (DELETE).
 //
 // Requiere un servidor YA corriendo y credenciales por entorno (ver playwright.config.js):
-//   E2E_EMAIL, E2E_PASSWORD  (cuenta NO productiva)
-//   E2E_ROLE                 (default admin)
+//   E2E_EMAIL, E2E_PASSWORD  (cuenta NO productiva) · E2E_ROLE (default admin)
 //   E2E_BASE_URL             (default http://localhost:1337)
 const { test, expect } = require('@playwright/test');
 
@@ -17,25 +16,20 @@ const EMAIL = process.env.E2E_EMAIL;
 const PASSWORD = process.env.E2E_PASSWORD;
 const ROLE = process.env.E2E_ROLE || 'admin';
 
-test.describe('Experiencias — F3 draft-first (smoke)', () => {
+test.describe('Experiencias — F3 draft-first + nombre global (smoke)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Faltan E2E_EMAIL / E2E_PASSWORD');
 
-  // Errores de PÁGINA pre-existentes y AJENOS a F3 (layout/otros módulos) que no deben
-  // tumbar este smoke. Mantener la lista mínima y específica.
-  const IGNORED_PAGEERRORS = [
-    // dashboard.ejs: getElementById('breadcrumb-…').remove() cuando el breadcrumb no
-    // existe. Bug pre-existente (mismo que ignora quote-services.smoke.spec.js).
-    /Cannot read properties of null \(reading 'remove'\)/,
-  ];
-  const isIgnoredPageError = (text) => IGNORED_PAGEERRORS.some((re) => re.test(text));
+  // pageerror pre-existente y AJENO (breadcrumb de dashboard.ejs) — no debe tumbar el smoke.
+  const IGNORED_PAGEERRORS = [/Cannot read properties of null \(reading 'remove'\)/];
+  const isIgnoredPageError = (t) => IGNORED_PAGEERRORS.some((re) => re.test(t));
 
-  test('nueva experiencia crea un borrador active:false sin localStorage', async ({ page }) => {
+  test('nombre global obligatorio crea el borrador al escribirlo (active:false, sin localStorage)', async ({ page }) => {
     const pageErrors = [];
     page.on('pageerror', (err) => {
       if (!isIgnoredPageError(err.message)) pageErrors.push(err.message);
     });
 
-    // --- Login (form clásico; el csrfToken ya viene en la página) ---
+    // --- Login ---
     await page.goto('/login');
     await page.fill('#identifier', EMAIL);
     await page.fill('#password', PASSWORD);
@@ -44,68 +38,48 @@ test.describe('Experiencias — F3 draft-first (smoke)', () => {
       page.click('button[type="submit"]'),
     ]);
 
-    // --- Página de nueva experiencia ---
+    // --- Nueva experiencia ---
     await page.goto(`/dashboard/${ROLE}/experiences/new`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => !!window.experienceServicesBuilder, { timeout: 30_000 });
 
-    // 1. Métodos F3 presentes en la instancia
-    const methods = await page.evaluate(() => ({
-      ensure: typeof window.experienceServicesBuilder.ensureDraftExperience,
-      prompt: typeof window.experienceServicesBuilder.showBasicInfoRequired,
+    // 1. Nombre global en el header + Guardar deshabilitado (sin nombre)
+    await expect(page.locator('#experienceName'), 'input de nombre global visible').toBeVisible();
+    await expect(page.locator('#expSaveBtn'), 'Guardar deshabilitado sin nombre').toBeDisabled();
+
+    // Sin borrador ni localStorage todavía
+    const before = await page.evaluate(() => ({
+      marker: window.__experienceDraftId || null,
+      temp: localStorage.getItem('tempExperienceServices'),
     }));
-    expect(methods.ensure, 'ensureDraftExperience debe existir').toBe('function');
-    expect(methods.prompt, 'showBasicInfoRequired debe existir').toBe('function');
+    expect(before.marker, 'aún no hay borrador').toBeFalsy();
+    expect(before.temp, 'no se usa localStorage').toBeNull();
 
-    // 2. SIN nombre -> null y sin borrador (silenciamos el aviso para no bloquear)
-    const withoutName = await page.evaluate(async () => {
-      const b = window.experienceServicesBuilder;
-      b._draftExperienceId = null;
-      window.__experienceDraftId = null;
-      const nameEl = document.getElementById('experienceName');
-      if (nameEl) nameEl.value = '';
-      const origAlert = window.alert;
-      window.alert = () => {};
-      window.showAlert = () => {};
-      const res = await b.ensureDraftExperience();
-      window.alert = origAlert;
-      return { res, marker: window.__experienceDraftId };
-    });
-    expect(withoutName.res, 'sin nombre -> null').toBeNull();
-    expect(withoutName.marker, 'sin nombre -> no marca borrador').toBeFalsy();
-
-    // 3. CON nombre -> crea borrador real, marca el id, y NO usa localStorage
+    // 2. Escribir el nombre y hacer blur -> se crea el borrador automáticamente
     const uniqueName = `SMOKE F3 ${Date.now()}`;
     await page.fill('#experienceName', uniqueName);
-    const created = await page.evaluate(async () => {
-      const b = window.experienceServicesBuilder;
-      b._draftExperienceId = null;
-      window.__experienceDraftId = null;
-      const id = await b.ensureDraftExperience();
-      return {
-        id,
-        marker: window.__experienceDraftId,
-        temp: localStorage.getItem('tempExperienceServices'),
-      };
-    });
-    expect(created.id, 'con nombre -> id de borrador').toBeTruthy();
-    expect(created.marker, 'marca window.__experienceDraftId con el id').toBe(created.id);
-    expect(created.temp, 'NO se escribe localStorage tempExperienceServices').toBeNull();
+    await page.locator('#experienceName').blur();
+
+    await page.waitForFunction(() => !!window.__experienceDraftId, { timeout: 15_000 });
+    const draftId = await page.evaluate(() => window.__experienceDraftId);
+    expect(draftId, 'blur del nombre -> borrador creado').toBeTruthy();
+
+    // 3. Guardar ya habilitado + sin localStorage
+    await expect(page.locator('#expSaveBtn'), 'Guardar habilitado con nombre').toBeEnabled();
+    const temp = await page.evaluate(() => localStorage.getItem('tempExperienceServices'));
+    expect(temp, 'sigue sin localStorage').toBeNull();
 
     // 4. El borrador es active:false (oculto). Verificar vía API y limpiar (DELETE).
     const draftActive = await page.evaluate(async (id) => {
       const token = window.experienceServicesBuilder.getAccessToken();
-      const r = await fetch(`/api/experiences/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const r = await fetch(`/api/experiences/${id}`, { headers: { Authorization: `Bearer ${token}` } });
       const j = await r.json();
       const active = j.data ? j.data.active : 'no-data';
-      // cleanup: borrar el borrador de prueba
       await fetch(`/api/experiences/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
       return active;
-    }, created.id);
+    }, draftId);
     expect(draftActive, 'el borrador se crea active:false (oculto)').toBe(false);
 
     // Sin excepciones de página durante el flujo

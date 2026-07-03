@@ -47,11 +47,9 @@
                         <i class="ti ti-info-circle me-1"></i>
                         Informacion Basica
                     </h6>
-                    <div class="mb-3">
-                        <label for="experienceName" class="form-label">Nombre <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="experienceName" name="name" required maxlength="280" placeholder="Ej: Tour Gastronomico en el Centro Historico">
-                        <div class="invalid-feedback" id="name-error"></div>
-                    </div>
+                    <%# El campo "Nombre" es ahora GLOBAL: vive en el header del editor
+                        (experience-detail.ejs), obligatorio y visible en ambos tabs.
+                        Info y Servicios leen ese único #experienceName. %>
                     <div class="mb-3">
                         <label for="experienceDescription" class="form-label">Descripcion <span class="text-danger">*</span></label>
                         <textarea class="form-control" id="experienceDescription" name="description" required rows="2" placeholder="Descripcion detallada de lo que incluye esta experiencia..."></textarea>
@@ -580,7 +578,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Capture form values in real-time to avoid timing issues
         // Use specific form ID to guarantee correct element targeting
-        const nameInput = document.querySelector('#experienceInformationForm #experienceName');
+        const nameInput = document.querySelector('#experienceName');
         const descriptionTextarea = document.querySelector('#experienceInformationForm #experienceDescription');
         const costInput = document.querySelector('#experienceInformationForm #experienceCost');
         const includesTextarea = document.querySelector('#experienceInformationForm #experienceIncludes');
@@ -1285,15 +1283,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = result.data;
 
             // Basic fields - use specific form ID to guarantee correct element targeting
-            document.querySelector('#experienceInformationForm #experienceName').value = data.name || '';
+            document.querySelector('#experienceName').value = data.name || '';
             document.querySelector('#experienceInformationForm #experienceDescription').value = data.description || '';
             document.querySelector('#experienceInformationForm #experienceCost').value = data.cost || '';
             
             debugLog('Load Experience Data - Fields Populated', {
-                name: document.querySelector('#experienceInformationForm #experienceName').value,
+                name: document.querySelector('#experienceName').value,
                 description: document.querySelector('#experienceInformationForm #experienceDescription').value,
                 cost: document.querySelector('#experienceInformationForm #experienceCost').value,
-                nameFieldExists: !!document.querySelector('#experienceInformationForm #experienceName'),
+                nameFieldExists: !!document.querySelector('#experienceName'),
                 descriptionFieldExists: !!document.querySelector('#experienceInformationForm #experienceDescription')
             });
             document.getElementById('experiencePriceNoAlcohol').value = data.price_no_alcohol || '';
@@ -1604,6 +1602,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function saveExperience() {
+        // Nombre global obligatorio: no se puede guardar sin él. Enfoca el campo.
+        const globalNameEl = document.getElementById('experienceName');
+        if (!globalNameEl || !globalNameEl.value.trim()) {
+            showAlert('El nombre de la experiencia es obligatorio.', 'warning');
+            if (globalNameEl) {
+                globalNameEl.focus();
+                globalNameEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return;
+        }
+
         // Try multiple auth approaches - same as provider modal
         const accessToken = getAccessToken() || localStorage.getItem('authToken');
         
@@ -1627,7 +1636,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Enhanced debugging - check element existence first
         // Use specific form ID to guarantee correct element targeting
-        const nameElement = document.querySelector('#experienceInformationForm #experienceName');
+        const nameElement = document.querySelector('#experienceName');
         const descriptionElement = document.querySelector('#experienceInformationForm #experienceDescription');
         const costElement = document.querySelector('#experienceInformationForm #experienceCost');
 
