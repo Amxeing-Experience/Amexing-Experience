@@ -266,10 +266,10 @@
                     <div class="row">
                         <!-- Adult Prices Row -->
                         <div class="col-md-6 mb-3">
-                            <label for="experienceCost" class="form-label">Precio Adulto <span class="text-danger">*</span></label>
+                            <label for="experienceCost" class="form-label">Precio Adulto <span class="text-muted small">(opcional)</span></label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="experienceCost" name="cost" required min="0" step="0.01" placeholder="0.00">
+                                <input type="number" class="form-control" id="experienceCost" name="cost" min="0" step="0.01" placeholder="0.00">
                             </div>
                             <div class="invalid-feedback" id="cost-error"></div>
                         </div>
@@ -679,7 +679,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Define all numeric input fields with their validation rules
         const numericFields = [
             // Price fields (allow decimals)
-            { id: 'experienceCost', required: true, allowDecimals: true, min: 0, name: 'Precio Adulto' },
+            { id: 'experienceCost', required: false, allowDecimals: true, min: 0, name: 'Precio Adulto' },
             { id: 'experiencePriceNoAlcohol', required: false, allowDecimals: true, min: 0, name: 'Precio Sin Alcohol' },
             { id: 'experiencePriceChild', required: false, allowDecimals: true, min: 0, name: 'Precio Niño' },
             { id: 'experiencePriceInfant', required: false, allowDecimals: true, min: 0, name: 'Precio Infante' },
@@ -810,7 +810,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function getFieldConfig(inputId) {
         const fieldConfigs = [
-            { id: 'experienceCost', required: true, allowDecimals: true, min: 0, name: 'Precio Adulto' },
+            { id: 'experienceCost', required: false, allowDecimals: true, min: 0, name: 'Precio Adulto' },
             { id: 'experiencePriceNoAlcohol', required: false, allowDecimals: true, min: 0, name: 'Precio Sin Alcohol' },
             { id: 'experiencePriceChild', required: false, allowDecimals: true, min: 0, name: 'Precio Niño' },
             { id: 'experiencePriceInfant', required: false, allowDecimals: true, min: 0, name: 'Precio Infante' },
@@ -977,7 +977,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function validateAllNumericFields() {
         const numericFields = [
-            { id: 'experienceCost', required: true, allowDecimals: true, min: 0, name: 'Precio Adulto' },
+            { id: 'experienceCost', required: false, allowDecimals: true, min: 0, name: 'Precio Adulto' },
             { id: 'experiencePriceNoAlcohol', required: false, allowDecimals: true, min: 0, name: 'Precio Sin Alcohol' },
             { id: 'experiencePriceChild', required: false, allowDecimals: true, min: 0, name: 'Precio Niño' },
             { id: 'experiencePriceInfant', required: false, allowDecimals: true, min: 0, name: 'Precio Infante' },
