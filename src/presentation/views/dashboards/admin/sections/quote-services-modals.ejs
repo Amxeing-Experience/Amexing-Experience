@@ -421,13 +421,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <input type="text" class="form-control d-none" id="transportDestinationText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
                                     </div>
                                 </div>
-                                <!-- Pickup / Drop-off address (Punto a Punto only) -->
+                                <!-- Pickup / Drop-off address (Punto a Punto + Local: ambas columnas;
+                                     Aeropuerto one-way ARRIVAL: solo drop-off — el pick-up es el aeropuerto). -->
                                 <div class="row d-none" id="papAddressesRow">
-                                    <div class="col-md-6 mb-3">
+                                    <div class="col-md-6 mb-3" id="papPickupCol">
                                         <label class="form-label" for="transportPickupAddress">Dirección de pick-up</label>
                                         <input type="text" class="form-control" id="transportPickupAddress" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
                                     </div>
-                                    <div class="col-md-6 mb-3">
+                                    <div class="col-md-6 mb-3" id="papDropoffCol">
                                         <label class="form-label" for="transportDropoffAddress">Dirección de drop-off</label>
                                         <input type="text" class="form-control" id="transportDropoffAddress" placeholder="Ej: Aeropuerto BJX, Casa particular...">
                                     </div>
@@ -556,14 +557,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             </select>
                                         </div>
                                     </div>
-                                    <!-- Pickup / Drop-off addresses for Ida (Punto a Punto + Local) — sits right
-                                         below Origen/Destino so the route detail fields stay together. -->
+                                    <!-- Pickup / Drop-off addresses for Ida — sits right below Origen/Destino so the
+                                         route detail fields stay together. Punto a Punto + Local: ambas columnas.
+                                         Aeropuerto ARRIVAL (pierna Ida): solo drop-off — el pick-up es el aeropuerto. -->
                                     <div class="row d-none" id="papAddressesRowIda">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6 mb-3" id="papPickupColIda">
                                             <label class="form-label" for="roundTripPickupAddressIda">Dirección de pick-up</label>
                                             <input type="text" class="form-control" id="roundTripPickupAddressIda" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
                                         </div>
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6 mb-3" id="papDropoffColIda">
                                             <label class="form-label" for="roundTripDropoffAddressIda">Dirección de drop-off</label>
                                             <input type="text" class="form-control" id="roundTripDropoffAddressIda" placeholder="Ej: Aeropuerto BJX, Casa particular...">
                                         </div>
@@ -665,14 +667,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="text" class="form-control d-none" id="roundTripDestinationVueltaText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
                                         </div>
                                     </div>
-                                    <!-- Pickup / Drop-off addresses for Vuelta (Punto a Punto + Local) — sits right
-                                         below Origen/Destino so the route detail fields stay together. -->
+                                    <!-- Pickup / Drop-off addresses for Vuelta — sits right below Origen/Destino so the
+                                         route detail fields stay together. Punto a Punto + Local: ambas columnas.
+                                         Aeropuerto DEPARTURE (pierna Vuelta): solo pick-up — el drop-off es el aeropuerto. -->
                                     <div class="row d-none" id="papAddressesRowVuelta">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6 mb-3" id="papPickupColVuelta">
                                             <label class="form-label" for="roundTripPickupAddressVuelta">Dirección de pick-up</label>
                                             <input type="text" class="form-control" id="roundTripPickupAddressVuelta" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
                                         </div>
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6 mb-3" id="papDropoffColVuelta">
                                             <label class="form-label" for="roundTripDropoffAddressVuelta">Dirección de drop-off</label>
                                             <input type="text" class="form-control" id="roundTripDropoffAddressVuelta" placeholder="Ej: Aeropuerto BJX, Casa particular...">
                                         </div>
@@ -880,11 +883,21 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <label for="conceptoClientPrice" class="form-label">Precio Unitario (efectivo)</label>
                                     <input type="number" class="form-control" id="conceptoClientPrice" placeholder="0.00" step="0.01" min="0">
                                     <small class="text-muted">Precio unitario del concepto</small>
+                                    <!-- Aplicar/excluir el precio unitario del desglose (el valor se conserva). -->
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input" type="checkbox" id="conceptoApplyUnitPrice" checked>
+                                        <label class="form-check-label small" for="conceptoApplyUnitPrice">Aplicar al total</label>
+                                    </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="conceptoPricePerPerson" class="form-label">Precio por Persona (efectivo)</label>
                                     <input type="number" class="form-control" id="conceptoPricePerPerson" placeholder="0.00" step="0.01" min="0">
                                     <small class="text-muted">Precio por persona del concepto</small>
+                                    <!-- Aplicar/excluir el precio por persona del desglose (el valor se conserva). -->
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input" type="checkbox" id="conceptoApplyPerPerson" checked>
+                                        <label class="form-check-label small" for="conceptoApplyPerPerson">Aplicar al total</label>
+                                    </div>
                                 </div>
                             </div>
                             <!-- Surcharges checkbox kept in DOM (hidden) so existing JS handlers still work -->
@@ -917,15 +930,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             <!-- People Quantities for Concepto -->
                             <div class="row">
                                 <div class="col-md-4 mb-3">
-                                    <label for="conceptoAdultsQuantity" class="form-label">Adultos</label>
+                                    <label for="conceptoAdultsQuantity" class="form-label">Número de adultos (12+)</label>
                                     <input type="number" class="form-control concepto-quantity-input" id="conceptoAdultsQuantity" min="0" max="50" placeholder="0">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="conceptoChildrenQuantity" class="form-label">Niños</label>
+                                    <label for="conceptoChildrenQuantity" class="form-label">Número de niños (3-12)</label>
                                     <input type="number" class="form-control concepto-quantity-input" id="conceptoChildrenQuantity" min="0" max="50" placeholder="0">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="conceptoAdultsNoAlcoholQuantity" class="form-label">Adultos sin Alcohol</label>
+                                    <label for="conceptoAdultsNoAlcoholQuantity" class="form-label">Número de infantes (0-2)</label>
                                     <input type="number" class="form-control concepto-quantity-input" id="conceptoAdultsNoAlcoholQuantity" min="0" max="50" placeholder="0">
                                 </div>
                             </div>
