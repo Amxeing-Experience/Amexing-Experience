@@ -34,6 +34,11 @@ const experienceTitle = isNewExperience ? 'Nueva Experiencia' : 'Experiencia';
             </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-shrink-0">
+            <!-- F2: total en vivo de servicios, siempre visible al construir -->
+            <div id="expHeaderTotalWrap" class="d-none text-end me-1">
+                <div class="text-muted text-uppercase" style="font-size:0.65rem; letter-spacing:.04em; line-height:1;">Total servicios</div>
+                <div class="fw-bold" style="color: var(--brand-primary, #969b81); font-size:1.15rem; line-height:1.25;" id="expHeaderTotal">$0.00</div>
+            </div>
             <button type="button" class="btn text-white" style="background: var(--brand-gradient);" id="expSaveBtn">
                 <i class="ti ti-device-floppy me-1"></i><%= isNewExperience ? 'Crear Experiencia' : 'Guardar' %>
             </button>
@@ -120,6 +125,14 @@ const experienceTitle = isNewExperience ? 'Nueva Experiencia' : 'Experiencia';
 }
 .breadcrumb-item a:hover {
     color: var(--brand-primary, #969b81);
+}
+/* F2: títulos de sección internos en la paleta de marca (salvia) en vez del azul
+   de Bootstrap (text-primary), para consistencia visual del editor. */
+.experience-editor h6.text-primary {
+    color: var(--brand-primary, #969b81) !important;
+}
+.experience-editor h6.text-primary.border-bottom {
+    border-color: var(--brand-primary, #969b81) !important;
 }
 </style>
 

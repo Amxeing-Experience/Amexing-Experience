@@ -3522,6 +3522,10 @@ class ExperienceServicesBuilder {
     const emptyState = document.getElementById('emptyStateContainer');
     if (!container || !emptyState) return;
 
+    // F2 (total en vivo): recalcular desglose + totales en cada re-render de
+    // servicios (agregar/editar/borrar), para que el total se actualice al instante.
+    this.updatePriceBreakdown();
+
     if (this.services.size === 0) {
       container.classList.add('d-none');
       emptyState.classList.remove('d-none');
@@ -3893,6 +3897,17 @@ class ExperienceServicesBuilder {
     window.dispatchEvent(new CustomEvent('servicesUpdated'));
   }
 
+  // F2 (total en vivo): refleja el total de servicios en el header, siempre visible
+  // mientras se construye la experiencia (como el total corriente de una cotización).
+  setHeaderTotal(amount) {
+    const el = document.getElementById('expHeaderTotal');
+    if (!el) return;
+    const n = Number(amount) || 0;
+    el.textContent = `$${n.toFixed(2)}`;
+    const wrap = document.getElementById('expHeaderTotalWrap');
+    if (wrap) wrap.classList.remove('d-none');
+  }
+
   updatePriceBreakdown() {
     // Update the information panel breakdown (not the removed bottom panel)
     const breakdownListEl = document.getElementById('servicesBreakdownList');
@@ -3916,6 +3931,7 @@ class ExperienceServicesBuilder {
       // Update totals to zero
       if (servicesTotalCostEl) servicesTotalCostEl.textContent = '$0.00';
       if (servicesPerPersonCostEl) servicesPerPersonCostEl.textContent = '$0.00';
+      this.setHeaderTotal(0); // F2: total en vivo del header
       return;
     }
 
@@ -4018,6 +4034,7 @@ class ExperienceServicesBuilder {
     // Update summary totals in information panel
     if (servicesTotalCostEl) servicesTotalCostEl.textContent = `$${totalServicesCost.toFixed(2)}`;
     if (servicesPerPersonCostEl) servicesPerPersonCostEl.textContent = `$${perPersonCost.toFixed(2)}`;
+    this.setHeaderTotal(totalServicesCost); // F2: total en vivo del header
   }
 
   // =====================
