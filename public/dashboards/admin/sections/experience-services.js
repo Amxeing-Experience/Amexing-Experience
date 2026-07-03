@@ -498,6 +498,7 @@ class ExperienceServicesBuilder {
         vehicleType: sub.vehicleType,
         vehicleTypeName: sub.vehicleTypeName,
         price: sub.unitPrice || 0,
+        hours: sub.hours != null ? sub.hours : null, // horas del tour (para recomponer total)
         quantity: sub.quantity || 1,
         notes: sub.notes || '',
         experienceId: sub.experienceId,
@@ -3076,7 +3077,15 @@ class ExperienceServicesBuilder {
           if (vehicleSelect) vehicleSelect.value = service.vehicleId;
         }
         const priceEl = document.getElementById('servicePrice');
-        if (priceEl) priceEl.value = service.unitPrice != null ? service.unitPrice : (service.price || 0);
+        if (priceEl) {
+          // Como en cotizaciones: el precio BASE siempre es el precio por hora del
+          // VEHÍCULO (tour-prices), NUNCA el total del servicio. Así al editar no se
+          // triplica (el total = base × horas se muestra aparte vía updateServiceTotal).
+          const vehBase = service.vehicleId != null ? this.getTourVehiclePrice(service.vehicleId) : null;
+          priceEl.value = vehBase != null
+            ? vehBase
+            : (service.unitPrice != null ? service.unitPrice : (service.price || 0));
+        }
         this._populatingTransportForm = false;
       }
     }
@@ -4154,7 +4163,7 @@ class ExperienceServicesBuilder {
         unitPrice: servicePrice,
         quantity: service.quantity || 1,
         notes: service.notes || '',
-        hours: null,
+        hours: service.hours || null,
         total: servicePrice * (service.quantity || 1),
         experienceId: service.experienceId || null,
         tourId: service.tourId || null,
@@ -4264,7 +4273,7 @@ class ExperienceServicesBuilder {
         unitPrice: service.calculatedPrice || 0,
         quantity: service.quantity || 1,
         notes: service.notes || '',
-        hours: null,
+        hours: service.hours || null,
         total: (service.calculatedPrice || 0) * (service.quantity || 1),
         experienceId: service.experienceId || null,
         tourId: service.tourId || null,
