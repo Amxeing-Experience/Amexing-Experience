@@ -955,16 +955,14 @@ class ExperienceServicesBuilder {
       tiempoEsperaSection.classList.add('d-none');  // Always hidden for now
     }
 
-    // Hide Additional Vehicle checkbox and Cantidad field for transport (as requested) 
+    // Cantidad: oculta para transporte y para TOUR (el tour se cobra por horas, no
+    // por cantidad). El check de vehículo adicional va oculto siempre.
     const quantityFieldContainer = document.getElementById('quantityFieldContainer');
     const additionalVehicleContainer = document.getElementById('additionalVehicleContainer');
-    if (type === 'transport') {
-      if (quantityFieldContainer) quantityFieldContainer.classList.add('d-none');  // Hide cantidad field for transport
-      if (additionalVehicleContainer) additionalVehicleContainer.classList.add('d-none');  // Hide additional vehicle
-    } else {
-      if (quantityFieldContainer) quantityFieldContainer.classList.remove('d-none');
-      if (additionalVehicleContainer) additionalVehicleContainer.classList.add('d-none');
+    if (quantityFieldContainer) {
+      quantityFieldContainer.classList.toggle('d-none', type === 'transport' || type === 'tour');
     }
+    if (additionalVehicleContainer) additionalVehicleContainer.classList.add('d-none');
 
     // Guía/Greeter por tipo: Tour -> "Guía + Chofer" (sin greeter);
     // Transporte -> "Guía" + "Greeter".
@@ -3853,7 +3851,10 @@ class ExperienceServicesBuilder {
   // =====================
 
   calculateServicePrice(service) {
-    if (service.type === 'experience' || service.type === 'tour') {
+    // Los TOURS no usan precio por persona (adulto/niño): su precio es base × horas
+    // (+ guía), ya calculado y guardado en service.price. Por eso NO entran a esta
+    // rama; caen al retorno de abajo (service.price × quantity) para no quedar en $0.
+    if (service.type === 'experience') {
       const adults = service.adultsQuantity || 0;
       const children = service.childrenQuantity || 0;
       const noAlc = service.adultsNoAlcoholQuantity || 0;
