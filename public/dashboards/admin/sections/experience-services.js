@@ -2116,9 +2116,11 @@ class ExperienceServicesBuilder {
       if (el) el.textContent = range ? `(${range})` : '';
     };
 
-    setPrice('walkingPriceSmall', values.walkingPriceSmall != null ? values.walkingPriceSmall : tour.walkingPriceSmall);
-    setPrice('walkingPriceMedium', values.walkingPriceMedium != null ? values.walkingPriceMedium : tour.walkingPriceMedium);
-    setPrice('walkingPriceLarge', values.walkingPriceLarge != null ? values.walkingPriceLarge : tour.walkingPriceLarge);
+    // Un override 0/vacío = "sin editar" -> usa el precio del tour (un precio de
+    // grupo 0 no tiene sentido). Un precio editado (>0) tiene precedencia.
+    setPrice('walkingPriceSmall', values.walkingPriceSmall ? values.walkingPriceSmall : tour.walkingPriceSmall);
+    setPrice('walkingPriceMedium', values.walkingPriceMedium ? values.walkingPriceMedium : tour.walkingPriceMedium);
+    setPrice('walkingPriceLarge', values.walkingPriceLarge ? values.walkingPriceLarge : tour.walkingPriceLarge);
 
     setLabel('walkingRangeSmallLabel', tour.walkingRangeSmall);
     setLabel('walkingRangeMediumLabel', tour.walkingRangeMedium);
