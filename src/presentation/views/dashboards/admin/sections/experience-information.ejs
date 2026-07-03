@@ -74,12 +74,9 @@
                         <i class="ti ti-clock me-1"></i>
                         Tiempos
                     </h6>
+                    <%# "Duración (hrs)" es ahora GLOBAL: vive en el header, junto al nombre,
+                        con la "duración sugerida" (suma de tiempos de los servicios). %>
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="experienceDuration" class="form-label">Duracion (hrs)</label>
-                            <input type="number" class="form-control" id="experienceDuration" name="duration" min="0" step="0.5" placeholder="2.5">
-                            <div class="form-text"><small>Tiempo total experiencia</small></div>
-                        </div>
                         <div class="col-md-6 mb-3">
                             <label for="experienceTravelDuration" class="form-label">Duracion Trayecto (min)</label>
                             <input type="number" class="form-control" id="experienceTravelDuration" name="travel_duration" min="0" step="1" placeholder="60">

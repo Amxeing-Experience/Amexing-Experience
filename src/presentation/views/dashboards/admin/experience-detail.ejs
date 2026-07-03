@@ -47,14 +47,24 @@ const experienceTitle = isNewExperience ? 'Nueva Experiencia' : 'Experiencia';
 
     <!-- Nombre GLOBAL (obligatorio): fuente única para Información y Servicios (F3).
          Al escribirlo se crea el borrador automáticamente; sin nombre no se guarda. -->
-    <div class="mb-3">
-        <label for="experienceName" class="form-label fw-semibold mb-1">
-            Nombre de la experiencia <span class="text-danger">*</span>
-        </label>
-        <input type="text" class="form-control form-control-lg" id="experienceName" name="name"
-               required maxlength="280" autocomplete="off"
-               placeholder="Ej: Tour Gastronómico en el Centro Histórico">
-        <div class="form-text" id="expNameHint">Obligatorio. Al escribirlo se guarda un borrador automáticamente.</div>
+    <div class="row g-3 mb-3">
+        <div class="col-md-8">
+            <label for="experienceName" class="form-label fw-semibold mb-1">
+                Nombre de la experiencia <span class="text-danger">*</span>
+            </label>
+            <input type="text" class="form-control form-control-lg" id="experienceName" name="name"
+                   required maxlength="280" autocomplete="off"
+                   placeholder="Ej: Tour Gastronómico en el Centro Histórico">
+            <div class="form-text" id="expNameHint">Obligatorio. Al escribirlo se guarda un borrador automáticamente.</div>
+        </div>
+        <div class="col-md-4">
+            <label for="experienceDuration" class="form-label fw-semibold mb-1">Duración (hrs)</label>
+            <div class="input-group input-group-lg">
+                <span class="input-group-text"><i class="ti ti-clock-hour-3"></i></span>
+                <input type="number" class="form-control" id="experienceDuration" name="duration" min="0" step="0.5" placeholder="2.5">
+            </div>
+            <div class="form-text" id="expSuggestedDuration"></div>
+        </div>
     </div>
 
     <!-- Tabs: Servicios | Información (sustituyen al acordeón; cada sección a ancho completo) -->

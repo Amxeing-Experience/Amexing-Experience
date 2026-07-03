@@ -505,6 +505,7 @@ class ExperienceServicesBuilder {
         vehicleTypeName: sub.vehicleTypeName,
         price: sub.unitPrice || 0,
         hours: sub.hours != null ? sub.hours : null, // horas del tour (para recomponer total)
+        durationHours: sub.durationHours != null ? sub.durationHours : null, // para duración sugerida
         quantity: sub.quantity || 1,
         notes: sub.notes || '',
         experienceId: sub.experienceId,
@@ -3370,6 +3371,11 @@ class ExperienceServicesBuilder {
     service.type = type;
     service.notes = document.getElementById('serviceNotes')?.value || '';
 
+    // Transporte: duración = tiempo de ruta (min -> hrs), para la duración sugerida.
+    if (type === 'transport' && !service.durationHours && this.cachedRouteDuration) {
+      service.durationHours = (parseFloat(this.cachedRouteDuration) || 0) / 60;
+    }
+
     if (this.currentServiceId) {
       // Update existing
       service.id = this.currentServiceId;
@@ -3420,6 +3426,7 @@ class ExperienceServicesBuilder {
     const service = {
       experienceId,
       concept: exp ? exp.name : 'Experiencia',
+      durationHours: exp && exp.duration ? (parseFloat(exp.duration) || 0) : 0, // para duración sugerida
       isProviderExperience: isProvider,
       price: total,
       quantity: 1,
@@ -3676,6 +3683,8 @@ class ExperienceServicesBuilder {
     // F2 (total en vivo): recalcular desglose + totales en cada re-render de
     // servicios (agregar/editar/borrar), para que el total se actualice al instante.
     this.updatePriceBreakdown();
+    // Duración sugerida = suma de los tiempos de los servicios (se recalcula en vivo).
+    this.updateSuggestedDuration();
 
     if (this.services.size === 0) {
       container.classList.add('d-none');
@@ -4100,6 +4109,49 @@ class ExperienceServicesBuilder {
     if (wrap) wrap.classList.remove('d-none');
   }
 
+  // "HH:MM" -> minutos (para duración por horario). null si no es válido.
+  parseTimeToMinutes(str) {
+    if (!str) return null;
+    const m = String(str).trim().match(/^(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    return (parseInt(m[1], 10) * 60) + parseInt(m[2], 10);
+  }
+
+  // Duración de UN servicio en horas: duración explícita (tour = horas;
+  // transporte/experiencia = durationHours) y, si no, por horario (fin - inicio).
+  getServiceDurationHours(service) {
+    if (service.hours) return parseFloat(service.hours) || 0;
+    if (service.durationHours) return parseFloat(service.durationHours) || 0;
+    const start = this.parseTimeToMinutes(service.startTime);
+    const end = this.parseTimeToMinutes(service.endTime);
+    if (start != null && end != null && end > start) return (end - start) / 60;
+    return 0;
+  }
+
+  // Suma de las duraciones de todos los servicios = duración sugerida de la experiencia.
+  getSuggestedDurationHours() {
+    let total = 0;
+    this.services.forEach((s) => { total += this.getServiceDurationHours(s); });
+    return Math.round(total * 100) / 100;
+  }
+
+  // Etiqueta "Duración sugerida: X h" en el header (con enlace para aplicarla al campo).
+  updateSuggestedDuration() {
+    const el = document.getElementById('expSuggestedDuration');
+    if (!el) return;
+    const suggested = this.getSuggestedDurationHours();
+    if (suggested <= 0) { el.innerHTML = ''; return; }
+    el.innerHTML = `Sugerida: <strong>${suggested} h</strong> · <a href="#" id="expUseSuggestedDuration">usar</a>`;
+    const link = document.getElementById('expUseSuggestedDuration');
+    if (link) {
+      link.onclick = (e) => {
+        e.preventDefault();
+        const input = document.getElementById('experienceDuration');
+        if (input) input.value = suggested;
+      };
+    }
+  }
+
   updatePriceBreakdown() {
     // Update the information panel breakdown (not the removed bottom panel)
     const breakdownListEl = document.getElementById('servicesBreakdownList');
@@ -4342,6 +4394,7 @@ class ExperienceServicesBuilder {
         quantity: service.quantity || 1,
         notes: service.notes || '',
         hours: service.hours || null,
+        durationHours: service.durationHours || null,
         total: servicePrice * (service.quantity || 1),
         experienceId: service.experienceId || null,
         tourId: service.tourId || null,
@@ -4456,6 +4509,7 @@ class ExperienceServicesBuilder {
         quantity: service.quantity || 1,
         notes: service.notes || '',
         hours: service.hours || null,
+        durationHours: service.durationHours || null,
         total: (service.calculatedPrice || 0) * (service.quantity || 1),
         experienceId: service.experienceId || null,
         tourId: service.tourId || null,
