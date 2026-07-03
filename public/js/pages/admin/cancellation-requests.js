@@ -373,18 +373,6 @@ function showRequestDetails(request) {
             </div>
         </div>
 
-        <div class="mb-3">
-            <label class="form-label fw-semibold">Política de cancelación</label>
-            <div class="border rounded p-2 bg-light">
-                <div class="d-flex justify-content-between"><span>Crédito (saldo a favor)</span><span>$${Number(request.creditoAmount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
-                <div class="d-flex justify-content-between"><span>Penalización</span><span>$${Number(request.penalizacionAmount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
-                <div class="d-flex justify-content-between"><span>Reembolso a tarjeta</span><span>$${Number(request.reembolsoAmount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span></div>
-                <hr class="my-1">
-                <div class="small text-muted">Regla: ${({ empresa: 'Cancela la empresa (100% reembolso)', no_show: 'No-show (100% penalización)', mayor_igual_24h: '≥24 h (100% crédito)', entre_12_24h: '12–24 h (50/50)', menor_12h: '<12 h (100% penalización)' }[request.policyTier] || request.policyTier || '—')}</div>
-                <div class="small text-muted">Tipo: ${request.tipoCancelacion === 'empresa' ? 'Empresa' : 'Cliente'}${request.esNoShow ? ' · No-show' : ''}</div>
-            </div>
-        </div>
-
         ${request.adminComments ? `
             <div class="mb-3">
                 <div class="text-muted text-uppercase fw-semibold mb-1" style="font-size:.7rem; letter-spacing:.04em;"><i class="ti ti-message-circle me-1"></i>Comentarios del administrador</div>
@@ -438,29 +426,11 @@ function showApprovalModal(action) {
         '¿Está seguro que desea rechazar esta solicitud de cancelación? La solicitud será denegada.';
     
     $('#approvalModalLabel').text(title);
-    // For approvals, let the reviewer set who cancels and whether it was a no-show.
-    // The server recomputes the credit/penalty/refund split from these.
-    const policyInputs = isApproval ? `
-        <div class="mb-2">
-            <label class="form-label fw-semibold">Tipo de cancelación</label>
-            <select id="reviewTipoCancelacion" class="form-select form-select-sm">
-                <option value="cliente">Cliente</option>
-                <option value="empresa">Empresa (100% reembolso)</option>
-            </select>
-        </div>
-        <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" id="reviewEsNoShow">
-            <label class="form-check-label" for="reviewEsNoShow">El cliente no se presentó (no-show → 100% penalización)</label>
-        </div>
-        <div class="small text-muted">Al aprobar se aplicará la política de cancelación con estos datos.</div>
-    ` : '';
-
     $('#approvalContent').html(`
         <div class="alert ${isApproval ? 'alert-success' : 'alert-danger'}">
             <i class="ti ${isApproval ? 'ti-check-circle' : 'ti-x-circle'} me-2"></i>
             ${content}
         </div>
-        ${policyInputs}
     `);
     
     const confirmBtn = $('#confirmActionBtn');
@@ -517,9 +487,7 @@ async function processReviewAction() {
             },
             body: JSON.stringify({
                 action: currentAction,
-                adminComments: comments,
-                tipoCancelacion: $('#reviewTipoCancelacion').val() || 'cliente',
-                esNoShow: $('#reviewEsNoShow').is(':checked')
+                adminComments: comments
             })
         });
 

@@ -20,7 +20,6 @@ const Parse = require('parse/node');
 const CancellationRequest = require('../../../domain/models/CancellationRequest');
 const Quote = require('../../../domain/models/Quote');
 const logger = require('../../../infrastructure/logger');
-const CancellationPolicyService = require('../../services/CancellationPolicyService');
 const { logReadAccess, logBulkReadAccess } = require('../../utils/auditHelper');
 
 /**
@@ -599,13 +598,6 @@ class CancellationRequestsController {
         adminComments: request.get('reviewComments'),
         refundAmount: request.get('refundAmount'),
         cancellationFee: request.get('cancellationFee'),
-        // Cancellation policy split (CancellationPolicyService).
-        creditoAmount: request.get('creditoAmount') || 0,
-        penalizacionAmount: request.get('penalizacionAmount') || 0,
-        reembolsoAmount: request.get('reembolsoAmount') || 0,
-        policyTier: request.get('policyTier') || null,
-        esNoShow: request.get('esNoShow') === true,
-        tipoCancelacion: request.get('tipoCancelacion') || 'cliente',
         active: request.get('active'),
         exists: request.get('exists'),
       };
@@ -758,16 +750,6 @@ class CancellationRequestsController {
     // Set all fields at once to avoid validate firing before all fields are present
     request.set(requestFields);
 
-    // Compute and store the cancellation policy split (credit/penalty/refund) so the
-    // reviewer sees the financial outcome. Client cancellation by default.
-    const montoPagado = await this.getReservationPaidAmount(quote);
-    this.applyPolicy(request, {
-      montoPagado,
-      hoursBeforeEvent,
-      tipoCancelacion: requestData.tipoCancelacion || 'cliente',
-      esNoShow: requestData.esNoShow === true,
-    });
-
     await request.save(null, { useMasterKey: true });
 
     return {
@@ -791,7 +773,7 @@ class CancellationRequestsController {
    */
   async processCancellationRequestReview(request, currentUser, reviewData) {
     const {
-      decision, comments, refundAmount, cancellationFee, esNoShow, tipoCancelacion,
+      decision, comments, refundAmount, cancellationFee,
     } = reviewData;
 
     // Update request with review data
@@ -799,26 +781,8 @@ class CancellationRequestsController {
     request.setReviewedBy(currentUser);
     request.setReviewedAt(new Date());
     if (comments) request.setReviewComments(comments.trim());
-
-    // Recompute the policy split with the (possibly updated) initiator / no-show inputs.
-    const quoteForPolicy = request.getQuote();
-    const montoPagado = quoteForPolicy ? await this.getReservationPaidAmount(quoteForPolicy) : 0;
-    this.applyPolicy(request, {
-      montoPagado,
-      hoursBeforeEvent: request.getHoursBeforeEvent(),
-      tipoCancelacion: tipoCancelacion || request.getTipoCancelacion(),
-      esNoShow: esNoShow !== undefined ? esNoShow === true : request.getEsNoShow(),
-    });
-
-    // Manual overrides (dirección discretion / fuerza mayor) win over the formula.
-    if (refundAmount !== undefined) {
-      request.setRefundAmount(refundAmount);
-      request.setReembolsoAmount(refundAmount);
-    }
-    if (cancellationFee !== undefined) {
-      request.setCancellationFee(cancellationFee);
-      request.setPenalizacionAmount(cancellationFee);
-    }
+    if (refundAmount !== undefined) request.setRefundAmount(refundAmount);
+    if (cancellationFee !== undefined) request.setCancellationFee(cancellationFee);
 
     await request.save(null, { useMasterKey: true });
 
@@ -877,57 +841,6 @@ class CancellationRequestsController {
       error: message,
       timestamp: new Date().toISOString(),
     });
-  }
-
-  /**
-   * Find the (non-cancelled) reservation linked to a quote and return its paid amount.
-   * @param {object} quote - Quote Parse object.
-   * @returns {Promise<number>} Amount paid in MXN (0 when no reservation/payments).
-   * @example
-   * const paid = await this.getReservationPaidAmount(quote);
-   */
-  async getReservationPaidAmount(quote) {
-    try {
-      const resQuery = new Parse.Query('Reservation');
-      resQuery.equalTo('quotePtr', quote);
-      resQuery.equalTo('exists', true);
-      const reservation = await resQuery.first({ useMasterKey: true });
-      return reservation ? (reservation.get('paidAmount') || 0) : 0;
-    } catch (error) {
-      logger.warn('Could not resolve reservation paid amount for cancellation policy', {
-        quoteId: quote?.id,
-        error: error.message,
-      });
-      return 0;
-    }
-  }
-
-  /**
-   * Compute the cancellation policy split and store it on the request. Mirrors
-   * reembolso/penalizacion onto refundAmount/cancellationFee for back-compat.
-   * @param {object} request - CancellationRequest object.
-   * @param {object} inputs - { montoPagado, hoursBeforeEvent, tipoCancelacion, esNoShow }.
-   * @returns {object} Policy result { credito, penalizacion, reembolso, policyTier }.
-   * @example
-   * this.applyPolicy(request, { montoPagado: 1000, hoursBeforeEvent: 18, tipoCancelacion: 'cliente', esNoShow: false });
-   */
-  applyPolicy(request, inputs) {
-    const policy = CancellationPolicyService.calculate({
-      montoPagado: inputs.montoPagado,
-      horasAntelacion: inputs.hoursBeforeEvent,
-      tipoCancelacion: inputs.tipoCancelacion,
-      esNoShow: inputs.esNoShow,
-    });
-    request.setCreditoAmount(policy.credito);
-    request.setPenalizacionAmount(policy.penalizacion);
-    request.setReembolsoAmount(policy.reembolso);
-    request.setPolicyTier(policy.policyTier);
-    request.setTipoCancelacion(inputs.tipoCancelacion || 'cliente');
-    request.setEsNoShow(inputs.esNoShow === true);
-    // Back-compat mirrors (existing fields/UI read these).
-    request.setRefundAmount(policy.reembolso);
-    request.setCancellationFee(policy.penalizacion);
-    return policy;
   }
 
   /**
