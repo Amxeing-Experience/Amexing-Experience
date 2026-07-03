@@ -850,6 +850,13 @@ class ExperienceServicesBuilder {
     document.getElementById('serviceForm')?.reset();
     this.resetServiceTypeContent();
 
+    // Poblar los dropdowns ANTES de rellenar los campos: si se hace después (como
+    // estaba), populateTourSelect/ExperienceSelect/RateSelector reconstruyen las
+    // <option> y borran la selección que populateServiceFields fija al editar.
+    this.populateRateSelector();
+    this.populateExperienceSelect();
+    this.populateTourSelect();
+
     if (serviceId) {
       // Edit mode
       const service = this.services.get(serviceId);
@@ -873,13 +880,6 @@ class ExperienceServicesBuilder {
       if (saveBtn) saveBtn.innerHTML = '<i class="ti ti-device-floppy me-1"></i>Guardar Servicio';
       this.handleServiceTypeChange('experience');
     }
-
-    // Populate rate selector
-    this.populateRateSelector();
-
-    // Populate experience and tour selects
-    this.populateExperienceSelect();
-    this.populateTourSelect();
 
     const bsModal = new bootstrap.Modal(modal);
     bsModal.show();
