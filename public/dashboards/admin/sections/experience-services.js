@@ -260,6 +260,18 @@ class ExperienceServicesBuilder {
     // Tour selection
     document.getElementById('tourSelect')?.addEventListener('change', (e) => {
       this.handleTourSelection(e.target.value);
+      // Los walking tours incluyen guía por default -> marca el check al elegirlo
+      // (independiente del selector de "por este tour / por toda la experiencia").
+      const tour = this.toursCache.get(e.target.value);
+      if (tour?.isWalkingTour) {
+        const g = document.getElementById('includeGuide');
+        if (g && !g.checked) {
+          g.checked = true;
+          this.handleIncludeGuideChange(true);
+        }
+      }
+      this.updateGuideDurationModeVisibility();
+      this.updateServiceTotal();
     });
 
     // Tour transport checkbox
@@ -2484,9 +2496,10 @@ class ExperienceServicesBuilder {
   updateGuideDurationModeVisibility() {
     const modeSelect = document.getElementById('guideDurationMode');
     if (!modeSelect) return;
+    // Independiente del check de guía: los walking tours ya incluyen guía por default,
+    // así que el selector de duración se muestra para cualquier tour a pie.
     const isWalking = !!this.selectedTourData?.isWalkingTour;
-    const guideChecked = document.getElementById('includeGuide')?.checked || false;
-    modeSelect.classList.toggle('d-none', !(isWalking && guideChecked));
+    modeSelect.classList.toggle('d-none', !isWalking);
   }
 
   // "1-5" -> {min:1,max:5}; "16+" -> {min:16,max:Infinity}; otro -> null.
