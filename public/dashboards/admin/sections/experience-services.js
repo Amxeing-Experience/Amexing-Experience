@@ -2804,10 +2804,14 @@ class ExperienceServicesBuilder {
 
     // Sumar guía/greeter (según tipo + checkboxes).
     const { guide, greeter } = this.getGuideGreeterCost();
-    total += guide + greeter;
+    // Round-trip de transporte: guía y greeter también se doblan (×2), igual que el base.
+    const extrasMult = (type === 'transport' && document.getElementById('transportRoundTrip')?.checked) ? 2 : 1;
+    const guideT = guide * extrasMult;
+    const greeterT = greeter * extrasMult;
+    total += guideT + greeterT;
     const extras = [];
-    if (guide > 0) extras.push(`guía $${guide.toFixed(2)}`);
-    if (greeter > 0) extras.push(`greeter $${greeter.toFixed(2)}`);
+    if (guideT > 0) extras.push(`guía $${guideT.toFixed(2)}`);
+    if (greeterT > 0) extras.push(`greeter $${greeterT.toFixed(2)}`);
     if (extras.length) detail += ` + ${extras.join(' + ')}`;
 
     totalEl.textContent = `$${total.toFixed(2)} ${currency}${detail}`;
@@ -3642,9 +3646,10 @@ class ExperienceServicesBuilder {
     const additionalVehicle = document.getElementById('additionalVehicle')?.checked || false;
     const vehicleQty = additionalVehicle ? 2 : 1;
     const { guide: guideCost, greeter: greeterCost } = this.getGuideGreeterCost();
-    // Viaje redondo multiplica el precio base (por vehículo) ×2. El guía/greeter no.
+    // Viaje redondo multiplica ×2 TODO el traslado: base (por vehículo) + guía + greeter.
     const roundTrip = document.getElementById('transportRoundTrip')?.checked || false;
-    const price = (base * vehicleQty * (roundTrip ? 2 : 1)) + guideCost + greeterCost;
+    const rtMult = roundTrip ? 2 : 1;
+    const price = ((base * vehicleQty) + guideCost + greeterCost) * rtMult;
     const quantity = 1;
     const rateId = document.getElementById('transportCategory')?.value || null;
     const vehicleId = document.getElementById('vehicleSelect')?.value || null;
