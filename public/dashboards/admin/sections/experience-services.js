@@ -284,6 +284,16 @@ class ExperienceServicesBuilder {
     document.getElementById('serviceQuantity')?.addEventListener('input', () => this.updateServiceTotal());
     document.getElementById('additionalVehicle')?.addEventListener('change', () => this.updateServiceTotal());
 
+    // Duración editable del header: al cambiarla, recalcular en vivo las guías de los
+    // tours a pie cobrados "por toda la experiencia" y repintar tarjetas/total/sugerida.
+    document.getElementById('experienceDuration')?.addEventListener('input', () => {
+      this.recomputeWalkingTourExperienceGuides();
+      this.renderServices();
+    });
+
+    // Modo de duración de la guía (tour a pie): recalcula el Total del modal en vivo.
+    document.getElementById('guideDurationMode')?.addEventListener('change', () => this.updateServiceTotal());
+
     // Traslado: duración editable (h/min) + viaje redondo recalculan el total en vivo.
     document.getElementById('transportDurationHours')?.addEventListener('input', () => this.updateServiceTotal());
     document.getElementById('transportDurationMinutes')?.addEventListener('input', () => this.updateServiceTotal());
@@ -298,6 +308,7 @@ class ExperienceServicesBuilder {
     // Guide checkbox
     document.getElementById('includeGuide')?.addEventListener('change', (e) => {
       this.handleIncludeGuideChange(e.target.checked);
+      this.updateGuideDurationModeVisibility();
       this.updateServiceTotal();
     });
 
@@ -525,6 +536,7 @@ class ExperienceServicesBuilder {
         childPrice: sub.childPrice || 0,
         noAlcoholPrice: sub.noAlcoholPrice || 0,
         includeGuide: sub.includeGuide || false,
+        guideDurationMode: sub.guideDurationMode || 'tour',
         includeGreeter: sub.includeGreeter || false,
         greeterInVehicle: sub.greeterInVehicle || false,
         waitingTimeHours: sub.waitingTimeHours || 0,
@@ -829,7 +841,13 @@ class ExperienceServicesBuilder {
 
     if (type === 'tour') {
       if (includeGuide) {
-        const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 0;
+        // Tour a pie con modo "por toda la experiencia": la guía se cobra sobre la
+        // Duración editable del header; en cualquier otro caso, sobre las horas del tour.
+        const isWalking = !!this.selectedTourData?.isWalkingTour;
+        const durationMode = document.getElementById('guideDurationMode')?.value || 'tour';
+        const hours = (isWalking && durationMode === 'experience')
+          ? (parseFloat(document.getElementById('experienceDuration')?.value) || 0)
+          : (parseFloat(document.getElementById('hoursQuantity')?.value) || 0);
         guide = (this.driverTourRateCache?.value || 0) * hours;
       }
     } else if (type === 'transport') {
@@ -1036,22 +1054,35 @@ class ExperienceServicesBuilder {
     const includeGreeterContainer = document.getElementById('greeterCheckboxContainer');
     const opcionalLabelContainer = includeGuideContainer?.closest('.col-md-2');
     const guideLabel = document.getElementById('guideLabel');
+    // 'transportFieldsRow' ya está declarado arriba (visibilidad base por tipo).
+    const segmentoCol = document.getElementById('transportSegmentoCol');
+    const vehicleCol = document.getElementById('transportVehicleCol');
 
     if (type === 'transport') {
       if (includeGuideContainer) includeGuideContainer.classList.remove('d-none');
       if (includeGreeterContainer) includeGreeterContainer.classList.remove('d-none');
       if (opcionalLabelContainer) opcionalLabelContainer.classList.remove('d-none');
       if (guideLabel) guideLabel.textContent = 'Guía';
+      // Restaurar la fila y sus columnas (por si venía de un tour a pie que las ocultó).
+      if (transportFieldsRow) transportFieldsRow.classList.remove('d-none');
+      if (segmentoCol) segmentoCol.classList.remove('d-none');
+      if (vehicleCol) vehicleCol.classList.remove('d-none');
     } else if (type === 'tour') {
       if (includeGuideContainer) includeGuideContainer.classList.remove('d-none');
       if (includeGreeterContainer) includeGreeterContainer.classList.add('d-none');
       if (opcionalLabelContainer) opcionalLabelContainer.classList.remove('d-none');
       if (guideLabel) guideLabel.textContent = 'Guía + Chofer';
+      // La fila queda visible (guía siempre disponible); Segmento/Vehículo se
+      // reactivan por defecto y luego handleTourTransportToggle decide según el tour.
+      if (transportFieldsRow) transportFieldsRow.classList.remove('d-none');
+      if (segmentoCol) segmentoCol.classList.remove('d-none');
+      if (vehicleCol) vehicleCol.classList.remove('d-none');
     } else {
       // Experiencia/Concepto: no aplican (la fila de transporte va oculta).
       if (includeGuideContainer) includeGuideContainer.classList.add('d-none');
       if (includeGreeterContainer) includeGreeterContainer.classList.add('d-none');
       if (opcionalLabelContainer) opcionalLabelContainer.classList.add('d-none');
+      if (transportFieldsRow) transportFieldsRow.classList.add('d-none');
     }
 
     // Hide horas field for transport but keep for tours and experiences  
@@ -2425,10 +2456,16 @@ class ExperienceServicesBuilder {
   }
 
   handleTourTransportToggle(checked) {
+    // Mantener la fila visible (para que la columna "Opcional" con la guía siga
+    // disponible en tours a pie); solo ocultar Segmento + Vehículo cuando es a pie.
     const transportFieldsRow = document.getElementById('transportFieldsRow');
     if (transportFieldsRow) {
-      transportFieldsRow.classList.toggle('d-none', !checked);
+      transportFieldsRow.classList.remove('d-none');
     }
+    const segmentoCol = document.getElementById('transportSegmentoCol');
+    const vehicleCol = document.getElementById('transportVehicleCol');
+    if (segmentoCol) segmentoCol.classList.toggle('d-none', !checked);
+    if (vehicleCol) vehicleCol.classList.toggle('d-none', !checked);
     // Un tour CON vehículo cobra por el vehículo -> muestra el campo de Precio.
     const standardPricingSection = document.getElementById('standardPricingSection');
     if (standardPricingSection) {
@@ -2439,6 +2476,17 @@ class ExperienceServicesBuilder {
     if (walkingTourPricingSection) {
       walkingTourPricingSection.classList.toggle('d-none', checked);
     }
+    // Tour a pie con guía marcada -> muestra el selector de modo de duración de la guía.
+    this.updateGuideDurationModeVisibility();
+  }
+
+  // El selector "#guideDurationMode" solo aplica a tours a pie con la guía marcada.
+  updateGuideDurationModeVisibility() {
+    const modeSelect = document.getElementById('guideDurationMode');
+    if (!modeSelect) return;
+    const isWalking = !!this.selectedTourData?.isWalkingTour;
+    const guideChecked = document.getElementById('includeGuide')?.checked || false;
+    modeSelect.classList.toggle('d-none', !(isWalking && guideChecked));
   }
 
   // "1-5" -> {min:1,max:5}; "16+" -> {min:16,max:Infinity}; otro -> null.
@@ -3241,7 +3289,15 @@ class ExperienceServicesBuilder {
     if (includeGuide) includeGuide.checked = service.includeGuide || false;
     if (includeGreeter) includeGreeter.checked = service.includeGreeter || false;
 
+    // Restaurar el modo de duración de la guía guardado (tours a pie).
+    const guideDurationMode = document.getElementById('guideDurationMode');
+    if (guideDurationMode) guideDurationMode.value = service.guideDurationMode || 'tour';
+
     if (service.tourId) this.handleTourSelection(service.tourId);
+
+    // Ya con el tour seleccionado, mostrar/ocultar el selector y refrescar el total.
+    this.updateGuideDurationModeVisibility();
+    this.updateServiceTotal();
 
     // Tour a pie: restaurar personas + precios de grupo GUARDADOS (sobre los del tour).
     if (service.isWalkingTour && this.selectedTourData?.isWalkingTour) {
@@ -3633,6 +3689,9 @@ class ExperienceServicesBuilder {
       vehicleTypeName: vehicleType ? vehicleType.name : null,
       includeGuide,
       includeGreeter,
+      // Modo de cobro de la guía en tours a pie: 'tour' (horas del tour) o
+      // 'experience' (Duración editable del header). Default 'tour'.
+      guideDurationMode: document.getElementById('guideDurationMode')?.value || 'tour',
       isWalkingTour: tour ? (tour.isWalkingTour || false) : false,
       languages: document.getElementById('tourLanguages')?.value || '',
       clientNotes: document.getElementById('tourClientNotes')?.value || '',
@@ -3763,7 +3822,28 @@ class ExperienceServicesBuilder {
   // RENDERING
   // =====================
 
+  // Recalcula la guía de los tours a pie que se cobran "por toda la experiencia":
+  // guía = ChoferTour × Duración editable del header. Se aplica sobre la base a pie
+  // (precio sin guía) para no duplicar, y actualiza price/unitPrice del servicio.
+  recomputeWalkingTourExperienceGuides() {
+    const rate = this.driverTourRateCache?.value || 0;
+    const globalDur = parseFloat(document.getElementById('experienceDuration')?.value) || 0;
+    this.services.forEach((s) => {
+      if (s.type === 'tour' && s.isWalkingTour && s.includeGuide && s.guideDurationMode === 'experience') {
+        const newGuide = rate * globalDur;
+        const walkingBase = (s.price || 0) - (s.guideCost || 0);
+        s.guideCost = newGuide;
+        s.price = walkingBase + newGuide;
+        s.unitPrice = s.price;
+      }
+    });
+  }
+
   renderServices() {
+    // Antes de pintar: recalcular las guías "por toda la experiencia" para que
+    // tarjetas, total y duración sugerida reflejen la Duración editable actual.
+    this.recomputeWalkingTourExperienceGuides();
+
     const container = document.getElementById('servicesContainer');
     const emptyState = document.getElementById('emptyStateContainer');
     if (!container || !emptyState) return;
@@ -4503,6 +4583,7 @@ class ExperienceServicesBuilder {
         childPrice: service.childPrice || null,
         noAlcoholPrice: service.noAlcoholPrice || null,
         includeGuide: service.includeGuide || false,
+        guideDurationMode: service.guideDurationMode || 'tour',
         includeGreeter: service.includeGreeter || false,
         greeterInVehicle: service.greeterInVehicle || false,
         waitingTimeHours: service.waitingTimeHours || 0,
@@ -4621,6 +4702,7 @@ class ExperienceServicesBuilder {
         childPrice: service.childPrice || null,
         noAlcoholPrice: service.noAlcoholPrice || null,
         includeGuide: service.includeGuide || false,
+        guideDurationMode: service.guideDurationMode || 'tour',
         includeGreeter: service.includeGreeter || false,
         greeterInVehicle: service.greeterInVehicle || false,
         waitingTimeHours: service.waitingTimeHours || 0,

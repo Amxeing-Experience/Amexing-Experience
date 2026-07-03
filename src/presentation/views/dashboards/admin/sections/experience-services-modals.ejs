@@ -150,14 +150,14 @@
                     </div>
                     
                     <div class="row" id="transportFieldsRow">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-6 mb-3" id="transportSegmentoCol">
                             <label for="transportCategory" class="form-label">Segmento <span class="text-danger">*</span></label>
                             <select class="form-select" id="transportCategory" required>
                                 <option value="">-- Seleccionar segmento --</option>
                                 <!-- Options will be loaded dynamically from Rate table -->
                             </select>
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-4 mb-3" id="transportVehicleCol">
                             <label for="vehicleSelect" class="form-label">Vehículo</label>
                             <select class="form-select" id="vehicleSelect">
                                 <option value="">-- Sin vehículo --</option>
@@ -172,6 +172,13 @@
                                         Guía + Chofer
                                     </label>
                                 </div>
+                                <!-- Tour a pie: elige si la guía se cobra por este tour o por
+                                     toda la experiencia (usa la Duración editable del header).
+                                     Visible solo para tours a pie con guía marcada. -->
+                                <select class="form-select form-select-sm mb-1 d-none" id="guideDurationMode" style="font-size: 0.75rem;">
+                                    <option value="tour">Guía: por este tour</option>
+                                    <option value="experience">Guía: por toda la experiencia</option>
+                                </select>
                                 <div class="form-check" id="greeterCheckboxContainer">
                                     <input class="form-check-input" type="checkbox" value="" id="includeGreeter">
                                     <label class="form-check-label small" for="includeGreeter" id="greeterLabel" style="font-size: 0.875rem; line-height: 1.2;">
