@@ -282,15 +282,19 @@
 
                     <!-- Walking tour pricing (tour a pie): por tamaño de grupo, precios editables (MXN) -->
                     <div id="walkingTourPricingSection" class="d-none">
+                        <!-- Personas arriba, en su propia fila -->
                         <div class="row">
-                            <div class="col-md-3 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label for="walkingTourPeopleCount" class="form-label">Personas <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="ti ti-users"></i></span>
                                     <input type="number" class="form-control" id="walkingTourPeopleCount" min="1" step="1" value="1">
                                 </div>
                             </div>
-                            <div class="col-md-3 mb-3">
+                        </div>
+                        <!-- Precios por grupo (editables, más anchos) -->
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
                                 <label for="walkingPriceSmall" class="form-label">Grupo <span id="walkingRangeSmallLabel" class="text-muted small"></span></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
@@ -298,7 +302,7 @@
                                     <span class="input-group-text">MXN</span>
                                 </div>
                             </div>
-                            <div class="col-md-3 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label for="walkingPriceMedium" class="form-label">Grupo <span id="walkingRangeMediumLabel" class="text-muted small"></span></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
@@ -306,7 +310,7 @@
                                     <span class="input-group-text">MXN</span>
                                 </div>
                             </div>
-                            <div class="col-md-3 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label for="walkingPriceLarge" class="form-label">Grupo <span id="walkingRangeLargeLabel" class="text-muted small"></span></label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>

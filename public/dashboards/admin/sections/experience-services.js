@@ -2431,14 +2431,16 @@ class ExperienceServicesBuilder {
     return groups;
   }
 
-  // Total del tour a pie: suma del precio de cada grupo asignado (precio plano por grupo,
-  // SIN multiplicar por horas). Usa personas (default 1) + precios editables.
+  // Total del tour a pie: suma del precio de cada grupo asignado × las horas del tour.
+  // Usa personas (default 1) + precios editables + horas (#hoursQuantity).
   getWalkingTourTotal() {
     const tour = this.selectedTourData;
     if (!tour || !tour.isWalkingTour) return 0;
     const peopleCount = Math.max(1, parseInt(document.getElementById('walkingTourPeopleCount')?.value, 10) || 1);
+    const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
     const groups = this.calculateWalkingTourGroups(tour, peopleCount);
-    return groups.reduce((sum, g) => sum + (parseFloat(g.tier.price) || 0), 0);
+    const perGroup = groups.reduce((sum, g) => sum + (parseFloat(g.tier.price) || 0), 0);
+    return perGroup * hours;
   }
 
   async handleRateSelection(rateId) {
@@ -2712,12 +2714,13 @@ class ExperienceServicesBuilder {
     let detail = '';
 
     if (type === 'tour' && this.selectedTourData?.isWalkingTour) {
-      // Tour a pie: total = suma de precios por grupo según personas (precios editables).
+      // Tour a pie: total = suma de precios por grupo (según personas) × horas.
       const peopleCount = Math.max(1, parseInt(document.getElementById('walkingTourPeopleCount')?.value, 10) || 1);
+      const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
       total = this.getWalkingTourTotal();
       const groups = this.calculateWalkingTourGroups(this.selectedTourData, peopleCount);
       const tierParts = groups.map((g) => `${g.tier.label || g.tier.name}: $${(parseFloat(g.tier.price) || 0).toFixed(2)}`);
-      detail = ` (${peopleCount} pax${tierParts.length ? ` — ${tierParts.join(', ')}` : ''})`;
+      detail = ` (${peopleCount} pax × ${hours} h${tierParts.length ? ` — ${tierParts.join(', ')}` : ''})`;
     } else if (type === 'tour') {
       const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
       total = base * hours;
