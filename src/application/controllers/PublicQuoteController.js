@@ -699,6 +699,7 @@ class PublicQuoteController {
    * available on the public view). Mutates quoteData.serviceItems in place.
    * @param {object} quoteData - Prepared quote data with serviceItems.
    * @returns {Promise<void>}
+   * @example
    */
   async injectServiceIncludes(quoteData) {
     try {

@@ -362,8 +362,9 @@ Created by Denisse Maldonado
             <h2 class="bodas-logistica__title"><%= t('pages:bodas.logistica.title') %></h2>
             <span class="bodas-logistica__rule" aria-hidden="true"></span>
             <div class="bodas-logistica__text">
-                <p>Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat. Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat.</p>
-                <p>Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim.</p>
+                <% t('pages:bodas.logistica.body').split('\n').forEach(function (bodyParagraph) { if (!bodyParagraph.trim()) return; %>
+                <p><%= bodyParagraph %></p>
+                <% }); %>
             </div>
             <span class="bodas-logistica__rule" aria-hidden="true"></span>
         </div>
@@ -391,7 +392,7 @@ Created by Denisse Maldonado
             { label: t('pages:bodas.servicios.transporte'),  img: '/images/boda_s1.png' },
             { label: t('pages:bodas.servicios.hospedaje'),   img: '/images/boda_s2.png' },
             { label: t('pages:bodas.servicios.vuelos'),      img: '/images/boda_s3.png' },
-            { label: t('pages:bodas.servicios.actividades'), img: '/images/boda_s4.png' }
+            { label: t('pages:bodas.servicios.actividades'), img: '/images/DSC_0621.jpg' }
         ];
     %>
     <section class="bodas-servicios">

@@ -13,7 +13,7 @@ const logger = require('../../infrastructure/logger');
 
 /**
  * Parse subclass modeling a single (type, option) travel preference for a Client
- * (or AmexingUser), e.g. type "tour_interest" with option "viñedos". A client may
+ * (or AmexingUser), e.g. Type "tour_interest" with option "viñedos". A client may
  * have many such records.
  * @augments BaseModel
  * @example

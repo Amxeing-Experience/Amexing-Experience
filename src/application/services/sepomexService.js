@@ -1,5 +1,5 @@
 /**
- * sepomexService - Official SEPOMEX (Correos de México) postal-code lookup, self-hosted from a
+ * SepomexService - Official SEPOMEX (Correos de México) postal-code lookup, self-hosted from a
  * compressed dataset bundled in the repo (src/infrastructure/data/sepomex-cp.json.gz). Resolves a
  * 5-digit CP to its estado, municipio and the list of colonias. Loaded lazily and cached in memory.
  *
@@ -13,6 +13,10 @@ const logger = require('../../infrastructure/logger');
 const DATA_FILE = path.join(__dirname, '..', '..', 'infrastructure', 'data', 'sepomex-cp.json.gz');
 let data = null;
 
+/**
+ *
+ * @example
+ */
 function load() {
   if (data) return data;
   try {
@@ -31,6 +35,7 @@ function load() {
  * Look up a Mexican postal code.
  * @param {string} cp - 5-digit postal code.
  * @returns {{estado: string, municipio: string, colonias: string[]}|null} Match or null.
+ * @example
  */
 function lookup(cp) {
   const code = String(cp || '').replace(/\D/g, '').slice(0, 5);

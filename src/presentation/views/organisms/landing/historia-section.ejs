@@ -20,7 +20,7 @@ Created by Denisse Maldonado
             text: 'Impulsado por el entusiasmo de sus primeros clientes, el proyecto creció de manera orgánica.\n\nCon una profunda pasión por la historia y la cultura, la experiencia se fue profesionalizando con la incorporación de Angélica Juárez como guía certificada y el desarrollo de recorridos diseñados para conectar a cada visitante con el alma de la ciudad.\n\nLo que comenzó como un esfuerzo familiar pronto se convirtió en una vocación compartida.'
         },
         {
-            year: '2016', order: 4, title: 'Una Empresa Familiar', subtitle: 'Segunda generación', side: 'right', image: true, open: false,
+            year: '2016', order: 4, title: 'Una Empresa Familiar', subtitle: 'Segunda generación', side: 'right', images: ['/images/2daGeneracion.jpg'], open: false,
             text: 'A lo largo de los años, la empresa ha crecido manteniendo su esencia familiar.\n\nLos hijos se han integrado al proyecto, formando hoy una segunda generación que continúa fortaleciendo la visión de Amexing Experience, con una perspectiva más amplia y una preparación acorde a las nuevas exigencias del mercado.'
         },
         {
@@ -35,7 +35,7 @@ Created by Denisse Maldonado
         },
         {
             year: 'Hoy', order: 6, title: 'Una Visión en Expansión', subtitle: '', side: 'center', open: false,
-            images: ['/images/AMEXING80.jpg'],
+            images: ['/images/eventothis.jpg'],
             text: 'Hoy, como agencia acreditada por IATA, Amexing Experience amplía su capacidad para ofrecer servicios integrales que incluyen vuelos, hospedaje y experiencias diseñadas a la medida.\n\nLa empresa sigue evolucionando, pero conserva la misma esencia que la vio nacer: una profunda conexión con San Miguel de Allende y el deseo genuino de compartirlo con el mundo.'
         }
     ];
@@ -312,9 +312,16 @@ Created by Denisse Maldonado
     cursor: pointer;
 }
 
-/* una sola imagen: panorámica en vez de cuadrada */
+/* una sola imagen: respeta su proporción natural (vertical u horizontal) en vez
+   de forzar un recuadro apaisado. max-height evita que una foto vertical crezca
+   de más; se centra en el ancho de la tarjeta. */
 .historia-timeline__images[data-count="1"] .historia-timeline__photo {
-    aspect-ratio: 4 / 3;
+    aspect-ratio: auto;
+    width: auto;
+    max-width: 100%;
+    max-height: 520px;
+    object-fit: cover;
+    margin: 0 auto;
 }
 
 /* en conteos impares (>2) la última ocupa toda la fila */

@@ -40,6 +40,7 @@ class OwnedClientsController {
    * @param {object} currentUser - The AmexingUser creating/owning the client.
    * @param {string} userRole - Role of currentUser.
    * @returns {string} The agency id (department_manager objectId, o el organizationId del agente).
+   * @example
    */
   getAgencyId(currentUser, userRole) {
     if (userRole === 'department_manager') return currentUser.id;
@@ -53,6 +54,7 @@ class OwnedClientsController {
    * @param {object} currentUser - The caller.
    * @param {string} userRole - Role of the caller.
    * @returns {Parse.Query} A configured AmexingUser query (exists=true).
+   * @example
    */
   buildAgencyClientQuery(currentUser, userRole) {
     const q = new Parse.Query(Parse.Object.extend('AmexingUser'));

@@ -62,6 +62,11 @@ const serviciosDropdown = [
         <div class="landing-nav__menu" id="landingNavMenu">
             <ul class="landing-nav__list">
                 <li class="landing-nav__item">
+                    <a href="<%= isEnglish ? '/en' : '/' %>" class="landing-nav__link <%= activePage === 'home' ? 'landing-nav__link--active' : '' %>" data-label="<%= translate('navbar:menu.home') %>">
+                        <%= translate('navbar:menu.home') %>
+                    </a>
+                </li>
+                <li class="landing-nav__item">
                     <a href="<%= isEnglish ? '/en/about' : '/nosotros' %>" class="landing-nav__link <%= activePage === 'about' ? 'landing-nav__link--active' : '' %>" data-label="<%= translate('navbar:menu.about') %>">
                         <%= translate('navbar:menu.about') %>
                     </a>
