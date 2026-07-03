@@ -377,7 +377,10 @@ Created by Denisse Maldonado
 
     <%# Header: banner con la imagen de la flota %>
     <section class="transporte-hero">
-        <img src="/images/transportes_services.jpg" alt="<%= t('pages:transporte.heroAlt') %>" class="transporte-hero__img">
+        <video class="transporte-hero__img" autoplay muted loop playsinline preload="metadata"
+               poster="/images/video_tesla_poster.jpg" aria-label="<%= t('pages:transporte.heroAlt') %>">
+            <source src="/images/video_tesla.mp4" type="video/mp4">
+        </video>
     </section>
 
     <%# Opciones de vehículos %>

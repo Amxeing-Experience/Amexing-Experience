@@ -119,3 +119,7 @@ docs/backlog/_plantilla.md
 # Playwright E2E output
 test-results/
 playwright-report/
+
+# Source videos (raw). Convert to optimized .mp4 for web; don't commit raw sources
+# (GitHub rejects files > 100 MB). See public/images/*.mp4 for the served versions.
+public/images/*.mov
