@@ -54,6 +54,17 @@ test.describe('Summary — "Cliente" oculto para cliente directo', () => {
     );
     expect(attn.length, '"Atención a" debe tener contenido').toBeGreaterThan(0);
     expect(attn, '"Atención a" no debe quedar en "-"').not.toBe('-');
+
+    // "Fechas de servicios" — visible y con contenido (la cotización tiene servicios con fecha).
+    const datesHidden = await page.evaluate(
+      () => document.getElementById('summaryServiceDatesRow')?.classList.contains('d-none'),
+    );
+    expect(datesHidden, '#summaryServiceDatesRow debe estar visible cuando hay servicios').toBe(false);
+    const serviceDates = await page.evaluate(
+      () => (document.getElementById('summaryServiceDates')?.textContent || '').trim(),
+    );
+    expect(serviceDates, '"Fechas de servicios" no debe quedar en "-"').not.toBe('-');
+    expect(serviceDates.length, '"Fechas de servicios" debe tener contenido').toBeGreaterThan(0);
   });
 
   test('cliente NO directo (legacy/agencia): se muestra "Cliente"', async ({ page }) => {

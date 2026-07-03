@@ -741,6 +741,10 @@ const e = __isRes ? 'reservación' : 'cotización';
                         <span class="sm-quote-info-label">Personas</span>
                         <span class="sm-quote-info-value" id="summaryNumberOfPeople">-</span>
                     </div>
+                    <div class="sm-quote-info-item d-none" id="summaryServiceDatesRow">
+                        <span class="sm-quote-info-label">Fechas de servicios</span>
+                        <span class="sm-quote-info-value" id="summaryServiceDates">-</span>
+                    </div>
                 </div>
             </div>
 
@@ -1256,6 +1260,38 @@ const e = __isRes ? 'reservación' : 'cotización';
                 summaryEventTypeRow?.classList.add('d-none');
             }
             document.getElementById('summaryNumberOfPeople').textContent = quote.numberOfPeople || '0';
+
+            // Fechas de servicios: de la fecha del primer servicio a la del último. day.date es
+            // YYYY-MM-DD (ordena cronológico como string). Se parsea como fecha LOCAL para evitar el
+            // corrimiento de -1 día del UTC. Se oculta la fila si no hay días con fecha.
+            (() => {
+                const datesRow = document.getElementById('summaryServiceDatesRow');
+                const datesEl = document.getElementById('summaryServiceDates');
+                if (!datesRow || !datesEl) return;
+                const dayDates = ((quote.serviceItems && quote.serviceItems.days) || [])
+                    .map((d) => d && d.date)
+                    .filter(Boolean)
+                    .sort();
+                if (dayDates.length === 0) {
+                    datesEl.textContent = '-';
+                    datesRow.classList.add('d-none');
+                    return;
+                }
+                const fmtServiceDate = (s) => {
+                    let d;
+                    if (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+                        const [y, m, dd] = s.split('-').map(Number);
+                        d = new Date(y, m - 1, dd);
+                    } else {
+                        d = new Date(s);
+                    }
+                    return d.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+                };
+                const first = fmtServiceDate(dayDates[0]);
+                const last = fmtServiceDate(dayDates[dayDates.length - 1]);
+                datesEl.textContent = first === last ? first : `${first} – ${last}`;
+                datesRow.classList.remove('d-none');
+            })();
 
             // Idioma de preferencia — show only when set (maps the 2-letter code to a label).
             // Sits between Folio and Última actualización; widen the row to 3 columns
@@ -1920,7 +1956,15 @@ const e = __isRes ? 'reservación' : 'cotización';
                 yPosition += 5;
             }
             doc.text(`PERSONAS: ${numberOfPeople}`, margin, yPosition);
-            yPosition += 10;
+            yPosition += 5;
+            // Fechas de servicios: solo si la fila está visible (hay días con fecha).
+            const __serviceDatesHidden = document.getElementById('summaryServiceDatesRow')?.classList.contains('d-none');
+            const __serviceDates = (document.getElementById('summaryServiceDates')?.textContent || '').trim();
+            if (!__serviceDatesHidden && __serviceDates && __serviceDates !== '-') {
+                doc.text(`FECHAS DE SERVICIOS: ${__serviceDates}`, margin, yPosition);
+                yPosition += 5;
+            }
+            yPosition += 5;
 
             // Services Section
             doc.setFontSize(12);
