@@ -3882,18 +3882,9 @@ class ExperienceServicesBuilder {
     const hasNoPeople = adults === 0 && children === 0 && noAlc === 0;
     const hasPrices = (service.adultPrice > 0) || (service.childPrice > 0) || (service.noAlcoholPrice > 0);
 
+    // El desglose de precios ya muestra el simulado de 1 persona; no lo repetimos aquí.
     if (hasNoPeople && hasPrices) {
-      const parts = [];
-      if (service.adultPrice > 0) {
-        parts.push('1 adulto (simulado)');
-      }
-      if (service.childPrice > 0) {
-        parts.push('1 niño (simulado)');
-      }
-      if (service.noAlcoholPrice > 0) {
-        parts.push('1 s/alcohol (simulado)');
-      }
-      return `<div class="text-muted small mt-1"><i class="ti ti-users me-1"></i>${parts.join(' + ')}</div>`;
+      return '';
     }
 
     if (hasNoPeople) return '';
