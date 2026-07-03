@@ -686,12 +686,15 @@ class ExperienceServicesBuilder {
   async loadDriverTourRate() {
     try {
       const token = this.getAccessToken();
-      const response = await fetch('/api/rates?name=Chofer+Tour', {
+      // La tarifa "Chofer Tour" la administra DriverTourRateController en su propio
+      // endpoint (devuelve { data: { value } }), NO /api/rates. Con el endpoint mal,
+      // driverTourRateCache quedaba null y el guía del tour se calculaba en $0.
+      const response = await fetch('/api/driver-tour-rate/current', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
-      if (data.success && data.data && data.data.length > 0) {
-        this.driverTourRateCache = data.data[0];
+      if (data.success && data.data) {
+        this.driverTourRateCache = data.data; // { value, ... }
       }
     } catch (error) {
       console.error('Error loading driver tour rate:', error);
