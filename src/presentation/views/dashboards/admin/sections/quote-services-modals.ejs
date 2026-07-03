@@ -667,14 +667,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="text" class="form-control d-none" id="roundTripDestinationVueltaText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
                                         </div>
                                     </div>
-                                    <!-- Pickup / Drop-off addresses for Vuelta (Punto a Punto + Local) — sits right
-                                         below Origen/Destino so the route detail fields stay together. -->
+                                    <!-- Pickup / Drop-off addresses for Vuelta — sits right below Origen/Destino so the
+                                         route detail fields stay together. Punto a Punto + Local: ambas columnas.
+                                         Aeropuerto DEPARTURE (pierna Vuelta): solo pick-up — el drop-off es el aeropuerto. -->
                                     <div class="row d-none" id="papAddressesRowVuelta">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6 mb-3" id="papPickupColVuelta">
                                             <label class="form-label" for="roundTripPickupAddressVuelta">Dirección de pick-up</label>
                                             <input type="text" class="form-control" id="roundTripPickupAddressVuelta" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
                                         </div>
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6 mb-3" id="papDropoffColVuelta">
                                             <label class="form-label" for="roundTripDropoffAddressVuelta">Dirección de drop-off</label>
                                             <input type="text" class="form-control" id="roundTripDropoffAddressVuelta" placeholder="Ej: Aeropuerto BJX, Casa particular...">
                                         </div>

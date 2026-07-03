@@ -2788,32 +2788,37 @@ class ItineraryBuilder {
       }
     }
 
-    // Drop-off address for airport ARRIVAL (one-way): the guest lands at the airport
-    // (that's the origin / pick-up), so we only offer a drop-off address — where they
-    // are taken after landing. Other airport cases keep the row hidden. For
-    // punto-a-punto / local the row is toggled by handleTransportTypeChange with BOTH
-    // columns, so restore both here in case a previous airport-arrival hid the pick-up.
+    // Address fields for airport transfers (one-way):
+    //  - ARRIVAL: the guest lands at the airport (that's the pick-up), so we only offer a
+    //    DROP-OFF address — where they are taken after landing.
+    //  - DEPARTURE: the guest is dropped at the airport, so we only offer a PICK-UP address
+    //    — where they are collected before the flight.
+    // The single visible column takes the full row width. For punto-a-punto / local the row
+    // is toggled by handleTransportTypeChange with BOTH columns, so restore both here.
     const papAddressesRow = document.getElementById('papAddressesRow');
     const papPickupCol = document.getElementById('papPickupCol');
     const papDropoffCol = document.getElementById('papDropoffCol');
     if (transportType === 'aeropuerto') {
+      papAddressesRow?.classList.remove('d-none');
       if (directionType === 'arrival') {
-        papAddressesRow?.classList.remove('d-none');
+        // Only drop-off (full width); pick-up is the airport.
         papPickupCol?.classList.add('d-none');
         papDropoffCol?.classList.remove('d-none');
-        // Pick-up hidden → drop-off takes the full row width.
         papDropoffCol?.classList.remove('col-md-6');
         papDropoffCol?.classList.add('col-md-12');
       } else {
-        papAddressesRow?.classList.add('d-none');
+        // Only pick-up (full width); drop-off is the airport.
+        papDropoffCol?.classList.add('d-none');
         papPickupCol?.classList.remove('d-none');
-        papDropoffCol?.classList.remove('col-md-12');
-        papDropoffCol?.classList.add('col-md-6');
+        papPickupCol?.classList.remove('col-md-6');
+        papPickupCol?.classList.add('col-md-12');
       }
     } else {
       // punto-a-punto / local one-way: both columns visible (row visibility set elsewhere)
       papPickupCol?.classList.remove('d-none');
       papDropoffCol?.classList.remove('d-none');
+      papPickupCol?.classList.remove('col-md-12');
+      papPickupCol?.classList.add('col-md-6');
       papDropoffCol?.classList.remove('col-md-12');
       papDropoffCol?.classList.add('col-md-6');
     }
@@ -4297,16 +4302,17 @@ class ItineraryBuilder {
             data.returnAdditionalFlights = this.collectAdditionalFlights('roundTripAdditionalFlightsListVuelta');
           }
 
-          // Pickup / drop-off addresses per leg. Aeropuerto: only the Ida (arrival)
-          // drop-off — the guest lands at the airport and is taken to this address;
-          // pick-up is the airport itself. Punto a Punto / Local: both addresses per leg.
+          // Pickup / drop-off addresses per leg. Aeropuerto: Ida (arrival) → solo drop-off
+          // (el pick-up es el aeropuerto); Vuelta (departure) → solo pick-up (el drop-off es
+          // el aeropuerto). Punto a Punto / Local: ambas direcciones por pierna.
           data.pickupAddress = '';
           data.dropoffAddress = '';
           const rtDropoffIda = (document.getElementById('roundTripDropoffAddressIda')?.value || '').trim();
+          const rtPickupVuelta = (document.getElementById('roundTripPickupAddressVuelta')?.value || '').trim();
           if (tType === 'aeropuerto') {
             data.pickupAddressIda = '';
             data.dropoffAddressIda = rtDropoffIda;
-            data.pickupAddressVuelta = '';
+            data.pickupAddressVuelta = rtPickupVuelta;
             data.dropoffAddressVuelta = '';
           } else {
             data.pickupAddressIda = (document.getElementById('roundTripPickupAddressIda')?.value || '').trim();
@@ -4377,6 +4383,8 @@ class ItineraryBuilder {
           const usesPickupDropoff = data.transportType === 'punto-a-punto' || data.transportType === 'local';
           // Airport one-way ARRIVAL: only a drop-off address (pick-up is the airport).
           const isAirportArrivalDropoff = data.transportType === 'aeropuerto' && directionType === 'arrival';
+          // Airport one-way DEPARTURE: only a pick-up address (drop-off is the airport).
+          const isAirportDeparturePickup = data.transportType === 'aeropuerto' && directionType === 'departure';
           if (usesPickupDropoff) {
             // One-way fields
             const pickup = document.getElementById('transportPickupAddress')?.value || '';
@@ -4395,6 +4403,13 @@ class ItineraryBuilder {
           } else if (isAirportArrivalDropoff) {
             data.pickupAddress = '';
             data.dropoffAddress = (document.getElementById('transportDropoffAddress')?.value || '').trim();
+            data.pickupAddressIda = '';
+            data.dropoffAddressIda = '';
+            data.pickupAddressVuelta = '';
+            data.dropoffAddressVuelta = '';
+          } else if (isAirportDeparturePickup) {
+            data.pickupAddress = (document.getElementById('transportPickupAddress')?.value || '').trim();
+            data.dropoffAddress = '';
             data.pickupAddressIda = '';
             data.dropoffAddressIda = '';
             data.pickupAddressVuelta = '';

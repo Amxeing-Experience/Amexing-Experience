@@ -262,6 +262,28 @@ ItineraryBuilder.prototype.updateRoundTripFieldVisibility = function () {
       if (vueltaDestLabel) vueltaDestLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
     }
 
+    // Pick-up address on the Vuelta (DEPARTURE) leg. Aeropuerto: the guest is dropped at the
+    // airport (that's the destination / drop-off), so only offer a pick-up address — where
+    // they are collected before the flight — and show the row even though drop-off is hidden.
+    // Punto a Punto / Local keep BOTH columns; restore the drop-off column here so a previous
+    // aeropuerto selection doesn't leave it hidden.
+    const papRowVuelta = document.getElementById('papAddressesRowVuelta');
+    const papPickupColVuelta = document.getElementById('papPickupColVuelta');
+    const papDropoffColVuelta = document.getElementById('papDropoffColVuelta');
+    if (transportType === 'aeropuerto') {
+      papRowVuelta?.classList.remove('d-none');
+      papDropoffColVuelta?.classList.add('d-none');
+      papPickupColVuelta?.classList.remove('d-none');
+      // Drop-off hidden → pick-up takes the full row width.
+      papPickupColVuelta?.classList.remove('col-md-6');
+      papPickupColVuelta?.classList.add('col-md-12');
+    } else {
+      papPickupColVuelta?.classList.remove('d-none');
+      papDropoffColVuelta?.classList.remove('d-none');
+      papPickupColVuelta?.classList.remove('col-md-12');
+      papPickupColVuelta?.classList.add('col-md-6');
+    }
+
     // Update section headers based on transport type
     const idaHeader = document.getElementById('roundTripIdaHeader');
     const vueltaHeader = document.getElementById('roundTripVueltaHeader');
