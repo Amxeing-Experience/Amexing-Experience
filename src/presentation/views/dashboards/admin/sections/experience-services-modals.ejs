@@ -279,7 +279,43 @@
                             </div>
                         </div>
                     </div>
-                    
+
+                    <!-- Walking tour pricing (tour a pie): por tamaño de grupo, precios editables (MXN) -->
+                    <div id="walkingTourPricingSection" class="d-none">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label for="walkingTourPeopleCount" class="form-label">Personas <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="ti ti-users"></i></span>
+                                    <input type="number" class="form-control" id="walkingTourPeopleCount" min="1" step="1" value="1">
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="walkingPriceSmall" class="form-label">Grupo <span id="walkingRangeSmallLabel" class="text-muted small"></span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control walking-group-price" id="walkingPriceSmall" placeholder="0.00" step="0.01" min="0">
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="walkingPriceMedium" class="form-label">Grupo <span id="walkingRangeMediumLabel" class="text-muted small"></span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control walking-group-price" id="walkingPriceMedium" placeholder="0.00" step="0.01" min="0">
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="walkingPriceLarge" class="form-label">Grupo <span id="walkingRangeLargeLabel" class="text-muted small"></span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control walking-group-price" id="walkingPriceLarge" placeholder="0.00" step="0.01" min="0">
+                                    <span class="input-group-text">MXN</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="mb-3">
                         <label for="serviceNotes" class="form-label">Notas Adicionales</label>

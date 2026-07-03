@@ -284,6 +284,12 @@ class ExperienceServicesBuilder {
     document.getElementById('serviceQuantity')?.addEventListener('input', () => this.updateServiceTotal());
     document.getElementById('additionalVehicle')?.addEventListener('change', () => this.updateServiceTotal());
 
+    // Tour a pie: personas + precios de grupo editables recalculan el total en vivo.
+    document.getElementById('walkingTourPeopleCount')?.addEventListener('input', () => this.updateServiceTotal());
+    document.querySelectorAll('.walking-group-price').forEach((el) => {
+      el.addEventListener('input', () => this.updateServiceTotal());
+    });
+
     // Guide checkbox
     document.getElementById('includeGuide')?.addEventListener('change', (e) => {
       this.handleIncludeGuideChange(e.target.checked);
@@ -523,6 +529,10 @@ class ExperienceServicesBuilder {
         destinationName: sub.destinationName || null,
         rateName: sub.rateName || null,
         isWalkingTour: sub.isWalkingTour || false,
+        walkingPriceSmall: sub.walkingPriceSmall || 0,
+        walkingPriceMedium: sub.walkingPriceMedium || 0,
+        walkingPriceLarge: sub.walkingPriceLarge || 0,
+        walkingPeopleCount: sub.walkingPeopleCount || 1,
         languages: sub.languages || '',
         clientNotes: sub.clientNotes || '',
       });
@@ -2087,6 +2097,35 @@ class ExperienceServicesBuilder {
         hoursInput.value = +hrs.toFixed(1);
       }
     }
+
+    // Tour a pie: precargar precios de grupo (editables), etiquetas de rango y personas=1.
+    if (tour.isWalkingTour) {
+      this.populateWalkingTourFields(tour);
+      this.updateServiceTotal();
+    }
+  }
+
+  // Precarga los inputs editables del tour a pie desde el objeto del tour.
+  populateWalkingTourFields(tour, values = {}) {
+    const setPrice = (inputId, value) => {
+      const el = document.getElementById(inputId);
+      if (el) el.value = (value != null && value !== '') ? value : 0;
+    };
+    const setLabel = (spanId, range) => {
+      const el = document.getElementById(spanId);
+      if (el) el.textContent = range ? `(${range})` : '';
+    };
+
+    setPrice('walkingPriceSmall', values.walkingPriceSmall != null ? values.walkingPriceSmall : tour.walkingPriceSmall);
+    setPrice('walkingPriceMedium', values.walkingPriceMedium != null ? values.walkingPriceMedium : tour.walkingPriceMedium);
+    setPrice('walkingPriceLarge', values.walkingPriceLarge != null ? values.walkingPriceLarge : tour.walkingPriceLarge);
+
+    setLabel('walkingRangeSmallLabel', tour.walkingRangeSmall);
+    setLabel('walkingRangeMediumLabel', tour.walkingRangeMedium);
+    setLabel('walkingRangeLargeLabel', tour.walkingRangeLarge);
+
+    const peopleEl = document.getElementById('walkingTourPeopleCount');
+    if (peopleEl) peopleEl.value = values.walkingPeopleCount != null ? values.walkingPeopleCount : 1;
   }
 
   buildTourDetailsCard(tour) {
@@ -2336,6 +2375,70 @@ class ExperienceServicesBuilder {
     if (standardPricingSection) {
       standardPricingSection.classList.toggle('d-none', !checked);
     }
+    // Tour a pie (checked=false) -> muestra precios por grupo; con vehículo, los oculta.
+    const walkingTourPricingSection = document.getElementById('walkingTourPricingSection');
+    if (walkingTourPricingSection) {
+      walkingTourPricingSection.classList.toggle('d-none', checked);
+    }
+  }
+
+  // "1-5" -> {min:1,max:5}; "16+" -> {min:16,max:Infinity}; otro -> null.
+  parseWalkingTourRange(rangeStr) {
+    if (!rangeStr) return null;
+    const trimmed = String(rangeStr).trim();
+    const plusMatch = trimmed.match(/^(\d+)\+/);
+    if (plusMatch) return { min: parseInt(plusMatch[1], 10), max: Infinity };
+    const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)/);
+    if (rangeMatch) return { min: parseInt(rangeMatch[1], 10), max: parseInt(rangeMatch[2], 10) };
+    return null;
+  }
+
+  // Reparte 'peopleCount' personas en los tramos del tour (rangos vienen del tour;
+  // los PRECIOS salen de los inputs editables #walkingPriceSmall/Medium/Large si están,
+  // con fallback al precio guardado del tour). Devuelve [{tier, count}].
+  calculateWalkingTourGroups(tour, peopleCount) {
+    if (!tour) return [];
+    const readPrice = (inputId, fallback) => {
+      const el = document.getElementById(inputId);
+      if (el && el.value !== '' && el.value != null) {
+        const v = parseFloat(el.value);
+        if (!isNaN(v)) return v;
+      }
+      return parseFloat(fallback || 0) || 0;
+    };
+
+    const tiers = [
+      { name: 'Small', label: tour.walkingRangeSmall, range: this.parseWalkingTourRange(tour.walkingRangeSmall), price: readPrice('walkingPriceSmall', tour.walkingPriceSmall) },
+      { name: 'Medium', label: tour.walkingRangeMedium, range: this.parseWalkingTourRange(tour.walkingRangeMedium), price: readPrice('walkingPriceMedium', tour.walkingPriceMedium) },
+      { name: 'Large', label: tour.walkingRangeLarge, range: this.parseWalkingTourRange(tour.walkingRangeLarge), price: readPrice('walkingPriceLarge', tour.walkingPriceLarge) },
+    ].filter((t) => t.range);
+
+    // Tramos ordenados por capacidad máxima descendente.
+    const sortedTiers = [...tiers].sort((a, b) => (b.range.max === Infinity ? 999 : b.range.max) - (a.range.max === Infinity ? 999 : a.range.max));
+
+    const groups = [];
+    let remaining = peopleCount;
+    while (remaining > 0 && sortedTiers.length) {
+      let bestTier = null;
+      for (const tier of sortedTiers) {
+        if (remaining >= tier.range.min) { bestTier = tier; break; }
+      }
+      if (!bestTier) bestTier = sortedTiers[sortedTiers.length - 1];
+      const allocated = Math.min(remaining, bestTier.range.max === Infinity ? remaining : bestTier.range.max);
+      groups.push({ tier: bestTier, count: allocated });
+      remaining -= allocated;
+    }
+    return groups;
+  }
+
+  // Total del tour a pie: suma del precio de cada grupo asignado (precio plano por grupo,
+  // SIN multiplicar por horas). Usa personas (default 1) + precios editables.
+  getWalkingTourTotal() {
+    const tour = this.selectedTourData;
+    if (!tour || !tour.isWalkingTour) return 0;
+    const peopleCount = Math.max(1, parseInt(document.getElementById('walkingTourPeopleCount')?.value, 10) || 1);
+    const groups = this.calculateWalkingTourGroups(tour, peopleCount);
+    return groups.reduce((sum, g) => sum + (parseFloat(g.tier.price) || 0), 0);
   }
 
   async handleRateSelection(rateId) {
@@ -2608,7 +2711,14 @@ class ExperienceServicesBuilder {
     let total = base;
     let detail = '';
 
-    if (type === 'tour') {
+    if (type === 'tour' && this.selectedTourData?.isWalkingTour) {
+      // Tour a pie: total = suma de precios por grupo según personas (precios editables).
+      const peopleCount = Math.max(1, parseInt(document.getElementById('walkingTourPeopleCount')?.value, 10) || 1);
+      total = this.getWalkingTourTotal();
+      const groups = this.calculateWalkingTourGroups(this.selectedTourData, peopleCount);
+      const tierParts = groups.map((g) => `${g.tier.label || g.tier.name}: $${(parseFloat(g.tier.price) || 0).toFixed(2)}`);
+      detail = ` (${peopleCount} pax${tierParts.length ? ` — ${tierParts.join(', ')}` : ''})`;
+    } else if (type === 'tour') {
       const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
       total = base * hours;
       detail = ` ($${base.toFixed(2)} × ${hours} h)`;
@@ -3059,6 +3169,17 @@ class ExperienceServicesBuilder {
 
     if (service.tourId) this.handleTourSelection(service.tourId);
 
+    // Tour a pie: restaurar personas + precios de grupo GUARDADOS (sobre los del tour).
+    if (service.isWalkingTour && this.selectedTourData?.isWalkingTour) {
+      this.populateWalkingTourFields(this.selectedTourData, {
+        walkingPriceSmall: service.walkingPriceSmall != null ? service.walkingPriceSmall : undefined,
+        walkingPriceMedium: service.walkingPriceMedium != null ? service.walkingPriceMedium : undefined,
+        walkingPriceLarge: service.walkingPriceLarge != null ? service.walkingPriceLarge : undefined,
+        walkingPeopleCount: service.walkingPeopleCount != null ? service.walkingPeopleCount : 1,
+      });
+      this.updateServiceTotal();
+    }
+
     // Restaurar horas guardadas (handleTourSelection las pone con la duración del tour).
     if (service.hours) {
       const hoursEl = document.getElementById('hoursQuantity');
@@ -3376,21 +3497,36 @@ class ExperienceServicesBuilder {
     const vehicleId = document.getElementById('vehicleSelect')?.value || null;
     const vehicleType = vehicleId ? this.vehicleTypesMap.get(vehicleId) : null;
 
+    const isWalkingTour = tour ? (tour.isWalkingTour || false) : false;
+
     // El precio del tour-con-vehículo = base (precio por hora de tour-prices) × horas
     // + guía (Chofer Tour × horas) si aplica.
     const base = parseFloat(document.getElementById('servicePrice')?.value) || 0;
     const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
     const { guide: guideCost } = this.getGuideGreeterCost();
-    const total = (base * hours) + guideCost;
+
+    // Tour a pie: precio por grupo (precios editables) según personas; SIN base × horas.
+    const walkingPriceSmall = parseFloat(document.getElementById('walkingPriceSmall')?.value) || 0;
+    const walkingPriceMedium = parseFloat(document.getElementById('walkingPriceMedium')?.value) || 0;
+    const walkingPriceLarge = parseFloat(document.getElementById('walkingPriceLarge')?.value) || 0;
+    const walkingPeopleCount = Math.max(1, parseInt(document.getElementById('walkingTourPeopleCount')?.value, 10) || 1);
+
+    const total = isWalkingTour
+      ? (this.getWalkingTourTotal() + guideCost)
+      : (base * hours) + guideCost;
 
     return {
       tourId,
       concept: tour ? (tour.destinationPOI?.name || tour.name || 'Tour') : 'Tour',
       price: total,
-      unitPrice: base,
+      unitPrice: isWalkingTour ? total : base,
       hours,
       guideCost,
       quantity: 1,
+      walkingPriceSmall,
+      walkingPriceMedium,
+      walkingPriceLarge,
+      walkingPeopleCount,
       adultsQuantity: adultsQty,
       childrenQuantity: childrenQty,
       adultsNoAlcoholQuantity: noAlcQty,
@@ -4187,6 +4323,10 @@ class ExperienceServicesBuilder {
         destinationName: service.destinationName || null,
         rateName: service.rateName || null,
         isWalkingTour: service.isWalkingTour || false,
+        walkingPriceSmall: service.walkingPriceSmall || null,
+        walkingPriceMedium: service.walkingPriceMedium || null,
+        walkingPriceLarge: service.walkingPriceLarge || null,
+        walkingPeopleCount: service.walkingPeopleCount || null,
         languages: service.languages || '',
         clientNotes: service.clientNotes || '',
       });
