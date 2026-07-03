@@ -1215,11 +1215,13 @@ const e = __isRes ? 'reservación' : 'cotización';
                 ? 'Reservación'
                 : 'Cotización';
             document.getElementById('summaryLastUpdated').textContent = formatDateSpanish(quote.updatedAt);
-            // Atención a — defaults to the quote owner's full name. When the
-            // owner is an admin/superadmin the owner identity isn't meaningful
-            // to the client, so fall back to the contact person instead.
-            // "Atención a" = the quote OWNER (propietario / a quién pertenece la cotización).
-            // Falls back to the contact person only when the owner has no name.
+            // "Atención a":
+            //  - AGENCIA: el propietario del quote (el agente que lo gestiona). El "Cliente" (la
+            //    agencia) se muestra en su propio campo.
+            //  - CLIENTE DIRECTO (end_client): el CLIENTE mismo — el "Cliente" se oculta y el
+            //    destinatario del documento es el cliente. NO el propietario, que puede ser el
+            //    admin/agente que creó la cotización (p. ej. "Admin User").
+            //  Fallback en ambos: contactPerson → '-'.
             const summaryContactPersonElement = document.getElementById('summaryContactPerson');
             if (summaryContactPersonElement) {
                 const owner = quote.owner || {};
@@ -1232,7 +1234,15 @@ const e = __isRes ? 'reservación' : 'cotización';
                 const contactValue = contactPerson && contactPerson.toLowerCase() !== 'no especificado'
                     ? contactPerson
                     : '';
-                summaryContactPersonElement.textContent = ownerFullName || contactValue || '-';
+                let attnName = ownerFullName;
+                if (quote.clientType === 'direct' && quote.client) {
+                    const c = quote.client;
+                    const directClientName = (c.companyName
+                        || c.name
+                        || `${c.firstName || ''} ${c.lastName || ''}`.trim()).trim();
+                    if (directClientName) attnName = directClientName;
+                }
+                summaryContactPersonElement.textContent = attnName || contactValue || '-';
             }
 
             // Quote details — omit the "Motivo de viaje" row entirely when no event type was provided

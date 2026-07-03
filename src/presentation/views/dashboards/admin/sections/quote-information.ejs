@@ -2168,8 +2168,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                             el.style.display = 'inline';
                         });
                         
-                        // Load direct clients before setting the value
-                        await loadActiveClients('', 1, 'direct');
+                        // Cargar la lista de clientes DIRECTOS en el dropdown #directClientId (el que
+                        // usa admin en modo directo). Antes llamaba loadActiveClients(...,'direct'), que
+                        // llena #clientId (agencia) → el dropdown directo quedaba SIN opciones.
+                        await loadDirectClients('', 1);
                     }
                 }
 
@@ -2208,8 +2210,14 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 
                 if (userRole === 'admin' || userRole === 'superadmin') {
                     if (isDirectClient) {
-                        // For direct client quotes, use companyClientPtr
-                        if (quote.companyClientPtr && quote.companyClientPtr.id) {
+                        // Cliente directo (end_client): el cliente vive en quote.client (AmexingUser).
+                        // Antes estaba en companyClientPtr (Client legado, YA MIGRADO); esta preselección
+                        // seguía leyendo el campo viejo → no seleccionaba nada. Se usa quote.client y se
+                        // deja companyClientPtr como fallback para quotes legacy.
+                        if (quote.client && quote.client.id) {
+                            selectedClientId = quote.client.id;
+                            selectedClientData = quote.client;
+                        } else if (quote.companyClientPtr && quote.companyClientPtr.id) {
                             selectedClientId = quote.companyClientPtr.id;
                             selectedClientData = quote.companyClientPtr;
                         }
