@@ -8,6 +8,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const ReservationController = require('../../../application/controllers/api/ReservationController');
+const PaymentController = require('../../../application/controllers/api/PaymentController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 
 const router = express.Router();
@@ -109,6 +110,65 @@ router.delete(
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRole(['admin', 'superadmin']),
   (req, res) => ReservationController.removeAdjustment(req, res)
+);
+
+// Payments — nivel 4+ (agencia `department_manager` + agente `client`, además de admin/superadmin), igual
+// que el resto de la superficie de reservación (ver/asignar/cancelar). Adjustments siguen admin-only por
+// ser acción de pricing de Amexing. Nivel 4 (no 5) para incluir a la agencia — ver "niveles invertidos" en CLAUDE.md.
+/**
+ * GET /api/reservations/:id/payments — List payments + summary (agencia+ / admin).
+ */
+router.get(
+  '/:id/payments',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => PaymentController.getPayments(req, res)
+);
+
+/**
+ * POST /api/reservations/:id/payments — Register a payment (agencia+ / admin).
+ */
+router.post(
+  '/:id/payments',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => PaymentController.addPayment(req, res)
+);
+
+/**
+ * PUT /api/reservations/:id/payments/:paymentId — Edit a payment (agencia+ / admin).
+ */
+router.put(
+  '/:id/payments/:paymentId',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => PaymentController.updatePayment(req, res)
+);
+
+/**
+ * DELETE /api/reservations/:id/payments/:paymentId — Delete a payment (agencia+ / admin).
+ */
+router.delete(
+  '/:id/payments/:paymentId',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => PaymentController.deletePayment(req, res)
+);
+
+/**
+ * POST /api/reservations/:id/payments/:paymentId/receipt — Upload/replace a payment receipt
+ * (agencia+ / admin). Separate from create/update so a slow S3 upload never blocks the save.
+ */
+router.post(
+  '/:id/payments/:paymentId/receipt',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => PaymentController.uploadReceipt(req, res)
 );
 
 /**

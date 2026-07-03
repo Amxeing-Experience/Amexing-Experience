@@ -68,6 +68,14 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
         .resv-conf .rc-pay-row.rc-pay-total{background:#f3f3ee}
         .resv-conf .rc-pay-row.rc-pay-total .l{color:#111}
         .resv-conf .rc-pay-row.rc-pay-total .v{font-weight:700;font-size:16px;color:#111}
+        /* Outstanding balance: emphasize the amount due. */
+        .resv-conf .rc-pay-row.rc-pay-balance .v{font-weight:700;color:#b8860b}
+        /* Status pill (scoped — no Bootstrap badges on this standalone page). */
+        .resv-conf .rc-pay-status{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;line-height:1.5;color:#fff;background:#8a8a8a}
+        .resv-conf .rc-pay-status-paid{background:#2bb673}
+        .resv-conf .rc-pay-status-partial{background:#b8860b}
+        .resv-conf .rc-pay-status-pending{background:#8a8a8a}
+        .resv-conf .rc-pay-status-refunded{background:#6b7a8f}
         @media (max-width:560px){.resv-conf .rc-grid{grid-template-columns:1fr}.resv-conf .rc-cell:nth-child(odd){border-right:none}.resv-conf .rc-c6,.resv-conf .rc-c3,.resv-conf .rc-c2{grid-column:span 6}}
 
         /* ===== Experiences / tours (page-2 section) ===== */
@@ -148,6 +156,13 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
             var sumSubtotal = svc.subtotal;
             var sumIva = svc.iva;
             var sumTotal = svc.total;
+            var pay = quote.payment || {};
+            var payStatus = pay.paymentStatus || 'pending';
+            var payPaid = Number(pay.paidAmount) || 0;
+            var payBalance = (pay.balance === null || pay.balance === undefined) ? null : Number(pay.balance);
+            var payTip = Number(pay.tip) || 0;
+            var PAY_STATUS_LABELS = { pending: 'Pendiente de pago', partial: 'Pago parcial', paid: 'Pagado', refunded: 'Reembolsado' };
+            var payStatusLabel = PAY_STATUS_LABELS[payStatus] || PAY_STATUS_LABELS.pending;
             function fmtMoney(n) {
                 if (n === null || n === undefined || n === '') return '';
                 var num = Number(n);
@@ -316,6 +331,19 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
             <% if (sumTotal) { %>
             <div class="rc-pay-row rc-pay-total"><span class="l">Total</span><span class="v"><%= fmtMoney(sumTotal) %></span></div>
             <% } %>
+            <% if (payTip > 0) { %>
+            <div class="rc-pay-row"><span class="l">Propina</span><span class="v"><%= fmtMoney(payTip) %></span></div>
+            <% } %>
+            <div class="rc-pay-row"><span class="l">Pagado</span><span class="v"><%= fmtMoney(payPaid) %></span></div>
+            <div class="rc-pay-row<%= (payBalance !== null && payBalance > 0) ? ' rc-pay-balance' : '' %>">
+                <span class="l">Saldo</span>
+                <% if (payBalance !== null && payBalance <= 0) { %>
+                <span class="v">Pagado en su totalidad</span>
+                <% } else { %>
+                <span class="v"><%= fmtMoney(payBalance === null ? 0 : payBalance) %></span>
+                <% } %>
+            </div>
+            <div class="rc-pay-row"><span class="l">Estado</span><span class="v"><span class="rc-pay-status rc-pay-status-<%= payStatus %>"><%= payStatusLabel %></span></span></div>
             <% if (paymentLabel) { %>
             <div class="rc-pay-row"><span class="l">Tipo de pago</span><span class="v"><%= paymentLabel %></span></div>
             <% } %>

@@ -1393,6 +1393,48 @@ This is an automated message from Amexing Experience. Please do not reply to thi
       throw error;
     }
   }
+
+  /**
+   * Send a birthday greeting email (greeting only — no promo). Triggered by the daily
+   * sendBirthdayGreetings cloud job for clients whose birthDate matches today.
+   * @param {object} emailData - { to, name, clientId }.
+   * @returns {Promise<object>} Send result.
+   * @example
+   * await emailService.sendBirthdayGreeting({ to: 'cliente@x.com', name: 'Ana', clientId: 'abc' });
+   */
+  async sendBirthdayGreeting(emailData) {
+    try {
+      const { to, name, clientId } = emailData;
+      if (!to) throw new Error('Missing required email data (to)');
+
+      const greetName = name || 'Cliente';
+      const templateVariables = {
+        ...TemplateService.getCommonVariables(),
+        ASUNTO: '¡Feliz cumpleaños!',
+        NOMBRE_CLIENTE: greetName,
+      };
+
+      const { html, text } = TemplateService.render('birthday_greeting', templateVariables, { includeText: true });
+
+      const result = await this.sendEmail({
+        to,
+        subject: `¡Feliz cumpleaños, ${greetName}! 🎉 | Amexing Experience`,
+        html,
+        text,
+        tags: ['birthday', 'greeting'],
+        notificationType: 'BIRTHDAY_GREETING',
+        metadata: { clientId: clientId || 'unknown', templateUsed: 'birthday_greeting' },
+      });
+
+      logger.info('Birthday greeting email sent successfully', { to, clientId, emailId: result.id });
+      return result;
+    } catch (error) {
+      logger.error('Failed to send birthday greeting email', {
+        error: error.message, to: emailData?.to, clientId: emailData?.clientId,
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = new EmailService();

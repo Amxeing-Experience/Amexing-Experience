@@ -1,0 +1,15 @@
+¡Feliz cumpleaños, {{NOMBRE_CLIENTE}}! 🎉
+
+En Amexing Experience queremos desearte un día lleno de alegría, momentos especiales y la mejor compañía.
+
+Gracias por permitirnos ser parte de tus experiencias de viaje. Hoy celebramos contigo.
+
+Con cariño,
+El equipo de Amexing Experience
+
+"{{TAGLINE}}"
+
+--
+Sitio web: {{SITIO_WEB}}
+Aviso de privacidad: {{AVISO_PRIVACIDAD}}
+© {{AÑO}} Amexing Experience. Todos los derechos reservados.

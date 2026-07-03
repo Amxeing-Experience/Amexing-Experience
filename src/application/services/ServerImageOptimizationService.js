@@ -55,8 +55,10 @@ class ServerImageOptimizationService extends FileStorageService {
       const extension = this.getFileExtension(fileName);
       const basePath = baseKey.substring(0, baseKey.lastIndexOf('.'));
 
-      // Upload original file first
-      await this.uploadFile(fileBuffer, baseKey, mimeType, options);
+      // Upload the original AT baseKey itself (customS3Key) so the returned originalS3Key actually
+      // resolves in S3. Without customS3Key, uploadFile generates a different key and the presigned
+      // URL for baseKey 404s with an S3 XML error (NoSuchKey) when opening the document/receipt.
+      await this.uploadFile(fileBuffer, baseKey, mimeType, { ...options, customS3Key: baseKey });
 
       const optimizedVariants = {};
 

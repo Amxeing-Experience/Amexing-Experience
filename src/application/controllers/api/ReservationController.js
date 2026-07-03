@@ -12,6 +12,7 @@
 const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 const FileStorageService = require('../../services/FileStorageService');
+const PaymentService = require('../../services/PaymentService');
 // Models used via Parse.Query string references
 
 // Module-level FileStorageService for presigned S3 URLs (static class needs this)
@@ -645,6 +646,20 @@ class ReservationController {
       servicesQuery.limit(1000);
       const services = await servicesQuery.find({ useMasterKey: true });
 
+      // Payment rollup (fresh, non-persisting) for the financial summary + per-service status.
+      let paymentSummary = null;
+      try {
+        paymentSummary = await PaymentService.summarize(id);
+      } catch (payErr) {
+        logger.warn('ReservationController.getReservationById: payment summary failed', { error: payErr.message });
+      }
+      // Payments now apply against the reservation grand total (no per-service split); the
+      // summary no longer carries a services[] rollup. Kept guarded for backward compatibility.
+      const paymentByService = {};
+      if (paymentSummary && Array.isArray(paymentSummary.services)) {
+        for (const s of paymentSummary.services) paymentByService[s.id] = s;
+      }
+
       const client = reservation.get('clientPtr');
 
       // Build a lookup from serviceItemsSnapshot for fallback when subconcept is null
@@ -859,6 +874,21 @@ class ReservationController {
           adjustments: reservation.get('adjustments') || [],
           currency: reservation.get('currency'),
           paymentType: reservation.get('paymentType'),
+          // Payment rollup (con IVA + propina): paymentStatus pending|partial|paid|refunded.
+          payment: paymentSummary ? {
+            paymentStatus: paymentSummary.paymentStatus,
+            paidAmount: paymentSummary.paidAmount,
+            balance: paymentSummary.balance,
+            subtotal: paymentSummary.subtotal,
+            iva: paymentSummary.iva,
+            tip: paymentSummary.tip,
+            total: paymentSummary.total,
+          } : {
+            paymentStatus: reservation.get('paymentStatus') || 'pending',
+            paidAmount: reservation.get('paidAmount') || 0,
+            balance: reservation.get('balance'),
+            tip: reservation.get('tip') || 0,
+          },
           numberOfPeople: reservation.get('numberOfPeople'),
           eventType: reservation.get('eventType'),
           contactPerson: reservation.get('contactPerson'),
@@ -901,6 +931,13 @@ class ReservationController {
               status: svc.get('status'),
               price: svc.get('price'),
               total: svc.get('total'),
+              // Per-service payment rollup (granularidad por servicio).
+              paymentStatus: paymentByService[svc.id]
+                ? paymentByService[svc.id].paymentStatus : (svc.get('paymentStatus') || 'pending'),
+              paidAmount: paymentByService[svc.id]
+                ? paymentByService[svc.id].paidAmount : (svc.get('paidAmount') || 0),
+              paymentBalance: paymentByService[svc.id]
+                ? paymentByService[svc.id].balance : svc.get('balance'),
               originName: svc.get('originName'),
               destinationName: svc.get('destinationName'),
               vehicleTypeName: svc.get('vehicleTypeName'),
@@ -1528,11 +1565,15 @@ class ReservationController {
         finalAmount = Math.round(((servicesSubtotal * percentage) / 100) * 100) / 100;
       }
 
+      if (Number(finalAmount) > 100000000) {
+        return res.status(400).json({ success: false, error: 'El monto del ajuste no puede exceder 100,000,000' });
+      }
+
       // Create adjustment entry
       const adjustment = {
         id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         type,
-        description: description.trim(),
+        description: description.trim().slice(0, 150),
         amount: finalAmount,
         percentage: type === 'discount' && percentage ? percentage : null,
         createdAt: new Date().toISOString(),
@@ -1547,6 +1588,14 @@ class ReservationController {
       ReservationController.recalculateTotal(reservation);
 
       await reservation.save(null, { useMasterKey: true });
+
+      // Keep the payment rollup (balance/paymentStatus) in sync with the new amount due (adjustments
+      // now flow into the payment total). Non-fatal: the adjustment itself already saved.
+      try {
+        await require('../../services/PaymentService').recalculate(id);
+      } catch (e) {
+        logger.warn('Adjustment saved but payment recalculate failed', { reservationId: id, error: e.message });
+      }
 
       logger.info('Reservation adjustment added', {
         reservationId: id,
@@ -1605,6 +1654,13 @@ class ReservationController {
       ReservationController.recalculateTotal(reservation);
 
       await reservation.save(null, { useMasterKey: true });
+
+      // Keep the payment rollup in sync with the new amount due (non-fatal).
+      try {
+        await require('../../services/PaymentService').recalculate(id);
+      } catch (e) {
+        logger.warn('Adjustment removed but payment recalculate failed', { reservationId: id, error: e.message });
+      }
 
       logger.info('Reservation adjustment removed', {
         reservationId: id,
