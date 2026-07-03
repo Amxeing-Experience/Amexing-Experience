@@ -34,6 +34,12 @@ ItineraryBuilder.prototype.clearTransportFormFields = function () {
     const specificLocationRow = document.getElementById('specificLocationRow');
     if (specificLocationRow) specificLocationRow.classList.add('d-none');
 
+    // Clear one-way pick-up / drop-off addresses (round-trip legs cleared below)
+    const pickupAddress = document.getElementById('transportPickupAddress');
+    if (pickupAddress) pickupAddress.value = '';
+    const dropoffAddress = document.getElementById('transportDropoffAddress');
+    if (dropoffAddress) dropoffAddress.value = '';
+
     // Clear segmento
     const category = document.getElementById('transportCategory');
     if (category) category.value = '';
@@ -77,6 +83,8 @@ ItineraryBuilder.prototype.clearTransportFormFields = function () {
       'roundTripAirlineIda', 'roundTripFlightNumberIda',
       'roundTripAirlineVuelta', 'roundTripFlightNumberVuelta',
       'roundTripSpecificLocationIda', 'roundTripSpecificLocationVuelta',
+      'roundTripPickupAddressIda', 'roundTripDropoffAddressIda',
+      'roundTripPickupAddressVuelta', 'roundTripDropoffAddressVuelta',
     ];
     rtFields.forEach((id) => {
       const el = document.getElementById(id);

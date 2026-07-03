@@ -593,7 +593,8 @@
             if (this.config.displayRules.shouldShowPrice(service)) {
                 html += '<div class="service-price text-end">';
                 if (isExcluded) {
-                    html += '<span class="service-badge external mb-1">Pago externo</span><br>';
+                    // "Pago externo" ya se muestra junto al nombre (izquierda); no se duplica aquí
+                    // (junto al precio, derecha).
                     html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
                 } else {
                     html += `<div class="service-price">${this.formatCurrency(price)}</div>`;
@@ -1137,7 +1138,8 @@
             if (this.config.displayRules.shouldShowPrice(service)) {
                 html += '<div class="service-price text-end">';
                 if (isExcluded) {
-                    html += '<span class="service-badge external mb-1">Pago externo</span><br>';
+                    // "Pago externo" ya se muestra junto al nombre (izquierda); no se duplica aquí
+                    // (junto al precio, derecha).
                     html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
                 } else {
                     html += `<div class="service-price">${this.formatCurrency(price)}</div>`;
@@ -1361,10 +1363,15 @@
             }
 
             if (noAlcohol > 0) {
-                const config = this.config.passengerTypes.adultsNoAlcohol;
-                html += `<span class="${this.getPassengerBadgeClass('adultsNoAlcohol')}">
+                // En CONCEPTO el campo adultsNoAlcoholQuantity representa INFANTES (0-2); en otros
+                // tipos (experiencias/tours) es "sin alcohol". Mismo campo, etiqueta/estilo por tipo.
+                const isConcepto = service.type === 'concepto';
+                const badgeKey = isConcepto ? 'infants' : 'adultsNoAlcohol';
+                const config = this.config.passengerTypes[badgeKey];
+                const label = (isConcepto && noAlcohol > 1) ? config.pluralLabel : config.label;
+                html += `<span class="${this.getPassengerBadgeClass(badgeKey)}">
                     <i class="${config.icon} fs-6"></i>
-                    <span>${noAlcohol} ${config.label}</span>
+                    <span>${noAlcohol} ${label}</span>
                 </span>`;
             }
 
@@ -1387,7 +1394,14 @@
             if (adults > 0) parts.push(`${adults} adulto${adults > 1 ? 's' : ''}`);
             if (children > 0) parts.push(`${children} niño${children > 1 ? 's' : ''}`);
             if (infants > 0) parts.push(`${infants} infante${infants > 1 ? 's' : ''}`);
-            if (noAlcohol > 0) parts.push(`${noAlcohol} sin alcohol`);
+            // En CONCEPTO el 3er campo (adultsNoAlcoholQuantity) representa INFANTES (0-2); en otros
+            // tipos (experiencias/tours) sigue siendo "sin alcohol". El campo es el mismo; sólo cambia
+            // la etiqueta visible según el tipo, alineado con el label del modal.
+            if (noAlcohol > 0) {
+                parts.push(service.type === 'concepto'
+                    ? `${noAlcohol} infante${noAlcohol > 1 ? 's' : ''}`
+                    : `${noAlcohol} sin alcohol`);
+            }
 
             return `<i class="ti ti-users me-1"></i>${parts.join(' • ')}`;
         }

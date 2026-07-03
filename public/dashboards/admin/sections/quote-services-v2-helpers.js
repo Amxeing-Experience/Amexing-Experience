@@ -214,6 +214,29 @@ ItineraryBuilder.prototype.updateRoundTripFieldVisibility = function () {
       if (idaOriginLabel) idaOriginLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
     }
 
+    // Drop-off address on the Ida (ARRIVAL) leg. Aeropuerto: the guest lands at the
+    // airport (that's the origin / pick-up), so only offer a drop-off address — where
+    // they are taken after landing — and show the row even though pick-up is hidden.
+    // Punto a Punto / Local keep BOTH columns (row visibility is toggled by
+    // handleTransportTypeChange); restore the pick-up column here so a previous
+    // aeropuerto selection doesn't leave it hidden.
+    const papRowIda = document.getElementById('papAddressesRowIda');
+    const papPickupColIda = document.getElementById('papPickupColIda');
+    const papDropoffColIda = document.getElementById('papDropoffColIda');
+    if (transportType === 'aeropuerto') {
+      papRowIda?.classList.remove('d-none');
+      papPickupColIda?.classList.add('d-none');
+      papDropoffColIda?.classList.remove('d-none');
+      // Pick-up hidden → drop-off takes the full row width.
+      papDropoffColIda?.classList.remove('col-md-6');
+      papDropoffColIda?.classList.add('col-md-12');
+    } else {
+      papPickupColIda?.classList.remove('d-none');
+      papDropoffColIda?.classList.remove('d-none');
+      papDropoffColIda?.classList.remove('col-md-12');
+      papDropoffColIda?.classList.add('col-md-6');
+    }
+
     // --- VUELTA (departure pattern) ---
     const vueltaOriginComboWrapper = document.getElementById('roundTripOriginVueltaComboWrapper');
     const vueltaOriginSelect = document.getElementById('roundTripOriginVueltaSelect');
@@ -585,7 +608,16 @@ ItineraryBuilder.prototype.renderPeopleQuantities = function (service) {
       }
 
       if (adultsNoAlcoholQuantity > 0) {
-        quantitiesHtml.push(`
+        // En CONCEPTO el campo adultsNoAlcoholQuantity representa INFANTES (0-2); en experiencias/
+        // tours sigue siendo "sin alcohol". Mismo campo, etiqueta/estilo según el tipo.
+        quantitiesHtml.push(service.type === 'concepto'
+          ? `
+                    <span class="badge bg-warning-subtle text-warning d-inline-flex align-items-center gap-1 me-2 mb-1">
+                        <i class="ti ti-baby-carriage fs-6"></i>
+                        <span>${adultsNoAlcoholQuantity} infante${adultsNoAlcoholQuantity > 1 ? 's' : ''} (0-2)</span>
+                    </span>
+                `
+          : `
                     <span class="badge bg-info-subtle text-info d-inline-flex align-items-center gap-1 me-2 mb-1">
                         <i class="ti ti-glass-off fs-6"></i>
                         <span>${adultsNoAlcoholQuantity} sin alcohol</span>
