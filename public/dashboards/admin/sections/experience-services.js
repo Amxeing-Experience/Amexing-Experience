@@ -96,9 +96,11 @@ class ExperienceServicesBuilder {
       this.setAddServiceButtonsEnabled(false);
       await this.loadExperienceData();
 
-      // Load temporarily stored services for new experiences
+      // F3 (draft-first): las experiencias nuevas ya no acumulan servicios en
+      // localStorage; se guardan directo contra un borrador real. Limpiamos
+      // cualquier residuo de sesiones previas para no inyectar servicios fantasma.
       if (this.experienceId === 'new') {
-        this.loadTemporaryServices();
+        localStorage.removeItem('tempExperienceServices');
       }
 
       await Promise.all([
@@ -4047,12 +4049,70 @@ class ExperienceServicesBuilder {
     }, 2000);
   }
 
+  // F3 (draft-first): asegura que exista un borrador de experiencia (active:false)
+  // para guardar servicios directo, sin localStorage. Devuelve el id del borrador,
+  // o null si falta el nombre (en cuyo caso avisa amablemente al usuario).
+  async ensureDraftExperience() {
+    if (this._draftExperienceId) return this._draftExperienceId;
+    if (window.__experienceDraftId) {
+      this._draftExperienceId = window.__experienceDraftId;
+      return this._draftExperienceId;
+    }
+
+    const name = (document.getElementById('experienceName')?.value || '').trim();
+    const type = (document.getElementById('experienceType')?.value || '').trim() || 'Experience';
+    const description = (document.getElementById('experienceDescription')?.value || '').trim();
+    if (!name) {
+      this.showBasicInfoRequired();
+      return null;
+    }
+
+    const accessToken = this.getAccessToken();
+    if (!accessToken) throw new Error('No access token found');
+
+    const response = await fetch('/api/experiences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      // cost:0 satisface la validación del create; el form de Información pone el
+      // costo real al finalizar el borrador.
+      body: JSON.stringify({ name, description: description || name, type, cost: 0, active: false }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'No se pudo crear el borrador de la experiencia');
+    }
+
+    const result = await response.json();
+    const id = (result.data && result.data.id) || result.id;
+    if (!id) throw new Error('El borrador se creó sin id');
+
+    this._draftExperienceId = id;
+    // El form de Información finaliza este borrador (active:true) al guardar.
+    window.__experienceDraftId = id;
+    console.log('✅ F3 draft-first: borrador de experiencia creado', id);
+    return id;
+  }
+
+  // Aviso amable cuando falta el nombre para poder crear el borrador (no se pierde
+  // lo que el usuario ya configuró en el servicio).
+  showBasicInfoRequired() {
+    const msg = 'Escribe primero el nombre de la experiencia (arriba) para poder guardar los servicios.';
+    if (typeof window.showAlert === 'function') window.showAlert(msg, 'warning');
+    else window.alert(msg);
+    const nameEl = document.getElementById('experienceName');
+    if (nameEl) {
+      nameEl.focus();
+      nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
   async saveToBackend() {
-    // For new experiences, store services temporarily in localStorage
+    // F3 (draft-first): en vez de acumular en localStorage, aseguramos un borrador
+    // real (active:false) y guardamos los servicios directo contra él.
     if (this.experienceId === 'new') {
-      const serviceData = this.getTemporaryServiceData();
-      localStorage.setItem('tempExperienceServices', JSON.stringify(serviceData));
-      return; // Skip API call for new experiences
+      const draftId = await this.ensureDraftExperience();
+      if (!draftId) return; // faltó el nombre; ya se avisó al usuario
+      this.experienceId = draftId;
     }
 
     const subtotal = this.calculateSubtotal();

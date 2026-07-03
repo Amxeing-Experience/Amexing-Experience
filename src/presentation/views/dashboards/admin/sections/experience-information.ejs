@@ -358,7 +358,7 @@
 
         <!-- Save Button -->
         <div class="d-flex justify-content-end gap-2 pt-3 border-top">
-            <a href="/dashboard/admin/experiences" class="btn btn-secondary">
+            <a href="/dashboard/admin/experiences" id="cancelExperienceBtn" class="btn btn-secondary">
                 <i class="ti ti-x me-1"></i>Cancelar
             </a>
             <button type="button" class="btn btn-primary" id="saveExperienceInfoBtn">
@@ -555,7 +555,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setupEventListeners() {
         document.getElementById('saveExperienceInfoBtn').addEventListener('click', saveExperience);
-        
+
+        // F3 (draft-first): si se creó un borrador (active:false) al agregar servicios
+        // y el usuario cancela sin finalizar, borramos ese borrador para no dejar
+        // registros huérfanos. (Igual quedaría inactivo y fuera de las listas.)
+        const cancelBtn = document.getElementById('cancelExperienceBtn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', async (e) => {
+                const draftId = window.__experienceDraftId;
+                if (!draftId) return; // navegación normal
+                e.preventDefault();
+                try {
+                    const token = getAccessToken() || localStorage.getItem('authToken');
+                    await fetch(`/api/experiences/${draftId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` },
+                    });
+                } catch (_) { /* si falla, el borrador queda inactivo y filtrado */ }
+                window.__experienceDraftId = null;
+                localStorage.removeItem('tempExperienceServices');
+                window.location.href = '/dashboard/admin/experiences';
+            });
+        }
+
         // Capture form values in real-time to avoid timing issues
         // Use specific form ID to guarantee correct element targeting
         const nameInput = document.querySelector('#experienceInformationForm #experienceName');
@@ -1776,8 +1798,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            const url = isNew ? '/api/experiences' : `/api/experiences/${experienceId}`;
-            const method = isNew ? 'POST' : 'PUT';
+            // F3 (draft-first): si al agregar servicios ya se creó un borrador
+            // (active:false), este "guardar" lo FINALIZA (PUT + active:true) en vez
+            // de crear una experiencia duplicada.
+            const draftId = window.__experienceDraftId || null;
+            const creatingNew = isNew && !draftId;
+            const targetId = draftId || experienceId;
+            if (draftId) body.active = true;
+
+            const url = creatingNew ? '/api/experiences' : `/api/experiences/${targetId}`;
+            const method = creatingNew ? 'POST' : 'PUT';
 
             const response = await fetch(url, {
                 method,
@@ -1854,175 +1884,35 @@ document.addEventListener('DOMContentLoaded', function() {
             saveText.innerHTML = `<i class="ti ti-check me-1"></i>Guardado`;
             showAlert(isNew ? 'Experiencia creada exitosamente' : 'Cambios guardados exitosamente', 'success');
 
-            if (isNew && result.data && result.data.id) {
-                debugLog('Services Transfer - Starting', { experienceId: result.data.id });
-                
-                // Check if temporary services exist
-                const tempServicesData = localStorage.getItem('tempExperienceServices');
-                debugLog('Services Transfer - Temporary Services Check', {
-                    exists: !!tempServicesData,
-                    data: tempServicesData ? JSON.parse(tempServicesData) : null
-                });
-                
-                
-                let servicesTransferSuccessful = true;
-                
-                // Check authorization before attempting transfer
-                const hasAuthorization = await checkServiceTransferAuthorization(accessToken);
-                
-                if (!hasAuthorization) {
-                    showAlert('No tienes permisos para transferir servicios. Contacta al administrador.', 'warning');
-                    saveText.innerHTML = `<i class="ti ti-check me-1"></i>Guardado (sin servicios)`;
-                    return;
+            if (isNew) {
+                // F3 (draft-first): normalmente los servicios ya se guardaron directo
+                // contra el borrador (active:false); no hay transferencia desde
+                // localStorage. Limpiamos el marcador y vamos al detalle.
+                const finalId = (result.data && result.data.id) || draftId || experienceId;
+                window.__experienceDraftId = null;
+                localStorage.removeItem('tempExperienceServices');
+                if (window.experienceServicesBuilder) {
+                    const builder = window.experienceServicesBuilder;
+                    builder.experienceId = finalId;
+                    // Red de seguridad: si el usuario agregó servicios ANTES de poner
+                    // el nombre (aún en memoria, sin borrador creado), persístelos ahora
+                    // contra la experiencia real para no perderlos.
+                    if (builder.services && builder.services.size > 0) {
+                        try {
+                            await builder.saveToBackend();
+                        } catch (flushErr) {
+                            console.warn('No se pudieron guardar los servicios en memoria:', flushErr);
+                            showAlert('La experiencia se creó, pero revisa que los servicios se hayan guardado.', 'warning');
+                        }
+                    }
                 }
 
-                // Transfer temporary services if they exist
-                if (window.ExperienceServicesBuilder && typeof ExperienceServicesBuilder.transferTemporaryServices === 'function') {
-                    if (tempServicesData) {
-                        try {
-                            debugLog('Services Transfer - Initiating Transfer', {
-                                experienceId: result.data.id,
-                                hasAccessToken: !!accessToken,
-                                tempServicesSize: tempServicesData.length,
-                                tempServicesPreview: tempServicesData.substring(0, 100) + '...'
-                            });
-                            
-                            // Show transfer in progress
-                            saveText.innerHTML = `<i class="ti ti-spinner spinner-border spinner-border-sm me-1"></i>Transfiriendo servicios...`;
-                            
-                            // Add timeout to catch hanging transfers
-                            const transferPromise = ExperienceServicesBuilder.transferTemporaryServices(result.data.id, accessToken);
-                            const timeoutPromise = new Promise((_, reject) => {
-                                setTimeout(() => reject(new Error('Transfer timeout after 30 seconds')), 30000);
-                            });
-                            
-                            await Promise.race([transferPromise, timeoutPromise]);
-                            
-                            debugLog('Services Transfer - Success', { experienceId: result.data.id });
-                            saveText.innerHTML = `<i class="ti ti-check me-1"></i>Completado`;
-                        } catch (error) {
-                            debugLog('Services Transfer - Failed', { 
-                                error: error.message,
-                                errorStack: error.stack,
-                                experienceId: result.data.id,
-                                accessToken: accessToken ? 'EXISTS' : 'MISSING'
-                            });
-                            servicesTransferSuccessful = false;
-                            showAlert('Experiencia creada, pero hubo un error al transferir los servicios. Por favor, agrega los servicios manualmente.', 'warning');
-                            saveText.innerHTML = `<i class="ti ti-check me-1"></i>Guardado (sin servicios)`;
-                        }
-                    } else {
-                        debugLog('Services Transfer - No Services to Transfer', { 
-                            localStorageKeys: Object.keys(localStorage).filter(key => key.includes('temp') || key.includes('service'))
-                        });
-                    }
+                if (typeof isDebugMode === 'function' && isDebugMode()) {
+                    showAlert(`Debug: experiencia ${finalId} guardada. Redirect prevenido.`, 'info');
                 } else {
-                    debugLog('Services Transfer - Builder Not Available', {
-                        hasWindow: !!(window),
-                        windowExperienceKeys: Object.keys(window).filter(key => key.toLowerCase().includes('experience')),
-                        scriptTags: document.querySelectorAll('script[src*="experience-services"]').length,
-                        allScriptTags: Array.from(document.querySelectorAll('script[src]')).map(s => s.src).filter(src => src.includes('experience'))
-                    });
-                    
-                    // Try to wait and retry if script isn't loaded yet
-                    debugLog('Services Transfer - Attempting Script Load Retry', {});
-                    let retryCount = 0;
-                    const maxRetries = 5;
-                    
-                    const checkBuilderInterval = setInterval(() => {
-                        retryCount++;
-                        debugLog('Services Transfer - Retry Attempt', { 
-                            attempt: retryCount,
-                            hasBuilder: !!(window.ExperienceServicesBuilder),
-                            hasTransferFunction: !!(window.ExperienceServicesBuilder && typeof ExperienceServicesBuilder.transferTemporaryServices === 'function')
-                        });
-                        
-                        if (window.ExperienceServicesBuilder && typeof ExperienceServicesBuilder.transferTemporaryServices === 'function') {
-                            clearInterval(checkBuilderInterval);
-                            debugLog('Services Transfer - Builder Now Available, Starting Transfer', {});
-                            
-                            if (tempServicesData) {
-                                saveText.innerHTML = `<i class="ti ti-spinner spinner-border spinner-border-sm me-1"></i>Transfiriendo servicios (intento ${retryCount})...`;
-                                
-                                ExperienceServicesBuilder.transferTemporaryServices(result.data.id, accessToken)
-                                    .then(() => {
-                                        debugLog('Services Transfer - Delayed Success', { retryAttempt: retryCount });
-                                        saveText.innerHTML = `<i class="ti ti-check me-1"></i>Completado`;
-                                        showAlert('Servicios transferidos exitosamente', 'success');
-                                    })
-                                    .catch((error) => {
-                                        debugLog('Services Transfer - Delayed Failed', { 
-                                            error: error.message,
-                                            retryAttempt: retryCount
-                                        });
-                                        showAlert('Error al transferir servicios. Por favor, agrega los servicios manualmente.', 'warning');
-                                        saveText.innerHTML = `<i class="ti ti-check me-1"></i>Guardado (sin servicios)`;
-                                    });
-                            }
-                        } else if (retryCount >= maxRetries) {
-                            clearInterval(checkBuilderInterval);
-                            debugLog('Services Transfer - Retry Failed', { maxAttemptsReached: retryCount });
-                            showAlert('No se pudo cargar el sistema de servicios. Agrega los servicios manualmente.', 'warning');
-                        }
-                    }, 1000); // Check every second
-                }
-                
-                // Check if debug mode is active
-                if (isDebugMode()) {
-                    debugLog('Debug Mode - Redirect Prevented', { 
-                        wouldRedirectTo: `/dashboard/admin/experiences/${result.data.id}` 
-                    });
-                    
-                    // Show debug info instead of redirecting
-                    showAlert(`Debug Mode: Redirect prevented. Would redirect to: /dashboard/admin/experiences/${result.data.id}`, 'info');
-                    
-                    // Add button to manually redirect
-                    const debugPanel = document.createElement('div');
-                    debugPanel.className = 'alert alert-info mt-3';
-                    
-                    // Get services transfer status for debug display
-                    const servicesInfo = tempServicesData ? 
-                        `Services found: ${JSON.parse(tempServicesData).services?.length || 0}` : 
-                        'No services to transfer';
-                    
-                    debugPanel.innerHTML = `
-                        <h6>🔍 Debug Mode Active - Services Transfer</h6>
-                        <p><strong>Experience ID:</strong> ${result.data.id}</p>
-                        <p><strong>Services Status:</strong> ${servicesInfo}</p>
-                        <p><strong>Transfer Result:</strong> ${servicesTransferSuccessful ? '✅ Success' : '❌ Failed'}</p>
-                        <div class="mt-3">
-                            <button class="btn btn-info btn-sm" onclick="showDebugLogs()">
-                                📋 View Debug Logs
-                            </button>
-                            <button class="btn btn-primary btn-sm ms-2" onclick="window.location.href='/dashboard/admin/experiences/${result.data.id}'">
-                                ➡️ Go to Experience
-                            </button>
-                            <button class="btn btn-secondary btn-sm ms-2" onclick="localStorage.setItem('experienceDebugMode', 'false'); location.reload();">
-                                ❌ Disable Debug
-                            </button>
-                        </div>
-                        <div class="mt-2">
-                            <small class="text-muted">Debug logs are saved in localStorage and available after page reload.</small>
-                        </div>
-                    `;
-                    // Find a suitable container for the debug panel
-                    const container = document.querySelector('.experience-information-card') || 
-                                    document.querySelector('.card-body') || 
-                                    document.querySelector('.container') ||
-                                    document.body;
-                    
-                    if (container) {
-                        container.appendChild(debugPanel);
-                    } else {
-                        // Fallback: create alert
-                        showAlert(`🔍 Debug: Experience created (${result.data.id}). Services: ${servicesInfo}. Transfer: ${servicesTransferSuccessful ? 'Success' : 'Failed'}`, 'info');
-                    }
-                } else {
-                    // Normal redirect
                     setTimeout(() => {
-                        debugLog('Redirecting to Experience Detail', {});
-                        window.location.href = `/dashboard/admin/experiences/${result.data.id}`;
-                    }, servicesTransferSuccessful ? 1200 : 2000);
+                        window.location.href = `/dashboard/admin/experiences/${finalId}`;
+                    }, 1000);
                 }
             }
         } catch (error) {
