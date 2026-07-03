@@ -717,7 +717,7 @@ const e = __isRes ? 'reservación' : 'cotización';
                 </div>
                 <div class="sm-quote-info-divider"></div>
                 <div class="sm-quote-info-row">
-                    <div class="sm-quote-info-item">
+                    <div class="sm-quote-info-item" id="summaryClientItem">
                         <span class="sm-quote-info-label">Cliente</span>
                         <span class="sm-quote-info-value fw-semibold" id="summaryClientName">-</span>
                     </div>
@@ -1336,6 +1336,12 @@ const e = __isRes ? 'reservación' : 'cotización';
             }
             document.getElementById('summaryClientName').textContent = clientName;
 
+            // Cliente directo (end_client, NO agencia): se oculta el campo "Cliente" y queda solo
+            // "Atención a" (que es el cliente). En agencia/otros se mantiene el campo.
+            const __isDirectClient = quote.clientType === 'direct';
+            const summaryClientItem = document.getElementById('summaryClientItem');
+            if (summaryClientItem) summaryClientItem.classList.toggle('d-none', __isDirectClient);
+
             // Load experience caches for establishment detection (only for authenticated views)
             <% if (!locals.isPublicView) { %>
             await Promise.all([
@@ -1892,8 +1898,13 @@ const e = __isRes ? 'reservación' : 'cotización';
 
             doc.text(`ATENCIÓN A: ${contactPerson}`, margin, yPosition);
             yPosition += 5;
-            doc.text(`CLIENTE: ${clientName}`, margin, yPosition);
-            yPosition += 5;
+            // Cliente directo (end_client): se omite "CLIENTE" también en el PDF, igual que en
+            // pantalla (donde #summaryClientItem queda oculto). Solo queda "ATENCIÓN A".
+            const __clientHidden = document.getElementById('summaryClientItem')?.classList.contains('d-none');
+            if (!__clientHidden) {
+                doc.text(`CLIENTE: ${clientName}`, margin, yPosition);
+                yPosition += 5;
+            }
             if (eventType) {
                 doc.text(`EVENTO: ${eventType}`, margin, yPosition);
                 yPosition += 5;
