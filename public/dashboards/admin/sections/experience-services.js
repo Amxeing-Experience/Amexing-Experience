@@ -3986,7 +3986,6 @@ class ExperienceServicesBuilder {
 
       return `
         <div class="price-breakdown mt-2 p-2 bg-light rounded">
-          <div class="small fw-bold mb-1">Precios simulados para 1 persona:</div>
           <div class="small">${breakdownParts.join('<br>')}</div>
         </div>
       `;
@@ -4179,7 +4178,6 @@ class ExperienceServicesBuilder {
         const hasPrices = adultPrice > 0 || childPrice > 0 || noAlcPrice > 0;
 
         if (hasNoPeople && hasPrices) {
-          priceLines.push(`<div class="text-muted small mt-2">Precios simulados para 1 persona:</div>`);
           if (adultPrice > 0) {
             const total = adultPrice * 1;
             priceLines.push(`<div class="small ms-3">• 1 Adulto: $${adultPrice.toFixed(2)} × 1 = $${total.toFixed(2)}</div>`);
