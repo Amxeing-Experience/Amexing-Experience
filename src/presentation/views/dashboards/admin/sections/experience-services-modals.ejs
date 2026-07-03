@@ -188,6 +188,30 @@
                         </div>
                     </div>
 
+                    <!-- Duración del traslado (Transport only). Se autollena de la ruta y es
+                         editable. "Redondo" multiplica duración y precio ×2. Alimenta la
+                         duración sugerida y la tarjeta del servicio (service.durationHours). -->
+                    <div class="row" id="transportDurationRow">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Duración (ida) <small class="text-muted">(horas y minutos)</small></label>
+                            <div class="input-group">
+                                <input type="number" min="0" step="1" class="form-control" id="transportDurationHours" placeholder="0" autocomplete="off" aria-label="Horas">
+                                <span class="input-group-text">h</span>
+                                <input type="number" min="0" max="59" step="5" class="form-control" id="transportDurationMinutes" placeholder="0" autocomplete="off" aria-label="Minutos">
+                                <span class="input-group-text">min</span>
+                            </div>
+                            <small class="text-muted d-block" id="transportDurationHint">Se autollena de la ruta; editable.</small>
+                        </div>
+                        <div class="col-md-6 mb-3 d-flex align-items-center">
+                            <div class="form-check mt-3">
+                                <input class="form-check-input" type="checkbox" value="" id="transportRoundTrip">
+                                <label class="form-check-label" for="transportRoundTrip">
+                                    <i class="ti ti-arrows-left-right me-1"></i>Redondo (ida y vuelta ×2)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Tiempo de Espera (Transport only) -->
                     <div id="tiempoEsperaSection" class="d-none mb-3">
                         <div class="row align-items-end">

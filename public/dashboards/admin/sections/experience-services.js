@@ -284,6 +284,11 @@ class ExperienceServicesBuilder {
     document.getElementById('serviceQuantity')?.addEventListener('input', () => this.updateServiceTotal());
     document.getElementById('additionalVehicle')?.addEventListener('change', () => this.updateServiceTotal());
 
+    // Traslado: duración editable (h/min) + viaje redondo recalculan el total en vivo.
+    document.getElementById('transportDurationHours')?.addEventListener('input', () => this.updateServiceTotal());
+    document.getElementById('transportDurationMinutes')?.addEventListener('input', () => this.updateServiceTotal());
+    document.getElementById('transportRoundTrip')?.addEventListener('change', () => this.updateServiceTotal());
+
     // Tour a pie: personas + precios de grupo editables recalculan el total en vivo.
     document.getElementById('walkingTourPeopleCount')?.addEventListener('input', () => this.updateServiceTotal());
     document.querySelectorAll('.walking-group-price').forEach((el) => {
@@ -529,6 +534,9 @@ class ExperienceServicesBuilder {
         originName: sub.originName || null,
         destinationName: sub.destinationName || null,
         rateName: sub.rateName || null,
+        roundTrip: sub.roundTrip || false,
+        transportDurationHours: sub.transportDurationHours ?? null,
+        transportDurationMinutes: sub.transportDurationMinutes ?? null,
         isWalkingTour: sub.isWalkingTour || false,
         walkingPriceSmall: sub.walkingPriceSmall || 0,
         walkingPriceMedium: sub.walkingPriceMedium || 0,
@@ -832,6 +840,43 @@ class ExperienceServicesBuilder {
     return { guide, greeter };
   }
 
+  // Duración (en horas, puede ser decimal) del traslado según los campos editables
+  // del modal. "Redondo" multiplica ×2. Actualiza el hint y devuelve el total.
+  getTransportDurationHours() {
+    const h = parseInt(document.getElementById('transportDurationHours')?.value, 10) || 0;
+    const m = parseInt(document.getElementById('transportDurationMinutes')?.value, 10) || 0;
+    const round = document.getElementById('transportRoundTrip')?.checked || false;
+    const oneWay = h + m / 60;
+    const total = oneWay * (round ? 2 : 1);
+
+    const hint = document.getElementById('transportDurationHint');
+    if (hint) {
+      const oneWayLabel = `${h} h ${m} min`;
+      hint.textContent = round
+        ? `${oneWayLabel} × 2 = ${total.toFixed(2)} h`
+        : `${oneWayLabel} (${total.toFixed(2)} h)`;
+    }
+    return total;
+  }
+
+  // Autollena los campos de duración (h/min) desde la duración de ruta (minutos)
+  // sólo si están vacíos, para no pisar lo que el usuario haya editado.
+  prefillTransportDurationFromRoute() {
+    const hoursEl = document.getElementById('transportDurationHours');
+    const minutesEl = document.getElementById('transportDurationMinutes');
+    if (!hoursEl || !minutesEl) return;
+
+    const min = parseInt(this.cachedRouteDuration, 10) || 0;
+    if (min <= 0) return;
+
+    const isEmpty = (el) => el.value === '' || el.value == null;
+    if (isEmpty(hoursEl) && isEmpty(minutesEl)) {
+      hoursEl.value = Math.floor(min / 60);
+      minutesEl.value = min % 60;
+      this.updateServiceTotal();
+    }
+  }
+
   async loadPricingRates() {
     try {
       if (window.PricingUtils && typeof window.PricingUtils.loadCurrentRates === 'function') {
@@ -962,6 +1007,12 @@ class ExperienceServicesBuilder {
     const transportFieldsRow = document.getElementById('transportFieldsRow');
     if (transportFieldsRow) {
       transportFieldsRow.classList.toggle('d-none', type !== 'transport');
+    }
+
+    // Duración editable + viaje redondo: sólo para transporte.
+    const transportDurationRow = document.getElementById('transportDurationRow');
+    if (transportDurationRow) {
+      transportDurationRow.classList.toggle('d-none', type !== 'transport');
     }
 
     // Hide Tiempo de espera for transport (as requested)
@@ -2586,6 +2637,7 @@ class ExperienceServicesBuilder {
       this.transportPriceData = result.data;
       // Cache routeDuration separately so it persists even if transportPriceData is cleared
       this.cachedRouteDuration = result.data.routeDuration || null;
+      this.prefillTransportDurationFromRoute();
       this.populateTransportVehicleDropdown(result.data.vehicles);
     } catch (error) {
       console.error('Error looking up transport prices:', error);
@@ -2738,9 +2790,16 @@ class ExperienceServicesBuilder {
       total = base * qty;
       if (qty > 1) detail = ` ($${base.toFixed(2)} × ${qty})`;
     } else if (type === 'transport') {
+      const round = document.getElementById('transportRoundTrip')?.checked || false;
       const qty = document.getElementById('additionalVehicle')?.checked ? 2 : 1;
-      total = base * qty;
-      if (qty > 1) detail = ` ($${base.toFixed(2)} × ${qty})`;
+      const roundMult = round ? 2 : 1;
+      total = base * qty * roundMult;
+      const parts = [];
+      if (qty > 1) parts.push(`${qty} veh.`);
+      if (round) parts.push('redondo ×2');
+      if (parts.length) detail = ` ($${base.toFixed(2)} × ${parts.join(' × ')})`;
+      // Mantén el hint de duración sincronizado (aplica ×2 si es redondo).
+      this.getTransportDurationHours();
     }
 
     // Sumar guía/greeter (según tipo + checkboxes).
@@ -3321,6 +3380,15 @@ class ExperienceServicesBuilder {
     // 10. Waiting time
     const waitingTimeHours = document.getElementById('waitingTimeHours');
     if (waitingTimeHours) waitingTimeHours.value = service.waitingTimeHours || 0;
+
+    // 11. Duración editable (h/min) + viaje redondo
+    const durHoursEl = document.getElementById('transportDurationHours');
+    const durMinutesEl = document.getElementById('transportDurationMinutes');
+    const roundTripEl = document.getElementById('transportRoundTrip');
+    if (durHoursEl) durHoursEl.value = service.transportDurationHours ?? '';
+    if (durMinutesEl) durMinutesEl.value = service.transportDurationMinutes ?? '';
+    if (roundTripEl) roundTripEl.checked = service.roundTrip || false;
+    this.updateServiceTotal();
   }
 
   populateConceptoFields(service) {
@@ -3574,7 +3642,9 @@ class ExperienceServicesBuilder {
     const additionalVehicle = document.getElementById('additionalVehicle')?.checked || false;
     const vehicleQty = additionalVehicle ? 2 : 1;
     const { guide: guideCost, greeter: greeterCost } = this.getGuideGreeterCost();
-    const price = (base * vehicleQty) + guideCost + greeterCost;
+    // Viaje redondo multiplica el precio base (por vehículo) ×2. El guía/greeter no.
+    const roundTrip = document.getElementById('transportRoundTrip')?.checked || false;
+    const price = (base * vehicleQty * (roundTrip ? 2 : 1)) + guideCost + greeterCost;
     const quantity = 1;
     const rateId = document.getElementById('transportCategory')?.value || null;
     const vehicleId = document.getElementById('vehicleSelect')?.value || null;
@@ -3632,6 +3702,11 @@ class ExperienceServicesBuilder {
       includeGreeter,
       greeterInVehicle,
       waitingTimeHours,
+      // Duración (con ×2 si es redondo) para la duración sugerida y la tarjeta.
+      durationHours: this.getTransportDurationHours(),
+      roundTrip,
+      transportDurationHours: parseInt(document.getElementById('transportDurationHours')?.value, 10) || 0,
+      transportDurationMinutes: parseInt(document.getElementById('transportDurationMinutes')?.value, 10) || 0,
     };
   }
 
@@ -4432,6 +4507,9 @@ class ExperienceServicesBuilder {
         originName: service.originName || null,
         destinationName: service.destinationName || null,
         rateName: service.rateName || null,
+        roundTrip: service.roundTrip || false,
+        transportDurationHours: service.transportDurationHours ?? null,
+        transportDurationMinutes: service.transportDurationMinutes ?? null,
         isWalkingTour: service.isWalkingTour || false,
         walkingPriceSmall: service.walkingPriceSmall || null,
         walkingPriceMedium: service.walkingPriceMedium || null,
@@ -4547,6 +4625,9 @@ class ExperienceServicesBuilder {
         originName: service.originName || null,
         destinationName: service.destinationName || null,
         rateName: service.rateName || null,
+        roundTrip: service.roundTrip || false,
+        transportDurationHours: service.transportDurationHours ?? null,
+        transportDurationMinutes: service.transportDurationMinutes ?? null,
         isWalkingTour: service.isWalkingTour || false,
         languages: service.languages || '',
         clientNotes: service.clientNotes || '',
