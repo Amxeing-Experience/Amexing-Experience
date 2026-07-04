@@ -3962,9 +3962,18 @@ class ExperienceServicesBuilder {
     }
 
     // Duración del servicio (para ver/verificar la suma de la "duración sugerida").
-    const svcDurationHours = this.getServiceDurationHours(service);
+    // Duración mostrada en la tarjeta. Para un walking tour en modo "por toda la
+    // experiencia" muestra la duración de la experiencia (que es la que multiplica su
+    // precio); en cualquier otro caso, la duración propia del servicio.
+    let svcDurationHours = this.getServiceDurationHours(service);
+    let svcDurationLabel = `${svcDurationHours} h`;
+    if (service.type === 'tour' && service.isWalkingTour && service.guideDurationMode === 'experience') {
+      const expDur = parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours();
+      svcDurationHours = expDur;
+      svcDurationLabel = `${expDur} h (toda la experiencia)`;
+    }
     const svcDurationHtml = svcDurationHours > 0
-      ? `<div class="col-auto"><i class="ti ti-clock-hour-3 me-1"></i>${svcDurationHours} h</div>`
+      ? `<div class="col-auto"><i class="ti ti-clock-hour-3 me-1"></i>${svcDurationLabel}</div>`
       : '';
 
     return `
