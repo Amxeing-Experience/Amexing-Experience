@@ -563,6 +563,7 @@ class ExperienceServicesBuilder {
         transportDurationMinutes: sub.transportDurationMinutes ?? null,
         isWalkingTour: sub.isWalkingTour || false,
         walkingPriceSmall: sub.walkingPriceSmall || 0,
+        walkingPerGroup: sub.walkingPerGroup != null ? sub.walkingPerGroup : null,
         walkingPriceMedium: sub.walkingPriceMedium || 0,
         walkingPriceLarge: sub.walkingPriceLarge || 0,
         walkingPeopleCount: sub.walkingPeopleCount || 1,
@@ -852,14 +853,13 @@ class ExperienceServicesBuilder {
     let greeter = 0;
 
     if (type === 'tour') {
-      if (includeGuide) {
-        // Tour a pie con modo "por toda la experiencia": la guía se cobra sobre la
-        // Duración editable del header; en cualquier otro caso, sobre las horas del tour.
-        const isWalking = !!this.selectedTourData?.isWalkingTour;
-        const durationMode = document.getElementById('guideDurationMode')?.value || 'tour';
-        const hours = (isWalking && durationMode === 'experience')
-          ? (parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours())
-          : (parseFloat(document.getElementById('hoursQuantity')?.value) || 0);
+      if (this.selectedTourData?.isWalkingTour) {
+        // Tour a pie: el precio de grupo YA incluye la guía (grupos × duración); no se
+        // suma una tarifa de chofer aparte.
+        guide = 0;
+      } else if (includeGuide) {
+        // Tour con vehículo: guía = Chofer Tour × horas del tour.
+        const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 0;
         guide = (this.driverTourRateCache?.value || 0) * hours;
       }
     } else if (type === 'transport') {
@@ -2553,14 +2553,30 @@ class ExperienceServicesBuilder {
 
   // Total del tour a pie: suma del precio de cada grupo asignado × las horas del tour.
   // Usa personas (default 1) + precios editables + horas (#hoursQuantity).
-  getWalkingTourTotal() {
+  // Suma de precios de grupo (según personas), SIN multiplicar por tiempo.
+  getWalkingPerGroupSum() {
     const tour = this.selectedTourData;
     if (!tour || !tour.isWalkingTour) return 0;
     const peopleCount = Math.max(1, parseInt(document.getElementById('walkingTourPeopleCount')?.value, 10) || 1);
-    const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
     const groups = this.calculateWalkingTourGroups(tour, peopleCount);
-    const perGroup = groups.reduce((sum, g) => sum + (parseFloat(g.tier.price) || 0), 0);
-    return perGroup * hours;
+    return groups.reduce((sum, g) => sum + (parseFloat(g.tier.price) || 0), 0);
+  }
+
+  // Horas que multiplican al walking tour según el toggle: por el TOUR (sus horas) o
+  // por TODA LA EXPERIENCIA (Duración editable del header, o la sugerida si está vacía).
+  getWalkingTourHours() {
+    const mode = document.getElementById('guideDurationMode')?.value || 'tour';
+    if (mode === 'experience') {
+      return parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours();
+    }
+    return parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
+  }
+
+  // Total del tour a pie = suma de grupos × horas (del tour o de la experiencia).
+  // El precio de grupo ya incluye la guía; no se suma tarifa de chofer aparte.
+  getWalkingTourTotal() {
+    if (!this.selectedTourData?.isWalkingTour) return 0;
+    return this.getWalkingPerGroupSum() * this.getWalkingTourHours();
   }
 
   async handleRateSelection(rateId) {
@@ -2835,9 +2851,10 @@ class ExperienceServicesBuilder {
     let detail = '';
 
     if (type === 'tour' && this.selectedTourData?.isWalkingTour) {
-      // Tour a pie: total = suma de precios por grupo (según personas) × horas.
+      // Tour a pie: total = suma de precios por grupo (según personas) × horas
+      // (del tour o de toda la experiencia, según el toggle).
       const peopleCount = Math.max(1, parseInt(document.getElementById('walkingTourPeopleCount')?.value, 10) || 1);
-      const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
+      const hours = this.getWalkingTourHours();
       total = this.getWalkingTourTotal();
       const groups = this.calculateWalkingTourGroups(this.selectedTourData, peopleCount);
       const tierParts = groups.map((g) => `${g.tier.label || g.tier.name}: $${(parseFloat(g.tier.price) || 0).toFixed(2)}`);
@@ -3688,6 +3705,7 @@ class ExperienceServicesBuilder {
       walkingPriceMedium,
       walkingPriceLarge,
       walkingPeopleCount,
+      walkingPerGroup: isWalkingTour ? this.getWalkingPerGroupSum() : null, // suma de grupos, para recalcular × duración
       adultsQuantity: adultsQty,
       childrenQuantity: childrenQty,
       adultsNoAlcoholQuantity: noAlcQty,
@@ -3838,18 +3856,19 @@ class ExperienceServicesBuilder {
   // Recalcula la guía de los tours a pie que se cobran "por toda la experiencia":
   // guía = ChoferTour × Duración editable del header. Se aplica sobre la base a pie
   // (precio sin guía) para no duplicar, y actualiza price/unitPrice del servicio.
+  // Walking tours en modo "por toda la experiencia": su total = suma de grupos ×
+  // la duración de la experiencia. Como esa duración es editable (o la sugerida),
+  // se recalcula en vivo cuando cambia.
   recomputeWalkingTourExperienceGuides() {
-    const rate = this.driverTourRateCache?.value || 0;
     // Duración del header si está puesta; si no, la duración total sugerida (suma
-    // de todos los servicios) — así el guía siempre cubre toda la experiencia.
+    // de todos los servicios) — así siempre cubre toda la experiencia.
     const globalDur = parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours();
     this.services.forEach((s) => {
-      if (s.type === 'tour' && s.isWalkingTour && s.includeGuide && s.guideDurationMode === 'experience') {
-        const newGuide = rate * globalDur;
-        const walkingBase = (s.price || 0) - (s.guideCost || 0);
-        s.guideCost = newGuide;
-        s.price = walkingBase + newGuide;
+      if (s.type === 'tour' && s.isWalkingTour && s.guideDurationMode === 'experience') {
+        const perGroup = parseFloat(s.walkingPerGroup) || 0;
+        s.price = perGroup * globalDur;
         s.unitPrice = s.price;
+        s.guideCost = 0;
       }
     });
   }
@@ -4102,7 +4121,10 @@ class ExperienceServicesBuilder {
     const tour = this.toursCache.get(service.tourId);
     if (!tour) return '';
     const peopleCount = Math.max(1, parseInt(service.walkingPeopleCount, 10) || 1);
-    const hours = parseFloat(service.hours) || 1;
+    // Horas del multiplicador: por toda la experiencia (duración global) o por el tour.
+    const hours = service.guideDurationMode === 'experience'
+      ? (parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours())
+      : (parseFloat(service.hours) || 1);
     const priceOf = (svc, fb) => (parseFloat(svc) || parseFloat(fb) || 0);
     const tiers = [
       { label: tour.walkingRangeSmall, range: this.parseWalkingTourRange(tour.walkingRangeSmall), price: priceOf(service.walkingPriceSmall, tour.walkingPriceSmall) },
@@ -4613,6 +4635,7 @@ class ExperienceServicesBuilder {
         transportDurationMinutes: service.transportDurationMinutes ?? null,
         isWalkingTour: service.isWalkingTour || false,
         walkingPriceSmall: service.walkingPriceSmall || null,
+        walkingPerGroup: service.walkingPerGroup != null ? service.walkingPerGroup : null,
         walkingPriceMedium: service.walkingPriceMedium || null,
         walkingPriceLarge: service.walkingPriceLarge || null,
         walkingPeopleCount: service.walkingPeopleCount || null,
