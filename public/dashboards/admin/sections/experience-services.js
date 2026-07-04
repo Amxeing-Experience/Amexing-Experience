@@ -858,7 +858,7 @@ class ExperienceServicesBuilder {
         const isWalking = !!this.selectedTourData?.isWalkingTour;
         const durationMode = document.getElementById('guideDurationMode')?.value || 'tour';
         const hours = (isWalking && durationMode === 'experience')
-          ? (parseFloat(document.getElementById('experienceDuration')?.value) || 0)
+          ? (parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours())
           : (parseFloat(document.getElementById('hoursQuantity')?.value) || 0);
         guide = (this.driverTourRateCache?.value || 0) * hours;
       }
@@ -3840,7 +3840,9 @@ class ExperienceServicesBuilder {
   // (precio sin guía) para no duplicar, y actualiza price/unitPrice del servicio.
   recomputeWalkingTourExperienceGuides() {
     const rate = this.driverTourRateCache?.value || 0;
-    const globalDur = parseFloat(document.getElementById('experienceDuration')?.value) || 0;
+    // Duración del header si está puesta; si no, la duración total sugerida (suma
+    // de todos los servicios) — así el guía siempre cubre toda la experiencia.
+    const globalDur = parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours();
     this.services.forEach((s) => {
       if (s.type === 'tour' && s.isWalkingTour && s.includeGuide && s.guideDurationMode === 'experience') {
         const newGuide = rate * globalDur;
