@@ -260,16 +260,6 @@ class ExperienceServicesBuilder {
     // Tour selection
     document.getElementById('tourSelect')?.addEventListener('change', (e) => {
       this.handleTourSelection(e.target.value);
-      // Los walking tours incluyen guía por default -> marca el check al elegirlo
-      // (independiente del selector de "por este tour / por toda la experiencia").
-      const tour = this.toursCache.get(e.target.value);
-      if (tour?.isWalkingTour) {
-        const g = document.getElementById('includeGuide');
-        if (g && !g.checked) {
-          g.checked = true;
-          this.handleIncludeGuideChange(true);
-        }
-      }
       this.updateGuideDurationModeVisibility();
       this.updateServiceTotal();
     });
@@ -2488,7 +2478,12 @@ class ExperienceServicesBuilder {
     if (walkingTourPricingSection) {
       walkingTourPricingSection.classList.toggle('d-none', checked);
     }
-    // Tour a pie con guía marcada -> muestra el selector de modo de duración de la guía.
+    // Walking tour: NO aplica "Guía + Chofer" (el precio de grupo ya la incluye) ->
+    // se oculta el checkbox; en tour con vehículo sí se muestra.
+    const guideCheck = document.getElementById('includeGuide')?.closest('.form-check');
+    if (guideCheck) guideCheck.classList.toggle('d-none', !checked);
+
+    // Tour a pie -> muestra el selector de "cobrar por este tour / toda la experiencia".
     this.updateGuideDurationModeVisibility();
   }
 
