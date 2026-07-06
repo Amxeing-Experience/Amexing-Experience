@@ -172,13 +172,6 @@
                                         Guía + Chofer
                                     </label>
                                 </div>
-                                <!-- Tour a pie: elige si el precio (grupos × horas) se cobra por
-                                     este tour o por toda la experiencia (Duración del header).
-                                     Visible solo para tours a pie. -->
-                                <select class="form-select form-select-sm mb-1 d-none" id="guideDurationMode" style="font-size: 0.75rem;">
-                                    <option value="tour">Cobrar por este tour</option>
-                                    <option value="experience">Cobrar por toda la experiencia</option>
-                                </select>
                                 <div class="form-check" id="greeterCheckboxContainer">
                                     <input class="form-check-input" type="checkbox" value="" id="includeGreeter">
                                     <label class="form-check-label small" for="includeGreeter" id="greeterLabel" style="font-size: 0.875rem; line-height: 1.2;">
@@ -313,7 +306,7 @@
 
                     <!-- Walking tour pricing (tour a pie): por tamaño de grupo, precios editables (MXN) -->
                     <div id="walkingTourPricingSection" class="d-none">
-                        <!-- Personas arriba, en su propia fila -->
+                        <!-- Personas + cómo se cobra el precio (por el tour o por la experiencia) -->
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label for="walkingTourPeopleCount" class="form-label">Personas <span class="text-danger">*</span></label>
@@ -321,6 +314,16 @@
                                     <span class="input-group-text"><i class="ti ti-users"></i></span>
                                     <input type="number" class="form-control" id="walkingTourPeopleCount" min="1" step="1" value="1">
                                 </div>
+                            </div>
+                            <div class="col-md-8 mb-3">
+                                <label for="guideDurationMode" class="form-label">
+                                    <i class="ti ti-clock-dollar me-1"></i>Cobrar el precio por
+                                </label>
+                                <select class="form-select" id="guideDurationMode">
+                                    <option value="tour">Solo este tour (sus horas)</option>
+                                    <option value="experience">Toda la experiencia (Duración del header)</option>
+                                </select>
+                                <small class="form-text text-muted">El precio de grupo se multiplica por estas horas.</small>
                             </div>
                         </div>
                         <!-- Precios por grupo (editables, más anchos) -->

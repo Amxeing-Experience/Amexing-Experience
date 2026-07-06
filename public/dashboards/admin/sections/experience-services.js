@@ -2458,43 +2458,22 @@ class ExperienceServicesBuilder {
   }
 
   handleTourTransportToggle(checked) {
-    // Mantener la fila visible (para que la columna "Opcional" con la guía siga
-    // disponible en tours a pie); solo ocultar Segmento + Vehículo cuando es a pie.
+    // Tour a pie (checked=false): oculta toda la fila de transporte (segmento,
+    // vehículo, guía) — no aplica — y muestra la sección de precios por grupo
+    // (que ya incluye el selector "cobrar por este tour / toda la experiencia").
     const transportFieldsRow = document.getElementById('transportFieldsRow');
-    if (transportFieldsRow) {
-      transportFieldsRow.classList.remove('d-none');
-    }
-    const segmentoCol = document.getElementById('transportSegmentoCol');
-    const vehicleCol = document.getElementById('transportVehicleCol');
-    if (segmentoCol) segmentoCol.classList.toggle('d-none', !checked);
-    if (vehicleCol) vehicleCol.classList.toggle('d-none', !checked);
-    // Un tour CON vehículo cobra por el vehículo -> muestra el campo de Precio.
+    if (transportFieldsRow) transportFieldsRow.classList.toggle('d-none', !checked);
     const standardPricingSection = document.getElementById('standardPricingSection');
-    if (standardPricingSection) {
-      standardPricingSection.classList.toggle('d-none', !checked);
-    }
-    // Tour a pie (checked=false) -> muestra precios por grupo; con vehículo, los oculta.
+    if (standardPricingSection) standardPricingSection.classList.toggle('d-none', !checked);
     const walkingTourPricingSection = document.getElementById('walkingTourPricingSection');
-    if (walkingTourPricingSection) {
-      walkingTourPricingSection.classList.toggle('d-none', checked);
-    }
-    // Walking tour: NO aplica "Guía + Chofer" (el precio de grupo ya la incluye) ->
-    // se oculta el checkbox; en tour con vehículo sí se muestra.
-    const guideCheck = document.getElementById('includeGuide')?.closest('.form-check');
-    if (guideCheck) guideCheck.classList.toggle('d-none', !checked);
-
-    // Tour a pie -> muestra el selector de "cobrar por este tour / toda la experiencia".
-    this.updateGuideDurationModeVisibility();
+    if (walkingTourPricingSection) walkingTourPricingSection.classList.toggle('d-none', checked);
   }
 
   // El selector "#guideDurationMode" solo aplica a tours a pie con la guía marcada.
   updateGuideDurationModeVisibility() {
-    const modeSelect = document.getElementById('guideDurationMode');
-    if (!modeSelect) return;
-    // Independiente del check de guía: los walking tours ya incluyen guía por default,
-    // así que el selector de duración se muestra para cualquier tour a pie.
-    const isWalking = !!this.selectedTourData?.isWalkingTour;
-    modeSelect.classList.toggle('d-none', !isWalking);
+    // El selector "cobrar por este tour / toda la experiencia" ahora vive dentro de
+    // #walkingTourPricingSection, que ya se muestra/oculta con el tipo de tour, así
+    // que su visibilidad se maneja sola. (Se mantiene por compatibilidad de llamadas.)
   }
 
   // "1-5" -> {min:1,max:5}; "16+" -> {min:16,max:Infinity}; otro -> null.
