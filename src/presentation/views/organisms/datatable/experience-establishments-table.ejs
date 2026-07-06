@@ -839,6 +839,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         },
         // Lista angosta: sin colapso responsive; búsqueda arriba, tabla, info+paginación
         responsive: false,
+        // No medir el ancho por contenido (evita que un nombre largo ensanche la tabla).
+        autoWidth: false,
         dom: '<"mb-2"f>rt<"d-flex flex-wrap justify-content-between align-items-center mt-2 gap-2"ip>',
         drawCallback: function() {
             // Initialize tooltips
@@ -3086,6 +3088,12 @@ function showErrorAlert(message) {
 }
 .establishment-inbox #<%= dtTableId %> tbody tr {
     cursor: pointer;
+}
+/* Columna única fija al 100% del contenedor: evita que un nombre largo (text-truncate
+   usa white-space:nowrap) expanda la tabla y se desborde encima del panel de detalle. */
+.establishment-inbox-table {
+    table-layout: fixed;
+    width: 100%;
 }
 .establishment-inbox-table tbody td {
     padding: 0.65rem 0.5rem;

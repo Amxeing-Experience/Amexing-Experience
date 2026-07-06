@@ -1075,6 +1075,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Bandeja: sin colapso responsive (interfiere con el click de fila en
             // columna angosta); la lista usa scroll horizontal del wrapper.
             responsive: false,
+            // No medir el ancho por contenido (evita que un nombre largo ensanche la tabla).
+            autoWidth: false,
             // Lista angosta: apila buscador arriba (full width), tabla, y luego
             // info + paginación, para que los controles no se encimen.
             dom: '<"mb-2"f>rt<"d-flex flex-wrap justify-content-between align-items-center mt-2 gap-2"ip>',
@@ -3726,6 +3728,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 }
 .provider-inbox #<%= dtTableId %> tbody tr {
     cursor: pointer;
+}
+/* Columna única fija al 100% del contenedor: evita que un nombre largo (text-truncate
+   usa white-space:nowrap) expanda la tabla y se desborde encima del panel de detalle. */
+.provider-inbox-table {
+    table-layout: fixed;
+    width: 100%;
 }
 .provider-inbox-table tbody td {
     padding: 0.65rem 0.5rem;
