@@ -2,10 +2,12 @@ const logger = require('../../infrastructure/logger');
 const tripAdvisorService = require('../services/tripAdvisorService');
 const POIService = require('../services/POIService');
 const FleetService = require('../services/FleetService');
+const PublicExperiencesService = require('../services/PublicExperiencesService');
 
-// Instancias únicas para el render público (resuelven destinos/flota + presigned URLs).
+// Instancias únicas para el render público (resuelven destinos/flota/experiencias + presigned URLs).
 const poiService = new POIService();
 const fleetService = new FleetService();
+const publicExperiencesService = new PublicExperiencesService();
 
 /**
  * Home Controller - Handles public web pages and landing page functionality.
@@ -189,6 +191,12 @@ class HomeController {
       // en vez de categorías fijas. Se resuelve server-side (página pública, sin auth).
       if (view === 'servicios/tours') {
         data.tourDestinos = await poiService.getActivePOIsWithImages('Tours');
+      }
+
+      // Experiencias: los detail cards muestran las EXPERIENCIAS activas agrupadas por su
+      // categoría temática (experience_category). Se resuelve server-side (sin auth).
+      if (view === 'servicios/experiencias') {
+        data.experiencesByCategory = await publicExperiencesService.getActiveExperiencesByCategory(currentLang);
       }
 
       res.render(view, data);
