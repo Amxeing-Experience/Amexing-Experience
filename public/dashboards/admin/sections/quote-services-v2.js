@@ -505,6 +505,16 @@ class ItineraryBuilder {
     // (El autollenado de Hora de inicio/fin desde "Horario disponible del tour" se bindea en
     //  populateTourScheduleDropdown vía select.onchange — ver quote-services-v2-helpers.js.)
 
+    // Checkbox "Guía" de experiencia → recalcular precio (el guía se cotiza como walking tour SMA).
+    const guideCb = document.getElementById('experienceGuide');
+    if (guideCb) {
+      guideCb.onchange = () => {
+        this.serviceModified = true;
+        this.updateDevPaymentBreakdown();
+        this.updateServicePriceBreakdown();
+      };
+    }
+
     // Service Type Toggle
     document.querySelectorAll('input[name="serviceType"]').forEach((radio) => {
       radio.addEventListener('change', (e) => this.handleServiceTypeChange(e.target.value));
@@ -3984,6 +3994,9 @@ class ItineraryBuilder {
         // Duración editable de la experiencia (autollenada del catálogo, modificable). Se guarda en
         // data.duration (ya persistido) — informativa; no afecta el precio (que es por persona).
         data.duration = parseFloat(document.getElementById('experienceDuration')?.value) || null;
+        // Checkbox "Guía": cuando está marcado, el precio incluye el guía (walking tour SMA:
+        // tier×personas × duración) sumado en el dev breakdown. Se persiste el flag para restaurarlo.
+        data.experienceGuide = document.getElementById('experienceGuide')?.checked || false;
         data.adultsQuantity = parseInt(document.getElementById('adultsQuantity')?.value || 0);
         data.childrenQuantity = parseInt(document.getElementById('childrenQuantity')?.value || 0);
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
@@ -5266,6 +5279,11 @@ class ItineraryBuilder {
             if (service.adultsNoAlcoholQuantity !== undefined) {
               adultsNoAlcoholQuantityField.value = service.adultsNoAlcoholQuantity;
             }
+
+            // Restaurar el checkbox "Guía" (el precio guardado ya incluye el costo del guía).
+            // Se setea antes de recalcular el desglose para que el guía se incluya.
+            const experienceGuideField = document.getElementById('experienceGuide');
+            if (experienceGuideField) experienceGuideField.checked = !!service.experienceGuide;
 
             // Also restore price fields when fields are ready
             const adultPriceField = document.getElementById('adultPrice');
@@ -9223,8 +9241,13 @@ class ItineraryBuilder {
       const childrenTotal = childrenQty * childPrice;
       const noAlcoholTotal = noAlcoholQty * noAlcoholPrice;
 
+      // Guía opcional (checkbox): costo base tipo walking tour de SMA (tier por nº de personas ×
+      // duración). Se suma a la base ANTES del recargo para que el motor lo cotice consistente
+      // (impacta total, pricesByType, guardado y desglose de una sola vez).
+      const guideCost = this.getExperienceGuideCostMXN();
+
       // Calculate base total (efectivo)
-      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal;
+      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal + guideCost;
 
       // Totales por forma de pago vía el motor único (un solo nodo: el total base).
       const experiencePricing = window.PricingEngine
@@ -9265,6 +9288,10 @@ class ItineraryBuilder {
         if (efectivoBreakdown) efectivoBreakdown += '\n';
         efectivoBreakdown += `Sin alcohol: ${noAlcoholQty} × $${noAlcoholPrice.toFixed(2)} = $${noAlcoholTotal.toFixed(2)}`;
       }
+      if (guideCost > 0) {
+        if (efectivoBreakdown) efectivoBreakdown += '\n';
+        efectivoBreakdown += `Guía: $${guideCost.toFixed(2)}`;
+      }
       if (efectivoBreakdown) efectivoBreakdown += '\n';
       efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
 
@@ -9282,6 +9309,10 @@ class ItineraryBuilder {
         if (transferenciaBreakdown) transferenciaBreakdown += '\n';
         transferenciaBreakdown += `Sin alcohol: ${noAlcoholQty} × $${(noAlcoholPrice * tMult).toFixed(2)} = $${(noAlcoholTotal * tMult).toFixed(2)}`;
       }
+      if (guideCost > 0) {
+        if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+        transferenciaBreakdown += `Guía: $${(guideCost * tMult).toFixed(2)}`;
+      }
       if (transferenciaBreakdown) transferenciaBreakdown += '\n';
       transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
 
@@ -9298,6 +9329,10 @@ class ItineraryBuilder {
       if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
         if (tarjetaBreakdown) tarjetaBreakdown += '\n';
         tarjetaBreakdown += `Sin alcohol: ${noAlcoholQty} × $${(noAlcoholPrice * cMult).toFixed(2)} = $${(noAlcoholTotal * cMult).toFixed(2)}`;
+      }
+      if (guideCost > 0) {
+        if (tarjetaBreakdown) tarjetaBreakdown += '\n';
+        tarjetaBreakdown += `Guía: $${(guideCost * cMult).toFixed(2)}`;
       }
       if (tarjetaBreakdown) tarjetaBreakdown += '\n';
       tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
@@ -11879,6 +11914,8 @@ class ItineraryBuilder {
             adultPrice: subconcept.adultPrice || 0,
             childPrice: subconcept.childPrice || 0,
             noAlcoholPrice: subconcept.noAlcoholPrice || 0,
+            // Checkbox "Guía" de experiencia (incluye guía tipo walking tour SMA en el precio).
+            experienceGuide: subconcept.experienceGuide || false,
             // Tour-specific fields (from backend)
             duration: subconcept.duration || 1,
             includeGuide: subconcept.includeGuide || false,
@@ -19909,6 +19946,8 @@ class ItineraryBuilder {
             adultsQuantity: service.adultsQuantity ?? null,
             childrenQuantity: service.childrenQuantity ?? null,
             adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity ?? null,
+            // Flag "Guía" de experiencia (el precio ya incluye el costo del guía en pricesByType).
+            experienceGuide: service.experienceGuide || false,
             infantsQuantity: service.infantsQuantity ?? null,
             // Schedule for experiences
             selectedSchedule: service.selectedSchedule || null,

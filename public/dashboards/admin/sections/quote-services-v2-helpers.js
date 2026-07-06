@@ -1452,6 +1452,32 @@ ItineraryBuilder.prototype.showTourDetails = function (tour) {
     }
 };
 
+// Busca el walking tour de "San Miguel de Allende" en el catálogo (para el "Guía" de experiencias).
+ItineraryBuilder.prototype.getSanMiguelWalkingTour = function () {
+    const all = this.toursCache && this.toursCache.get('all');
+    if (!Array.isArray(all)) return null;
+    const norm = (s) => String(s == null ? '' : s).toLowerCase();
+    const isSMA = (t) => {
+        const poi = t.destinationPOI && (t.destinationPOI.name || t.destinationPOI);
+        return /san miguel de allende/.test(norm(poi)) || /san miguel de allende/.test(norm(t.description));
+    };
+    return all.find((t) => t.isWalkingTour && isSMA(t)) || null;
+};
+
+// Costo base (MXN, sin recargo) del "Guía" de una experiencia: precio tipo walking tour de SMA =
+// tier(por nº de personas) × duración (horas). 0 si el checkbox está apagado o falta info.
+ItineraryBuilder.prototype.getExperienceGuideCostMXN = function () {
+    const cb = document.getElementById('experienceGuide');
+    if (!cb || !cb.checked) return 0;
+    const tour = this.getSanMiguelWalkingTour();
+    if (!tour) return 0;
+    const num = (id) => parseInt(document.getElementById(id) && document.getElementById(id).value, 10) || 0;
+    const people = num('adultsQuantity') + num('childrenQuantity') + num('adultsNoAlcoholQuantity');
+    const duration = parseFloat(document.getElementById('experienceDuration') && document.getElementById('experienceDuration').value) || 0;
+    if (people <= 0 || duration <= 0) return 0;
+    return this.getWalkingTourPrice(tour, people, duration) || 0;
+};
+
 ItineraryBuilder.prototype.clearTourSchedule = function () {
     const scheduleInfoDiv = document.getElementById('tourScheduleInfo');
     if (scheduleInfoDiv) scheduleInfoDiv.classList.add('d-none');
