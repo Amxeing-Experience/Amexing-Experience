@@ -871,6 +871,7 @@ class QuoteController {
                 firstName: owner.get('firstName') || '',
                 lastName: owner.get('lastName') || '',
                 email: owner.get('email') || '',
+                phone: owner.get('phone') || '',
                 fullName: `${owner.get('firstName') || ''} ${owner.get('lastName') || ''}`.trim(),
                 isMe: !!(currentUser && owner.id === currentUser.id),
               }

@@ -685,9 +685,15 @@
             }
 
             // Guide. Tours bundle guide + driver, so the tag reads "Incluye Guía + Driver";
-            // a-disposición keeps just "Incluye Guía".
-            if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
-                const guideLabel = service.type === 'a-disposicion' ? 'Incluye Driver' : 'Incluye Guía + Driver';
+            // a-disposición keeps just "Incluye Guía". Para TOURS, si la lista "Incluye" ya
+            // menciona un guía (guía/guías/guiado, sin importar acentos), NO repetimos el label
+            // aparte — se evita la duplicación. El dato `includeGuide` se conserva igual (se
+            // guarda) para poder asignar el guía en reservas; esto es solo presentación.
+            const includesRaw = Array.isArray(service.includes) ? service.includes.join(' ') : (service.includes || '');
+            const includesLower = String(includesRaw).toLowerCase();
+            const includesMentionsGuide = includesLower.includes('guia') || includesLower.includes('guía');
+            if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide
+                && !(service.type === 'tour' && includesMentionsGuide)) {
                 html += `<div class="service-detail-item text-success mt-1">
                     <i class="ti ti-user me-1"></i>
                     <strong>${service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía'}</strong>
@@ -716,8 +722,15 @@
                     if (typeof val === 'string') return val.trim();
                     return '';
                 };
-                const includesText = normalizeIncludes(service.includes);
+                let includesText = normalizeIncludes(service.includes);
                 const notIncludesText = normalizeIncludes(service.notincludes);
+                // Tour con guía cuya lista "Incluye" ya menciona guía: agregamos "Driver" como
+                // ítem (el label aparte se omitió arriba para no duplicar). Así la info de
+                // guía + driver queda en un solo lugar. Solo si aún no aparece driver/chofer.
+                if (service.type === 'tour' && service.includeGuide && includesMentionsGuide
+                    && !/driver|chofer/i.test(includesText)) {
+                    includesText = includesText ? `${includesText}\nDriver` : 'Driver';
+                }
                 if (includesText || notIncludesText) {
                     const includesCol = (icon, color, label, value) => (value ? `
                         <div class="d-flex align-items-start">
@@ -1109,11 +1122,9 @@
                 html += '</div>';
             }
 
-            // Guide (label differs: a-disposicion → Chofer, tours/experiences → Guía)
+            // Guide: tours → "Guía + Driver"; el resto (incl. a-disposición) → "Guía".
             if (service.includeGuide) {
-                const guideLabel = service.type === 'a-disposicion'
-                    ? 'Incluye Chofer'
-                    : (service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía');
+                const guideLabel = service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía';
                 html += `<div class="service-detail-item mt-1" style="color: #7a7f6b;">
                     <i class="ti ti-user me-1"></i>
                     <strong>${guideLabel}</strong>
@@ -1241,11 +1252,9 @@
                 </div>`;
             }
 
-            // Guide (label differs: a-disposicion → Chofer, tours/experiences → Guía)
+            // Guide: tours → "Guía + Driver"; el resto (incl. a-disposición) → "Guía".
             if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide) {
-                const guideLabel = service.type === 'a-disposicion'
-                    ? 'Incluye Chofer'
-                    : (service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía');
+                const guideLabel = service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía';
                 html += `<div class="service-detail-item text-success">
                     <i class="ti ti-user me-1"></i>
                     <strong>${guideLabel}</strong>
