@@ -98,6 +98,25 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             </select>
                             <div class="form-text">Clasifica el destino según el tipo de servicio</div>
                         </div>
+
+                        <!-- Imagen del destino: opcional, 1 sola, se optimiza automáticamente -->
+                        <div class="mb-3">
+                            <label for="poiImageInput" class="form-label">Imagen <span class="text-muted">(opcional)</span></label>
+
+                            <div id="poiImagePreviewWrap" class="mb-2 d-none">
+                                <div class="position-relative d-inline-block">
+                                    <img id="poiImagePreview" src="" alt="Imagen del destino" class="rounded border" style="max-height: 160px; max-width: 100%; object-fit: cover;">
+                                    <button type="button" id="removePOIImageBtn" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" title="Quitar imagen">
+                                        <i class="ti ti-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <input type="file" class="form-control" id="poiImageInput" accept=".jpg,.jpeg,.png,.webp">
+                            <div class="form-text">
+                                <i class="ti ti-info-circle me-1"></i>1 imagen por destino. Se optimiza automáticamente (AVIF/WebP/JPEG).
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Alert informativo -->
@@ -149,6 +168,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+
+        // Imagen del destino en edición: null (sin/ quitada) | {dataUrl, fileName, isNew:true}
+        // (nueva) | {s3Key, optimizedVariants, url, ...} (existente que se conserva).
+        let poiImageState = null;
 
         // Get JWT token from cookies
         function getAccessToken() {
@@ -352,6 +375,28 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             savePOI();
         });
 
+        // Imagen: al elegir un archivo se muestra el preview y se guarda como nueva (base64).
+        $('#poiImageInput').on('change', function() {
+            const file = this.files && this.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                poiImageState = { dataUrl: e.target.result, fileName: file.name, isNew: true };
+                $('#poiImagePreview').attr('src', e.target.result);
+                $('#poiImagePreviewWrap').removeClass('d-none');
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Quitar la imagen del destino
+        $('#removePOIImageBtn').on('click', function() {
+            poiImageState = null;
+            $('#poiImagePreview').attr('src', '');
+            $('#poiImagePreviewWrap').addClass('d-none');
+            $('#poiImageInput').val('');
+        });
+
         // Functions
         function openPOIModal(isEdit = false) {
             // Clear any previous modal alerts
@@ -365,6 +410,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#poiId').val('');
             $('#modalTitle').text(isEdit ? 'Editar Destino' : 'Crear Nuevo Destino');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Destino');
+
+            // Limpia el estado/preview de la imagen (el editar lo repuebla tras el GET)
+            poiImageState = null;
+            $('#poiImagePreview').attr('src', '');
+            $('#poiImagePreviewWrap').addClass('d-none');
+            $('#poiImageInput').val('');
         }
 
         function loadPOIData(poiId) {
@@ -383,6 +434,19 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#name').val(poi.name);
                         if (poi.serviceType && poi.serviceType.id) {
                             $('#serviceType').val(poi.serviceType.id);
+                        }
+
+                        // Imagen existente: conservar SIEMPRE el objeto (para no perderla al
+                        // guardar) y mostrar el preview solo si trae url.
+                        if (poi.image && (poi.image.url || poi.image.dataUrl || poi.image.s3Key)) {
+                            poiImageState = poi.image;
+                            const src = poi.image.url || poi.image.dataUrl || '';
+                            $('#poiImagePreview').attr('src', src);
+                            $('#poiImagePreviewWrap').toggleClass('d-none', !src);
+                        } else {
+                            poiImageState = null;
+                            $('#poiImagePreview').attr('src', '');
+                            $('#poiImagePreviewWrap').addClass('d-none');
                         }
                     } else {
                         showErrorAlert('Formato de respuesta inválido');
@@ -408,7 +472,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
             const poiData = {
                 name: $('#name').val().trim(),
-                serviceTypeId: $('#serviceType').val()
+                serviceTypeId: $('#serviceType').val(),
+                // Imagen: nueva → solo {dataUrl, fileName}; existente → objeto tal cual
+                // (el backend la conserva por su s3Key); sin imagen/quitada → null.
+                image: poiImageState
+                    ? (poiImageState.isNew
+                        ? { dataUrl: poiImageState.dataUrl, fileName: poiImageState.fileName }
+                        : poiImageState)
+                    : null
             };
 
             const url = isEdit ? `${apiEndpoint}/${poiId}` : apiEndpoint;

@@ -23,6 +23,8 @@
 
 const Parse = require('parse/node');
 const POIService = require('../../services/POIService');
+const ImageOptimizationService = require('../../services/ImageOptimizationService');
+const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 const logger = require('../../../infrastructure/logger');
 
 /**
@@ -33,6 +35,123 @@ class POIController {
     this.poiService = new POIService();
     this.maxPageSize = 100;
     this.defaultPageSize = 25;
+
+    // Servicios de imagen (mismos que experiencias) para la imagen única del destino.
+    // Carpeta S3 propia `pois/…`; presigned URLs con formato óptimo (AVIF/WebP/JPEG).
+    const s3Options = {
+      baseFolder: 'pois',
+      isPublic: false,
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+    };
+    this.imageOptimizationService = new ImageOptimizationService({
+      ...s3Options,
+      enableOptimization: process.env.ENABLE_IMAGE_OPTIMIZATION !== 'false',
+    });
+    this.serverOptimizationService = new ServerImageOptimizationService(s3Options);
+  }
+
+  /**
+   * Procesa la imagen única de un destino (misma lógica que las fotos de experiencias,
+   * pero para UNA sola imagen). Devuelve el objeto imagen a persistir o null.
+   * @param {object|null} image - `{ dataUrl }` (nueva) o `{ s3Key, optimizedVariants, ... }` (existente).
+   * @param {string} poiId - Id del destino (para la ruta en S3).
+   * @param {object} userContext - Contexto de auditoría.
+   * @returns {Promise<object|null>} Imagen optimizada, la existente, o null.
+   * @example
+   * const img = await controller.processSingleImage({ dataUrl }, poi.id, userContext);
+   */
+  async processSingleImage(image, poiId, userContext) {
+    if (!image) {
+      return null;
+    }
+
+    // Imagen nueva (data URL base64) → optimizar y subir
+    if (image.dataUrl && image.dataUrl.startsWith('data:')) {
+      const matches = image.dataUrl.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        logger.warn('Invalid base64 data URL for POI image', { poiId });
+        return image.s3Key ? image : null;
+      }
+
+      const mimeType = matches[1];
+      const buffer = Buffer.from(matches[2], 'base64');
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substr(2, 9);
+      const originalFileName = image.fileName || 'image.jpg';
+      const extension = originalFileName.split('.').pop() || 'jpg';
+      const uniqueFileName = `${timestamp}-${randomString}.${extension}`;
+
+      const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
+        buffer,
+        uniqueFileName,
+        mimeType,
+        { entityPath: `pois/${poiId}`, entityId: poiId, userContext }
+      );
+
+      logger.info('POI image optimized', {
+        poiId,
+        fileName: originalFileName,
+        s3Key: optimizationResult.originalS3Key,
+        userId: userContext?.userId,
+      });
+
+      return {
+        s3Key: optimizationResult.originalS3Key,
+        fileName: originalFileName,
+        originalName: originalFileName,
+        optimizedVariants: optimizationResult.optimizedVariants,
+        optimizationMetadata: optimizationResult.metadata,
+        fileSize: buffer.length,
+        mimeType,
+      };
+    }
+
+    // Imagen existente → conservar, pero sin persistir la url/dataUrl presigned (transitorias);
+    // se regeneran al responder. Preserva los metadatos de optimización.
+    if (image.s3Key || image.optimizedVariants || image.optimizationMetadata) {
+      const persisted = { ...image };
+      delete persisted.url;
+      delete persisted.dataUrl;
+      return persisted;
+    }
+
+    return null;
+  }
+
+  /**
+   * Formatea la imagen del destino para la respuesta: presigned URL en el formato óptimo.
+   * @param {object|null} image - Imagen persistida.
+   * @param {string} acceptHeader - Header Accept del navegador.
+   * @returns {Promise<object|null>} Imagen con `url`/`dataUrl` o null.
+   * @example
+   * const img = await controller.formatImageForResponse(poi.get('image'), req.get('accept'));
+   */
+  async formatImageForResponse(image, acceptHeader = '') {
+    if (!image) {
+      return null;
+    }
+
+    try {
+      if (image.s3Key && this.imageOptimizationService?.enableOptimization) {
+        const imageData = await this.imageOptimizationService.getImageWithOptimalFormat(image, acceptHeader);
+        return {
+          ...image,
+          url: imageData.url,
+          dataUrl: imageData.url,
+          optimizationMetadata: imageData.metadata || image.optimizationMetadata,
+        };
+      }
+
+      if (image.s3Key) {
+        const url = await this.imageOptimizationService.getPresignedUrl(image.s3Key);
+        return { ...image, url, dataUrl: url };
+      }
+    } catch (error) {
+      logger.warn('Error formatting POI image for response', { error: error.message });
+    }
+
+    return image;
   }
 
   /**
@@ -257,6 +376,7 @@ class POIController {
             name: serviceType.get('name'),
           }
           : null,
+        image: await this.formatImageForResponse(poi.get('image'), req.get('accept') || ''),
         createdAt: poi.createdAt,
         updatedAt: poi.updatedAt,
       };
@@ -291,7 +411,7 @@ class POIController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      const { name, serviceTypeId } = req.body;
+      const { name, serviceTypeId, image } = req.body;
 
       // Validate required fields
       if (!name || name.trim().length === 0) {
@@ -351,10 +471,28 @@ class POIController {
         },
       });
 
+      // Imagen (opcional): se procesa DESPUÉS del primer save para tener el id del destino
+      // (la ruta en S3 usa `pois/${poiId}`). Si hay imagen, se optimiza y se re-guarda.
+      const userContext = {
+        objectId: currentUser.id,
+        id: currentUser.id,
+        userId: currentUser.id,
+        email: currentUser.get('email'),
+        username: currentUser.get('username') || currentUser.get('email'),
+      };
+      if (image) {
+        const processedImage = await this.processSingleImage(image, poi.id, userContext);
+        if (processedImage) {
+          poi.set('image', processedImage);
+          await poi.save(null, { useMasterKey: true, context: { user: userContext } });
+        }
+      }
+
       logger.info('POI created', {
         poiId: poi.id,
         name: poi.get('name'),
         serviceTypeId: serviceType.id,
+        hasImage: !!poi.get('image'),
         createdBy: currentUser.id,
       });
 
@@ -366,6 +504,7 @@ class POIController {
           id: serviceType.id,
           name: serviceType.get('name'),
         },
+        image: await this.formatImageForResponse(poi.get('image'), req.get('accept') || ''),
       };
 
       return this.sendSuccess(res, data, 'Punto de interés creado exitosamente', 201);
@@ -411,7 +550,9 @@ class POIController {
         return this.sendError(res, 'Punto de interés no encontrado', 404);
       }
 
-      const { name, active, serviceTypeId } = req.body;
+      const {
+        name, active, serviceTypeId, image,
+      } = req.body;
 
       // Update name if provided
       if (name && name.trim().length > 0) {
@@ -455,17 +596,28 @@ class POIController {
         }
       }
 
+      // Imagen (opcional): solo se toca si el request la incluye. Objeto con dataUrl →
+      // se optimiza; objeto existente → se conserva; null/vacío → se quita del destino.
+      const userContext = {
+        objectId: currentUser.id,
+        id: currentUser.id,
+        userId: currentUser.id,
+        email: currentUser.get('email'),
+        username: currentUser.get('username') || currentUser.get('email'),
+      };
+      if (Object.prototype.hasOwnProperty.call(req.body, 'image')) {
+        const processedImage = image ? await this.processSingleImage(image, poi.id, userContext) : null;
+        if (processedImage) {
+          poi.set('image', processedImage);
+        } else {
+          poi.unset('image');
+        }
+      }
+
       // Save changes with user context for audit trail
       await poi.save(null, {
         useMasterKey: true,
-        context: {
-          user: {
-            objectId: currentUser.id,
-            id: currentUser.id,
-            email: currentUser.get('email'),
-            username: currentUser.get('username') || currentUser.get('email'),
-          },
-        },
+        context: { user: userContext },
       });
 
       // Fetch updated POI with serviceType included
@@ -492,6 +644,7 @@ class POIController {
             name: serviceType.get('name'),
           }
           : null,
+        image: await this.formatImageForResponse(updatedPoi.get('image'), req.get('accept') || ''),
         updatedAt: updatedPoi.updatedAt,
       };
 
