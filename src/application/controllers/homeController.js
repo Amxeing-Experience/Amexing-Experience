@@ -1,5 +1,9 @@
 const logger = require('../../infrastructure/logger');
 const tripAdvisorService = require('../services/tripAdvisorService');
+const POIService = require('../services/POIService');
+
+// Instancia única para el render público (resuelve destinos + presigned URLs de su imagen).
+const poiService = new POIService();
 
 /**
  * Home Controller - Handles public web pages and landing page functionality.
@@ -178,6 +182,12 @@ class HomeController {
         t,
         currentLang,
       };
+
+      // Tours: el strip horizontal muestra los DESTINOS tipo Tours activos (con su imagen)
+      // en vez de categorías fijas. Se resuelve server-side (página pública, sin auth).
+      if (view === 'servicios/tours') {
+        data.tourDestinos = await poiService.getActivePOIsWithImages('Tours');
+      }
 
       res.render(view, data);
     } catch (error) {
