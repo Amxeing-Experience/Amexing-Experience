@@ -1,9 +1,11 @@
 const logger = require('../../infrastructure/logger');
 const tripAdvisorService = require('../services/tripAdvisorService');
 const POIService = require('../services/POIService');
+const FleetService = require('../services/FleetService');
 
-// Instancia única para el render público (resuelve destinos + presigned URLs de su imagen).
+// Instancias únicas para el render público (resuelven destinos/flota + presigned URLs).
 const poiService = new POIService();
+const fleetService = new FleetService();
 
 /**
  * Home Controller - Handles public web pages and landing page functionality.
@@ -263,6 +265,10 @@ class HomeController {
         t,
         currentLang,
       };
+
+      // Flota real agrupada por categoría (VehicleType) con sus imágenes, server-side.
+      // La vista cae a su placeholder si viene vacío.
+      data.fleetByCategory = await fleetService.getActiveFleetByCategory();
 
       res.render('nuestra-flota', data);
     } catch (error) {
