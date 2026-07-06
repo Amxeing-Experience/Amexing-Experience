@@ -373,6 +373,30 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
     font-weight: 600;
 }
 
+/* Chip de "Tipo de experiencia" (categoría temática) en el cuerpo de la card:
+   pill con icono, distinto del badge de Tipo (esquina de la imagen). */
+.experience-category-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    padding: 3px 10px;
+    margin-bottom: 0.6rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: #fff7ed;
+    color: #c2410c;
+    border: 1px solid #fed7aa;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.experience-category-chip i {
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
 .experience-card-body {
     padding: 1.25rem;
     flex: 1;
@@ -490,6 +514,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Experience management functionality
     let allExperiences = [];
     let filteredExperiences = [];
+
+    // Etiquetas legibles del "Tipo de experiencia" (experience_category) para las cards/filtro.
+    const EXPERIENCE_CATEGORY_LABELS = {
+        catas: 'Catas',
+        arte: 'Arte',
+        historia_arquitectura: 'Historia y Arquitectura',
+        gastronomicas: 'Gastronómicas',
+        aventura: 'Aventura',
+        naturaleza: 'Naturaleza',
+        de_temporada: 'De Temporada'
+    };
+    const categoryLabel = (v) => EXPERIENCE_CATEGORY_LABELS[v] || '';
     let currentExchangeRate = 20; // Default exchange rate MXN to USD
     let currentTransferRate = 0; // Transfer payment surcharge percentage
     let currentAgencyRate = 0; // Credit card payment surcharge percentage
@@ -1238,6 +1274,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             <h5 class="experience-card-title" title="${experience.displayName}">
                                 ${experience.displayName}
                             </h5>
+                            ${categoryLabel(experience.experience_category) ? `
+                                <span class="experience-category-chip" title="Tipo de experiencia">
+                                    <i class="ti ti-category"></i>${categoryLabel(experience.experience_category)}
+                                </span>
+                            ` : ''}
                             <div class="experience-card-description">
                                 ${experience.displayDescription || 'Sin descripción disponible'}
                             </div>
