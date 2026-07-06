@@ -373,28 +373,24 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
     font-weight: 600;
 }
 
-/* Chip de "Tipo de experiencia" (categoría temática) en el cuerpo de la card:
-   pill con icono, distinto del badge de Tipo (esquina de la imagen). */
-.experience-category-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    max-width: 100%;
+/* Badge de "Tipo de experiencia" (categoría temática) sobre la imagen, esquina
+   inferior-izquierda: pastilla blanca con verde de marca. No ocupa espacio del cuerpo
+   y queda distinto del badge de Tipo (esquina superior-derecha). */
+.experience-category-badge {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    max-width: calc(100% - 20px);
     padding: 3px 10px;
-    margin-bottom: 0.6rem;
     border-radius: 999px;
     font-size: 0.72rem;
     font-weight: 600;
-    background: #fff7ed;
-    color: #c2410c;
-    border: 1px solid #fed7aa;
+    background: rgba(255, 255, 255, 0.95);
+    color: #157347;
+    border: 1px solid rgba(43, 182, 115, 0.35);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-.experience-category-chip i {
-    font-size: 0.85rem;
-    flex-shrink: 0;
 }
 
 .experience-card-body {
@@ -1265,20 +1261,18 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>`
                             }
                             <!-- Experience Type Badge -->
-                            ${experience.displayType && experience.displayType !== 'experiencia' ? 
+                            ${experience.displayType && experience.displayType !== 'experiencia' ?
                                 `<div class="experience-type-badge">
                                     <span class="type-badge ${typeClass}">${typeName}</span>
                                 </div>` : ''}
+                            <!-- Tipo de experiencia (categoría) -->
+                            ${categoryLabel(experience.experience_category) ?
+                                `<span class="experience-category-badge" title="Tipo de experiencia">${categoryLabel(experience.experience_category)}</span>` : ''}
                         </div>
                         <div class="experience-card-body">
                             <h5 class="experience-card-title" title="${experience.displayName}">
                                 ${experience.displayName}
                             </h5>
-                            ${categoryLabel(experience.experience_category) ? `
-                                <span class="experience-category-chip" title="Tipo de experiencia">
-                                    <i class="ti ti-category"></i>${categoryLabel(experience.experience_category)}
-                                </span>
-                            ` : ''}
                             <div class="experience-card-description">
                                 ${experience.displayDescription || 'Sin descripción disponible'}
                             </div>
