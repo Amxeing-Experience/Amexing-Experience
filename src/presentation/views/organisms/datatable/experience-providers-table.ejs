@@ -471,6 +471,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             Experiencias del Proveedor
                         </h6>
 
+                        <!-- Leyenda de auto-guardado por experiencia -->
+                        <div class="small text-muted mb-2">
+                            <i class="ti ti-info-circle me-1"></i>Los cambios se guardan solos al salir de cada campo. Las imágenes se guardan con el botón Guardar.
+                        </div>
+
                         <!-- Lista de experiencias editables inline -->
                         <div id="providerExperienciasList" class="mb-3">
                             <div id="noExperienciasMessage" class="text-center text-muted py-3 border rounded bg-light">
@@ -543,6 +548,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <span class="badge bg-light text-success border experiencia-acc-tipo d-none"></span>
             </span>
             <span class="d-flex align-items-center gap-2 flex-shrink-0">
+                <!-- Estado de auto-guardado por experiencia (se actualiza al salir de cada campo) -->
+                <span class="small experiencia-autosave-status text-muted" style="transition: opacity .3s ease;"></span>
                 <span class="fw-semibold text-success small experiencia-acc-price"></span>
                 <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn experiencia-acc-delete" title="Eliminar experiencia">
                     <i class="ti ti-trash"></i>
@@ -1503,6 +1510,92 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const index = card.data('index');
             updateExperienciaFromCard(card, index);
         });
+
+        // Auto-guardado por experiencia: al salir (blur) de un campo TEXT/NUMBER/SELECT/TEXTAREA
+        // (nunca file/imagen) se guarda SOLO esa experiencia. Delegado para cubrir cards dinámicas.
+        $(document).on('blur', '#providerExperienciasList .experiencia-editable :input:not([type=file])', function() {
+            const cardEl = this.closest('.experiencia-editable');
+            if (cardEl) autoSaveExperiencia(cardEl);
+        });
+
+        // Muestra el estado de auto-guardado en la cabecera de la card
+        function setAutosaveStatus(cardEl, text, kind) {
+            const $status = $(cardEl).find('.experiencia-autosave-status').first();
+            if (!$status.length) return;
+            $status.stop(true, true).css('opacity', 1).text(text);
+            $status.removeClass('text-muted text-success text-danger');
+            if (kind === 'success') $status.addClass('text-success');
+            else if (kind === 'error') $status.addClass('text-danger');
+            else $status.addClass('text-muted');
+            if (kind === 'success') {
+                setTimeout(() => { $status.fadeTo(300, 0, () => $status.text('')); }, 1500);
+            }
+        }
+
+        // Guarda una sola experiencia (solo campos de texto/número; las imágenes van con Guardar)
+        function autoSaveExperiencia(cardEl) {
+            const providerId = document.getElementById('providerId')?.value;
+            if (!providerId) return; // proveedor nuevo aún no guardado → se usa Guardar manual
+
+            const $card = $(cardEl);
+            const index = parseInt(cardEl.dataset.index);
+            if (isNaN(index)) return;
+
+            // Refresca el objeto local con lo que hay en la card
+            updateExperienciaFromCard($card, index);
+
+            // Evita solicitudes solapadas para la MISMA card
+            if (cardEl.dataset.saving === '1') {
+                cardEl.dataset.dirty = '1';
+                return;
+            }
+
+            const source = providerExperiencias[index] || {};
+            // Payload sin imágenes: el campo photos se maneja con el guardado manual
+            const payload = Object.assign({}, source);
+            delete payload.photos;
+            payload.displayOrder = index;
+
+            const expId = cardEl.dataset.id;
+            const isUpdate = typeof expId === 'string' && expId.length > 0;
+            const url = isUpdate
+                ? `/api/providers/${providerId}/experiencias/${expId}`
+                : `/api/providers/${providerId}/experiencias`;
+
+            cardEl.dataset.saving = '1';
+            setAutosaveStatus(cardEl, 'Guardando…', 'muted');
+
+            $.ajax({
+                url: url,
+                type: isUpdate ? 'PUT' : 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function(response) {
+                    // En creación, fija el id para que los siguientes blurs hagan PUT
+                    if (!isUpdate && response && response.data) {
+                        const newId = response.data.id || response.data.objectId;
+                        if (newId) {
+                            cardEl.dataset.id = newId;
+                            if (providerExperiencias[index]) providerExperiencias[index].id = newId;
+                        }
+                    }
+                    setAutosaveStatus(cardEl, 'Guardado ✓', 'success');
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON?.error || `HTTP ${xhr.status}`;
+                    console.error('Error auto-guardando experiencia:', msg);
+                    setAutosaveStatus(cardEl, 'Error al guardar', 'error');
+                },
+                complete: function() {
+                    cardEl.dataset.saving = '0';
+                    // Si hubo cambios mientras guardaba, re-ejecuta una vez
+                    if (cardEl.dataset.dirty === '1') {
+                        cardEl.dataset.dirty = '0';
+                        autoSaveExperiencia(cardEl);
+                    }
+                }
+            });
+        }
         
         // Toggle availability section
         $(document).on('click', '.toggle-availability-btn', function() {
