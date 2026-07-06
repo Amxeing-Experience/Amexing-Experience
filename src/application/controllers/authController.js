@@ -183,7 +183,7 @@ class AuthController {
     // Configure support email based on environment
     const supportEmail = process.env.NODE_ENV === 'development'
       ? 'denisse@meeplab.com'
-      : 'michelle@amexing.com';
+      : 'contact@amexingexperience.com';
 
     const PartnerRequestService = require('../services/PartnerRequestService');
 
