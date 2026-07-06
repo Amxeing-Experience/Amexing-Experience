@@ -3939,6 +3939,11 @@ class ServicesController {
         return this.sendError(res, 'originPOI y destinationPOI son requeridos', 400);
       }
 
+      /**
+       * Busca POIs por nombre exacto (case-insensitive), solo los que existen.
+       * @param {string} name - Nombre del POI a resolver.
+       * @returns {Promise<Parse.Object[]>} POIs que coinciden con ese nombre.
+       */
       const resolvePOIs = async (name) => {
         const q = new Parse.Query('POI');
         q.matches('name', `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
@@ -3954,6 +3959,12 @@ class ServicesController {
 
       // Match the route in EITHER direction (origin→dest OR dest→origin) — the duration
       // is the same for the leg regardless of how it was stored.
+      /**
+       * Arma una query de Services para una dirección (origen→destino) con duración > 0.
+       * @param {Parse.Object[]} originSet - POIs de origen.
+       * @param {Parse.Object[]} destSet - POIs de destino.
+       * @returns {Parse.Query} Query de Services para esa dirección.
+       */
       const buildDirQuery = (originSet, destSet) => {
         const q = new Parse.Query('Services');
         q.equalTo('exists', true);
@@ -4212,6 +4223,11 @@ class ServicesController {
       // the DB in the opposite origin/destination order). Look for the first service
       // with a duration in the matched set and, failing that, in BOTH directions —
       // so the duration is found regardless of how the route was entered.
+      /**
+       * Obtiene la primera routeDuration válida (>0) de un set de rate prices.
+       * @param {Parse.Object[]} rps - Rate prices con su `service` incluido.
+       * @returns {number|null} La duración de ruta encontrada, o null.
+       */
       const durationFrom = (rps) => rps
         .map((rp) => rp.get('service')?.get('routeDuration'))
         .find((d) => d != null && d > 0) || null;
