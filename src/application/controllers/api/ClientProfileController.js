@@ -354,7 +354,13 @@ class ClientProfileController {
     }
   }
 
-  // Replace the owner's whole preference set in one save (the UI sends all categories at once).
+  /**
+   * Reemplaza todo el set de preferencias de viaje del owner en un solo guardado
+   * (la UI envía todas las categorías a la vez).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   */
   async saveTravelPreferences(req, res) {
     const owner = await this.resolveOwner(req);
     try {
@@ -447,7 +453,12 @@ class ClientProfileController {
     return false;
   }
 
-  // Serialize a passport, resolving the presigned passportDocument URL from its S3 key when set.
+  /**
+   * Serializa un pasaporte resolviendo la URL presignada del documento desde su S3 key.
+   * @param {Parse.Object} passport - El pasaporte a serializar.
+   * @param {object} [ctx] - Contexto para toSafeJSON.
+   * @returns {Promise<object>} JSON seguro del pasaporte (con passportDocument URL si aplica).
+   */
   async serializePassport(passport, ctx = {}) {
     const json = await passport.toSafeJSON(ctx);
     if (json.passportDocumentS3Key) {
@@ -540,7 +551,12 @@ class ClientProfileController {
     }
   }
 
-  // Upload the passport copy via the S3 pipeline: images → optimizer, PDFs → direct S3 upload.
+  /**
+   * Sube la copia del pasaporte por el pipeline S3 (imágenes → optimizador, PDFs → subida directa).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   */
   async uploadPassportDocument(req, res) {
     const owner = await this.resolveOwner(req);
     try {
@@ -656,7 +672,11 @@ class ClientProfileController {
 
   // ---------- documents (ClientDocument; files in S3, no field-level encryption) ----------
 
-  // Serialize a document, resolving the presigned documentUrl from its S3 key.
+  /**
+   * Serializa un documento resolviendo la URL presignada (documentUrl) desde su S3 key.
+   * @param {Parse.Object} doc - El documento a serializar.
+   * @returns {Promise<object>} JSON seguro del documento (con documentUrl si aplica).
+   */
   async serializeDocument(doc) {
     const json = doc.toSafeJSON();
     if (json.s3Key) {
@@ -684,6 +704,11 @@ class ClientProfileController {
   async storeDocumentFile(owner, {
     fileBase64, fileName, mimeType, label, userId,
   }) {
+    /**
+     * Crea un Error con `.status` 400 (el catch del caller lo convierte en la respuesta).
+     * @param {string} msg - Mensaje de error.
+     * @returns {Error} Error con status 400.
+     */
     const fail = (msg) => Object.assign(new Error(msg), { status: 400 });
 
     if (!fileBase64) throw fail('No se recibió ningún archivo');
@@ -729,8 +754,13 @@ class ClientProfileController {
     return { s3Key, size: buffer.length, safeName };
   }
 
-  // Upload a client document via base64-in-JSON (multipart is blocked by the WAF, HTTP 426).
-  // Body: { fileBase64, fileName, mimeType, label }.
+  /**
+   * Sube un documento del cliente vía base64-en-JSON (multipart lo bloquea el WAF, HTTP 426).
+   * Body: { fileBase64, fileName, mimeType, label }.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   */
   async uploadDocument(req, res) {
     const owner = this.resolveOwner(req);
     try {
@@ -850,11 +880,20 @@ class ClientProfileController {
     try {
       const ownerObj = await this.validateOwnerExists(owner);
 
+      /**
+       * Nombre visible de un usuario: nombre+apellido, o email/username como fallback.
+       * @param {Parse.Object} u - AmexingUser (o null).
+       * @returns {string} Nombre a mostrar, o cadena vacía.
+       */
       const userName = (u) => (u
         ? (`${u.get('firstName') || ''} ${u.get('lastName') || ''}`.trim() || u.get('email') || u.get('username') || '')
         : '');
-      // A quote belongs to an AGENCY via its `client` pointer (an AmexingUser, role department_manager).
-      // The agency display name is contextualData.companyName (e.g. 'DENMF y Asociados', 'Nuba').
+      /**
+       * Nombre de la AGENCIA dueña de la cotización (via el pointer `client`, un AmexingUser
+       * role department_manager). Usa contextualData.companyName (p.ej. 'Nuba'), con fallbacks.
+       * @param {Parse.Object} clientPtr - Pointer al cliente/agencia.
+       * @returns {string} Nombre de la agencia, o cadena vacía si no aplica.
+       */
       const agencyNameOf = (clientPtr) => {
         if (!clientPtr || clientPtr.get('role') !== 'department_manager') return '';
         const cd = clientPtr.get('contextualData') || {};
