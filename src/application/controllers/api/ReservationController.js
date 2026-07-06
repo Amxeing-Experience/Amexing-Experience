@@ -210,12 +210,13 @@ class ReservationController {
         null, // 2 Propietario (computed: quotePtr.owner | createdBy)
         'eventType', // 3 Motivo de Viaje
         'contactPerson', // 4 Cliente Final
-        'startDate', // 5 Fecha Inicio
-        'numberOfPeople', // 6 Personas
-        null, // 7 Servicios (computed)
-        'status', // 8 Estado
-        'updatedAt', // 9 Última Modificación
-        null, // 10 Acciones (orderable: false)
+        null, // 5 Persona de Contacto (computed: contacto | propietario + teléfono)
+        'startDate', // 6 Fecha Inicio
+        'numberOfPeople', // 7 Personas
+        null, // 8 Servicios (computed)
+        'status', // 9 Estado
+        'updatedAt', // 10 Última Modificación
+        null, // 11 Acciones (orderable: false)
       ];
       const orderField = columnMap[orderColumnIndex] || 'startDate';
 
@@ -1843,6 +1844,9 @@ class ReservationController {
       clientType, // 'agency' | 'client' | null — para la etiqueta de tipo en la tabla
       // Cliente Final: copiado a la reservación desde la cotización (no hace falta el quote).
       contactPerson: reservation.get('contactPerson') || '',
+      contactPhone: reservation.get('contactPhone') || '',
+      // Teléfono del propietario, para cuando el contacto = propietario (fallback en la tabla).
+      ownerPhone: ownerSource ? (ownerSource.get('phone') || '') : '',
       leadGuestFirstName: reservation.get('leadGuestFirstName') || '',
       leadGuestLastName: reservation.get('leadGuestLastName') || '',
       eventType: reservation.get('eventType') || '',

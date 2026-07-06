@@ -502,6 +502,9 @@ class ItineraryBuilder {
     // Service Management
     document.getElementById('saveServiceBtn')?.addEventListener('click', () => this.saveService());
 
+    // (El autollenado de Hora de inicio/fin desde "Horario disponible del tour" se bindea en
+    //  populateTourScheduleDropdown vía select.onchange — ver quote-services-v2-helpers.js.)
+
     // Service Type Toggle
     document.querySelectorAll('input[name="serviceType"]').forEach((radio) => {
       radio.addEventListener('change', (e) => this.handleServiceTypeChange(e.target.value));
@@ -6786,16 +6789,17 @@ class ItineraryBuilder {
       includeGreeterCheckbox.checked = service.includeGreeter;
     }
 
-    // Step 6c: Restore start and end times
+    // Step 6c: Restore start and end times. Se asigna SIEMPRE (aunque vacío) para no dejar valores
+    // remanentes de un servicio editado antes: un tour sin horario debe quedar con inicio/fin vacíos.
     const startTimeField = document.getElementById('tourStartTime');
-    if (startTimeField && service.startTime) {
-      startTimeField.value = service.startTime;
-    }
+    if (startTimeField) startTimeField.value = service.startTime || '';
 
     const endTimeField = document.getElementById('tourEndTime');
-    if (endTimeField && service.endTime) {
-      endTimeField.value = service.endTime;
-    }
+    if (endTimeField) endTimeField.value = service.endTime || '';
+
+    // Preseleccionar en "Horario disponible del tour" el slot que coincide con las horas restauradas
+    // (o deseleccionar si el tour no tiene horario).
+    this.syncTourScheduleSelection();
 
     // Step 7: Restore vehicle tour override checkbox so the breakdown reads
     // the saved custom price (we live in the vehicle tour form, so the
@@ -19322,6 +19326,9 @@ class ItineraryBuilder {
       suggestedTimesDiv.textContent = suggestedTimes.join(' • ');
       scheduleInfoDiv.classList.remove('d-none');
     }
+
+    // Dropdown interactivo de horarios disponibles (autollena hora inicio/fin al seleccionar).
+    this.populateTourScheduleDropdown(tour);
   }
 
 

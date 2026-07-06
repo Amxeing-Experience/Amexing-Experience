@@ -228,6 +228,20 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
                             
+                            <!-- Horario disponible del tour (autollena hora de inicio/fin). Se muestra
+                                 solo cuando el tour seleccionado (con vehículo) tiene horarios/días. -->
+                            <div class="row mb-3 d-none" id="tourScheduleRow">
+                                <div class="col-md-12">
+                                    <label for="tourScheduleSelect" class="form-label">
+                                        <i class="ti ti-calendar-clock me-1"></i>Horario disponible del tour
+                                    </label>
+                                    <select class="form-select" id="tourScheduleSelect">
+                                        <option value="">Seleccionar horario...</option>
+                                    </select>
+                                    <div class="form-text">Al elegir un horario se autollenan la hora de inicio y de fin.</div>
+                                </div>
+                            </div>
+
                             <!-- Hora de inicio / Hora de fin (user input) -->
                             <div class="row mb-3">
                                 <div class="col-md-6">
@@ -1169,12 +1183,19 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
                         </div>
-                        <!-- Duración (horas): se autollena de la experiencia seleccionada y es editable. Full width, debajo del horario. -->
+                        <!-- Duración (horas): se autollena de la experiencia seleccionada y es editable.
+                             Al lado, checkbox opcional "Guía". -->
                         <div class="row mb-3">
-                            <div class="col-md-12">
+                            <div class="col-md-10">
                                 <label for="experienceDuration" class="form-label">Duración <small class="text-muted">(horas)</small></label>
                                 <input type="number" min="0" step="0.5" class="form-control" id="experienceDuration" placeholder="Ej: 2" autocomplete="off">
                                 <small class="text-muted d-block">Se autollena de la experiencia; puedes modificarla.</small>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-center">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" id="experienceGuide">
+                                    <label class="form-check-label" for="experienceGuide">Guía</label>
+                                </div>
                             </div>
                         </div>
                         
