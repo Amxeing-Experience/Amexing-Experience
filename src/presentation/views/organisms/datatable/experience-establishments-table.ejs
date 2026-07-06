@@ -385,7 +385,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     </select>
                 </div>
             </div>
-            
+
+            <!-- Tipo de experiencia (categoría temática) -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Tipo de experiencia</label>
+                <select class="form-select experiencia-category-input">
+                    <option value="">Seleccionar</option>
+                    <option value="catas">Catas</option>
+                    <option value="arte">Arte</option>
+                    <option value="historia_arquitectura">Historia y Arquitectura</option>
+                    <option value="gastronomicas">Gastronómicas</option>
+                    <option value="aventura">Aventura</option>
+                    <option value="naturaleza">Naturaleza</option>
+                    <option value="de_temporada">De Temporada</option>
+                </select>
+            </div>
+
             <!-- Descripción -->
             <div class="mb-2">
                 <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Descripción <span class="text-danger">*</span></label>
@@ -2237,6 +2252,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     name: getName('.experiencia-name-input'),
                     description: getName('.experiencia-description-input'),
                     tipo: getName('.experiencia-tipo-input'),
+                    experience_category: getName('.experiencia-category-input'),
                     price: getNumber('.experiencia-price-input') || 0,
                     price_no_alcohol: getNumber('.experiencia-price-no-alcohol-input'),
                     price_child: getNumber('.experiencia-price-child-input'),
@@ -2835,6 +2851,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-name-input').value = experiencia.name || '';
             card.querySelector('.experiencia-description-input').value = experiencia.description || '';
             card.querySelector('.experiencia-tipo-input').value = experiencia.tipo || experiencia.providerType || '';
+            card.querySelector('.experiencia-category-input').value = experiencia.experience_category || '';
             card.querySelector('.experiencia-price-input').value = experiencia.price || '';
             card.querySelector('.experiencia-price-no-alcohol-input').value = experiencia.price_no_alcohol || '';
             card.querySelector('.experiencia-price-child-input').value = experiencia.price_child || '';
