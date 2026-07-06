@@ -979,6 +979,12 @@ class ExperienceServicesBuilder {
   handleServiceTypeChange(type) {
     this.currentServiceType = type;
 
+    // La sección de precios del walking tour SOLO aplica a tours a pie: se oculta por
+    // default en cada cambio de tipo (handleTourTransportToggle la re-muestra cuando
+    // el tour seleccionado es a pie). Evita que se cuele en transporte/otros.
+    const walkingSection = document.getElementById('walkingTourPricingSection');
+    if (walkingSection) walkingSection.classList.add('d-none');
+
     // Al cambiar de servicio, limpia segmento/vehículo/precio para no arrastrar
     // la selección del tipo o ítem anterior. (En edición se restauran después.)
     this.resetSegmentVehiclePrice();
