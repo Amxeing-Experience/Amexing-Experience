@@ -871,15 +871,17 @@ document.addEventListener('DOMContentLoaded', async function() {
             let rawTime = '';
             let timeLabel = '';
             if (isDeparture && (svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested)) {
+                // Salida: la hora sugerida ES la hora de pick-up del servicio.
                 rawTime = svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested;
-                timeLabel = 'Hora de salida sugerida';
+                timeLabel = 'Horario';
             } else if (isArrival) {
+                // Llegada: el pick-up ocurre a la hora de llegada del pasajero.
                 rawTime = sub.startTime || sub.time || svc.time || '';
                 if (!rawTime && sub.selectedSchedule) {
                     const m = String(sub.selectedSchedule).match(/^(\d{1,2}:\d{2})/);
                     if (m) rawTime = m[1];
                 }
-                timeLabel = 'Hora de llegada';
+                timeLabel = 'Horario';
             }
             const rounded = rawTime ? roundTimeToNearest15(rawTime) : '';
             if (rounded) horarioItems.push(detailLine('clock', rounded, timeLabel));
@@ -945,7 +947,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         const vuelosItems = [];
         if (svc.type === 'transport') {
             if (sub.airline || sub.flightNumber) {
-                vuelosItems.push(detailLine('plane', `${sub.airline || ''} ${sub.flightNumber || ''}`.trim()));
+                const flightLabel = `${sub.airline || ''} ${sub.flightNumber || ''}`.trim();
+                // Hora real del vuelo (llegada o salida del avión), distinta al pick-up del Horario.
+                const fm = String(svc.time || sub.selectedSchedule || sub.time || '').match(/^(\d{1,2}:\d{2})/);
+                const flightTime = fm ? fm[1] : '';
+                vuelosItems.push(detailLine('plane', flightTime ? `${flightLabel} @ ${flightTime}` : flightLabel));
             }
             if (Array.isArray(sub.additionalFlights) && sub.additionalFlights.length > 0) {
                 sub.additionalFlights.forEach((f) => {
@@ -983,8 +989,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         const isAdmin = userRole === 'admin' || userRole === 'superadmin';
         const isClientFacing = isAdmin || userRole === 'department_manager' || userRole === 'client';
         const noteChannels = [
-            { label: 'Notas', icon: 'notes', color: '#adb5bd', text: (sub.notes || svc.notes || '').trim(), visible: true },
-            { label: 'Notas del cliente', icon: 'user', color: '#0d6efd', text: (sub.clientNotes || '').trim(), visible: isClientFacing },
+            { label: 'Notas del administrador', icon: 'notes', color: '#adb5bd', text: (sub.notes || svc.notes || '').trim(), visible: true },
+            { label: 'Notas del cliente', icon: 'user', color: '#0dcaf0', text: (sub.agencyNotes || '').trim(), visible: true },
+            { label: 'Notas del cliente (catálogo)', icon: 'book', color: '#0d6efd', text: (sub.clientNotes || '').trim(), visible: isClientFacing },
             { label: 'Notas del proveedor', icon: 'building', color: '#198754', text: (sub.providerNotes || '').trim(), visible: isAdmin },
             { label: 'Notas del equipo', icon: 'users', color: '#fd7e14', text: (sub.teamNotes || '').trim(), visible: isAdmin },
             { label: 'Notas internas', icon: 'lock', color: '#6f42c1', text: (sub.internalNotes || '').trim(), visible: isAdmin },

@@ -11,6 +11,8 @@ const e = __isRes ? 'reservación' : 'cotización';
 // Define role-based permissions at the top of the file
 const currentUserRole = typeof userRole !== 'undefined' ? userRole : '';
 const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
+// Notas del administrador: solo admin/superadmin las editan; DM/agente las ven en solo lectura.
+const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
 %>
 
 <style>
@@ -1306,9 +1308,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         <div id="serviceAttendeesList"></div>
                     </div>
 
+                    <div class="mb-3" id="adminNotesWrap">
+                        <label for="serviceNotes" class="form-label">Notas del administrador<% if (!canEditAdminNotes) { %> <span class="text-muted fw-normal">(solo lectura)</span><% } %></label>
+                        <textarea class="form-control" id="serviceNotes" rows="2" placeholder="<%= canEditAdminNotes ? 'Notas del administrador para este servicio...' : 'Sin notas del administrador' %>" style="min-height: 60px; resize: none; overflow-y: hidden;" <% if (!canEditAdminNotes) { %>readonly<% } %>></textarea>
+                    </div>
+
                     <div class="mb-3">
-                        <label for="serviceNotes" class="form-label">Notas Adicionales</label>
-                        <textarea class="form-control" id="serviceNotes" rows="2" placeholder="Información adicional del servicio..."></textarea>
+                        <label for="serviceAgencyNotes" class="form-label">Notas del cliente</label>
+                        <textarea class="form-control" id="serviceAgencyNotes" rows="2" placeholder="Notas del cliente para este servicio..." style="min-height: 60px; resize: none; overflow-y: hidden;"></textarea>
                     </div>
 
                     <!-- Preview -->
@@ -1376,3 +1383,40 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
         </div>
     </div>
 </div>
+
+<script>
+// Auto-grow de "Notas Adicionales": el cuadro crece con el contenido (al teclear, al poblar en
+// editar y al abrir el modal) en vez de dejar un cuadro chico con scroll. Tope 50vh → luego scroll.
+(function () {
+    const IDS = ['serviceNotes', 'serviceAgencyNotes'];
+    function growEl(ta) {
+        if (!ta) return;
+        ta.style.height = 'auto';
+        const max = Math.round(window.innerHeight * 0.5); // tope 50vh
+        ta.style.height = Math.min(ta.scrollHeight, max) + 'px';
+        ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden';
+    }
+    function growAll() { IDS.forEach((id) => growEl(document.getElementById(id))); }
+    function initServiceNotesAutoGrow() {
+        IDS.forEach((id) => {
+            const ta = document.getElementById(id);
+            if (!ta || ta.dataset.autogrow) return;
+            ta.dataset.autogrow = '1';
+            ta.addEventListener('input', () => growEl(ta));
+        });
+        // Expuesto para recalcular tras poblar por código (editar) o resetear (crear).
+        window.autoGrowServiceNotes = growAll;
+        // Recalcular cuando el modal termina de mostrarse (el contenido ya está puesto).
+        const modal = document.getElementById('serviceModal');
+        if (modal && !modal.dataset.notesAutogrow) {
+            modal.dataset.notesAutogrow = '1';
+            modal.addEventListener('shown.bs.modal', growAll);
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initServiceNotesAutoGrow);
+    } else {
+        initServiceNotesAutoGrow();
+    }
+})();
+</script>

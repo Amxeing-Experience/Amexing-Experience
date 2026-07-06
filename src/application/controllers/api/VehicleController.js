@@ -303,6 +303,7 @@ class VehicleController {
             capacity: vehicle.get('capacity'),
             luggageCapacity: vehicle.get('luggageCapacity'),
             color: vehicle.get('color'),
+            amenities: vehicle.get('amenities') || [],
             maintenanceStatus: vehicle.get('maintenanceStatus'),
             insuranceExpiry: vehicle.get('insuranceExpiry')?.toISOString(),
             active: vehicle.get('active'),
@@ -448,6 +449,7 @@ class VehicleController {
         capacity: vehicle.get('capacity'),
         luggageCapacity: vehicle.get('luggageCapacity'),
         color: vehicle.get('color'),
+        amenities: vehicle.get('amenities') || [],
         maintenanceStatus: vehicle.get('maintenanceStatus'),
         insuranceExpiry: vehicle.get('insuranceExpiry')?.toISOString().split('T')[0], // Format for input[type=date]
         active: vehicle.get('active'),
@@ -466,6 +468,27 @@ class VehicleController {
 
       return this.sendError(res, 'Failed to retrieve vehicle', 500);
     }
+  }
+
+  /**
+   * Normaliza amenidades a un arreglo de textos únicos, sin vacíos, recortados y con topes.
+   * @param {*} input - Valor recibido del body (idealmente un arreglo de strings).
+   * @returns {string[]} Amenidades saneadas (máx. 30, cada una máx. 60 chars).
+   * @example
+   */
+  normalizeAmenities(input) {
+    if (!Array.isArray(input)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const raw of input) {
+      const s = String(raw == null ? '' : raw).trim().slice(0, 60);
+      const key = s.toLowerCase();
+      if (s && !seen.has(key) && out.length < 30) {
+        seen.add(key);
+        out.push(s);
+      }
+    }
+    return out;
   }
 
   /**
@@ -509,6 +532,7 @@ class VehicleController {
         color,
         maintenanceStatus,
         insuranceExpiry,
+        amenities,
       } = req.body;
 
       // Validate required fields
@@ -581,6 +605,7 @@ class VehicleController {
       }
       vehicle.set('color', color);
       vehicle.set('maintenanceStatus', maintenanceStatus);
+      vehicle.set('amenities', this.normalizeAmenities(amenities));
       vehicle.set('active', true);
       vehicle.set('exists', true);
 
@@ -694,6 +719,7 @@ class VehicleController {
         maintenanceStatus,
         insuranceExpiry,
         active,
+        amenities,
       } = req.body;
 
       // Update fields if provided
@@ -705,6 +731,7 @@ class VehicleController {
       if (color) vehicle.set('color', color);
       if (maintenanceStatus) vehicle.set('maintenanceStatus', maintenanceStatus);
       if (active !== undefined) vehicle.set('active', active);
+      if (amenities !== undefined) vehicle.set('amenities', this.normalizeAmenities(amenities));
 
       if (insuranceExpiry) {
         // Normalize to end of day UTC to avoid timezone issues
