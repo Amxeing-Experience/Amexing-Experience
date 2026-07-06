@@ -1213,6 +1213,9 @@ class ItineraryBuilder {
     // Duración de experiencia (editable): solo marca el servicio como modificado (no afecta precio).
     document.getElementById('experienceDuration')?.addEventListener('input', () => {
       this.serviceModified = true;
+      // El costo del "Guía" depende de la duración (tier×personas × duración), así que recalcular.
+      this.updateDevPaymentBreakdown();
+      this.updateServicePriceBreakdown();
     });
 
     // Local transfers: recompute the estimated arrival when the pick-up time changes.
