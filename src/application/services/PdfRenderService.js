@@ -176,7 +176,10 @@ async function renderUrlToPdf(url, options = {}) {
     // `.pdf-keep-whole` so the CSS `break-inside: avoid` keeps it whole (a short
     // day jumps to the next page intact instead of splitting mid-day). Days taller
     // than a page stay untagged so they flow and break BETWEEN services — otherwise
-    // an oversized day forces a blank first page. Done here, after fonts/layout
+    // an oversized day forces a blank first page. The FIRST day is also left
+    // untagged so it starts right under the header and fills page 1 (breaking
+    // between services if needed) instead of jumping whole and leaving page 1 with
+    // only the header. Done here, after fonts/layout
     // have settled, comparing against the printable page geometry: the content
     // aspect ratio is invariant under puppeteer's width-based scale to the paper,
     // so maxHeightPx = referenceWidthPx * aspect holds in the live layout's units.
@@ -208,8 +211,12 @@ async function renderUrlToPdf(url, options = {}) {
         /* eslint-disable no-undef */
         const refWidth = document.documentElement.clientWidth;
         const maxHeight = refWidth * aspectRatio * 0.96; // small headroom for rounding
-        document.querySelectorAll('.day-card').forEach((el) => {
-          el.classList.toggle('pdf-keep-whole', el.offsetHeight <= maxHeight);
+        document.querySelectorAll('.day-card').forEach((el, i) => {
+          // The FIRST day is never tagged: let it start right below the header on
+          // page 1 and break BETWEEN services if it overflows, so page 1 isn't left
+          // near-empty (header only) while the day jumps whole to page 2. Later days
+          // keep the whole-day protection (jump intact rather than split).
+          el.classList.toggle('pdf-keep-whole', i > 0 && el.offsetHeight <= maxHeight);
         });
         /* eslint-enable no-undef */
       }, aspect);

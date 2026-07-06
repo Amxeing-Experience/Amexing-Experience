@@ -74,21 +74,121 @@ ItineraryBuilder.prototype.closeAddDayInline = function () {
 };
 
 ItineraryBuilder.prototype.populateTimeDatalist = function () {
-    let dl = document.getElementById('quoteTimeOptions');
-    if (!dl) {
-      dl = document.createElement('datalist');
-      dl.id = 'quoteTimeOptions';
-      document.body.appendChild(dl);
+    // El <datalist> nativo de Chrome pinta las 96 opciones como una lista larguísima. Se
+    // reemplaza por un dropdown compacto y filtrable (initTimeSuggestDropdown): quitamos el
+    // datalist nativo y el atributo `list` de los inputs para que no aparezca el nativo.
+    document.getElementById('quoteTimeOptions')?.remove();
+    document.querySelectorAll('.time-input[list]').forEach((el) => el.removeAttribute('list'));
+    this.initTimeSuggestDropdown();
+};
+
+// Dropdown de sugerencias de hora, compacto y filtrable, que reemplaza al <datalist> nativo.
+// Se ancla al input (position: fixed), con altura máxima + scroll y filtrado al escribir.
+// Conserva el input de texto (máscara, seteo por .value); al elegir dispara input + change.
+ItineraryBuilder.prototype.initTimeSuggestDropdown = function () {
+    if (this._timeSuggestInit) return;
+    this._timeSuggestInit = true;
+
+    if (!document.getElementById('time-suggest-css')) {
+      const style = document.createElement('style');
+      style.id = 'time-suggest-css';
+      style.textContent = '.time-suggest{position:fixed;z-index:1080;background:#fff;border:1px solid #dee2e6;'
+        + 'border-radius:.375rem;box-shadow:0 .5rem 1rem rgba(0,0,0,.15);max-height:216px;overflow-y:auto;'
+        + 'padding:4px 0;min-width:96px}'
+        + '.time-suggest-item{padding:5px 14px;cursor:pointer;font-size:.9rem;line-height:1.2;color:#212529;white-space:nowrap}'
+        + '.time-suggest-item.active,.time-suggest-item:hover{background:#eef1f4}';
+      document.head.appendChild(style);
     }
-    if (dl.options && dl.options.length) return; // ya poblado
-    let html = '';
+
+    const dd = document.createElement('div');
+    dd.className = 'time-suggest d-none';
+    dd.setAttribute('role', 'listbox');
+    document.body.appendChild(dd);
+
+    const ALL = [];
     for (let h = 0; h < 24; h += 1) {
       for (let m = 0; m < 60; m += 15) {
-        const t = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        html += `<option value="${t}"></option>`;
+        ALL.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
       }
     }
-    dl.innerHTML = html;
+
+    let current = null;
+    const close = () => { dd.classList.add('d-none'); dd.innerHTML = ''; current = null; };
+
+    const position = (input) => {
+      const r = input.getBoundingClientRect();
+      dd.style.left = `${r.left}px`;
+      dd.style.minWidth = `${r.width}px`;
+      const below = window.innerHeight - r.bottom;
+      if (below < 232 && r.top > 232) {
+        dd.style.top = 'auto';
+        dd.style.bottom = `${window.innerHeight - r.top + 2}px`;
+      } else {
+        dd.style.bottom = 'auto';
+        dd.style.top = `${r.bottom + 2}px`;
+      }
+    };
+
+    const render = (input) => {
+      const val = (input.value || '').trim();
+      let items = val ? ALL.filter((t) => t.startsWith(val)) : ALL;
+      if (!items.length) items = ALL;
+      dd.innerHTML = items.map((t) => `<div class="time-suggest-item" data-t="${t}">${t}</div>`).join('');
+      dd.classList.remove('d-none');
+      position(input);
+      const match = dd.querySelector(`[data-t="${val}"]`) || (val && dd.querySelector(`[data-t^="${val.slice(0, 2)}"]`));
+      if (match) { match.classList.add('active'); match.scrollIntoView({ block: 'nearest' }); } else { dd.scrollTop = 0; }
+    };
+
+    document.addEventListener('focusin', (e) => {
+      const t = e.target;
+      if (t && t.classList && t.classList.contains('time-input') && t.type !== 'time' && !t.readOnly) {
+        t.removeAttribute('list');
+        current = t;
+        render(t);
+      }
+    });
+
+    document.addEventListener('input', (e) => {
+      if (current && e.target === current) render(current);
+    });
+
+    dd.addEventListener('mousedown', (e) => {
+      // Conserva el foco del input aunque se haga mousedown en el scrollbar/padding
+      // (así no se cierra al arrastrar el scroll).
+      e.preventDefault();
+      const item = e.target.closest('.time-suggest-item');
+      if (!item || !current) return;
+      const input = current;
+      input.value = item.dataset.t;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      close();
+      input.blur();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!current || dd.classList.contains('d-none')) return;
+      const items = Array.from(dd.querySelectorAll('.time-suggest-item'));
+      if (!items.length) return;
+      let idx = items.findIndex((i) => i.classList.contains('active'));
+      if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(items.length - 1, idx + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(0, idx < 0 ? 0 : idx - 1); }
+      else if (e.key === 'Enter') { if (idx >= 0) { e.preventDefault(); items[idx].dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); } return; }
+      else if (e.key === 'Escape') { close(); return; }
+      else return;
+      items.forEach((i) => i.classList.remove('active'));
+      items[idx].classList.add('active');
+      items[idx].scrollIntoView({ block: 'nearest' });
+    });
+
+    document.addEventListener('focusout', (e) => {
+      if (e.target === current) {
+        setTimeout(() => { if (document.activeElement !== current) close(); }, 120);
+      }
+    });
+    window.addEventListener('scroll', () => { if (current) position(current); }, true);
+    window.addEventListener('resize', () => { if (current) position(current); });
 };
 
 ItineraryBuilder.prototype.setServiceTypeLocked = function (locked) {
@@ -214,6 +314,29 @@ ItineraryBuilder.prototype.updateRoundTripFieldVisibility = function () {
       if (idaOriginLabel) idaOriginLabel.innerHTML = 'Origen <span class="text-danger">*</span>';
     }
 
+    // Drop-off address on the Ida (ARRIVAL) leg. Aeropuerto: the guest lands at the
+    // airport (that's the origin / pick-up), so only offer a drop-off address — where
+    // they are taken after landing — and show the row even though pick-up is hidden.
+    // Punto a Punto / Local keep BOTH columns (row visibility is toggled by
+    // handleTransportTypeChange); restore the pick-up column here so a previous
+    // aeropuerto selection doesn't leave it hidden.
+    const papRowIda = document.getElementById('papAddressesRowIda');
+    const papPickupColIda = document.getElementById('papPickupColIda');
+    const papDropoffColIda = document.getElementById('papDropoffColIda');
+    if (transportType === 'aeropuerto') {
+      papRowIda?.classList.remove('d-none');
+      papPickupColIda?.classList.add('d-none');
+      papDropoffColIda?.classList.remove('d-none');
+      // Pick-up hidden → drop-off takes the full row width.
+      papDropoffColIda?.classList.remove('col-md-6');
+      papDropoffColIda?.classList.add('col-md-12');
+    } else {
+      papPickupColIda?.classList.remove('d-none');
+      papDropoffColIda?.classList.remove('d-none');
+      papDropoffColIda?.classList.remove('col-md-12');
+      papDropoffColIda?.classList.add('col-md-6');
+    }
+
     // --- VUELTA (departure pattern) ---
     const vueltaOriginComboWrapper = document.getElementById('roundTripOriginVueltaComboWrapper');
     const vueltaOriginSelect = document.getElementById('roundTripOriginVueltaSelect');
@@ -237,6 +360,28 @@ ItineraryBuilder.prototype.updateRoundTripFieldVisibility = function () {
       vueltaOriginSelect?.classList.remove('d-none');
       vueltaDestSelect?.classList.remove('d-none');
       if (vueltaDestLabel) vueltaDestLabel.innerHTML = 'Destino <span class="text-danger">*</span>';
+    }
+
+    // Pick-up address on the Vuelta (DEPARTURE) leg. Aeropuerto: the guest is dropped at the
+    // airport (that's the destination / drop-off), so only offer a pick-up address — where
+    // they are collected before the flight — and show the row even though drop-off is hidden.
+    // Punto a Punto / Local keep BOTH columns; restore the drop-off column here so a previous
+    // aeropuerto selection doesn't leave it hidden.
+    const papRowVuelta = document.getElementById('papAddressesRowVuelta');
+    const papPickupColVuelta = document.getElementById('papPickupColVuelta');
+    const papDropoffColVuelta = document.getElementById('papDropoffColVuelta');
+    if (transportType === 'aeropuerto') {
+      papRowVuelta?.classList.remove('d-none');
+      papDropoffColVuelta?.classList.add('d-none');
+      papPickupColVuelta?.classList.remove('d-none');
+      // Drop-off hidden → pick-up takes the full row width.
+      papPickupColVuelta?.classList.remove('col-md-6');
+      papPickupColVuelta?.classList.add('col-md-12');
+    } else {
+      papPickupColVuelta?.classList.remove('d-none');
+      papDropoffColVuelta?.classList.remove('d-none');
+      papPickupColVuelta?.classList.remove('col-md-12');
+      papPickupColVuelta?.classList.add('col-md-6');
     }
 
     // Update section headers based on transport type
@@ -585,7 +730,16 @@ ItineraryBuilder.prototype.renderPeopleQuantities = function (service) {
       }
 
       if (adultsNoAlcoholQuantity > 0) {
-        quantitiesHtml.push(`
+        // En CONCEPTO el campo adultsNoAlcoholQuantity representa INFANTES (0-2); en experiencias/
+        // tours sigue siendo "sin alcohol". Mismo campo, etiqueta/estilo según el tipo.
+        quantitiesHtml.push(service.type === 'concepto'
+          ? `
+                    <span class="badge bg-warning-subtle text-warning d-inline-flex align-items-center gap-1 me-2 mb-1">
+                        <i class="ti ti-baby-carriage fs-6"></i>
+                        <span>${adultsNoAlcoholQuantity} infante${adultsNoAlcoholQuantity > 1 ? 's' : ''} (0-2)</span>
+                    </span>
+                `
+          : `
                     <span class="badge bg-info-subtle text-info d-inline-flex align-items-center gap-1 me-2 mb-1">
                         <i class="ti ti-glass-off fs-6"></i>
                         <span>${adultsNoAlcoholQuantity} sin alcohol</span>

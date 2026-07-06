@@ -201,8 +201,8 @@ class AdminController extends RoleBasedController {
         breadcrumb: null, // Disable automatic breadcrumb generation
       };
 
-      // Add DataTables assets if employees or tarifario section is active
-      if (section === 'employees' || section === 'tarifario') {
+      // Add DataTables assets if employees, tarifario or trips (quotes) section is active
+      if (section === 'employees' || section === 'tarifario' || section === 'quotes') {
         viewData.pageStyles = [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
           'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',

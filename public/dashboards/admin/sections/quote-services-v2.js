@@ -1099,6 +1099,14 @@ class ItineraryBuilder {
         this.updateServicePriceBreakdown();
       });
     });
+    // Checkboxes "Aplicar al total" (unitario / por-persona): recalcular desglose al cambiar.
+    ['conceptoApplyUnitPrice', 'conceptoApplyPerPerson'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('change', () => {
+        this.serviceModified = true;
+        this.updateConceptoServicePrice();
+        this.updateServicePriceBreakdown();
+      });
+    });
 
     // Tour start time listener - auto-calculate end time
     document.getElementById('tourStartTime')?.addEventListener('change', () => {
@@ -1645,6 +1653,13 @@ class ItineraryBuilder {
       // Reset modification flags for new services
       this.conceptoFieldManuallyCleared = false;
       this.conceptoFieldManuallyModified = false;
+
+      // Reset "Aplicar al total" a MARCADO (default) para servicios nuevos — los modales no se
+      // resetean solos, así que un concepto previo con un checkbox desmarcado lo dejaría pegado.
+      const conceptoApplyUnitReset = document.getElementById('conceptoApplyUnitPrice');
+      if (conceptoApplyUnitReset) conceptoApplyUnitReset.checked = true;
+      const conceptoApplyPerPersonReset = document.getElementById('conceptoApplyPerPerson');
+      if (conceptoApplyPerPersonReset) conceptoApplyPerPersonReset.checked = true;
 
       // Clear tour details when opening a new service modal
       const tourDetails = document.getElementById('tourDetails');
@@ -2773,6 +2788,41 @@ class ItineraryBuilder {
       }
     }
 
+    // Address fields for airport transfers (one-way):
+    //  - ARRIVAL: the guest lands at the airport (that's the pick-up), so we only offer a
+    //    DROP-OFF address — where they are taken after landing.
+    //  - DEPARTURE: the guest is dropped at the airport, so we only offer a PICK-UP address
+    //    — where they are collected before the flight.
+    // The single visible column takes the full row width. For punto-a-punto / local the row
+    // is toggled by handleTransportTypeChange with BOTH columns, so restore both here.
+    const papAddressesRow = document.getElementById('papAddressesRow');
+    const papPickupCol = document.getElementById('papPickupCol');
+    const papDropoffCol = document.getElementById('papDropoffCol');
+    if (transportType === 'aeropuerto') {
+      papAddressesRow?.classList.remove('d-none');
+      if (directionType === 'arrival') {
+        // Only drop-off (full width); pick-up is the airport.
+        papPickupCol?.classList.add('d-none');
+        papDropoffCol?.classList.remove('d-none');
+        papDropoffCol?.classList.remove('col-md-6');
+        papDropoffCol?.classList.add('col-md-12');
+      } else {
+        // Only pick-up (full width); drop-off is the airport.
+        papDropoffCol?.classList.add('d-none');
+        papPickupCol?.classList.remove('d-none');
+        papPickupCol?.classList.remove('col-md-6');
+        papPickupCol?.classList.add('col-md-12');
+      }
+    } else {
+      // punto-a-punto / local one-way: both columns visible (row visibility set elsewhere)
+      papPickupCol?.classList.remove('d-none');
+      papDropoffCol?.classList.remove('d-none');
+      papPickupCol?.classList.remove('col-md-12');
+      papPickupCol?.classList.add('col-md-6');
+      papDropoffCol?.classList.remove('col-md-12');
+      papDropoffCol?.classList.add('col-md-6');
+    }
+
     // Re-populate dropdowns considering direction
     if (transportType) {
       populateDropdownsForTransportType(transportType, directionType);
@@ -3237,7 +3287,8 @@ class ItineraryBuilder {
         conceptoClientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
       }
 
-      const conceptoApplySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
+      // Concepto: el recargo SIEMPRE se aplica (no se puede desactivar). No depende del checkbox.
+      const conceptoApplySurcharges = true;
 
       // Base = precio unitario + (total de personas × precio por persona), igual que el
       // desglose/preview. Antes el precio GUARDADO omitía el componente por-persona.
@@ -3245,7 +3296,12 @@ class ItineraryBuilder {
       const totalPeople = (parseInt(document.getElementById('conceptoAdultsQuantity')?.value || 0))
         + (parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0))
         + (parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0));
-      const conceptoBaseEfectivo = conceptoClientPrice + (totalPeople * pricePerPerson);
+      // "Aplicar al total" por campo: el componente excluido conserva su valor en el campo pero
+      // cuenta como 0 en la base guardada (pricesByType).
+      const conceptoApplyUnit = document.getElementById('conceptoApplyUnitPrice')?.checked ?? true;
+      const conceptoApplyPerPerson = document.getElementById('conceptoApplyPerPerson')?.checked ?? true;
+      const conceptoBaseEfectivo = (conceptoApplyUnit ? conceptoClientPrice : 0)
+        + (conceptoApplyPerPerson ? (totalPeople * pricePerPerson) : 0);
 
       // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
       const conceptoPricing = window.PricingEngine
@@ -4246,6 +4302,25 @@ class ItineraryBuilder {
             data.returnAdditionalFlights = this.collectAdditionalFlights('roundTripAdditionalFlightsListVuelta');
           }
 
+          // Pickup / drop-off addresses per leg. Aeropuerto: Ida (arrival) → solo drop-off
+          // (el pick-up es el aeropuerto); Vuelta (departure) → solo pick-up (el drop-off es
+          // el aeropuerto). Punto a Punto / Local: ambas direcciones por pierna.
+          data.pickupAddress = '';
+          data.dropoffAddress = '';
+          const rtDropoffIda = (document.getElementById('roundTripDropoffAddressIda')?.value || '').trim();
+          const rtPickupVuelta = (document.getElementById('roundTripPickupAddressVuelta')?.value || '').trim();
+          if (tType === 'aeropuerto') {
+            data.pickupAddressIda = '';
+            data.dropoffAddressIda = rtDropoffIda;
+            data.pickupAddressVuelta = rtPickupVuelta;
+            data.dropoffAddressVuelta = '';
+          } else {
+            data.pickupAddressIda = (document.getElementById('roundTripPickupAddressIda')?.value || '').trim();
+            data.dropoffAddressIda = rtDropoffIda;
+            data.pickupAddressVuelta = (document.getElementById('roundTripPickupAddressVuelta')?.value || '').trim();
+            data.dropoffAddressVuelta = (document.getElementById('roundTripDropoffAddressVuelta')?.value || '').trim();
+          }
+
           data.originName = data.origin || 'Origen';
           const transportTypeLabels = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
           data.concept = `${transportTypeLabels[tType] || 'Transporte'}: ${data.origin || 'Origen'} - ${data.destination || 'Destino'} (Ida y Vuelta)`;
@@ -4306,6 +4381,10 @@ class ItineraryBuilder {
 
           // Pickup / drop-off addresses (Punto a Punto + Local)
           const usesPickupDropoff = data.transportType === 'punto-a-punto' || data.transportType === 'local';
+          // Airport one-way ARRIVAL: only a drop-off address (pick-up is the airport).
+          const isAirportArrivalDropoff = data.transportType === 'aeropuerto' && directionType === 'arrival';
+          // Airport one-way DEPARTURE: only a pick-up address (drop-off is the airport).
+          const isAirportDeparturePickup = data.transportType === 'aeropuerto' && directionType === 'departure';
           if (usesPickupDropoff) {
             // One-way fields
             const pickup = document.getElementById('transportPickupAddress')?.value || '';
@@ -4321,6 +4400,20 @@ class ItineraryBuilder {
             data.dropoffAddressIda = dropoffIda.trim();
             data.pickupAddressVuelta = pickupVuelta.trim();
             data.dropoffAddressVuelta = dropoffVuelta.trim();
+          } else if (isAirportArrivalDropoff) {
+            data.pickupAddress = '';
+            data.dropoffAddress = (document.getElementById('transportDropoffAddress')?.value || '').trim();
+            data.pickupAddressIda = '';
+            data.dropoffAddressIda = '';
+            data.pickupAddressVuelta = '';
+            data.dropoffAddressVuelta = '';
+          } else if (isAirportDeparturePickup) {
+            data.pickupAddress = (document.getElementById('transportPickupAddress')?.value || '').trim();
+            data.dropoffAddress = '';
+            data.pickupAddressIda = '';
+            data.dropoffAddressIda = '';
+            data.pickupAddressVuelta = '';
+            data.dropoffAddressVuelta = '';
           } else {
             data.pickupAddress = '';
             data.dropoffAddress = '';
@@ -4515,12 +4608,16 @@ class ItineraryBuilder {
         } else {
           data.clientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
         }
-        data.applySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
+        data.applySurcharges = true; // Concepto: el recargo SIEMPRE se aplica (no se puede desactivar).
         // Precio por persona (efectivo) — informational/per-person price stored alongside unit price
         const pricePerPersonField = document.getElementById('conceptoPricePerPerson');
         data.conceptoPricePerPerson = pricePerPersonField && pricePerPersonField.value !== ''
           ? parseFloat(pricePerPersonField.value) || 0
           : null;
+        // Flags "Aplicar al total" por componente (unitario / por-persona). Default true. El valor
+        // del campo se conserva aunque el flag esté en false (se guarda igual clientPrice/perPerson).
+        data.conceptoApplyUnitPrice = document.getElementById('conceptoApplyUnitPrice')?.checked ?? true;
+        data.conceptoApplyPerPerson = document.getElementById('conceptoApplyPerPerson')?.checked ?? true;
 
         qsDevLog('💾 Collecting concepto data:', {
           clientPrice: data.clientPrice,
@@ -6307,6 +6404,11 @@ class ItineraryBuilder {
           console.error('❌ EDIT CONCEPTO DEBUG - conceptoContent element not found!');
         }
 
+        // Concepto usa "Precio Unitario" + "Precio por Persona"; el campo genérico "Precio base"
+        // (standardPricingSection) sobra y confunde. Igual que en el modal de AGREGAR, se oculta
+        // también al EDITAR (antes solo se ocultaba al agregar, y al editar reaparecía).
+        document.getElementById('standardPricingSection')?.classList.add('d-none');
+
         // Populate concepto concept field
         const conceptoConceptField = document.getElementById('conceptoConcept');
         if (conceptoConceptField) {
@@ -6370,12 +6472,24 @@ class ItineraryBuilder {
             if (service.clientPrice !== undefined && service.clientPrice !== null) {
               conceptoClientPriceField.value = service.clientPrice;
               qsDevLog('✅ CONCEPTO FIELD - Set clientPrice to:', service.clientPrice);
-            } else if (service.price !== undefined && service.price !== null) {
-              // Fallback: use service.price if clientPrice is missing
-              conceptoClientPriceField.value = service.price;
-              qsDevLog('⚠️ CONCEPTO FIELD - Used service.price fallback:', service.price);
             } else {
-              console.warn('❌ CONCEPTO FIELD - No valid price found in service data');
+              // Reload desde backend: el precio unitario (clientPrice) NO se persiste, así que lo
+              // RECONSTRUIMOS. Unitario EFECTIVO = total efectivo (pricesByType.efectivo) − personas ×
+              // precio por persona efectivo. Antes el fallback usaba service.price (el TOTAL, ya
+              // surcheado) → metía el total en el unitario y, con el componente por-persona presente,
+              // DUPLICABA el total al editar (repro: unitario quedaba en el total en vez de 0).
+              const efectivoTotal = (service.pricesByType && service.pricesByType.efectivo != null)
+                ? Number(service.pricesByType.efectivo)
+                : (Number(service.price) || 0);
+              const people = (service.adultsQuantity || 0)
+                + (service.childrenQuantity || 0)
+                + (service.adultsNoAlcoholQuantity || 0);
+              const perPerson = Number(service.conceptoPricePerPerson) || 0;
+              const unit = Math.max(0, efectivoTotal - (people * perPerson));
+              conceptoClientPriceField.value = unit > 0 ? unit : '';
+              qsDevLog('🔧 CONCEPTO FIELD - Unitario reconstruido (clientPrice no persistido):', {
+                efectivoTotal, people, perPerson, unit,
+              });
             }
           } else {
             console.error('❌ CONCEPTO FIELD - conceptoClientPrice field not found in DOM');
@@ -6388,6 +6502,12 @@ class ItineraryBuilder {
               ? service.conceptoPricePerPerson
               : '';
           }
+
+          // Restaurar los flags "Aplicar al total" por componente (default true si no vienen).
+          const conceptoApplyUnitCb = document.getElementById('conceptoApplyUnitPrice');
+          if (conceptoApplyUnitCb) conceptoApplyUnitCb.checked = service.conceptoApplyUnitPrice !== false;
+          const conceptoApplyPerPersonCb = document.getElementById('conceptoApplyPerPerson');
+          if (conceptoApplyPerPersonCb) conceptoApplyPerPersonCb.checked = service.conceptoApplyPerPerson !== false;
 
           if (conceptoApplySurchargesCheckbox) {
             // El recargo de concepto SIEMPRE se aplica (no se puede desactivar — decisión
@@ -7508,7 +7628,8 @@ class ItineraryBuilder {
       }).join('')}
                                         </div>
                                     ` : ''}
-                                    ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide ? `
+                                    ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide
+                                      && !(service.type === 'tour' && this.serviceIncludesMentionGuide(service)) ? `
                                         <div class="row g-2 text-success small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-user me-1"></i>
@@ -7553,7 +7674,15 @@ class ItineraryBuilder {
                                         </div>
                                     ` : ''}
                                     ${(service.type === 'tour' || service.type === 'experience') ? (() => {
-        const { includes, notIncludes } = this.getServiceIncludesInfo(service);
+        const info = this.getServiceIncludesInfo(service);
+        let includes = info.includes;
+        const notIncludes = info.notIncludes;
+        // Tour con guía cuya lista "Incluye" ya menciona guía: agregamos "Driver" como ítem
+        // (el label aparte se ocultó para no duplicar). Solo si aún no trae driver/chofer.
+        if (service.type === 'tour' && service.includeGuide && this.serviceIncludesMentionGuide(service)
+            && !/driver|chofer/i.test(includes || '')) {
+          includes = includes ? `${includes}\nDriver` : 'Driver';
+        }
         if (!includes && !notIncludes) return '';
         const col = (icon, label, value) => (value ? `
                                             <div class="col-12 col-md-6">
@@ -8250,12 +8379,19 @@ class ItineraryBuilder {
       // For Concepto: base = precio unitario + (total de personas × precio por persona).
       // Antes esta ruta (dev prices) omitía el por-persona, divergiendo del desglose (C2).
       const clientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
-      const applySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
+      // Concepto: el recargo por forma de pago SIEMPRE se aplica (no se puede desactivar — decisión
+      // del cliente). Antes se leía el checkbox, que en AGREGAR sale desmarcado → surcharge:false →
+      // transferencia/tarjeta salían sin recargo (iguales a efectivo).
+      const applySurcharges = true;
       const pricePerPerson = parseFloat(document.getElementById('conceptoPricePerPerson')?.value || 0);
       const totalPeople = (parseInt(document.getElementById('conceptoAdultsQuantity')?.value || 0))
         + (parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0))
         + (parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0));
-      const conceptoBaseEfectivo = clientPrice + (totalPeople * pricePerPerson);
+      // "Aplicar al total" por campo (unitario / por-persona): el componente excluido cuenta como 0.
+      const applyUnit = document.getElementById('conceptoApplyUnitPrice')?.checked ?? true;
+      const applyPerPerson = document.getElementById('conceptoApplyPerPerson')?.checked ?? true;
+      const conceptoBaseEfectivo = (applyUnit ? clientPrice : 0)
+        + (applyPerPerson ? (totalPeople * pricePerPerson) : 0);
 
       // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
       const conceptoPricing = window.PricingEngine
@@ -8570,7 +8706,10 @@ class ItineraryBuilder {
 
       // Handle Concepto service breakdown - get the CLIENT price, not the service price
       const clientPrice = parseFloat(document.getElementById('conceptoClientPrice')?.value || 0);
-      const applySurcharges = document.getElementById('conceptoApplySurcharges')?.checked ?? true;
+      // Concepto: el recargo por forma de pago SIEMPRE se aplica (no se puede desactivar — decisión
+      // del cliente). Antes se leía el checkbox, que en AGREGAR sale desmarcado → surcharge:false →
+      // transferencia/tarjeta salían sin recargo (iguales a efectivo).
+      const applySurcharges = true;
       const adultsQty = parseInt(document.getElementById('conceptoAdultsQuantity')?.value || 0);
       const childrenQty = parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0);
       const noAlcoholQty = parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0);
@@ -8579,10 +8718,18 @@ class ItineraryBuilder {
       // applied to the per-person price per payment type.
       const pricePerPersonEfectivo = parseFloat(document.getElementById('conceptoPricePerPerson')?.value || 0);
       const totalPeople = adultsQty + childrenQty + noAlcoholQty;
-      const hasPerPerson = pricePerPersonEfectivo > 0 && totalPeople > 0;
+      // El cliente puede capturar unitario Y por-persona pero elegir si cada uno APLICA al total
+      // (checkbox "Aplicar al total" por campo). El componente excluido conserva su valor en el
+      // campo pero cuenta como 0 en el cálculo/desglose.
+      const applyUnit = document.getElementById('conceptoApplyUnitPrice')?.checked ?? true;
+      const applyPerPerson = document.getElementById('conceptoApplyPerPerson')?.checked ?? true;
+      const effUnit = applyUnit ? clientPrice : 0;
+      const effPerPersonEfectivo = applyPerPerson ? pricePerPersonEfectivo : 0;
+      const hasPerPerson = effPerPersonEfectivo > 0 && totalPeople > 0;
+      const showUnitLine = applyUnit && clientPrice > 0;
 
-      // For concepto, use the CLIENT price as the base
-      vehicleBaseCost = clientPrice; // Use client price, not service price
+      // For concepto, use the CLIENT price as the base (unitario efectivo, 0 si no aplica)
+      vehicleBaseCost = effUnit;
       tourDuration = 1; // Concepto is not time-based
       vehicleQuantity = 1; // Concepto is not vehicle-based
       guideRate = 0; // No guide for concepto
@@ -8605,7 +8752,7 @@ class ItineraryBuilder {
       const peopleContext = [];
       if (adultsQty > 0) peopleContext.push(`${adultsQty} adulto${adultsQty > 1 ? 's' : ''}`);
       if (childrenQty > 0) peopleContext.push(`${childrenQty} niño${childrenQty > 1 ? 's' : ''}`);
-      if (noAlcoholQty > 0) peopleContext.push(`${noAlcoholQty} sin alcohol`);
+      if (noAlcoholQty > 0) peopleContext.push(`${noAlcoholQty} infante${noAlcoholQty > 1 ? 's' : ''}`);
       const contextText = peopleContext.length > 0 ? ` (${peopleContext.join(', ')})` : '';
 
       // Update dev payment fields
@@ -8648,14 +8795,14 @@ class ItineraryBuilder {
       const transferMult = 1 + (this.transferRate / 100);
       const agencyMult = 1 + (this.agencyRate / 100);
 
-      const pricePerPersonTransfer = pricePerPersonEfectivo * transferMult;
-      const pricePerPersonTarjeta = pricePerPersonEfectivo * agencyMult;
+      const pricePerPersonTransfer = effPerPersonEfectivo * transferMult;
+      const pricePerPersonTarjeta = effPerPersonEfectivo * agencyMult;
 
-      const personSubtotalEfectivo = hasPerPerson ? totalPeople * pricePerPersonEfectivo : 0;
+      const personSubtotalEfectivo = hasPerPerson ? totalPeople * effPerPersonEfectivo : 0;
       const personSubtotalTransfer = hasPerPerson ? totalPeople * pricePerPersonTransfer : 0;
       const personSubtotalTarjeta = hasPerPerson ? totalPeople * pricePerPersonTarjeta : 0;
 
-      const transferenciaBase = clientPrice + personSubtotalEfectivo;
+      const transferenciaBase = effUnit + personSubtotalEfectivo;
       // Totales por forma de pago vía el motor único (un solo nodo: el total base).
       const conceptoTotals = window.PricingEngine
         ? window.PricingEngine.composeServiceNodes({
@@ -8674,15 +8821,20 @@ class ItineraryBuilder {
 
       // Create breakdown texts for each payment type — per-person line appears
       // before the recargo / total so the math is obvious to read.
-      const efectivoBreakdown = `Concepto${contextText}: $${clientPrice.toFixed(2)}\n`
-        + buildPerPersonLine(pricePerPersonEfectivo)
+      // La línea del unitario solo aparece si "Aplicar al total" del unitario está marcado (y > 0).
+      const unitLineEf = showUnitLine ? `Concepto${contextText}: $${clientPrice.toFixed(2)}\n` : '';
+      const unitLineTr = showUnitLine ? `Concepto${contextText}: $${(clientPrice * transferMult).toFixed(2)}\n` : '';
+      const unitLineTj = showUnitLine ? `Concepto${contextText}: $${(clientPrice * agencyMult).toFixed(2)}\n` : '';
+
+      const efectivoBreakdown = unitLineEf
+        + buildPerPersonLine(effPerPersonEfectivo)
         + `Total: $${efectivoPrice.toFixed(2)}`;
 
-      const transferenciaBreakdown = `Concepto${contextText}: $${(clientPrice * transferMult).toFixed(2)}\n`
+      const transferenciaBreakdown = unitLineTr
         + buildPerPersonLine(pricePerPersonTransfer)
         + `Total: $${transferenciaPrice.toFixed(2)}`;
 
-      const tarjetaBreakdown = `Concepto${contextText}: $${(clientPrice * agencyMult).toFixed(2)}\n`
+      const tarjetaBreakdown = unitLineTj
         + buildPerPersonLine(pricePerPersonTarjeta)
         + `Total: $${tarjetaPrice.toFixed(2)}`;
 
@@ -9626,7 +9778,7 @@ class ItineraryBuilder {
         const peopleContext = [];
         if (adultsQty > 0) peopleContext.push(`${adultsQty} adulto${adultsQty > 1 ? 's' : ''}`);
         if (childrenQty > 0) peopleContext.push(`${childrenQty} niño${childrenQty > 1 ? 's' : ''}`);
-        if (noAlcoholQty > 0) peopleContext.push(`${noAlcoholQty} sin alcohol`);
+        if (noAlcoholQty > 0) peopleContext.push(`${noAlcoholQty} infante${noAlcoholQty > 1 ? 's' : ''}`);
 
         const contextText = peopleContext.length > 0 ? ` (${peopleContext.join(', ')})` : '';
         breakdown += `Concepto${contextText} = $${vehicleTotal.toFixed(2)}\n`;
@@ -10844,31 +10996,36 @@ class ItineraryBuilder {
       return result;
     }
 
-    // Availability array (objects with day keys + time data)
+    // Availability array. Se normaliza IGUAL que el modal de detalle de experiencias
+    // (que sí muestra los horarios): se agrupa por día y se leen las franjas directo de
+    // `item.times` ({start,end}) o de las formas legacy (start_time/startTime). Antes se
+    // delegaba en extractTimesFromScheduleData, que en la práctica devolvía franjas vacías
+    // y por eso una experiencia con horarios (p.ej. Cata Horizontal) caía a "Todos los días".
     if (Array.isArray(item.availability)) {
-      const dayTimesMap = new Map();
-      for (const obj of item.availability) {
-        if (!obj || typeof obj !== 'object') continue;
-        for (let d = 0; d < 7; d++) {
-          const keys = [d.toString(), dayNamesEn[d], dayNamesEs[d]];
-          for (const key of keys) {
-            if (obj.hasOwnProperty(key) && obj[key]) {
-              if (!dayTimesMap.has(d)) dayTimesMap.set(d, []);
-              const extracted = this.extractTimesFromScheduleData(obj[key], 0);
-              extracted.forEach((t) => dayTimesMap.get(d).push(t.label));
-              break;
-            }
-          }
-          if (obj.day === d) {
-            if (!dayTimesMap.has(d)) dayTimesMap.set(d, []);
-            const extracted = this.extractTimesFromScheduleData(obj, 0);
-            extracted.forEach((t) => dayTimesMap.get(d).push(t.label));
-          }
+      const byDay = new Map();
+      const pushSlot = (day, start, end) => {
+        if (typeof day !== 'number') return;
+        if (!byDay.has(day)) byDay.set(day, []);
+        if (start && end) {
+          const label = `${this.formatTime(start)} - ${this.formatTime(end)}`;
+          if (!byDay.get(day).includes(label)) byDay.get(day).push(label);
         }
-      }
-      for (const [d, times] of dayTimesMap) {
-        result.push({ day: dayAbbrevs[d], times });
-      }
+      };
+      item.availability.forEach((obj) => {
+        if (typeof obj === 'number') { pushSlot(obj); return; }
+        if (!obj || typeof obj !== 'object') return;
+        if (Array.isArray(obj.times)) {
+          if (obj.times.length === 0) pushSlot(obj.day);
+          obj.times.forEach((t) => pushSlot(obj.day, t.start || t.startTime, t.end || t.endTime));
+        } else {
+          pushSlot(obj.day, obj.start_time || obj.startTime, obj.end_time || obj.endTime);
+        }
+      });
+      // Orden lunes-primero (1..6, luego 0=domingo al final), como en el detalle.
+      const weekOrder = (d) => (d + 6) % 7;
+      Array.from(byDay.keys()).sort((a, b) => weekOrder(a) - weekOrder(b)).forEach((d) => {
+        result.push({ day: dayAbbrevs[d], times: byDay.get(d) });
+      });
       return result;
     }
 
@@ -11164,6 +11321,15 @@ class ItineraryBuilder {
   // These fields live on the tour/experience catalog (not on the service itself),
   // so we look them up from the cache by id. Returns normalized strings preserving
   // line breaks (arrays are joined with newlines), or null when there's nothing to show.
+  // ¿La lista "Incluye" del servicio ya menciona un guía? (guía/guías/guiado, sin importar
+  // acentos). Se usa para no duplicar el label "Incluye Guía + Driver" cuando el Incluye ya
+  // trae guía, y para agregar "Driver" a esa lista en su lugar.
+  serviceIncludesMentionGuide(service) {
+    const info = this.getServiceIncludesInfo(service);
+    const lower = String(info.includes || '').toLowerCase();
+    return lower.includes('guia') || lower.includes('guía');
+  }
+
   getServiceIncludesInfo(service) {
     const empty = { includes: null, notIncludes: null };
     if (!service) return empty;
@@ -11706,6 +11872,8 @@ class ItineraryBuilder {
             returnAdditionalFlights: Array.isArray(subconcept.returnAdditionalFlights) ? subconcept.returnAdditionalFlights : [],
             extraAdditionalVehicles: Array.isArray(subconcept.extraAdditionalVehicles) ? subconcept.extraAdditionalVehicles : [],
             conceptoPricePerPerson: subconcept.conceptoPricePerPerson !== undefined ? subconcept.conceptoPricePerPerson : null,
+            conceptoApplyUnitPrice: subconcept.conceptoApplyUnitPrice !== undefined ? subconcept.conceptoApplyUnitPrice : true,
+            conceptoApplyPerPerson: subconcept.conceptoApplyPerPerson !== undefined ? subconcept.conceptoApplyPerPerson : true,
             includeInTotal: subconcept.includeInTotal !== undefined ? subconcept.includeInTotal : true,
             // Transport-specific fields (from backend)
             transportType: subconcept.transportType || null,
@@ -12551,6 +12719,13 @@ class ItineraryBuilder {
     } else {
       if (stdSection && priceCol.parentElement !== stdSection) stdSection.insertBefore(priceCol, stdSection.firstChild);
       priceCol.className = 'col-md-6 mb-3';
+    }
+
+    // Concepto usa "Precio Unitario" + "Precio por Persona"; el campo genérico "Precio base"
+    // (standardPricingSection) sobra y confunde. Se oculta AQUÍ —lugar central que corre en cada
+    // sync de layout, incluido el editar— para que no reaparezca (antes solo se ocultaba al agregar).
+    if (type === 'concepto' && stdSection) {
+      stdSection.classList.add('d-none');
     }
   }
 
@@ -14174,8 +14349,11 @@ class ItineraryBuilder {
     const childrenQty = parseInt(document.getElementById('conceptoChildrenQuantity')?.value || 0);
     const noAlcoholQty = parseInt(document.getElementById('conceptoAdultsNoAlcoholQuantity')?.value || 0);
     const totalPeople = adultsQty + childrenQty + noAlcoholQty;
-    const personSubtotal = pricePerPerson > 0 && totalPeople > 0 ? totalPeople * pricePerPerson : 0;
-    const baseEfectivo = clientPrice + personSubtotal;
+    // "Aplicar al total" por campo: el componente excluido cuenta como 0 (el valor sigue en el campo).
+    const applyUnit = document.getElementById('conceptoApplyUnitPrice')?.checked ?? true;
+    const applyPerPerson = document.getElementById('conceptoApplyPerPerson')?.checked ?? true;
+    const personSubtotal = (applyPerPerson && pricePerPerson > 0 && totalPeople > 0) ? totalPeople * pricePerPerson : 0;
+    const baseEfectivo = (applyUnit ? clientPrice : 0) + personSubtotal;
 
     // If surcharges should be applied, use getDisplayPrice to add payment type surcharge
     // Otherwise, use the combined base as-is.
@@ -14984,6 +15162,14 @@ class ItineraryBuilder {
       const container = document.getElementById('servicePriceBreakdown');
       if (container) container.classList.add('d-none');
       return;
+    }
+
+    // Concepto NO usa el "Precio base" genérico (usa "Precio Unitario" + "Precio por Persona").
+    // Se oculta AQUÍ porque este render corre en cada actualización, incluido el EDITAR —donde el
+    // handler de tipo no corre por el bloqueo de tipo (setServiceTypeLocked)—, garantizando que la
+    // sección no reaparezca. (En agregar también se oculta vía el handler de tipo.)
+    if (serviceType === 'concepto') {
+      document.getElementById('standardPricingSection')?.classList.add('d-none');
     }
 
     // Refresca el dev breakdown (fuente de verdad vía el motor) ANTES de cualquier desglose
@@ -19787,6 +19973,8 @@ class ItineraryBuilder {
             isCustomPrice: !!service.isCustomPrice,
             // Concepto: precio por persona (efectivo) — informational, persisted alongside unit price
             conceptoPricePerPerson: service.conceptoPricePerPerson !== undefined ? service.conceptoPricePerPerson : null,
+            conceptoApplyUnitPrice: service.conceptoApplyUnitPrice !== undefined ? service.conceptoApplyUnitPrice : true,
+            conceptoApplyPerPerson: service.conceptoApplyPerPerson !== undefined ? service.conceptoApplyPerPerson : true,
             // Persisted user decision to dismiss the overlap warning for this service
             overlapAccepted: service.overlapAccepted || false,
             // Segment name + color cache so public/summary/PDF can render the chip without

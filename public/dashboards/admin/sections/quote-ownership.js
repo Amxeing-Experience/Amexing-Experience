@@ -105,6 +105,9 @@ class QuoteOwnershipManager {
 
             if (isNewQuote) {
                 console.log('New quote detected, skipping ownership/collaborator loading');
+                // En una cotización nueva el propietario es el usuario actual (creador): pintar el
+                // display compacto para no dejar los skeleton loaders girando indefinidamente.
+                this.renderCurrentUserAsOwner();
                 // Setup event listeners even for new quotes
                 this.setupEventListeners();
                 this.dataLoaded = true; // Mark as loaded for new quotes
@@ -383,6 +386,27 @@ class QuoteOwnershipManager {
 
         // Update compact owner display in quote information form
         this.updateCompactOwnerDisplay();
+    }
+
+    // Cotización nueva: el propietario es el usuario actual (creador). No hay owner en el backend
+    // todavía, así que se pinta el display compacto directo desde window.currentUserData.
+    renderCurrentUserAsOwner() {
+        const compactNameEl = document.getElementById('compactOwnerName');
+        const compactEmailEl = document.getElementById('compactOwnerEmail');
+        const ownerLoader = document.getElementById('ownerLoader');
+        const ownerEmailLoader = document.getElementById('ownerEmailLoader');
+        if (!compactNameEl || !compactEmailEl) return; // no existe en esta página
+
+        const u = window.currentUserData || window.currentUser || {};
+        const name = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || '';
+        const email = u.email || '';
+
+        if (ownerLoader) ownerLoader.style.display = 'none';
+        if (ownerEmailLoader) ownerEmailLoader.style.display = 'none';
+        compactNameEl.textContent = name || 'Tú';
+        compactNameEl.style.display = 'block';
+        compactEmailEl.textContent = email;
+        compactEmailEl.style.display = 'block';
     }
 
     updateCompactOwnerDisplay() {
