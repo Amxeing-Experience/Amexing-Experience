@@ -1877,13 +1877,16 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 return;
             }
 
-            // El nombre es obligatorio para crear la experiencia; sin él no auto-guardamos aún
             const payload = readEstablishmentExperienciaCard(cardEl);
-            if (!payload.name) return;
             payload.displayOrder = index;
 
             const expId = cardEl.dataset.id;
             const isUpdate = typeof expId === 'string' && expId.length > 0;
+
+            // El backend exige name + description para CREAR. No auto-crear hasta tenerlos
+            // (evita un 400/"Error al guardar" transitorio al salir del nombre sin descripción).
+            if (!isUpdate && (!payload.name || !payload.description)) return;
+
             const url = isUpdate
                 ? `/api/providers/${establishmentId}/experiencias/${expId}`
                 : `/api/providers/${establishmentId}/experiencias`;

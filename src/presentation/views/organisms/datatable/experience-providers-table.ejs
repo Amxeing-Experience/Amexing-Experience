@@ -1558,6 +1558,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
             const expId = cardEl.dataset.id;
             const isUpdate = typeof expId === 'string' && expId.length > 0;
+
+            // El backend exige name + description para CREAR. No auto-crear hasta tenerlos
+            // (evita un 400/"Error al guardar" transitorio al salir del nombre sin descripción).
+            if (!isUpdate && (!payload.name || !payload.description)) return;
+
             const url = isUpdate
                 ? `/api/providers/${providerId}/experiencias/${expId}`
                 : `/api/providers/${providerId}/experiencias`;
@@ -1576,6 +1581,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         const newId = response.data.id || response.data.objectId;
                         if (newId) {
                             cardEl.dataset.id = newId;
+                            cardEl.setAttribute('data-id', newId);
                             if (providerExperiencias[index]) providerExperiencias[index].id = newId;
                         }
                     }
