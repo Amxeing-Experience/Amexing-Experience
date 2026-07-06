@@ -819,7 +819,7 @@ class AuthController {
     // Determine support email based on environment
     const supportEmail = process.env.NODE_ENV === 'development'
       ? 'denisse@meeplab.com'
-      : 'michelle@amexing.com';
+      : 'contact@amexingexperience.com';
 
     res.render('auth/forgot-password', {
       title: 'Forgot Password - AmexingWeb',
