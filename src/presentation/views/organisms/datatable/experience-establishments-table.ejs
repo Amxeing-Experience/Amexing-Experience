@@ -287,6 +287,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             Experiencias del Establecimiento
                         </h6>
 
+                        <!-- Leyenda de auto-guardado por experiencia -->
+                        <div class="small text-muted mb-2">
+                            <i class="ti ti-info-circle me-1"></i>Los cambios se guardan solos al salir de cada campo. Las imágenes se guardan con el botón Guardar.
+                        </div>
+
                         <!-- Lista de experiencias editables inline -->
                         <div id="establishmentExperienciasList" class="mb-3">
                             <div id="noEstablishmentExperienciasMessage" class="text-center text-muted py-3 border rounded bg-light">
@@ -359,6 +364,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <span class="badge bg-light text-success border experiencia-acc-tipo d-none"></span>
             </span>
             <span class="d-flex align-items-center gap-2 flex-shrink-0">
+                <!-- Estado de auto-guardado por experiencia (se actualiza al salir de cada campo) -->
+                <span class="small experiencia-autosave-status text-muted" style="transition: opacity .3s ease;"></span>
                 <span class="fw-semibold text-success small experiencia-acc-price"></span>
                 <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn experiencia-acc-delete" title="Eliminar experiencia">
                     <i class="ti ti-trash"></i>
@@ -1795,6 +1802,127 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 }
             });
         });
+
+        // Auto-guardado por experiencia: al salir (blur) de un campo TEXT/NUMBER/SELECT/TEXTAREA
+        // (nunca file/imagen) se guarda SOLO esa experiencia. Delegado para cubrir cards dinámicas.
+        $(document).on('blur', '#establishmentExperienciasList .experiencia-editable :input:not([type=file])', function() {
+            const cardEl = this.closest('.experiencia-editable');
+            if (cardEl) autoSaveEstablishmentExperiencia(cardEl);
+        });
+
+        // Muestra el estado de auto-guardado en la cabecera de la card
+        function setEstablishmentAutosaveStatus(cardEl, text, kind) {
+            const $status = $(cardEl).find('.experiencia-autosave-status').first();
+            if (!$status.length) return;
+            $status.stop(true, true).css('opacity', 1).text(text);
+            $status.removeClass('text-muted text-success text-danger');
+            if (kind === 'success') $status.addClass('text-success');
+            else if (kind === 'error') $status.addClass('text-danger');
+            else $status.addClass('text-muted');
+            if (kind === 'success') {
+                setTimeout(() => { $status.fadeTo(300, 0, () => $status.text('')); }, 1500);
+            }
+        }
+
+        // Lee UNA card de establecimiento a payload (mismo mapeo que collectEstablishmentExperienciasData,
+        // sin fotos: las imágenes se guardan con el botón Guardar).
+        function readEstablishmentExperienciaCard(card) {
+            const getName = (selector) => card.querySelector(selector)?.value?.trim() || '';
+            const getNumber = (selector) => {
+                const value = card.querySelector(selector)?.value;
+                return value ? parseFloat(value) : null;
+            };
+            const getInt = (selector) => {
+                const value = card.querySelector(selector)?.value;
+                return value ? parseInt(value) : null;
+            };
+            return {
+                name: getName('.experiencia-name-input'),
+                description: getName('.experiencia-description-input'),
+                tipo: getName('.experiencia-tipo-input'),
+                price: getNumber('.experiencia-price-input') || 0,
+                price_no_alcohol: getNumber('.experiencia-price-no-alcohol-input'),
+                price_child: getNumber('.experiencia-price-child-input'),
+                duration: getNumber('.experiencia-duration-input'),
+                travel_duration: getInt('.experiencia-travel-duration-input'),
+                advance_booking_time: getInt('.experiencia-advance-minutes-input'),
+                min_people: getInt('.experiencia-min-people-input'),
+                max_people: getInt('.experiencia-max-people-input'),
+                fixed_schedule: card.querySelector('.experiencia-fixed-schedule-input') ? card.querySelector('.experiencia-fixed-schedule-input').checked : false,
+                includes: getName('.experiencia-includes-input') ?
+                    getName('.experiencia-includes-input').split('\n').map(item => item.trim()).filter(item => item.length > 0) : [],
+                notincludes: getName('.experiencia-notincludes-input') ?
+                    getName('.experiencia-notincludes-input').split('\n').map(item => item.trim()).filter(item => item.length > 0) : [],
+                languages: getName('.experiencia-languages-input') ?
+                    getName('.experiencia-languages-input').split('\n').map(item => item.trim()).filter(item => item.length > 0) : [],
+                internal_notes: getName('.experiencia-internal-notes-input'),
+                client_booking_notes: getName('.experiencia-client-booking-notes-input'),
+                provider_notes: getName('.experiencia-provider-notes-input'),
+                team_notes: getName('.experiencia-team-notes-input')
+            };
+        }
+
+        // Guarda una sola experiencia del establecimiento (solo texto/número; las imágenes van con Guardar).
+        // Los establecimientos reutilizan los endpoints de experiencias de proveedor.
+        function autoSaveEstablishmentExperiencia(cardEl) {
+            const establishmentId = document.getElementById('establishmentId')?.value;
+            if (!establishmentId) return; // establecimiento nuevo aún no guardado → se usa Guardar manual
+
+            const index = Array.from(document.querySelectorAll('#establishmentExperienciasList .experiencia-editable')).indexOf(cardEl);
+            if (index < 0) return;
+
+            // Evita solicitudes solapadas para la MISMA card
+            if (cardEl.dataset.saving === '1') {
+                cardEl.dataset.dirty = '1';
+                return;
+            }
+
+            // El nombre es obligatorio para crear la experiencia; sin él no auto-guardamos aún
+            const payload = readEstablishmentExperienciaCard(cardEl);
+            if (!payload.name) return;
+            payload.displayOrder = index;
+
+            const expId = cardEl.dataset.id;
+            const isUpdate = typeof expId === 'string' && expId.length > 0;
+            const url = isUpdate
+                ? `/api/providers/${establishmentId}/experiencias/${expId}`
+                : `/api/providers/${establishmentId}/experiencias`;
+
+            cardEl.dataset.saving = '1';
+            setEstablishmentAutosaveStatus(cardEl, 'Guardando…', 'muted');
+
+            $.ajax({
+                url: url,
+                type: isUpdate ? 'PUT' : 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(payload),
+                success: function(response) {
+                    // En creación, fija el id para que los siguientes blurs hagan PUT
+                    if (!isUpdate && response && response.data) {
+                        const newId = response.data.id || response.data.objectId;
+                        if (newId) {
+                            cardEl.dataset.id = newId;
+                            cardEl.setAttribute('data-id', newId);
+                            cardEl.setAttribute('data-original-provider-id', establishmentId);
+                        }
+                    }
+                    setEstablishmentAutosaveStatus(cardEl, 'Guardado ✓', 'success');
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON?.error || `HTTP ${xhr.status}`;
+                    console.error('Error auto-guardando experiencia:', msg);
+                    setEstablishmentAutosaveStatus(cardEl, 'Error al guardar', 'error');
+                },
+                complete: function() {
+                    cardEl.dataset.saving = '0';
+                    // Si hubo cambios mientras guardaba, re-ejecuta una vez
+                    if (cardEl.dataset.dirty === '1') {
+                        cardEl.dataset.dirty = '0';
+                        autoSaveEstablishmentExperiencia(cardEl);
+                    }
+                }
+            });
+        }
 
         // Quick Add Establishment Experience Modal Functions
         function openQuickAddEstablishmentExperienceModal(establishmentId, establishmentName) {
