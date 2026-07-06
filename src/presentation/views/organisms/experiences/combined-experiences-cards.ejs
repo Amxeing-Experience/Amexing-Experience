@@ -29,11 +29,26 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
             <!-- Search and Filters -->
             <div class="card-body border-bottom bg-light">
                 <div class="row g-3">
-                    <div class="col-md-6">
+                    <div class="col-md-3">
                         <label for="searchExperience" class="form-label fw-semibold">
                             <i class="ti ti-search me-1"></i>Buscar Experiencia
                         </label>
-                        <input type="text" class="form-control" id="searchExperience" placeholder="Buscar por nombre o descripción...">
+                        <input type="text" class="form-control" id="searchExperience" placeholder="Buscar por nombre...">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filterCategory" class="form-label fw-semibold">
+                            <i class="ti ti-category me-1"></i>Tipo de experiencia
+                        </label>
+                        <select class="form-select" id="filterCategory">
+                            <option value="">Todas</option>
+                            <option value="catas">Catas</option>
+                            <option value="arte">Arte</option>
+                            <option value="historia_arquitectura">Historia y Arquitectura</option>
+                            <option value="gastronomicas">Gastronómicas</option>
+                            <option value="aventura">Aventura</option>
+                            <option value="naturaleza">Naturaleza</option>
+                            <option value="de_temporada">De Temporada</option>
+                        </select>
                     </div>
                     <div class="col-md-3">
                         <label for="filterCurrency" class="form-label fw-semibold">
@@ -1370,15 +1385,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Search and filter experiences
     function searchExperiences() {
         const searchFilter = document.getElementById('searchExperience').value.toLowerCase();
+        const categoryFilter = document.getElementById('filterCategory')?.value || '';
 
         filteredExperiences = allExperiences.filter(experience => {
-            // Only apply search filter, not currency/payment filters
-            const matchesSearch = !searchFilter || 
+            // Filtros de contenido (búsqueda + tipo de experiencia); moneda/pago solo recalculan precio.
+            const matchesSearch = !searchFilter ||
                 experience.displayName.toLowerCase().includes(searchFilter) ||
                 (experience.displayDescription && experience.displayDescription.toLowerCase().includes(searchFilter)) ||
                 (experience.providerName && experience.providerName.toLowerCase().includes(searchFilter));
 
-            return matchesSearch;
+            const matchesCategory = !categoryFilter || experience.experience_category === categoryFilter;
+
+            return matchesSearch && matchesCategory;
         });
         
         // Sort filtered results alphabetically by name
@@ -1393,6 +1411,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Set up event listeners for search and filters
     document.getElementById('searchExperience').addEventListener('input', searchExperiences);
+    document.getElementById('filterCategory').addEventListener('change', searchExperiences);
     document.getElementById('filterCurrency').addEventListener('change', function() {
         // Only update display to recalculate prices, don't filter
         displayExperiences();
