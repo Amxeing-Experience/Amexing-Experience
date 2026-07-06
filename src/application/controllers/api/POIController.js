@@ -133,18 +133,23 @@ class POIController {
     }
 
     try {
-      if (image.s3Key && this.imageOptimizationService?.enableOptimization) {
-        const imageData = await this.imageOptimizationService.getImageWithOptimalFormat(image, acceptHeader);
-        return {
-          ...image,
-          url: imageData.url,
-          dataUrl: imageData.url,
-          optimizationMetadata: imageData.metadata || image.optimizationMetadata,
-        };
+      // Elige el s3Key a servir: la variante optimizada preferida según el header Accept
+      // (avif → webp → jpeg), y si no hay variantes, el original. Se construye la presigned
+      // URL directamente (no se usa getImageWithOptimalFormat porque espera un Parse.Object).
+      let { s3Key } = image;
+      const variants = image.optimizedVariants;
+      if (variants && typeof variants === 'object') {
+        const preferred = this.imageOptimizationService.detectPreferredFormat?.(acceptHeader);
+        const order = [preferred, 'avif', 'webp', 'jpeg'].filter(Boolean);
+        const keyFrom = (v) => (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
+        const chosen = order.map((fmt) => keyFrom(variants[fmt])).find(Boolean);
+        if (chosen) {
+          s3Key = chosen;
+        }
       }
 
-      if (image.s3Key) {
-        const url = await this.imageOptimizationService.getPresignedUrl(image.s3Key);
+      if (s3Key) {
+        const url = await this.imageOptimizationService.getPresignedUrl(s3Key);
         return { ...image, url, dataUrl: url };
       }
     } catch (error) {
