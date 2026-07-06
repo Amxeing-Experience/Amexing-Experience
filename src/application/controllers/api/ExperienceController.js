@@ -743,7 +743,7 @@ class ExperienceController {
     experienceObj.set('cost', parseFloat(cost));
     // F3 (draft-first): permite crear como borrador oculto (active:false) cuando se
     // pide explícitamente; por defecto la experiencia se crea activa.
-    experienceObj.set('active', data.active === false || data.active === 'false' ? false : true);
+    experienceObj.set('active', !(data.active === false || data.active === 'false'));
     experienceObj.set('exists', true);
 
     // Handle destinationPOI pointer relationship
