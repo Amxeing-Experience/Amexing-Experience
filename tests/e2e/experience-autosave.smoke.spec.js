@@ -33,6 +33,8 @@ const BANDEJAS = [
     parentIdField: '#providerId',
     addExpBtn: '#addExperienciaBtn',
     list: '#providerExperienciasList',
+    tableId: 'experience-providers-table',
+    editBtn: '.edit-provider-btn',
   },
   {
     label: 'Establecimientos',
@@ -44,6 +46,8 @@ const BANDEJAS = [
     parentIdField: '#establishmentId',
     addExpBtn: '#addEstablishmentExperienciaBtn',
     list: '#establishmentExperienciasList',
+    tableId: 'experience-establishments-table',
+    editBtn: '.edit-establishment-btn',
   },
 ];
 
@@ -71,12 +75,15 @@ function deleteParent(page, baseEndpoint, id) {
 test.describe('Experiencias — auto-guardado por experiencia en bandejas (smoke)', () => {
   test.skip(!EMAIL || !PASSWORD, 'Faltan E2E_EMAIL / E2E_PASSWORD');
 
-  for (const b of BANDEJAS) {
-    test(`${b.label}: al salir del nombre se auto-crea la experiencia (POST) y al editar precio se actualiza (PUT)`, async ({ page }) => {
-      const pageErrors = [];
-      page.on('pageerror', (err) => { if (!isIgnoredPageError(err.message)) pageErrors.push(err.message); });
+  // Un solo login para ambas bandejas (minimiza intentos de login → evita rate limit).
+  test('Proveedores y Establecimientos: al salir del nombre se auto-crea (POST) y al editar precio se actualiza (PUT)', async ({ page }) => {
+    const pageErrors = [];
+    page.on('pageerror', (err) => { if (!isIgnoredPageError(err.message)) pageErrors.push(err.message); });
 
-      await login(page);
+    await login(page);
+
+    // Recorre cada bandeja con el mismo flujo (crea padre → reabre → auto-guarda experiencia).
+    const runBandeja = async (b) => {
       await page.goto(`/dashboard/${ROLE}/experiences?section=${b.section}`, { waitUntil: 'networkidle' });
 
       // 1. Crear el padre (proveedor/establecimiento) → capturamos el POST de creación.
@@ -106,15 +113,23 @@ test.describe('Experiencias — auto-guardado por experiencia en bandejas (smoke
       // Endpoint base usado (para limpiar al final con el mismo).
       const baseEndpoint = new URL(createResp.request().url()).pathname;
 
-      // El campo oculto del id del padre debe quedar poblado (habilita el auto-guardado).
-      await expect(page.locator(b.parentIdField)).toHaveValue(/.+/, { timeout: 15_000 });
-      // Tras crear el padre, la bandeja recarga su lista de experiencias; esperamos a que
-      // asiente para que ese re-render no pise la card que agregamos a continuación (evita
-      // una carrera entre el reload y el POST de auto-guardado).
-      await page.waitForLoadState('networkidle');
-
       try {
-        // 2. Agregar una experiencia y escribir el nombre → blur dispara POST /experiencias.
+        // 2. Reabrir el padre desde la tabla (flujo real: abrir un padre EXISTENTE y
+        // agregarle una experiencia). Recargar la sección da un estado limpio y evita la
+        // carrera del reload que dispara la creación del padre en la misma sesión.
+        await page.goto(`/dashboard/${ROLE}/experiences?section=${b.section}`, { waitUntil: 'networkidle' });
+        await page.fill(`#${b.tableId}_filter input`, uniqueName);
+        // Ambas bandejas abren el detalle al hacer click en la fila (no hay botón editar):
+        // clicamos la celda con el nombre (evita botones/acciones de la fila).
+        const nameCell = page.locator(`#${b.tableId} tbody tr td`, { hasText: uniqueName }).first();
+        await nameCell.waitFor({ state: 'visible', timeout: 15_000 });
+        await nameCell.click();
+
+        // El campo oculto del id del padre debe quedar poblado (habilita el auto-guardado).
+        await expect(page.locator(b.parentIdField)).toHaveValue(parentId, { timeout: 15_000 });
+        await page.waitForLoadState('networkidle');
+
+        // 3. Agregar una experiencia y escribir el nombre → blur dispara POST /experiencias.
         await page.locator(b.addExpBtn).first().click();
         const card = page.locator(`${b.list} .experiencia-editable`).last();
         await expect(card, 'card de experiencia nueva visible').toBeVisible();
@@ -138,7 +153,7 @@ test.describe('Experiencias — auto-guardado por experiencia en bandejas (smoke
         await expect(card, 'la card recibió data-id tras el auto-guardado').toHaveAttribute('data-id', /.+/, { timeout: 10_000 });
         await expect(card.locator('.experiencia-autosave-status'), 'estado Guardado ✓').toContainText('Guardado', { timeout: 10_000 });
 
-        // 3. Editar el precio → blur dispara PUT /experiencias/:id (actualiza, no re-crea).
+        // 4. Editar el precio → blur dispara PUT /experiencias/:id (actualiza, no re-crea).
         const expPrice = card.locator('.experiencia-price-input');
         await expPrice.fill('123.45');
         const [putExp] = await Promise.all([
@@ -154,8 +169,12 @@ test.describe('Experiencias — auto-guardado por experiencia en bandejas (smoke
         // Limpieza: borrar el padre creado (arrastra sus experiencias).
         if (parentId) await deleteParent(page, baseEndpoint, parentId);
       }
+    };
 
-      expect(pageErrors, `pageerrors: ${pageErrors.join(' | ')}`).toEqual([]);
-    });
-  }
+    for (const b of BANDEJAS) {
+      await test.step(b.label, () => runBandeja(b));
+    }
+
+    expect(pageErrors, `pageerrors: ${pageErrors.join(' | ')}`).toEqual([]);
+  });
 });
