@@ -651,7 +651,7 @@ class OwnedClientsController {
       }
 
       const {
-        firstName, lastName, email, companyName, phone,
+        firstName, lastName, email, companyName, phone, clientCategory,
       } = req.body;
 
       // Validate required fields
@@ -665,13 +665,22 @@ class OwnedClientsController {
       if (!organizationId) {
         return this.sendError(res, 'No se pudo resolver la agencia del usuario', 400);
       }
+
+      // Categoría del cliente directo (people-type). Solo admin/superadmin puede elegirla; se valida
+      // contra el set permitido y por defecto 'direct_client'. DM/agente siempre 'agency_client'.
+      const DIRECT_CATEGORIES = ['direct_client', 'wedding_planner', 'concierge', 'home_owner'];
+      let finalCategory = 'agency_client';
+      if (isAmexing) {
+        finalCategory = DIRECT_CATEGORIES.includes(clientCategory) ? clientCategory : 'direct_client';
+      }
+
       const created = await this.createEndClientUser({
         firstName,
         lastName,
         email,
         phone,
         companyType: companyName ? 'corporate' : 'individual',
-        clientCategory: isAmexing ? 'direct_client' : 'agency_client',
+        clientCategory: finalCategory,
         organizationId,
         createdBy: currentUser.id,
       });
