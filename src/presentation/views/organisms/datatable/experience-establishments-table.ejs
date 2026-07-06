@@ -1478,9 +1478,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Disable save button and show appropriate message
             const saveBtn = $('#saveEstablishmentBtn');
             const originalText = saveBtn.html();
-            // Cuando guardamos sin cerrar, mantenemos el botón en "Guardando…" hasta
-            // que el reload de subexperiencias termine (no en el complete del save).
-            let establishmentReloadPending = false;
+            // Guardar sin cerrar: el botón queda en "Guardando…" hasta que el flujo async
+            // termine de verdad (guardar experiencias + optimizar + recargar), no en el complete.
             const restoreSaveBtn = () => saveBtn.prop('disabled', false).html(originalText);
             const initialButtonText = totalImagesToOptimize > 0 ? 
                 `<i class="spinner-border spinner-border-sm me-1"></i>Optimizando ${totalImagesToOptimize} imagen${totalImagesToOptimize > 1 ? 'es' : ''}...` : 
@@ -1810,7 +1809,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#establishmentId').val(finalEstablishmentId);
                         $('#establishmentModalTitle').text('Editar Establecimiento');
                         currentModalState = { mode: 'edit', establishmentId: finalEstablishmentId, isOpen: true, sessionId: currentModalState.sessionId };
-                        establishmentReloadPending = true;
                         loadEstablishmentExperiencias(finalEstablishmentId, function() {
                             const cards = document.querySelectorAll('#establishmentExperienciasList .experiencia-editable');
                             expandedIdx.forEach(i => { if (cards[i]) expandEstablishmentCard(cards[i]); });
@@ -1826,15 +1824,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     const error = xhr.responseJSON?.error || 'Error al guardar el establecimiento';
                     showEstablishmentError(error);
                 },
-                complete: function() {
-                    // Si vamos a recargar subexperiencias (guardar sin cerrar), el botón
-                    // se restaura al terminar ese reload, no aquí, para que no parezca
-                    // que ya acabó mientras las tarjetas siguen cargando.
-                    if (!establishmentReloadPending && totalImagesToOptimize === 0) {
+                complete: function(xhr, textStatus) {
+                    // OJO: el success es ASÍNCRONO (guarda cada experiencia, optimiza imágenes
+                    // y recarga la lista). jQuery dispara complete apenas INVOCA el success, sin
+                    // esperar sus await, así que aquí el guardado aún no terminó. Por eso NO
+                    // restauramos el botón en caso de éxito: lo hace el propio flujo async cuando
+                    // realmente acaba (tras recargar). Solo restauramos si la petición falló.
+                    if (textStatus !== 'success') {
                         saveBtn.prop('disabled', false).html(originalText);
                     }
-                    // If there are images being optimized, button will be re-enabled
-                    // after optimization completes in the success callback
                 }
             });
         });
