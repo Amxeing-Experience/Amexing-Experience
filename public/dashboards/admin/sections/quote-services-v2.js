@@ -3865,6 +3865,7 @@ class ItineraryBuilder {
       additionalVehicleSegmentColor: null, // Rate color (hex) for the additional segment — set below
       categoryColor: null, // Rate color (hex) for the main vehicle segment — set per service type below
       notes: document.getElementById('serviceNotes')?.value,
+      agencyNotes: document.getElementById('serviceAgencyNotes')?.value,
       attendees: this.collectAttendees(),
       additionalFlights: this.collectAdditionalFlights(),
       extraAdditionalVehicles: this.collectExtraAdditionalVehicles(),
@@ -5073,6 +5074,15 @@ class ItineraryBuilder {
     }
 
     document.getElementById('serviceNotes').value = service.notes || '';
+    const agencyNotesEl = document.getElementById('serviceAgencyNotes');
+    if (agencyNotesEl) agencyNotesEl.value = service.agencyNotes || '';
+    // Para DM/agente, las notas del admin son solo lectura; si vienen vacías, ocultar la sección.
+    const adminNotesWrap = document.getElementById('adminNotesWrap');
+    const notesEl = document.getElementById('serviceNotes');
+    if (adminNotesWrap && notesEl && notesEl.hasAttribute('readonly')) {
+      adminNotesWrap.classList.toggle('d-none', !(service.notes || '').trim());
+    }
+    if (window.autoGrowServiceNotes) window.autoGrowServiceNotes();
     this.populateAttendees(service.attendees || []);
     this.populateAdditionalFlights(service.additionalFlights || []);
     // Show the extra additional vehicles container when the main checkbox is on,
@@ -7703,6 +7713,12 @@ class ItineraryBuilder {
                                         <div class="service-notes mt-1 text-muted small d-flex align-items-start">
                                             <i class="ti ti-notes me-1"></i>
                                             <span style="white-space: pre-wrap;">${service.notes}</span>
+                                        </div>
+                                    ` : ''}
+                                    ${service.agencyNotes ? `
+                                        <div class="service-notes mt-1 text-muted small d-flex align-items-start">
+                                            <i class="ti ti-building-store me-1"></i>
+                                            <span style="white-space: pre-wrap;">${service.agencyNotes}</span>
                                         </div>
                                     ` : ''}
                                     ${Array.isArray(service.attendees) && service.attendees.filter((n) => String(n).trim()).length > 0 ? `
@@ -11835,6 +11851,7 @@ class ItineraryBuilder {
             price: this.getCorrectPriceForPaymentType(subconcept, serviceItemsData.paymentType),
             quantity: subconcept.quantity || 1,
             notes: subconcept.notes || '',
+            agencyNotes: subconcept.agencyNotes || '',
             clientNotes: subconcept.clientNotes || '',
             providerNotes: subconcept.providerNotes || '',
             teamNotes: subconcept.teamNotes || '',
@@ -19860,6 +19877,9 @@ class ItineraryBuilder {
             unitPrice: servicePrice,
             quantity: service.quantity || 1,
             notes: service.notes || '',
+            // Notas de la agencia (editable por admin/DM/agente). Se persiste en el blob para que
+            // fluya a la reserva y salga en PDF/booking.
+            agencyNotes: service.agencyNotes || '',
             // Additional note channels — informational notes for different audiences.
             // Persisted on the subconcept blob so they flow into the reservation.
             clientNotes: service.clientNotes || '',

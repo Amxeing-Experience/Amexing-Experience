@@ -460,7 +460,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (sub.transportInfants) pax.push(`${sub.transportInfants} infante${sub.transportInfants > 1 ? 's' : ''}`);
             if (sub.persons && !pax.length) pax.push(`${sub.persons} persona${sub.persons > 1 ? 's' : ''}`);
             if (pax.length) tags.push(tag('users', pax.join(', '), 'primary'));
-            if (sub.airline || sub.flightNumber) tags.push(tag('plane', `${sub.airline || ''} ${sub.flightNumber || ''}`.trim(), 'info'));
+            if (sub.airline || sub.flightNumber) {
+                const flightLabel = `${sub.airline || ''} ${sub.flightNumber || ''}`.trim();
+                // Hora real del vuelo (llegada o salida del avión), distinta al pick-up del Horario.
+                const fm = String(svc.time || sub.selectedSchedule || sub.time || '').match(/^(\d{1,2}:\d{2})/);
+                const flightTime = fm ? fm[1] : '';
+                tags.push(tag('plane', flightTime ? `${flightLabel} @ ${flightTime}` : flightLabel, 'info'));
+            }
             if (sub.waitingTimeHours) tags.push(tag('clock-pause', `Espera: ${sub.waitingTimeHours}h`, 'warning'));
             if (Array.isArray(sub.extraAdditionalVehicles)) {
                 sub.extraAdditionalVehicles.forEach((v) => {
@@ -470,15 +476,23 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
             if (sub.routeDuration) tags.push(tag('route', `Duración: ${sub.routeDuration} min`, 'secondary'));
             
-            // Add suggested departure times for transport services
-            if (sub.flightDepartureTimeSuggested) {
-                tags.push(tag('clock-hour-4', `Salida sugerida: ${sub.flightDepartureTimeSuggested}`, 'success'));
+            // Horario = hora de pick-up del servicio (aeropuerto). Salida: la hora sugerida ES el
+            // pick-up; llegada: el pick-up ocurre a la hora de llegada del pasajero.
+            if (sub.transportType === 'aeropuerto') {
+                let pickup = '';
+                if (sub.directionType === 'departure') {
+                    pickup = sub.flightDepartureTimeSuggested || '';
+                } else if (sub.directionType === 'arrival') {
+                    const am = String(sub.time || svc.time || sub.selectedSchedule || '').match(/^(\d{1,2}:\d{2})/);
+                    pickup = am ? am[1] : '';
+                }
+                if (pickup) tags.push(tag('clock-hour-4', `Horario: ${pickup}`, 'success'));
             }
             if (sub.roundTripDepartureTimeSuggestedIda) {
-                tags.push(tag('clock-hour-4', `Ida sugerida: ${sub.roundTripDepartureTimeSuggestedIda}`, 'success'));
+                tags.push(tag('clock-hour-4', `Horario ida: ${sub.roundTripDepartureTimeSuggestedIda}`, 'success'));
             }
             if (sub.roundTripDepartureTimeSuggestedVuelta) {
-                tags.push(tag('clock-hour-4', `Vuelta sugerida: ${sub.roundTripDepartureTimeSuggestedVuelta}`, 'success'));
+                tags.push(tag('clock-hour-4', `Horario vuelta: ${sub.roundTripDepartureTimeSuggestedVuelta}`, 'success'));
             }
         }
 
@@ -506,7 +520,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         // General fields
-        if (sub.notes) tags.push(tag('note', sub.notes, 'secondary'));
+        if (sub.notes) tags.push(tag('note', `Admin: ${sub.notes}`, 'secondary'));
+        if (sub.agencyNotes) tags.push(tag('user', `Cliente: ${sub.agencyNotes}`, 'info'));
 
         return tags.length ? `<div class="mt-1 d-flex flex-wrap gap-1">${tags.join('')}</div>` : '';
     }

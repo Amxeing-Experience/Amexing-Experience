@@ -264,6 +264,8 @@ const menuItems = [
 
 .vehicle-card-info {
     flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 .vehicle-info-row {
@@ -281,6 +283,29 @@ const menuItems = [
 .vehicle-info-label {
     color: #6b7280;
     font-size: 0.875rem;
+}
+
+.vehicle-amenities-row {
+    border-top: 1px solid #f3f4f6;
+}
+
+.vehicle-amenities {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.amenity-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(var(--bs-primary-rgb), 0.1);
+    color: var(--bs-primary);
+    border-radius: 999px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.2;
 }
 
 .vehicle-info-value {
@@ -498,6 +523,7 @@ document.addEventListener('DOMContentLoaded', function() {
         grid.style.display = 'flex';
         noResults.style.display = 'none';
 
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         grid.innerHTML = filteredVehicles.map(vehicle => {
             const typeName = vehicle.vehicleTypeId?.name || 'Sin tipo';
             const rateName = vehicle.rateId?.name || 'Sin segmento';
@@ -551,9 +577,17 @@ document.addEventListener('DOMContentLoaded', function() {
                                         ${luggageCount} carry-on
                                     </span>
                                 </div>
+                                ${(Array.isArray(vehicle.amenities) && vehicle.amenities.length) ? `
+                                <div class="vehicle-amenities-row pt-3 mt-1 border-top">
+                                    <div class="vehicle-info-label mb-2"><i class="ti ti-sparkles me-1"></i>Amenidades</div>
+                                    <div class="vehicle-amenities">
+                                        ${vehicle.amenities.map(a => `<span class="amenity-chip">${esc(a)}</span>`).join('')}
+                                    </div>
+                                </div>
+                                ` : ''}
                                 ${imageUrl ? `
-                                <div class="vehicle-info-row border-0 pt-3">
-                                    <button class="btn btn-outline-primary btn-sm w-100 view-images-btn" 
+                                <div class="vehicle-info-row border-0 pt-3 mt-auto">
+                                    <button class="btn btn-outline-primary btn-sm w-100 view-images-btn"
                                             data-vehicle-id="${vehicle.id || vehicle.objectId}" 
                                             data-vehicle-name="${vehicle.brand} ${vehicle.model}">
                                         <i class="ti ti-photo me-1"></i>Ver Imágenes

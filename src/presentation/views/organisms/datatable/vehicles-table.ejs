@@ -211,6 +211,26 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         </div>
                     </div>
 
+                    <!-- Sección: Amenidades -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-sparkles me-1"></i>
+                            Amenidades
+                        </h6>
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control" id="vehAmenityInput" maxlength="60" placeholder="Ej: WiFi, A/C, Agua, Cargador USB...">
+                            <button type="button" class="btn btn-outline-primary" id="vehAddAmenityBtn">
+                                <i class="ti ti-plus me-1"></i>Agregar
+                            </button>
+                        </div>
+                        <div id="vehAmenitiesChips" class="d-flex flex-wrap gap-2 mb-2"></div>
+                        <div id="vehAmenitySuggestWrap" class="d-none">
+                            <div class="form-text mb-1"><i class="ti ti-bulb me-1"></i>Sugeridas del tipo (clic para agregar):</div>
+                            <div id="vehAmenitySuggest" class="d-flex flex-wrap gap-2"></div>
+                        </div>
+                        <div class="form-text">Escribe una amenidad y presiona Agregar (o Enter). También puedes agregar las sugeridas del tipo de vehículo.</div>
+                    </div>
+
                     <!-- Alert informativo -->
                     <div class="alert alert-info d-flex align-items-start" role="alert">
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
@@ -618,6 +638,15 @@ table.dataTable thead .sorting_desc_disabled {
             if (defaultLuggageCapacity !== undefined) {
                 $('#luggageCapacity').val(defaultLuggageCapacity);
             }
+
+            // Actualizar las amenidades sugeridas según el nuevo tipo.
+            renderVehAmenitySuggestions();
+        });
+
+        // Amenidades: agregar por botón o Enter (sin submitear el form).
+        $('#vehAddAmenityBtn').on('click', addVehAmenityFromInput);
+        $('#vehAmenityInput').on('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); addVehAmenityFromInput(); }
         });
 
         // Load rates as filter pills (tabs)
@@ -665,7 +694,14 @@ table.dataTable thead .sorting_desc_disabled {
                         const select = $('#vehicleType');
                         select.find('option:not(:first)').remove();
                         response.data.forEach(function(type) {
-                            select.append(`<option value="${type.value}" data-capacity="${type.capacity}" data-trunk-capacity="${type.trunkCapacity}">${type.label}</option>`);
+                            const opt = $('<option>')
+                                .val(type.value)
+                                .text(type.label)
+                                .attr('data-capacity', type.capacity)
+                                .attr('data-trunk-capacity', type.trunkCapacity);
+                            // Amenidades del tipo vía jQuery data (evita escapar JSON en el atributo).
+                            opt.data('amenities', Array.isArray(type.amenities) ? type.amenities : []);
+                            select.append(opt);
                         });
                     }
                 },
@@ -700,6 +736,7 @@ table.dataTable thead .sorting_desc_disabled {
             $('#vehicleModal').modal('show');
             $('#vehicleForm')[0].reset();
             $('#vehicleId').val('');
+            setVehAmenities([]); // limpiar chips (el reset no toca el contenedor) + ocultar sugerencias
             $('#modalTitle').text(isEdit ? 'Editar Vehículo' : 'Crear Nuevo Vehículo');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Vehículo');
             loadVehicleTypes();
@@ -740,6 +777,8 @@ table.dataTable thead .sorting_desc_disabled {
                         $.when(loadVehicleTypes(), loadRates()).done(function() {
                             $('#vehicleType').val(vehicle.vehicleTypeId);
                             $('#rate').val(vehicle.rateId || '');
+                            // Amenidades guardadas del vehículo + sugerencias del tipo (las que falten).
+                            setVehAmenities(vehicle.amenities || []);
                         });
                     } else {
                         showErrorAlert('Formato de respuesta inválido');
@@ -748,6 +787,71 @@ table.dataTable thead .sorting_desc_disabled {
                 error: function(xhr) {
                     showModalError(xhr.responseJSON?.error || 'Error al cargar el vehículo');
                 }
+            });
+        }
+
+        // --- Amenidades del vehículo (chips libres + sugeridas del tipo) ---
+        function makeVehAmenityChip(value) {
+            const safe = String(value);
+            const chip = document.createElement('span');
+            chip.className = 'badge bg-primary-subtle text-primary d-inline-flex align-items-center gap-1 py-2 px-3';
+            chip.dataset.amenity = safe;
+            const icon = document.createElement('i'); icon.className = 'ti ti-sparkles';
+            const label = document.createElement('span'); label.textContent = safe;
+            const rm = document.createElement('button');
+            rm.type = 'button'; rm.className = 'btn-close btn-close-sm ms-1'; rm.setAttribute('aria-label', 'Quitar');
+            rm.addEventListener('click', () => { chip.remove(); renderVehAmenitySuggestions(); });
+            chip.appendChild(icon); chip.appendChild(label); chip.appendChild(rm);
+            return chip;
+        }
+        function getVehAmenities() {
+            return Array.from(document.querySelectorAll('#vehAmenitiesChips [data-amenity]')).map(el => el.dataset.amenity);
+        }
+        function setVehAmenities(list) {
+            const box = document.getElementById('vehAmenitiesChips');
+            if (!box) return;
+            box.innerHTML = '';
+            (Array.isArray(list) ? list : []).forEach(v => {
+                const s = String(v == null ? '' : v).trim();
+                if (s) box.appendChild(makeVehAmenityChip(s));
+            });
+            renderVehAmenitySuggestions();
+        }
+        function addVehAmenity(value) {
+            const val = String(value == null ? '' : value).trim().slice(0, 60);
+            if (!val) return;
+            const exists = getVehAmenities().some(a => a.toLowerCase() === val.toLowerCase());
+            if (!exists) document.getElementById('vehAmenitiesChips').appendChild(makeVehAmenityChip(val));
+            renderVehAmenitySuggestions();
+        }
+        function addVehAmenityFromInput() {
+            const input = document.getElementById('vehAmenityInput');
+            addVehAmenity(input.value);
+            input.value = '';
+            input.focus();
+        }
+        // Sugeridas del tipo seleccionado: solo las que aún no están agregadas. Clic → se agrega.
+        function renderVehAmenitySuggestions() {
+            const wrap = document.getElementById('vehAmenitySuggestWrap');
+            const box = document.getElementById('vehAmenitySuggest');
+            if (!wrap || !box) return;
+            const typeAmenities = $('#vehicleType option:selected').data('amenities') || [];
+            const current = getVehAmenities().map(a => a.toLowerCase());
+            const missing = (Array.isArray(typeAmenities) ? typeAmenities : [])
+                .map(a => String(a == null ? '' : a).trim())
+                .filter(s => s && !current.includes(s.toLowerCase()));
+            box.innerHTML = '';
+            if (missing.length === 0) { wrap.classList.add('d-none'); return; }
+            wrap.classList.remove('d-none');
+            missing.forEach(s => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'badge bg-light text-secondary border d-inline-flex align-items-center gap-1 py-2 px-3';
+                const icon = document.createElement('i'); icon.className = 'ti ti-plus';
+                const label = document.createElement('span'); label.textContent = s;
+                chip.appendChild(icon); chip.appendChild(label);
+                chip.addEventListener('click', () => addVehAmenity(s));
+                box.appendChild(chip);
             });
         }
 
@@ -787,7 +891,8 @@ table.dataTable thead .sorting_desc_disabled {
                 luggageCapacity: $('#luggageCapacity').val() ? parseInt($('#luggageCapacity').val()) : null,
                 color: $('#color').val(),
                 maintenanceStatus: $('#maintenanceStatus').val(),
-                insuranceExpiry: $('#insuranceExpiry').val() || null
+                insuranceExpiry: $('#insuranceExpiry').val() || null,
+                amenities: getVehAmenities()
             };
             const url = isEdit ? `${apiEndpoint}/${vehicleId}` : apiEndpoint;
             const method = isEdit ? 'PUT' : 'POST';
