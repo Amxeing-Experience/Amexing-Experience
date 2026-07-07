@@ -894,6 +894,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         return indexA - indexB;
                     });
 
+                    // Si están los 7 días, mostrar "Todos los días" en vez de la lista completa.
+                    if (sortedDays.length === 7) {
+                        return 'Todos los días';
+                    }
                     // Si es un solo día, mostrar el nombre completo (p.ej. "Lunes") en vez de la abreviatura.
                     const fullDayMap = { 'Lu': 'Lunes', 'Ma': 'Martes', 'Mi': 'Miércoles', 'Ju': 'Jueves', 'Vi': 'Viernes', 'Sa': 'Sábado', 'Do': 'Domingo' };
                     if (sortedDays.length === 1) {
@@ -1159,9 +1163,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         return indexA - indexB;
                     });
                     
-                    // Si es un solo día, mostrar el nombre completo (p.ej. "Lunes") en vez de la abreviatura.
+                    // Si están los 7 días, "Todos los días"; si es un solo día, nombre completo.
                     const fullDayMap = { 'Lu': 'Lunes', 'Ma': 'Martes', 'Mi': 'Miércoles', 'Ju': 'Jueves', 'Vi': 'Viernes', 'Sa': 'Sábado', 'Do': 'Domingo' };
-                    if (sortedDays.length === 1) {
+                    if (sortedDays.length === 7) {
+                        formattedAvailability = 'Todos los días';
+                    } else if (sortedDays.length === 1) {
                         formattedAvailability = fullDayMap[sortedDays[0]] || sortedDays[0];
                     } else {
                         formattedAvailability = sortedDays.length > 0 ? sortedDays.join(', ') : null;
