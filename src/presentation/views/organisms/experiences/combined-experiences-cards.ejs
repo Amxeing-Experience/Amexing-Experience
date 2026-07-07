@@ -552,6 +552,24 @@ document.addEventListener('DOMContentLoaded', function() {
             return `${mins}min`;
         }
     }
+
+    // Reserva anticipada (minutos) → días si >=24h; si no, horas y minutos (sin decimales).
+    function formatAdvanceBooking(totalMinutes) {
+        const mins = parseInt(totalMinutes);
+        if (!mins || isNaN(mins) || mins <= 0) return 'Reserva inmediata';
+        if (mins >= 1440) {
+            const days = Math.floor(mins / 1440);
+            const remHours = Math.floor((mins % 1440) / 60);
+            let out = `${days} ${days === 1 ? 'día' : 'días'}`;
+            if (remHours > 0) out += ` ${remHours} ${remHours === 1 ? 'hora' : 'horas'}`;
+            return out;
+        }
+        const hours = Math.floor(mins / 60);
+        const minutes = mins % 60;
+        if (hours > 0 && minutes > 0) return `${hours}h ${minutes}min`;
+        if (hours > 0) return `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+        return `${minutes} min`;
+    }
     
     // Load exchange rate
     async function loadExchangeRate() {
@@ -1308,22 +1326,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <i class="ti ti-calendar-time me-1"></i>Reserva anticipada
                                     </span>
                                     <span class="experience-info-value">
-                                        ${(() => {
-                                            if (!experience.displayAdvanceBooking) return 'Reserva inmediata';
-                                            const totalMinutes = parseInt(experience.displayAdvanceBooking);
-                                            if (isNaN(totalMinutes)) return 'Reserva inmediata';
-                                            
-                                            const hours = Math.floor(totalMinutes / 60);
-                                            const minutes = totalMinutes % 60;
-                                            
-                                            if (hours > 0 && minutes > 0) {
-                                                return `${hours}h ${minutes}min`;
-                                            } else if (hours > 0) {
-                                                return `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
-                                            } else {
-                                                return `${minutes} min`;
-                                            }
-                                        })()}
+                                        ${formatAdvanceBooking(experience.displayAdvanceBooking)}
                                     </span>
                                 </div>
                                 <div class="experience-info-row">
@@ -2408,7 +2411,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${(experience.advance_minutes || experience.advance_booking_time || experience.advanceBookingTime) ? `
                     <div class="alert alert-warning">
                         <i class="ti ti-clock-hour-4 me-2"></i>
-                        <strong>Reservar con anticipación:</strong> Mínimo ${formatTravelDuration(experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime) || 0)} antes
+                        <strong>Reservar con anticipación:</strong> Mínimo ${formatAdvanceBooking(experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime) || 0)} antes
                     </div>
                 ` : ''}
 
