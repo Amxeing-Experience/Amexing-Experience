@@ -192,8 +192,12 @@ class HomeController {
       // Tours: el strip horizontal muestra los DESTINOS tipo Tours activos (con su imagen)
       // en vez de categorías fijas. Se resuelve server-side (página pública, sin auth).
       if (view === 'servicios/tours') {
-        data.tourDestinos = await poiService.getActivePOIsWithImages('Tours');
-        data.toursByDestino = await publicToursService.getActiveToursByDestino(currentLang);
+        const tourDestinos = await poiService.getActivePOIsWithImages('Tours');
+        const toursByDestino = await publicToursService.getActiveToursByDestino(currentLang);
+        // Fusiona los destinos "Walking Tour X" dentro de "X" (solo presentación; no toca datos).
+        const merged = publicToursService.mergeWalkingDestinos(tourDestinos, toursByDestino);
+        data.tourDestinos = merged.tourDestinos;
+        data.toursByDestino = merged.toursByDestino;
       }
 
       // Experiencias: los detail cards muestran las EXPERIENCIAS activas agrupadas por su

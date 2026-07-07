@@ -327,6 +327,7 @@ class QuoteService {
         'validUntil',
         'eventType',
         'clientFinalId',
+        'clientFinalName',
         'clientType',
       ];
 

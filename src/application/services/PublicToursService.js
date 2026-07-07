@@ -336,6 +336,50 @@ class PublicToursService {
       return byDestino;
     }
   }
+
+  /**
+   * Fusiona los destinos "Walking Tour X" dentro del destino base "X" SOLO para el render
+   * público: sus tours se agrupan bajo "X" (como una card más) y el chip "Walking Tour X" se
+   * oculta del strip. No toca datos: el tour, el POI, el admin, el tarifario y las cotizaciones
+   * quedan intactos; es puramente presentación de /servicios/tours. Si no existe un destino
+   * base "X", el destino "Walking Tour X" se deja como está (fallback seguro).
+   * @param {Array<{id:string,name:string,imageUrl:string}>} tourDestinos - Destinos del strip.
+   * @param {object} toursByDestino - Mapa { <poiId>: [cards] } de getActiveToursByDestino.
+   * @returns {{tourDestinos: Array, toursByDestino: object}} Destinos y mapa ya fusionados.
+   * @example
+   * const { tourDestinos, toursByDestino } = service.mergeWalkingDestinos(destinos, mapa);
+   */
+  mergeWalkingDestinos(tourDestinos, toursByDestino) {
+    const destinos = Array.isArray(tourDestinos) ? tourDestinos : [];
+    const merged = { ...(toursByDestino || {}) };
+
+    // Índice nombre(normalizado) → id de destino base.
+    const idByName = new Map();
+    destinos.forEach((d) => idByName.set((d.name || '').trim().toLowerCase(), d.id));
+
+    const hiddenIds = new Set();
+    destinos.forEach((d) => {
+      const match = (d.name || '').match(/^walking tour\s+(.+)$/i);
+      if (!match) {
+        return;
+      }
+      const baseId = idByName.get(match[1].trim().toLowerCase());
+      if (!baseId || baseId === d.id) {
+        return; // sin destino base "X" → se deja tal cual (fallback seguro)
+      }
+      const walkingCards = merged[d.id] || [];
+      if (walkingCards.length) {
+        merged[baseId] = (merged[baseId] || []).concat(walkingCards);
+      }
+      delete merged[d.id];
+      hiddenIds.add(d.id);
+    });
+
+    return {
+      tourDestinos: destinos.filter((d) => !hiddenIds.has(d.id)),
+      toursByDestino: merged,
+    };
+  }
 }
 
 module.exports = PublicToursService;

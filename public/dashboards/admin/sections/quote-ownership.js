@@ -3130,6 +3130,20 @@ class QuoteOwnershipManager {
                 this.displayOwnershipInModal();
                 this.displayOwner(); // Update main page ownership display
 
+                // Notificar al formulario de información para que la sección de Contacto
+                // (cuando "el contacto es el propietario") se actualice sin recargar la página.
+                // El listener actualiza window.__quoteOwner y refresca el resumen del contacto.
+                document.dispatchEvent(new CustomEvent('quoteOwnerChanged', {
+                    detail: {
+                        firstName: this.owner?.firstName || '',
+                        lastName: this.owner?.lastName || '',
+                        email: this.owner?.email || '',
+                        phone: this.owner?.phone || '',
+                        fullName: this.owner?.fullName
+                            || `${this.owner?.firstName || ''} ${this.owner?.lastName || ''}`.trim(),
+                    }
+                }));
+
                 // Refresh collaborators to show updated list after ownership transfer
                 await this.loadAgents();
                 this.displayAgents();

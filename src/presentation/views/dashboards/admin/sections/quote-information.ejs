@@ -31,8 +31,11 @@ const e = __isRes ? 'reservación' : 'cotización';
             <!-- Hidden field for quote ID (for editing) -->
             <input type="hidden" id="quoteId" name="quoteId" value="<%= typeof quoteId !== 'undefined' ? quoteId : '' %>">
 
-            <!-- Sección: Información del Cliente -->
-            <div class="border rounded p-3 mb-4">
+            <!-- Sección: Información del Cliente.
+                 Para department_manager/client el cliente se asigna por rol, así que la tarjeta se
+                 OCULTA (display:none) pero se conserva en el DOM: el input #clientId y su customSelect
+                 siguen inicializando y alimentando todo el flujo (no se pierden referencias). -->
+            <div class="border rounded p-3 mb-4"<% if (typeof userRole !== 'undefined' && (userRole === 'department_manager' || userRole === 'client')) { %> style="display:none;"<% } %>>
                 <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
                     <i class="ti ti-user me-1"></i>
                     Información del Cliente
@@ -161,25 +164,57 @@ const e = __isRes ? 'reservación' : 'cotización';
 
             <!-- Sección: Cliente Final (solo agencias; la tarjeta se togglea por modo vía #finalClientRow) -->
             <div class="border rounded p-3 mb-4 mt-4 flex-column" id="finalClientRow">
+                <!-- Encabezado con acción "Crear Cliente" a la derecha. Cubre el caso de una
+                     agencia SIN clientes finales (dropdown vacío): el listener #createFinalClientBtn
+                     ya existe y abre el modal correcto según rol (admin → sub-cliente de empresa;
+                     dept_manager/client → cliente propio), y al guardar lo agrega al dropdown y lo
+                     selecciona. La tarjeta solo se muestra en modo agencia. -->
                 <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
                     <i class="ti ti-user-check me-1"></i>
                     Cliente Final
                 </h6>
-                <div class="mb-2">
-                    <%- include('../../../atoms/common/tom-select', {
-                        id: 'clientFinalId',
-                        name: 'clientFinalId',
-                        multiple: false,
-                        placeholder: 'Seleccionar cliente final (opcional)',
-                        label: '',
-                        required: false,
-                        helpText: 'Selecciona el cliente final; su información se usa como Lead Guest',
-                        options: [],
-                        selected: []
-                    }) %>
+                <!-- Alertas locales de esta sección (p.ej. "selecciona una empresa antes de
+                     crear un cliente final"), para que se vean junto al botón y no arriba del
+                     formulario donde quedan fuera de vista. -->
+                <div id="finalClientAlerts"></div>
+                <!-- Nombre (combobox: busca clientes de la agencia o escribe uno nuevo) + Apellido.
+                     Al elegir un cliente existente se llenan Nombre y Apellido (displayField='firstName'
+                     muestra solo el nombre en el combobox). Al escribir uno nuevo, el Nombre es el
+                     tecleado y el Apellido se captura aparte. -->
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label mb-1">Nombre</label>
+                        <%- include('../../../atoms/common/tom-select', {
+                            id: 'clientFinalId',
+                            name: 'clientFinalId',
+                            multiple: false,
+                            placeholder: 'Buscar o escribir nombre',
+                            label: '',
+                            required: false,
+                            allowCreate: true,
+                            createLabel: 'Crear',
+                            displayField: 'firstName',
+                            helpText: '',
+                            options: [],
+                            selected: []
+                        }) %>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label for="finalClientLastName" class="form-label mb-1">Apellido</label>
+                        <input type="text" class="form-control" id="finalClientLastName" placeholder="Apellido">
+                    </div>
+                </div>
+                <!-- Guardar el Cliente Final como cliente de la agencia (como en Lead Guest).
+                     Siempre visible; se deshabilita al elegir un cliente existente (ya guardado). -->
+                <div class="form-check mb-2" id="saveFinalClientWrap">
+                    <input class="form-check-input" type="checkbox" id="saveFinalClientAsClient">
+                    <label class="form-check-label" for="saveFinalClientAsClient">
+                        <i class="ti ti-user-plus me-1"></i>Guardar cliente en el sistema<% if (typeof userRole !== 'undefined' && (userRole === 'admin' || userRole === 'superadmin')) { %> <span class="text-muted fw-normal">(se guardará como cliente de la agencia)</span><% } %>
+                    </label>
+                    <div class="form-text">Si no lo marcas, el nombre se usará solo en esta cotización.</div>
                 </div>
                 <div class="form-check mb-0">
-                    <input class="form-check-input" type="checkbox" id="leadGuestIsFinalClient" checked>
+                    <input class="form-check-input" type="checkbox" id="leadGuestIsFinalClient">
                     <label class="form-check-label" for="leadGuestIsFinalClient">
                         El Lead Guest es el cliente final
                     </label>
@@ -202,9 +237,30 @@ const e = __isRes ? 'reservación' : 'cotización';
 
                 <!-- Lead Guest manual: se oculta cuando "es el cliente final" está marcado (agencia) -->
                 <div id="leadGuestManualFields">
+                    <!-- Nombre (combobox en agencia: busca clientes o escribe uno nuevo; input plano
+                         en directo) + Apellido. displayField='firstName' muestra solo el nombre al
+                         elegir un cliente. leadGuestFirstName/LastName son la fuente de verdad. -->
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="leadGuestFirstName" class="form-label">Nombre</label>
+                            <label class="form-label">Nombre</label>
+                            <!-- Agencia: combobox Nombre -->
+                            <div class="d-none" id="leadGuestComboRow">
+                                <%- include('../../../atoms/common/tom-select', {
+                                    id: 'leadGuestClientId',
+                                    name: 'leadGuestClientId',
+                                    multiple: false,
+                                    placeholder: 'Buscar o escribir nombre',
+                                    label: '',
+                                    required: false,
+                                    allowCreate: true,
+                                    createLabel: 'Crear',
+                                    displayField: 'firstName',
+                                    helpText: '',
+                                    options: [],
+                                    selected: []
+                                }) %>
+                            </div>
+                            <!-- Directo: input Nombre (en agencia se oculta; sigue siendo fuente de verdad). -->
                             <input type="text" class="form-control" id="leadGuestFirstName" name="leadGuestFirstName" placeholder="Nombre">
                         </div>
                         <div class="col-md-6 mb-3">
@@ -392,13 +448,15 @@ const e = __isRes ? 'reservación' : 'cotización';
 </div>
 
 <!-- Quick Client Creation Modal -->
-<div class="modal fade" id="quickClientModal" tabindex="-1" aria-labelledby="quickClientModalLabel" aria-hidden="true">
+<div class="modal fade client-modal-v2" id="quickClientModal" tabindex="-1" aria-labelledby="quickClientModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="quickClientModalLabel">
-                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Rápido
-                </h5>
+                <div class="asc-hdr-icon"><i class="ti ti-user-plus"></i></div>
+                <div class="flex-grow-1">
+                    <h5 class="modal-title" id="quickClientModalLabel">Crear Cliente Rápido</h5>
+                    <div class="asc-subtitle">Se creará con la información mínima necesaria</div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
@@ -407,43 +465,47 @@ const e = __isRes ? 'reservación' : 'cotización';
                 <div id="quickClientModalAlerts"></div>
 
                 <form id="quickClientForm" class="needs-validation" novalidate>
-                    <div class="mb-3">
-                        <label for="qc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="qc_firstName" name="firstName" required placeholder="Ej: Juan">
-                        <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                    <p class="asc-section-label">Datos del cliente</p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="qc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="qc_firstName" name="firstName" required placeholder="Ej: Juan">
+                            <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="qc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="qc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                            <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="qc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="qc_lastName" name="lastName" required placeholder="Ej: Pérez">
-                        <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                    <div class="mt-3">
+                        <%- include('../../../atoms/common/email-input', {
+                            name: 'email',
+                            id: 'qc_email',
+                            label: 'Email',
+                            required: false,
+                            placeholder: 'email@ejemplo.com',
+                            helpText: 'Si no lo proporcionas, se generará un email temporal',
+                            containerClass: 'mb-3'
+                        }) %>
+
+                        <div class="mb-3">
+                            <label for="qc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
+                            <input type="text" class="form-control" id="qc_companyName" name="companyName" placeholder="Ej: Empresa S.A. de C.V.">
+                            <div class="form-text">Nombre de la empresa del cliente</div>
+                        </div>
+
+                        <%- include('../../../atoms/common/phone-input', {
+                            name: 'phone',
+                            id: 'qc_phone',
+                            label: 'Teléfono',
+                            required: false,
+                            helpText: 'Número de contacto del cliente',
+                            countryCode: 'MX',
+                            containerClass: 'mb-3'
+                        }) %>
                     </div>
-
-                    <%- include('../../../atoms/common/email-input', {
-                        name: 'email',
-                        id: 'qc_email',
-                        label: 'Email',
-                        required: false,
-                        placeholder: 'email@ejemplo.com',
-                        helpText: 'Si no lo proporcionas, se generará un email temporal',
-                        containerClass: 'mb-3'
-                    }) %>
-
-                    <div class="mb-3">
-                        <label for="qc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
-                        <input type="text" class="form-control" id="qc_companyName" name="companyName" placeholder="Ej: Empresa S.A. de C.V.">
-                        <div class="form-text">Nombre de la empresa del cliente</div>
-                    </div>
-
-                    <%- include('../../../atoms/common/phone-input', {
-                        name: 'phone',
-                        id: 'qc_phone',
-                        label: 'Teléfono',
-                        required: false,
-                        helpText: 'Número de contacto del cliente',
-                        countryCode: 'MX',
-                        containerClass: 'mb-3'
-                    }) %>
 
                     <div class="alert alert-info d-flex align-items-start" role="alert">
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
@@ -455,8 +517,8 @@ const e = __isRes ? 'reservación' : 'cotización';
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="ti ti-x me-1"></i>Cancelar
+                <button type="button" class="btn asc-btn-ghost" data-bs-dismiss="modal">
+                    Cancelar
                 </button>
                 <button type="button" class="btn btn-primary" id="saveQuickClientBtn">
                     <i class="ti ti-check me-1"></i>Crear Cliente
@@ -694,13 +756,51 @@ const e = __isRes ? 'reservación' : 'cotización';
 </div>
 
 <!-- Admin Sub-Client Creation Modal (for admin creating sub-clients for selected enterprise) -->
-<div class="modal fade" id="adminSubClientModal" tabindex="-1" aria-labelledby="adminSubClientModalLabel" aria-hidden="true">
+<style>
+    /* Rediseño compartido de modales de creación de cliente — clase .client-modal-v2.
+       La usan "Crear Cliente Final para Empresa" (#adminSubClientModal) y
+       "Crear Cliente Rápido" (#quickClientModal). Usa las variables de tema
+       (--bs-primary) para combinar con la app. */
+    .client-modal-v2 .modal-content { border:0; border-radius:16px; overflow:hidden; }
+    .client-modal-v2 .modal-header {
+        background:linear-gradient(135deg, var(--bs-primary) 0%, rgba(var(--bs-primary-rgb), .82) 100%);
+        color:#fff; border:0; padding:1.25rem 1.5rem; align-items:center;
+    }
+    .client-modal-v2 .asc-hdr-icon {
+        width:44px; height:44px; border-radius:12px; background:rgba(255,255,255,.2);
+        display:flex; align-items:center; justify-content:center; font-size:1.4rem; margin-right:.9rem; flex:0 0 auto;
+    }
+    .client-modal-v2 .modal-title { font-size:1.1rem; font-weight:700; line-height:1.2; color:#fff; }
+    .client-modal-v2 .asc-subtitle { font-size:.8rem; opacity:.85; }
+    .client-modal-v2 .modal-header .btn-close { filter:invert(1) grayscale(1) brightness(2); opacity:.9; }
+    .client-modal-v2 .modal-body { padding:1.5rem; }
+    .client-modal-v2 .asc-ent-pill {
+        display:flex; align-items:center; gap:.75rem; background:rgba(var(--bs-primary-rgb), .07);
+        border:1px solid rgba(var(--bs-primary-rgb), .18); border-radius:12px; padding:.75rem 1rem; margin-bottom:1.25rem;
+    }
+    .client-modal-v2 .asc-ent-ic {
+        width:38px; height:38px; border-radius:9px; background:#fff; display:flex; align-items:center;
+        justify-content:center; color:var(--bs-primary); font-size:1.2rem; flex:0 0 auto;
+    }
+    .client-modal-v2 .asc-ent-lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:var(--bs-primary); font-weight:700; opacity:.8; }
+    .client-modal-v2 .asc-ent-name { font-weight:700; color:#3d3470; font-size:.95rem; }
+    .client-modal-v2 .asc-section-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#9ca3af; font-weight:700; margin:0 0 .6rem; }
+    .client-modal-v2 .form-control, .client-modal-v2 .form-select { border-radius:10px; }
+    .client-modal-v2 .alert { border-radius:12px; }
+    .client-modal-v2 .modal-footer { border:0; padding:1rem 1.5rem 1.5rem; gap:.5rem; }
+    .client-modal-v2 .modal-footer .btn { border-radius:10px; padding:.55rem 1.2rem; font-weight:600; }
+    .client-modal-v2 .asc-btn-ghost { background:#f3f4f6; border:0; color:#6b7280; }
+    .client-modal-v2 .asc-btn-ghost:hover { background:#e5e7eb; color:#4b5563; }
+</style>
+<div class="modal fade client-modal-v2" id="adminSubClientModal" tabindex="-1" aria-labelledby="adminSubClientModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="adminSubClientModalLabel">
-                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Final para Empresa
-                </h5>
+                <div class="asc-hdr-icon"><i class="ti ti-user-plus"></i></div>
+                <div class="flex-grow-1">
+                    <h5 class="modal-title" id="adminSubClientModalLabel">Crear Cliente Final</h5>
+                    <div class="asc-subtitle">Se agregará a la empresa seleccionada</div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
@@ -709,68 +809,65 @@ const e = __isRes ? 'reservación' : 'cotización';
                 <div id="adminSubClientModalAlerts"></div>
 
                 <form id="adminSubClientForm" class="needs-validation" novalidate>
-                    <!-- Enterprise Info -->
-                    <div class="alert alert-info d-flex align-items-start" role="alert">
-                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                    <!-- Empresa seleccionada (pill): id preservado para el JS que setea el nombre -->
+                    <div class="asc-ent-pill">
+                        <div class="asc-ent-ic"><i class="ti ti-building"></i></div>
                         <div>
-                            <small><strong>Empresa seleccionada:</strong> <span id="selectedEnterpriseName">No hay empresa seleccionada</span></small>
-                            <br>
-                            <small>Este cliente final pertenecerá a la empresa seleccionada.</small>
+                            <div class="asc-ent-lbl">Empresa</div>
+                            <div class="asc-ent-name" id="selectedEnterpriseName">No hay empresa seleccionada</div>
                         </div>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="asc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="asc_firstName" name="firstName" required placeholder="Ej: Juan">
-                        <div class="invalid-feedback">Por favor ingresa el nombre</div>
+
+                    <p class="asc-section-label">Datos del cliente</p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="asc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="asc_firstName" name="firstName" required placeholder="Ej: Juan">
+                            <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="asc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="asc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                            <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="asc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="asc_lastName" name="lastName" required placeholder="Ej: Pérez">
-                        <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                    <div class="mt-3">
+                        <%- include('../../../atoms/common/email-input', {
+                            name: 'email',
+                            id: 'asc_email',
+                            label: 'Email',
+                            required: false,
+                            placeholder: 'email@ejemplo.com',
+                            helpText: 'Email de contacto del cliente final',
+                            containerClass: 'mb-3'
+                        }) %>
+
+                        <%- include('../../../atoms/common/phone-input', {
+                            name: 'phone',
+                            id: 'asc_phone',
+                            label: 'Teléfono',
+                            required: false,
+                            helpText: 'Número de contacto del cliente final',
+                            countryCode: 'MX',
+                            containerClass: 'mb-3'
+                        }) %>
+
+                        <%- include('../../../atoms/common/language-select', {
+                            id: 'asc_preferredLanguage',
+                            name: 'preferredLanguage',
+                            label: 'Idioma de Preferencia',
+                            required: false,
+                            helpText: 'Idioma preferido para comunicación',
+                            value: 'es'
+                        }) %>
                     </div>
-
-                    <%- include('../../../atoms/common/email-input', {
-                        name: 'email',
-                        id: 'asc_email',
-                        label: 'Email',
-                        required: false,
-                        placeholder: 'email@ejemplo.com',
-                        helpText: 'Email de contacto del cliente final',
-                        containerClass: 'mb-3'
-                    }) %>
-
-                    <div class="mb-3">
-                        <label for="asc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
-                        <input type="text" class="form-control" id="asc_companyName" name="companyName" placeholder="Ej: Departamento de Ventas S.A.">
-                        <div class="form-text">Nombre específico de la empresa del cliente final</div>
-                    </div>
-
-                    <%- include('../../../atoms/common/phone-input', {
-                        name: 'phone',
-                        id: 'asc_phone',
-                        label: 'Teléfono',
-                        required: false,
-                        helpText: 'Número de contacto del cliente final',
-                        countryCode: 'MX',
-                        containerClass: 'mb-3'
-                    }) %>
-                    
-                    <%- include('../../../atoms/common/language-select', {
-                        id: 'asc_preferredLanguage',
-                        name: 'preferredLanguage',
-                        label: 'Idioma de Preferencia',
-                        required: false,
-                        helpText: 'Idioma preferido para comunicación',
-                        value: 'es'
-                    }) %>
                 </form>
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="ti ti-x me-1"></i>Cancelar
+                <button type="button" class="btn asc-btn-ghost" data-bs-dismiss="modal">
+                    Cancelar
                 </button>
                 <button type="button" class="btn btn-primary" id="saveAdminSubClientBtn">
                     <i class="ti ti-check me-1"></i>Crear Cliente Final
@@ -915,14 +1012,14 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
     // (Detección por DOM, no por currentClientType, para evitar TDZ en llamadas tempranas.)
     function leadGuestSavesAsAgencyClient() {
         const isAmexingAdmin = (userRole === 'admin' || userRole === 'superadmin');
-        if (!isAmexingAdmin) return false;
+        if (!isAmexingAdmin) return false; // DM/agente: /quick ya guarda como agency_client de su agencia
         const enterpriseId = document.getElementById('clientId')?.value || '';
         if (!enterpriseId) return false;
-        const agencyRow = document.getElementById('agencyClientRow');
-        const directRow = document.getElementById('directClientRow');
-        const agencyVisible = !!agencyRow && window.getComputedStyle(agencyRow).display !== 'none';
-        const directVisible = !!directRow && window.getComputedStyle(directRow).display !== 'none';
-        return agencyVisible && !directVisible;
+        // Señal confiable de "modo agencia": la tarjeta Cliente Final (finalClientRow) SOLO se
+        // muestra para agencias. Antes se usaba agencyClientRow/directClientRow, que a veces
+        // quedaban desalineados con el modo real y el cliente se guardaba como directo del admin.
+        const finalRow = document.getElementById('finalClientRow');
+        return !!finalRow && window.getComputedStyle(finalRow).display !== 'none';
     }
     // Nota + selector junto a "Guardar cliente" (solo admin). En modo DIRECTO se puede elegir la
     // categoría del cliente (selector visible, nota oculta); en modo AGENCIA queda como cliente de la
@@ -1011,6 +1108,23 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
     // lo vuelve a derivar con el propietario real.
     syncContactFieldsVisibility();
 
+    // Si se transfiere el propietario de la cotización (desde quote-ownership.js) mientras la
+    // página está abierta, actualizar window.__quoteOwner y refrescar el resumen del contacto —
+    // así, cuando "el contacto es el propietario" está activo, refleja al nuevo propietario sin
+    // recargar. El teléfono puede venir vacío (el endpoint de ownership no lo incluye); se
+    // completa al recargar (el GET del quote sí trae owner.phone).
+    document.addEventListener('quoteOwnerChanged', (e) => {
+        const o = e.detail || {};
+        window.__quoteOwner = {
+            firstName: o.firstName || '',
+            lastName: o.lastName || '',
+            email: o.email || '',
+            phone: o.phone || '',
+            fullName: (o.fullName || `${o.firstName || ''} ${o.lastName || ''}`).trim(),
+        };
+        syncContactFieldsVisibility();
+    });
+
     // Espejo Lead Guest → Contacto (mismo individuo por defecto). Si el usuario edita el
     // contacto a mano, deja de reflejarse. No aplica si el override "es propietario" está activo.
     ['contactFirstName', 'contactLastName'].forEach((id) => {
@@ -1061,16 +1175,32 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         if (summary) {
             summary.classList.toggle('d-none', !linked);
             if (linked) {
-                const first = document.getElementById('leadGuestFirstName')?.value.trim() || '';
-                const last = document.getElementById('leadGuestLastName')?.value.trim() || '';
-                const email = document.getElementById('contactEmail')?.value.trim() || '';
+                // Derivar del Cliente Final ACTUAL (opción existente o tecleado) y mantener el Lead
+                // Guest (fuente de verdad) en sync — así el resumen refleja siempre el CF vigente.
+                const cfInst = document.getElementById('clientFinalId')?.customSelect;
+                let first = '';
+                let last = '';
+                let email = '';
+                if (cfInst && cfInst.isTyped && cfInst.isTyped()) {
+                    first = (cfInst.getTypedText && cfInst.getTypedText() || '').trim();
+                    last = (document.getElementById('finalClientLastName')?.value || '').trim();
+                } else {
+                    const opt = getFinalClientOptionByValue(getSelectedFinalClientValue());
+                    if (opt) { first = opt.firstName || ''; last = opt.lastName || ''; email = opt.email || ''; }
+                }
+                const setLg = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+                setLg('leadGuestFirstName', first);
+                setLg('leadGuestLastName', last);
+                email = email || document.getElementById('contactEmail')?.value.trim() || '';
                 const name = `${first} ${last}`.trim();
                 const txt = document.getElementById('leadGuestFinalSummaryText');
-                if (txt) txt.textContent = name ? (email ? `${name} · ${email}` : name) : 'Selecciona un cliente final arriba';
+                if (txt) txt.textContent = name ? (email ? `${name} · ${email}` : name) : 'Selecciona o escribe un cliente final arriba';
             }
         }
         // La nota de "Guardar cliente" depende del modo agencia/directo y de la agencia seleccionada.
         if (typeof updateSaveClientNote === 'function') updateSaveClientNote();
+        // Alternar combobox (agencia) vs inputs de nombre (directo) del Lead Guest.
+        if (typeof syncLeadGuestNameUi === 'function') syncLeadGuestNameUi();
     }
     // Aplica los datos del cliente final al Lead Guest (y al contacto).
     function applyFinalClientToLeadGuest(opt) {
@@ -1110,27 +1240,198 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         if (ts && ts.options && ts.options[val]) return ts.options[val];
         return null;
     }
+
+    // ===== Comboboxes de Lead Guest y Cliente Final (elegir cliente de agencia o crear nuevo) =====
+    function isAgencyModeVisible() {
+        const finalRow = document.getElementById('finalClientRow');
+        return !!finalRow && window.getComputedStyle(finalRow).display !== 'none';
+    }
+    // Nombre: combobox en agencia, input plano en directo. Apellido (leadGuestLastName) siempre visible.
+    function syncLeadGuestNameUi() {
+        const agency = isAgencyModeVisible();
+        document.getElementById('leadGuestComboRow')?.classList.toggle('d-none', !agency);
+        document.getElementById('leadGuestFirstName')?.classList.toggle('d-none', agency);
+    }
+    // Puebla el combobox de Lead Guest con los mismos clientes de la agencia que el Cliente Final.
+    async function populateLeadGuestOptions(clients) {
+        try {
+            const ts = await waitForTomSelect('leadGuestClientId');
+            if (ts.clearOptions) ts.clearOptions();
+            (clients || []).forEach((c) => { if (ts.addOption) ts.addOption(c); });
+        } catch (e) { /* combobox no inicializado aún */ }
+    }
+    // Divide un nombre completo en firstName / lastName por el primer espacio.
+    function splitLeadName(full) {
+        const parts = (full || '').trim().split(/\s+/).filter(Boolean);
+        return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') };
+    }
+
+    // Cliente Final: elegir existente (change no-typed) → llenar Apellido y deshabilitar "guardar"
+    // (ya está en el sistema). Sin selección → habilitar (por si escriben uno nuevo).
+    document.getElementById('clientFinalId')?.addEventListener('change', function () {
+        const inst = this.customSelect;
+        if (inst && inst.isTyped && inst.isTyped()) return; // el typed lo maneja customselect:create
+        const saveCb = document.getElementById('saveFinalClientAsClient');
+        const val = inst && inst.getValue ? inst.getValue() : this.value;
+        const opt = val && inst && inst.getOption ? inst.getOption(val) : null;
+        if (opt) {
+            const lastEl = document.getElementById('finalClientLastName');
+            if (lastEl) lastEl.value = opt.lastName || '';
+            if (saveCb) { saveCb.checked = false; saveCb.disabled = true; }
+        } else if (saveCb) {
+            saveCb.disabled = false;
+        }
+        saveCb?.closest('.form-check')?.classList.toggle('opacity-50', !!opt);
+    });
+    // Cliente Final tecleado (nuevo): el texto es el Nombre; el Apellido se captura en su campo.
+    document.getElementById('clientFinalId')?.addEventListener('customselect:create', function (e) {
+        const firstName = ((e.detail && e.detail.text) || '').trim();
+        const saveCb = document.getElementById('saveFinalClientAsClient');
+        if (saveCb) saveCb.disabled = false;
+        saveCb?.closest('.form-check')?.classList.remove('opacity-50');
+        const set = (id, v, clearEdited) => {
+            const el = document.getElementById(id);
+            if (el) { el.value = v; if (clearEdited) el.dataset.userEdited = ''; }
+        };
+        if (!document.getElementById('contactDifferentFromOwner')?.checked) {
+            set('contactFirstName', firstName, true);
+        }
+        if (document.getElementById('leadGuestIsFinalClient')?.checked) {
+            set('leadGuestFirstName', firstName);
+        }
+        if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode();
+    });
+    // Apellido del Cliente Final → contacto (si el contacto no es el propietario ni fue editado)
+    // y, si "el Lead Guest es el cliente final" está activo, refrescar el resumen del Lead Guest.
+    document.getElementById('finalClientLastName')?.addEventListener('input', function () {
+        if (!document.getElementById('contactDifferentFromOwner')?.checked) {
+            const cl = document.getElementById('contactLastName');
+            if (cl && !cl.dataset.userEdited) cl.value = this.value;
+        }
+        if (document.getElementById('leadGuestIsFinalClient')?.checked && typeof syncLeadGuestMode === 'function') {
+            syncLeadGuestMode();
+        }
+    });
+    // Al teclear en el Nombre (posible cliente nuevo), habilitar "guardar como cliente".
+    const enableSave = (cbId) => {
+        const cb = document.getElementById(cbId);
+        if (cb) { cb.disabled = false; cb.closest('.form-check')?.classList.remove('opacity-50'); }
+    };
+    document.getElementById('clientFinalId')?.addEventListener('customselect:input', () => enableSave('saveFinalClientAsClient'));
+    document.getElementById('leadGuestClientId')?.addEventListener('customselect:input', () => enableSave('saveLeadGuestAsClient'));
+
+    // Lead Guest combobox: elegir existente → llenar LG + contacto desde la opción.
+    document.getElementById('leadGuestClientId')?.addEventListener('change', function () {
+        const inst = this.customSelect;
+        if (inst && inst.isTyped && inst.isTyped()) return; // typed → customselect:create
+        const val = inst && inst.getValue ? inst.getValue() : this.value;
+        if (!val) return;
+        const opt = inst && inst.getOption ? inst.getOption(val) : null;
+        if (opt) {
+            applyFinalClientToLeadGuest(opt);
+            const saveCb = document.getElementById('saveLeadGuestAsClient');
+            if (saveCb) saveCb.checked = false;
+        }
+        if (typeof mirrorLeadGuestToContact === 'function') mirrorLeadGuestToContact();
+        if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode();
+    });
+    // Lead Guest tecleado (nuevo): el texto es el Nombre; el Apellido se captura en su campo.
+    document.getElementById('leadGuestClientId')?.addEventListener('customselect:create', function (e) {
+        const firstName = ((e.detail && e.detail.text) || '').trim();
+        const el = document.getElementById('leadGuestFirstName');
+        if (el) el.value = firstName;
+        if (typeof mirrorLeadGuestToContact === 'function') mirrorLeadGuestToContact();
+        if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode();
+    });
+
+    // Estado inicial del UI de nombre del Lead Guest + al cambiar de cliente/modo.
+    syncLeadGuestNameUi();
+    document.getElementById('clientId')?.addEventListener('change', syncLeadGuestNameUi);
+
+    // Resuelve el Cliente Final para el payload. { clientFinalId, clientFinalName }.
+    // Typed-new + "guardar como cliente" marcado → crea el cliente (y setea su id en el combobox).
+    async function resolveClientFinalForSave() {
+        const el = document.getElementById('clientFinalId');
+        const inst = el && el.customSelect;
+        if (!inst) return { clientFinalId: (el && el.value) || '', clientFinalName: '' };
+        const typed = inst.isTyped && inst.isTyped();
+        if (!typed) return { clientFinalId: inst.getValue() || '', clientFinalName: '' };
+        // Nombre = texto tecleado en el combobox; Apellido = su campo.
+        const firstName = ((inst.getTypedText && inst.getTypedText()) || '').trim();
+        const lastName = (document.getElementById('finalClientLastName')?.value || '').trim();
+        const fullName = `${firstName} ${lastName}`.trim() || firstName;
+        const saveCb = document.getElementById('saveFinalClientAsClient');
+        if (saveCb && saveCb.checked) {
+            if (firstName && lastName) {
+                const asAgency = leadGuestSavesAsAgencyClient();
+                const endpoint = asAgency ? '/api/owned-clients/admin-create-subclient' : '/api/owned-clients/quick';
+                const payload = asAgency
+                    ? { firstName, lastName, enterpriseId: document.getElementById('clientId')?.value || '' }
+                    : { firstName, lastName };
+                try {
+                    const resp = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${getAccessToken()}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                    const result = await resp.json();
+                    if (result && result.success && result.data) {
+                        inst.addOption({
+                            value: result.data.value, text: result.data.label,
+                            email: result.data.email || '', contactPerson: result.data.contactPerson || result.data.label,
+                            phone: result.data.phone || '', firstName, lastName,
+                        });
+                        inst.setValue(result.data.value);
+                        saveCb.checked = false;
+                        return { clientFinalId: result.data.value, clientFinalName: '' };
+                    }
+                } catch (err) { console.error('Error creando cliente final:', err); }
+            }
+        }
+        return { clientFinalId: '', clientFinalName: fullName };
+    }
     // Al marcar "El Lead Guest es el cliente final": el Lead Guest debe volverse el cliente final.
     // Si hay uno seleccionado y el Lead Guest actual DIFIERE, se confirma antes de reemplazar (si
     // cancelan, se desmarca). Sin cliente final → solo se muestra el resumen que pide seleccionar uno.
     document.getElementById('leadGuestIsFinalClient')?.addEventListener('change', async function () {
         const cb = this;
         if (cb.checked) {
+            // Cliente Final: opción existente o texto tecleado (nuevo). En ambos casos, al marcar
+            // "el Lead Guest es el cliente final" se copia su Nombre/Apellido al Lead Guest.
             let opt = null;
             try {
                 opt = getFinalClientOptionByValue(getSelectedFinalClientValue());
             } catch (e) { /* dropdown no disponible (p.ej. modo directo) */ }
+            let cfFirst = '';
+            let cfLast = '';
             if (opt) {
+                cfFirst = opt.firstName || '';
+                cfLast = opt.lastName || '';
+            } else {
+                const cfInst = document.getElementById('clientFinalId')?.customSelect;
+                if (cfInst && cfInst.isTyped && cfInst.isTyped() && cfInst.getTypedText) cfFirst = (cfInst.getTypedText() || '').trim();
+                cfLast = (document.getElementById('finalClientLastName')?.value || '').trim();
+            }
+            if (cfFirst || cfLast) {
                 const norm = (s) => (s || '').trim().toLowerCase();
                 const lgFirst = document.getElementById('leadGuestFirstName')?.value.trim() || '';
                 const lgLast = document.getElementById('leadGuestLastName')?.value.trim() || '';
-                const hasLeadGuest = !!(lgFirst || lgLast);
-                const differs = norm(lgFirst) !== norm(opt.firstName) || norm(lgLast) !== norm(opt.lastName);
-                if (hasLeadGuest && differs) {
-                    const ok = window.confirm('Se reemplazará el Lead Guest actual por el cliente final seleccionado. ¿Continuar?');
+                const differs = norm(lgFirst) !== norm(cfFirst) || norm(lgLast) !== norm(cfLast);
+                if ((lgFirst || lgLast) && differs) {
+                    const ok = window.confirm('Se reemplazará el Lead Guest actual por el cliente final. ¿Continuar?');
                     if (!ok) { cb.checked = false; syncLeadGuestMode(); return; }
                 }
-                applyFinalClientToLeadGuest(opt);
+                if (opt) {
+                    applyFinalClientToLeadGuest(opt);
+                } else {
+                    const set = (id, v, clearEdited) => { const el = document.getElementById(id); if (el) { el.value = v; if (clearEdited) el.dataset.userEdited = ''; } };
+                    set('leadGuestFirstName', cfFirst);
+                    set('leadGuestLastName', cfLast);
+                    if (!document.getElementById('contactDifferentFromOwner')?.checked) {
+                        set('contactFirstName', cfFirst, true);
+                        set('contactLastName', cfLast, true);
+                    }
+                }
             }
         }
         syncLeadGuestMode();
@@ -1703,7 +2004,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 
                 // Add empty option first
                 employeeTS.addOption({ value: '', text: 'Seleccionar cliente final (opcional)' });
-                
+
+                // Recolecta las mismas opciones para alimentar el combobox de Lead Guest (agencia).
+                const leadGuestOpts = [];
+
                 // Add sub-client options
                 result.data.clients.forEach(client => {
                     // Build display name - prioritize company name, then contact person, then constructed name
@@ -1742,7 +2046,7 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                         originalData: client
                     });
                     
-                    employeeTS.addOption({
+                    const cfOpt = {
                         value: client.id,
                         text: displayName,
                         email: client.email,
@@ -1752,10 +2056,14 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                         phone: client.phone || '',
                         companyName: client.companyName || '',
                         preferredLanguage: client.preferredLanguage || 'es'
-                    });
+                    };
+                    employeeTS.addOption(cfOpt);
+                    leadGuestOpts.push(cfOpt);
                 });
-                
+
                 employeeTS.refreshOptions(false);
+                // Mismo listado para el combobox de Lead Guest (modo agencia).
+                populateLeadGuestOptions(leadGuestOpts);
                 
                 // If a specific clientFinalId was provided, set it now
                 if (selectedClientFinalId) {
@@ -2339,7 +2647,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         const selectedEnterpriseId = clientIdInput ? clientIdInput.value : null;
         
         if (!selectedEnterpriseId) {
-            showAlert('quoteInformationAlerts', 'Por favor selecciona una empresa antes de crear un cliente final', 'warning');
+            // Mostrar el aviso dentro de la propia sección Cliente Final (junto al botón),
+            // no en quoteInformationAlerts (arriba del formulario, fuera de vista).
+            clearAlerts('finalClientAlerts');
+            showAlert('finalClientAlerts', 'Por favor selecciona una empresa antes de crear un cliente final', 'warning');
             return;
         }
         
@@ -2398,7 +2709,6 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             lastName: document.getElementById('asc_lastName').value.trim(),
             email: document.getElementById('asc_email').value.trim() || undefined,
             phone: document.getElementById('asc_phone').value.trim() || undefined,
-            companyName: document.getElementById('asc_companyName').value.trim() || undefined,
             preferredLanguage: document.getElementById('asc_preferredLanguage').value || 'es',
             // Add the enterprise ID as the owner
             enterpriseId: selectedEnterpriseId
@@ -2785,6 +3095,34 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                     }, 1000); // Wait 1 second for dropdown to fully load
                 }
 
+                // Cliente Final tecleado (texto libre, sin id): restaurar el display del combobox.
+                const quoteClientFinalName = quote.clientFinalName || '';
+                if (quoteClientFinalName && !quoteClientFinalId) {
+                    setTimeout(async () => {
+                        try {
+                            const ts = await waitForTomSelect('clientFinalId');
+                            if (ts.setTypedValue) ts.setTypedValue(quoteClientFinalName, true);
+                        } catch (e) { /* combobox no listo */ }
+                    }, 1000);
+                }
+
+                // Lead Guest (modo agencia): restaurar el display del combobox desde el nombre
+                // guardado — si coincide con una opción usar su id, si no mostrarlo como tecleado.
+                setTimeout(async () => {
+                    try {
+                        if (!isAgencyModeVisible()) return;
+                        const lgFirst = quote.leadGuestFirstName || '';
+                        if (!lgFirst && !quote.leadGuestLastName) return;
+                        const ts = await waitForTomSelect('leadGuestClientId');
+                        if (quoteClientFinalId && ts.getOption && ts.getOption(quoteClientFinalId)
+                            && document.getElementById('leadGuestIsFinalClient')?.checked) {
+                            ts.setValue(quoteClientFinalId); // muestra el Nombre vía displayField
+                        } else if (lgFirst && ts.setTypedValue) {
+                            ts.setTypedValue(lgFirst, true); // Nombre = firstName; el Apellido ya se restauró
+                        }
+                    } catch (e) { /* combobox no listo */ }
+                }, 1100);
+
                 // Populate form fields
                 if (quote.eventType) {
                     document.getElementById('eventType').value = quote.eventType;
@@ -2923,18 +3261,8 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             }
         }
 
-        // Get employee selection if any
-        let clientFinalId = null;
-        try {
-            const employeeTS = await waitForTomSelect('clientFinalId');
-            const value = employeeTS.getValue();
-            // Only set if there's an actual value
-            if (value && value !== '') {
-                clientFinalId = value;
-            }
-        } catch (e) {
-            console.log('Cliente Final dropdown not initialized yet');
-        }
+        // Cliente Final: existente (id), typed-guardado (crea cliente → id) o typed-libre (texto).
+        const cfSel = await resolveClientFinalForSave();
 
         // Get form data — contacto = propietario por defecto. Si NO se marcó "diferente al
         // propietario", se copian nombre/email/teléfono del propietario (evita doble captura).
@@ -2960,10 +3288,9 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             notes: document.getElementById('notes').value.trim() || undefined
         };
 
-        // Only include clientFinalId if it has a value
-        if (clientFinalId) {
-            formData.clientFinalId = clientFinalId;
-        }
+        // clientFinalId o clientFinalName (excluyentes; se envía el otro vacío para limpiar).
+        formData.clientFinalId = cfSel.clientFinalId || '';
+        formData.clientFinalName = cfSel.clientFinalName || '';
 
         // Include clientType for admin users updating direct client quotes
         if (userRole === 'admin' || userRole === 'superadmin') {
@@ -3076,18 +3403,8 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             }
         }
 
-        // Get employee selection if any
-        let clientFinalId = null;
-        try {
-            const employeeTS = await waitForTomSelect('clientFinalId');
-            const value = employeeTS.getValue();
-            // Only set if there's an actual value
-            if (value && value !== '') {
-                clientFinalId = value;
-            }
-        } catch (e) {
-            console.log('Cliente Final dropdown not initialized yet');
-        }
+        // Cliente Final: existente (id), typed-guardado (crea cliente → id) o typed-libre (texto).
+        const cfSel = await resolveClientFinalForSave();
 
         // Get form data — contacto = propietario por defecto (ver resolveContactValues).
         const contactVals = resolveContactValues();
@@ -3112,10 +3429,9 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             notes: document.getElementById('notes').value.trim() || undefined
         };
 
-        // Only include clientFinalId if it has a value
-        if (clientFinalId) {
-            formData.clientFinalId = clientFinalId;
-        }
+        // clientFinalId o clientFinalName (excluyentes; se envía el otro vacío para limpiar).
+        formData.clientFinalId = cfSel.clientFinalId || '';
+        formData.clientFinalName = cfSel.clientFinalName || '';
         
         // Include clientType for admin users creating direct client quotes
         if (userRole === 'admin' || userRole === 'superadmin') {

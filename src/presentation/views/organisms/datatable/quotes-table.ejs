@@ -600,10 +600,11 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     }
                 },
                 {
-                    data: 'contactPerson',
+                    // Columna "Cliente Final": el cliente final real (resuelto por id o texto libre),
+                    // NO el contacto. Antes mostraba contactPerson (p.ej. "Admin User" con contacto=propietario).
+                    data: 'clientFinalDisplay',
                     render: function(data, type, row) {
-                        const name = (data && data.trim())
-                            || `${row.contactFirstName || ''} ${row.contactLastName || ''}`.trim();
+                        const name = (data && data.trim()) || (row.clientFinalName || '').trim();
                         if (!name) return '<em class="text-muted">—</em>';
                         return `<span>${name}</span>`;
                     }

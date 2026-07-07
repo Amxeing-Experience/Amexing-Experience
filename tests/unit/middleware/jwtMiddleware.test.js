@@ -114,7 +114,10 @@ describe('JWT Middleware', () => {
       expect(mockRes.status).toHaveBeenCalledWith(401);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: false,
-        error: 'Invalid or malformed token'
+        error: 'Invalid or malformed token',
+        // Fuera de producción el middleware añade el motivo subyacente para diagnóstico
+        // (con NODE_ENV=test se incluye): detail = error.message de validateToken mockeado.
+        detail: 'Invalid token'
       });
       expect(mockNext).not.toHaveBeenCalled();
     });
