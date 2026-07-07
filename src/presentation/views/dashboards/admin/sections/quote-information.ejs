@@ -1009,14 +1009,14 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
     // (Detección por DOM, no por currentClientType, para evitar TDZ en llamadas tempranas.)
     function leadGuestSavesAsAgencyClient() {
         const isAmexingAdmin = (userRole === 'admin' || userRole === 'superadmin');
-        if (!isAmexingAdmin) return false;
+        if (!isAmexingAdmin) return false; // DM/agente: /quick ya guarda como agency_client de su agencia
         const enterpriseId = document.getElementById('clientId')?.value || '';
         if (!enterpriseId) return false;
-        const agencyRow = document.getElementById('agencyClientRow');
-        const directRow = document.getElementById('directClientRow');
-        const agencyVisible = !!agencyRow && window.getComputedStyle(agencyRow).display !== 'none';
-        const directVisible = !!directRow && window.getComputedStyle(directRow).display !== 'none';
-        return agencyVisible && !directVisible;
+        // Señal confiable de "modo agencia": la tarjeta Cliente Final (finalClientRow) SOLO se
+        // muestra para agencias. Antes se usaba agencyClientRow/directClientRow, que a veces
+        // quedaban desalineados con el modo real y el cliente se guardaba como directo del admin.
+        const finalRow = document.getElementById('finalClientRow');
+        return !!finalRow && window.getComputedStyle(finalRow).display !== 'none';
     }
     // Nota + selector junto a "Guardar cliente" (solo admin). En modo DIRECTO se puede elegir la
     // categoría del cliente (selector visible, nota oculta); en modo AGENCIA queda como cliente de la
