@@ -105,8 +105,12 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
                 <div class="exp-lux__media">
                     <img id="experienceHeroImage" src="" alt="" class="exp-lux__media-img">
                     <div class="exp-lux__media-overlay"></div>
+                    <button type="button" class="exp-lux__expand" id="experienceHeroExpand" aria-label="Ampliar galería" style="display:none;"><i class="ti ti-arrows-maximize"></i></button>
                     <div class="exp-lux__media-caption">
-                        <span class="exp-lux__category" id="experienceHeroCategory" style="display:none;"></span>
+                        <div class="exp-lux__tags">
+                            <span class="exp-lux__category" id="experienceHeroCategory" style="display:none;"></span>
+                            <span class="exp-lux__type-pill" id="experienceHeroType" style="display:none;"></span>
+                        </div>
                         <h3 id="experienceHeroTitle" class="exp-lux__title"></h3>
                         <span class="exp-lux__title-underline"></span>
                     </div>
@@ -115,7 +119,6 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
                 <!-- RIGHT: content pane -->
                 <div class="exp-lux__panel">
                     <div class="exp-lux__header">
-                        <span class="exp-lux__eyebrow">AMEXING · DETALLE</span>
                         <button type="button" class="exp-lux__close" data-bs-dismiss="modal" aria-label="Close">
                             <i class="ti ti-x"></i>
                         </button>
@@ -2239,15 +2242,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 heroImage.dispatchEvent(new Event('load'));
             }
             
-            // ---- LEFT pane caption: title + category badge ----
+            // ---- LEFT pane caption: title + category/type pills ----
             if (heroTitle) heroTitle.textContent = experience.name || experienceName || '';
             if (heroCategory) {
                 const catLabel = categoryLabel(experience.experience_category);
                 if (catLabel) {
-                    heroCategory.textContent = '· ' + catLabel.toUpperCase();
+                    heroCategory.textContent = catLabel.toUpperCase();
                     heroCategory.style.display = '';
                 } else {
                     heroCategory.style.display = 'none';
+                }
+            }
+            const heroType = document.getElementById('experienceHeroType');
+            if (heroType) {
+                const tipoVal = experience.tipo || experience.experienceType;
+                if (tipoVal) {
+                    heroType.textContent = String(tipoVal).charAt(0).toUpperCase() + String(tipoVal).slice(1);
+                    heroType.style.display = '';
+                } else {
+                    heroType.style.display = 'none';
                 }
             }
 
@@ -2264,13 +2277,54 @@ document.addEventListener('DOMContentLoaded', function() {
             // ---- Render the single-scroll body ----
             detailBody.innerHTML = renderExperienceDetailBody(experience, experienceName);
 
-            // Wire gallery thumbnails to the existing fullscreen gallery
-            detailBody.querySelectorAll('.exp-lux__thumb').forEach((el) => {
+            // Galería: clic en miniatura → cambia el hero (imagen principal);
+            // clic en el hero → abre el visor a pantalla completa en la foto seleccionada.
+            const thumbEls = detailBody.querySelectorAll('.exp-lux__thumb');
+            thumbEls.forEach((el) => {
                 el.addEventListener('click', () => {
                     const idx = parseInt(el.dataset.photoIndex, 10) || 0;
-                    openFullscreenGallery(idx);
+                    if (el.dataset.photoUrl) heroImage.src = el.dataset.photoUrl;
+                    heroImage.dataset.currentIndex = idx;
+                    thumbEls.forEach((t) => t.classList.toggle('is-active', t === el));
                 });
             });
+            heroImage.dataset.currentIndex = 0;
+            const mediaPane = heroImage.closest('.exp-lux__media');
+            const expandBtn = document.getElementById('experienceHeroExpand');
+            const hasGallery = storeGalleryPhotos.length > 0;
+            if (mediaPane) {
+                mediaPane.style.cursor = hasGallery ? 'zoom-in' : '';
+                mediaPane.onclick = () => {
+                    if (hasGallery) openFullscreenGallery(parseInt(heroImage.dataset.currentIndex, 10) || 0);
+                };
+            }
+            if (expandBtn) expandBtn.style.display = hasGallery ? '' : 'none';
+
+            // Navegación de la tira: flechas ‹ › y rueda del mouse (vertical → horizontal).
+            const galStrip = detailBody.querySelector('.exp-lux__gallery');
+            const galPrev = detailBody.querySelector('.exp-lux__gallery-nav--prev');
+            const galNext = detailBody.querySelector('.exp-lux__gallery-nav--next');
+            if (galStrip && galPrev && galNext) {
+                const galStep = () => Math.max(galStrip.clientWidth * 0.75, 200);
+                const galUpdateNav = () => {
+                    const maxScroll = galStrip.scrollWidth - galStrip.clientWidth - 2;
+                    galPrev.classList.toggle('is-hidden', galStrip.scrollLeft <= 0);
+                    galNext.classList.toggle('is-hidden', maxScroll <= 0 || galStrip.scrollLeft >= maxScroll);
+                };
+                galPrev.addEventListener('click', () => galStrip.scrollBy({ left: -galStep(), behavior: 'smooth' }));
+                galNext.addEventListener('click', () => galStrip.scrollBy({ left: galStep(), behavior: 'smooth' }));
+                galStrip.addEventListener('scroll', galUpdateNav);
+                galStrip.addEventListener('wheel', (e) => {
+                    if (galStrip.scrollWidth <= galStrip.clientWidth) return;
+                    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                        galStrip.scrollLeft += e.deltaY;
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+                // Recalcular al abrir (las imágenes pueden cambiar el ancho al cargar).
+                galUpdateNav();
+                setTimeout(galUpdateNav, 300);
+            }
 
             // Render the prices section (kept separate for currency/payment refresh)
             loadPricesTab(experience);
@@ -2304,7 +2358,7 @@ document.addEventListener('DOMContentLoaded', function() {
             sections.push(`<div class="exp-lux__section"><p class="exp-lux__desc">${experience.description}</p></div>`);
         }
 
-        // 2. Info tiles: Duración + Grupo máximo
+        // 2. Info tiles: Duración, Capacidad y Tiempo de viaje.
         const durVal = experience.duration ? formatDuration(experience.duration) : '';
         const minP = experience.min_people;
         const maxP = experience.max_people || experience.capacity;
@@ -2312,16 +2366,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (minP && maxP) groupVal = `${minP}–${maxP} personas`;
         else if (maxP) groupVal = `Máximo ${maxP} personas`;
         else if (minP) groupVal = `Mínimo ${minP} personas`;
+        const expTipo = experience.tipo || experience.experienceType;
+        const tiles = [
+            ['DURACIÓN', durVal || '—'],
+            ['CAPACIDAD', groupVal || '—'],
+        ];
+        if (experience.travel_duration) {
+            tiles.push(['TIEMPO DE VIAJE', formatTravelDuration(experience.travel_duration)]);
+        }
         sections.push(`
             <div class="exp-lux__tiles">
+                ${tiles.map(([label, val]) => `
                 <div class="exp-lux__tile">
-                    <span class="exp-lux__tile-label">DURACIÓN</span>
-                    <span class="exp-lux__tile-value">${durVal || '—'}</span>
-                </div>
-                <div class="exp-lux__tile">
-                    <span class="exp-lux__tile-label">GRUPO MÁXIMO</span>
-                    <span class="exp-lux__tile-value">${groupVal || '—'}</span>
-                </div>
+                    <span class="exp-lux__tile-label">${label}</span>
+                    <span class="exp-lux__tile-value">${val}</span>
+                </div>`).join('')}
             </div>
         `);
 
@@ -2356,28 +2415,27 @@ document.addEventListener('DOMContentLoaded', function() {
             `);
         }
 
-        // 3. Incluye
+        // 3 + 4. Incluye / No incluye, lado a lado en 2 columnas (se apilan en panel angosto).
         const inc = toArr(experience.includes);
-        if (inc.length) {
-            sections.push(`
-                <div class="exp-lux__section">
-                    <h4 class="exp-lux__heading">INCLUYE</h4>
-                    <ul class="exp-lux__list">
-                        ${inc.map(i => `<li><span class="exp-lux__check">✓</span><span>${i}</span></li>`).join('')}
-                    </ul>
-                </div>
-            `);
-        }
-
-        // 4. No incluye
         const ninc = toArr(experience.notincludes);
-        if (ninc.length) {
+        if (inc.length || ninc.length) {
+            const incCol = inc.length ? `
+                    <div class="exp-lux__inc-col">
+                        <h4 class="exp-lux__heading">INCLUYE</h4>
+                        <ul class="exp-lux__list">
+                            ${inc.map(i => `<li><span class="exp-lux__check">✓</span><span>${i}</span></li>`).join('')}
+                        </ul>
+                    </div>` : '';
+            const nincCol = ninc.length ? `
+                    <div class="exp-lux__inc-col">
+                        <h4 class="exp-lux__heading">NO INCLUYE</h4>
+                        <ul class="exp-lux__list exp-lux__list--muted">
+                            ${ninc.map(i => `<li><span class="exp-lux__cross">×</span><span>${i}</span></li>`).join('')}
+                        </ul>
+                    </div>` : '';
             sections.push(`
                 <div class="exp-lux__section">
-                    <h4 class="exp-lux__heading">NO INCLUYE</h4>
-                    <ul class="exp-lux__list exp-lux__list--muted">
-                        ${ninc.map(i => `<li><span class="exp-lux__cross">×</span><span>${i}</span></li>`).join('')}
-                    </ul>
+                    <div class="exp-lux__inc-grid">${incCol}${nincCol}</div>
                 </div>
             `);
         }
@@ -2401,48 +2459,54 @@ document.addEventListener('DOMContentLoaded', function() {
             `);
         }
 
-        // 5. Galería (up to 4 thumbnails → fullscreen gallery)
+        // 5. Galería: tira horizontal con TODAS las fotos. Clic en miniatura cambia el hero.
         if (experience.photos && experience.photos.length > 0) {
-            const thumbs = experience.photos.slice(0, 4).map((photo, index) => {
+            const thumbs = experience.photos.map((photo, index) => {
                 const url = getOptimizedImageUrl(photo) || '/img/amexing_logo_horizontal.avif';
-                return `<button type="button" class="exp-lux__thumb" data-photo-index="${index}" style="background-image:url('${url}')" aria-label="Ver foto ${index + 1}"></button>`;
+                return `<button type="button" class="exp-lux__thumb${index === 0 ? ' is-active' : ''}" data-photo-index="${index}" data-photo-url="${url}" style="background-image:url('${url}')" aria-label="Ver foto ${index + 1}"></button>`;
             }).join('');
             sections.push(`
                 <div class="exp-lux__section">
-                    <h4 class="exp-lux__heading">GALERÍA</h4>
+                    <div class="exp-lux__gallery-head">
+                        <h4 class="exp-lux__heading">GALERÍA</h4>
+                        <div class="exp-lux__gallery-navs">
+                            <button type="button" class="exp-lux__gallery-nav exp-lux__gallery-nav--prev is-hidden" aria-label="Anterior"><i class="ti ti-chevron-left"></i></button>
+                            <button type="button" class="exp-lux__gallery-nav exp-lux__gallery-nav--next" aria-label="Siguiente"><i class="ti ti-chevron-right"></i></button>
+                        </div>
+                    </div>
                     <div class="exp-lux__gallery">${thumbs}</div>
                 </div>
             `);
         }
 
-        // 6. Notas de reserva (highlighted box)
+        // 6. Reserva: tiempo de anticipación + notas de reserva, juntos en una sola sección.
         // Fall back to booking_notes/notas/notes so content isn't lost (old modal behavior).
         const bookingNotes = experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes;
-        if (bookingNotes) {
+        const advMinResv = experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime);
+        if (advMinResv || bookingNotes) {
+            let reservaInner = '';
+            if (advMinResv) {
+                reservaInner += `<p class="exp-lux__resv-adv">Reservar con al menos <span class="exp-lux__resv-adv-value">${formatAdvanceBooking(advMinResv)}</span> de anticipación.</p>`;
+            }
+            if (bookingNotes) {
+                reservaInner += `<p class="exp-lux__prewrap exp-lux__resv-notes">${bookingNotes}</p>`;
+            }
             sections.push(`
                 <div class="exp-lux__section">
-                    <div class="exp-lux__notebox">
-                        <h4 class="exp-lux__heading">NOTAS DE RESERVA</h4>
-                        <p class="exp-lux__prewrap">${bookingNotes}</p>
-                    </div>
+                    <h4 class="exp-lux__heading">RESERVA</h4>
+                    ${reservaInner}
                 </div>
             `);
         }
 
-        // 7. Key-value rows
+        // 7. Key-value rows (moneda/método de pago se muestran en la sección de precios;
+        //    el tipo de experiencia se muestra como pill en el hero)
         const kv = [];
-        const currencyMap = { MXN: 'MXN — Peso Mexicano', USD: 'USD — US Dollar' };
-        kv.push(['MONEDA', currencyMap[currency] || currency]);
-        const payMap = { efectivo: 'Efectivo', transferencia: 'Transferencia bancaria', tarjeta: 'Tarjeta de crédito' };
-        if (payMap[paymentType]) kv.push(['MÉTODO DE PAGO', payMap[paymentType]]);
-        const tipo = experience.tipo || experience.experienceType;
-        if (tipo) kv.push(['TIPO', String(tipo).charAt(0).toUpperCase() + String(tipo).slice(1)]);
         // Ubicación
         const ubic = experience.location || experience.address;
         if (ubic) kv.push(['UBICACIÓN', ubic]);
-        // Días disponibles (precomputed string)
-        kv.push(['DÍAS DISPONIBLES', experience.displayAvailability || 'Todos los días']);
-        // Horarios disponibles: unique start times across availability entries, 12h am/pm.
+        // Disponibilidad desglosada por día (día → sus horarios). Se agrupan los días que
+        // comparten exactamente el mismo horario para no repetir (p.ej. "Lun, Mié, Vie · 9:00 am").
         const to12h = (hhmm) => {
             const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/);
             if (!m) return '';
@@ -2452,33 +2516,77 @@ document.addEventListener('DOMContentLoaded', function() {
             h = h % 12; if (h === 0) h = 12;
             return h + ':' + min + ' ' + ampm;
         };
-        if (Array.isArray(experience.availability)) {
-            const seen = new Set();
-            const times = [];
+        const schedDayAbbr = {
+            '0': 'Do', '7': 'Do', 'sunday': 'Do', 'domingo': 'Do',
+            '1': 'Lu', 'monday': 'Lu', 'lunes': 'Lu',
+            '2': 'Ma', 'tuesday': 'Ma', 'martes': 'Ma',
+            '3': 'Mi', 'wednesday': 'Mi', 'miércoles': 'Mi', 'miercoles': 'Mi',
+            '4': 'Ju', 'thursday': 'Ju', 'jueves': 'Ju',
+            '5': 'Vi', 'friday': 'Vi', 'viernes': 'Vi',
+            '6': 'Sa', 'saturday': 'Sa', 'sábado': 'Sa', 'sabado': 'Sa'
+        };
+        const schedShort = { 'Lu': 'Lun', 'Ma': 'Mar', 'Mi': 'Mié', 'Ju': 'Jue', 'Vi': 'Vie', 'Sa': 'Sáb', 'Do': 'Dom' };
+        const schedFull = { 'Lu': 'Lunes', 'Ma': 'Martes', 'Mi': 'Miércoles', 'Ju': 'Jueves', 'Vi': 'Viernes', 'Sa': 'Sábado', 'Do': 'Domingo' };
+        const schedOrder = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+        let scheduleRendered = false;
+        if (Array.isArray(experience.availability) && experience.availability.length) {
+            const perDay = {}; // abbr -> [horarios formateados]
             experience.availability.forEach(entry => {
                 if (!entry || typeof entry !== 'object') return;
-                const starts = [];
+                let dv = entry.day !== undefined ? entry.day : (entry.Day !== undefined ? entry.Day : (entry.name !== undefined ? entry.name : entry.value));
+                if (dv === null || dv === undefined) return;
+                const abbr = schedDayAbbr[String(dv).toLowerCase().trim()];
+                if (!abbr) return;
+                const times = [];
                 if (Array.isArray(entry.times)) {
-                    entry.times.forEach(t => { if (t && t.start) starts.push(t.start); });
+                    entry.times.forEach(t => {
+                        if (!t) return;
+                        const s = to12h(t.start || t.startTime || t.start_time);
+                        const e = to12h(t.end || t.endTime || t.end_time);
+                        if (s) times.push(e ? `${s} – ${e}` : s);
+                    });
                 } else if (entry.startTime || entry.start_time) {
-                    starts.push(entry.startTime || entry.start_time);
+                    const s = to12h(entry.startTime || entry.start_time);
+                    const e = to12h(entry.endTime || entry.end_time);
+                    if (s) times.push(e ? `${s} – ${e}` : s);
                 }
-                starts.forEach(s => {
-                    const f = to12h(s);
-                    if (f && !seen.has(f)) { seen.add(f); times.push(f); }
-                });
+                if (!perDay[abbr]) perDay[abbr] = [];
+                times.forEach(t => { if (!perDay[abbr].includes(t)) perDay[abbr].push(t); });
             });
-            if (times.length) {
-                kv.push([experience.fixed_schedule ? 'HORARIOS' : 'HORARIOS SUGERIDOS', times.join(', ')]);
+            const activeDays = Object.keys(perDay).sort((a, b) => schedOrder.indexOf(a) - schedOrder.indexOf(b));
+            const anyTimes = activeDays.some(d => perDay[d].length);
+            if (activeDays.length && anyTimes) {
+                // Agrupar días con el mismo conjunto de horarios.
+                const groups = [];
+                activeDays.forEach(d => {
+                    const key = perDay[d].join('|');
+                    const g = groups.find(gr => gr.key === key);
+                    if (g) g.days.push(d); else groups.push({ key, days: [d], times: perDay[d] });
+                });
+                const rowsHtml = groups.map(g => {
+                    let label;
+                    if (g.days.length === 7) label = 'Todos los días';
+                    else if (g.days.length === 1) label = schedFull[g.days[0]];
+                    else label = g.days.map(d => schedShort[d]).join(', ');
+                    const timesHtml = g.times.length
+                        ? g.times.map(t => `<span class="exp-lux__sched-time">${t}</span>`).join('')
+                        : '<span class="exp-lux__sched-time exp-lux__sched-time--muted">Horario por confirmar</span>';
+                    return `<div class="exp-lux__sched-row"><span class="exp-lux__sched-days">${label}</span><span class="exp-lux__sched-times">${timesHtml}</span></div>`;
+                }).join('');
+                sections.push(`
+                    <div class="exp-lux__section">
+                        <h4 class="exp-lux__heading">${experience.fixed_schedule ? 'HORARIOS' : 'HORARIOS SUGERIDOS'}</h4>
+                        <div class="exp-lux__sched">${rowsHtml}</div>
+                    </div>
+                `);
+                scheduleRendered = true;
             }
         }
+        // Fallback: si no hubo horarios por día, mostrar al menos los días disponibles como texto.
+        if (!scheduleRendered) {
+            kv.push(['DÍAS DISPONIBLES', experience.displayAvailability || 'Todos los días']);
+        }
         // Tiempo de viaje
-        if (experience.travel_duration) kv.push(['TIEMPO DE VIAJE', formatTravelDuration(experience.travel_duration)]);
-        const advMin = experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime);
-        if (advMin) kv.push(['RESERVA ANTICIPADA', formatAdvanceBooking(advMin)]);
-        if (experience.cancellation_policy) kv.push(['CANCELACIÓN', `<span class="exp-lux__prewrap">${experience.cancellation_policy}</span>`]);
-        const langs = Array.isArray(experience.languages) ? experience.languages : (experience.languages ? [experience.languages] : []);
-        if (langs.length) kv.push(['IDIOMA', langs.join(' · ')]);
         if (kv.length) {
             sections.push(`
                 <div class="exp-lux__section">
@@ -2489,7 +2597,28 @@ document.addEventListener('DOMContentLoaded', function() {
             `);
         }
 
-        // 8. Términos y condiciones
+        // Idioma como chips (se lee mejor que texto plano).
+        const langs = Array.isArray(experience.languages) ? experience.languages : (experience.languages ? [experience.languages] : []);
+        if (langs.length) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">IDIOMA</h4>
+                    <div class="exp-lux__chips">
+                        ${langs.map(l => `<span class="exp-lux__chip">${l}</span>`).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        // 8. Precios por persona (filled by loadPricesTab into #pricesContent)
+        sections.push(`
+            <div class="exp-lux__section">
+                <h4 class="exp-lux__heading">PRECIOS POR PERSONA</h4>
+                <div id="pricesContent" class="exp-lux__prices"></div>
+            </div>
+        `);
+
+        // 9. Términos y condiciones (buy-out / mínimo privado) — junto a precios y cancelación al final.
         const hasBuyout = experience.buyout !== null && experience.buyout !== undefined && experience.buyout !== '';
         const hasPriv = experience.private_min_value !== null && experience.private_min_value !== undefined && experience.private_min_value !== '';
         if (hasBuyout || hasPriv) {
@@ -2506,13 +2635,15 @@ document.addEventListener('DOMContentLoaded', function() {
             `);
         }
 
-        // 9. Precios por persona (filled by loadPricesTab into #pricesContent)
-        sections.push(`
-            <div class="exp-lux__section">
-                <h4 class="exp-lux__heading">PRECIOS POR PERSONA</h4>
-                <div id="pricesContent" class="exp-lux__prices"></div>
-            </div>
-        `);
+        // 10. Política de cancelación — hasta el final, como sección normal (sobria).
+        if (experience.cancellation_policy) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">CANCELACIÓN</h4>
+                    <p class="exp-lux__prewrap">${experience.cancellation_policy}</p>
+                </div>
+            `);
+        }
 
         return sections.join('');
     }
@@ -3060,7 +3191,14 @@ document.addEventListener('DOMContentLoaded', function() {
         addCard('NIÑO', 'Precio niño', experience.displayPriceChild || experience.price_child);
         addCard('SIN ALCOHOL', 'Sin alcohol', experience.displayPriceNoAlcohol || experience.price_no_alcohol);
 
-        pricesContent.innerHTML = cards.length ? cards.join('') : `<p class="exp-lux__quote">Por cotizar</p>`;
+        // Moneda y método de pago aplicados a estos precios (se actualizan con los filtros).
+        const currencyMap = { MXN: 'MXN — Peso Mexicano', USD: 'USD — US Dollar' };
+        const payMap = { efectivo: 'Efectivo', transferencia: 'Transferencia bancaria', tarjeta: 'Tarjeta de crédito' };
+        const metaRows = [['Moneda', currencyMap[currency] || currency]];
+        if (payMap[paymentType]) metaRows.push(['Método de pago', payMap[paymentType]]);
+        const metaHtml = `<div class="exp-lux__price-meta">${metaRows.map(([k, v]) => `<div class="exp-lux__price-meta-row"><span>${k}</span><span>${v}</span></div>`).join('')}</div>`;
+
+        pricesContent.innerHTML = (cards.length ? cards.join('') : `<p class="exp-lux__quote">Por cotizar</p>`) + metaHtml;
     }
     
     // Function to load Itinerary tab
@@ -4573,6 +4711,7 @@ document.addEventListener('DOMContentLoaded', function() {
     position: absolute;
     inset: 0;
     background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.15) 45%, rgba(0, 0, 0, 0) 70%);
+    pointer-events: none;
 }
 .exp-lux__media-caption {
     position: absolute;
@@ -4580,13 +4719,60 @@ document.addEventListener('DOMContentLoaded', function() {
     right: 34px;
     bottom: 36px;
     z-index: 2;
+    pointer-events: none;
+}
+.exp-lux__expand {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    z-index: 3;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.28);
+    color: #fff;
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    transition: background 0.2s, border-color 0.2s;
+}
+.exp-lux__expand:hover {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: #fff;
+}
+.exp-lux__expand i {
+    font-size: 1.15rem;
+}
+.exp-lux__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
 }
 .exp-lux__category {
     display: inline-block;
-    margin-bottom: 14px;
     padding: 6px 14px;
     border-radius: 999px;
     background: rgba(20, 20, 20, 0.55);
+    backdrop-filter: blur(4px);
+    color: #f3f0e8;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.exp-lux__type-pill {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(243, 240, 232, 0.65);
+    background: rgba(20, 20, 20, 0.28);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     color: #f3f0e8;
     font-size: 0.68rem;
@@ -4622,7 +4808,7 @@ document.addEventListener('DOMContentLoaded', function() {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     padding: 22px 34px;
     border-bottom: 1px solid var(--exp-border);
 }
@@ -4678,7 +4864,6 @@ document.addEventListener('DOMContentLoaded', function() {
 .exp-lux__desc {
     margin: 0;
     font-family: var(--exp-serif);
-    font-style: italic;
     font-size: 1.06rem;
     line-height: 1.75;
     color: var(--exp-dark);
@@ -4688,7 +4873,7 @@ document.addEventListener('DOMContentLoaded', function() {
 /* Info tiles */
 .exp-lux__tiles {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 16px;
     margin-bottom: 30px;
 }
@@ -4712,6 +4897,55 @@ document.addEventListener('DOMContentLoaded', function() {
     font-family: var(--exp-serif);
     font-size: 1.15rem;
     color: var(--exp-dark);
+}
+
+/* Reserva */
+.exp-lux__resv-adv {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--exp-dark);
+}
+.exp-lux__resv-adv-value {
+    font-weight: 700;
+    color: var(--exp-olive);
+}
+.exp-lux__resv-notes {
+    margin: 16px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--exp-border);
+    color: var(--exp-muted);
+}
+
+/* Meta de precios (moneda / método de pago) */
+.exp-lux__price-meta {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--exp-border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.exp-lux__price-meta-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 0.8rem;
+    color: var(--exp-muted);
+}
+.exp-lux__price-meta-row span:last-child {
+    color: var(--exp-dark);
+    font-weight: 600;
+}
+
+/* Includes / excludes — 2 columnas lado a lado */
+.exp-lux__inc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 20px 32px;
+}
+.exp-lux__inc-col .exp-lux__heading {
+    margin-top: 0;
 }
 
 /* Includes / excludes lists */
@@ -4746,13 +4980,56 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 /* Gallery thumbnails */
+.exp-lux__gallery-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.exp-lux__gallery-head .exp-lux__heading {
+    margin: 0;
+}
+.exp-lux__gallery-navs {
+    display: inline-flex;
+    gap: 4px;
+}
 .exp-lux__gallery {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: flex;
     gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.exp-lux__gallery::-webkit-scrollbar {
+    display: none;
+}
+.exp-lux__gallery-nav {
+    background: transparent;
+    border: none;
+    padding: 2px;
+    color: var(--exp-muted);
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s, opacity 0.2s;
+}
+.exp-lux__gallery-nav:hover {
+    color: var(--exp-olive);
+}
+.exp-lux__gallery-nav.is-hidden {
+    opacity: 0.25;
+    pointer-events: none;
+}
+.exp-lux__gallery-nav i {
+    font-size: 1.2rem;
+    display: block;
 }
 .exp-lux__thumb {
-    aspect-ratio: 1 / 1;
+    flex: 0 0 auto;
+    width: 96px;
+    height: 96px;
+    scroll-snap-align: start;
     border: 1px solid var(--exp-border);
     border-radius: 4px;
     padding: 0;
@@ -4760,11 +5037,15 @@ document.addEventListener('DOMContentLoaded', function() {
     background-position: center;
     background-repeat: no-repeat;
     cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 .exp-lux__thumb:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+.exp-lux__thumb.is-active {
+    border-color: var(--exp-olive);
+    box-shadow: 0 0 0 2px var(--exp-olive);
 }
 
 /* Itinerary timeline */
@@ -4851,8 +5132,7 @@ document.addEventListener('DOMContentLoaded', function() {
     align-items: baseline;
     justify-content: space-between;
     gap: 20px;
-    padding: 13px 0;
-    border-bottom: 1px solid var(--exp-border);
+    padding: 7px 0;
 }
 .exp-lux__kv-row:last-child {
     border-bottom: none;
@@ -4868,6 +5148,67 @@ document.addEventListener('DOMContentLoaded', function() {
 .exp-lux__kv-val {
     text-align: right;
     font-size: 0.95rem;
+    color: var(--exp-dark);
+}
+
+/* Schedule breakdown (día → horarios) */
+.exp-lux__sched {
+    display: flex;
+    flex-direction: column;
+}
+.exp-lux__sched-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 7px 0;
+}
+.exp-lux__sched-row:last-child {
+    border-bottom: none;
+}
+.exp-lux__sched-days {
+    flex: 0 0 auto;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--exp-dark);
+    white-space: nowrap;
+    padding-top: 3px;
+}
+.exp-lux__sched-times {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+}
+.exp-lux__sched-time {
+    background: var(--exp-tile);
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 0.82rem;
+    color: var(--exp-dark);
+    white-space: nowrap;
+}
+.exp-lux__sched-time--muted {
+    background: transparent;
+    color: var(--exp-muted);
+    font-style: italic;
+}
+
+/* Chips (idioma, etc.) */
+.exp-lux__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.exp-lux__chip {
+    display: inline-flex;
+    align-items: center;
+    background: var(--exp-tile);
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 0.82rem;
     color: var(--exp-dark);
 }
 
@@ -4980,7 +5321,6 @@ document.addEventListener('DOMContentLoaded', function() {
         padding-right: 22px;
     }
     .exp-lux__gallery {
-        grid-template-columns: repeat(4, 1fr);
         gap: 8px;
     }
 }
