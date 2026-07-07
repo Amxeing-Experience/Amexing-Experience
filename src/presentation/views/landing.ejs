@@ -1601,15 +1601,38 @@ Created by Denisse Maldonado
         const pageLoader = document.getElementById('pageLoader');
         const scrollToTop = document.getElementById('scrollToTop');
         
-        // Hide loader after page load
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                pageLoader.classList.add('page-loader--hidden');
-                setTimeout(function() {
-                    pageLoader.style.display = 'none';
-                }, 500);
+        // Ocultar el loader SIN esperar la descarga completa del video del hero
+        // (HOME.mp4 pesa ~18MB). Antes se usaba window.load, que bloqueaba hasta
+        // bajar TODOS los recursos incluido el video; con autoplay el video ya
+        // venía avanzando por detrás del loader. Ahora ocultamos en cuanto el
+        // primer frame del video está listo (loadeddata), con un tope de tiempo
+        // de respaldo, y reiniciamos el video a 0 para que arranque desde el inicio.
+        const heroVideo = document.querySelector('.hero-section__video');
+
+        function hideLoader() {
+            if (!pageLoader || pageLoader.classList.contains('page-loader--hidden')) return;
+            if (heroVideo) {
+                try {
+                    heroVideo.currentTime = 0;
+                    const p = heroVideo.play();
+                    if (p && typeof p.catch === 'function') { p.catch(function () {}); }
+                } catch (e) { /* autoplay puede fallar en algunos navegadores; no bloquea */ }
+            }
+            pageLoader.classList.add('page-loader--hidden');
+            setTimeout(function () {
+                pageLoader.style.display = 'none';
             }, 500);
-        });
+        }
+
+        if (heroVideo) {
+            // Primer frame listo → ocultamos el loader.
+            heroVideo.addEventListener('loadeddata', hideLoader, { once: true });
+            // Respaldo: si el video tarda o falla, no dejamos el loader colgado.
+            setTimeout(hideLoader, 2500);
+        } else {
+            // Sin video de fondo: ocultamos apenas el DOM está listo.
+            hideLoader();
+        }
         
         // Scroll to Top Button
         window.addEventListener('scroll', function() {
