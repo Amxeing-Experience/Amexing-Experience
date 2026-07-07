@@ -27,12 +27,20 @@ const heroSubtitle = typeof subtitle !== 'undefined' ? subtitle : '';
 const heroCtaText = typeof ctaText !== 'undefined' ? ctaText : 'BOOK NOW';
 const heroCtaLink = typeof ctaLink !== 'undefined' ? ctaLink : '#book';
 const heroBgImage = typeof backgroundImage !== 'undefined' ? backgroundImage : '/images/hero-san-miguel-tesla.jpg';
+// Video de fondo opcional: si se pasa, reemplaza la imagen (que queda como poster/fallback).
+const heroBgVideo = typeof backgroundVideo !== 'undefined' && backgroundVideo ? backgroundVideo : null;
 const currentUser = typeof user !== 'undefined' ? user : null;
 %>
 
 <section class="hero-section" id="hero">
     <div class="hero-section__background">
-        <div class="hero-section__image" style="background-image: url('<%= heroBgImage %>')"></div>
+        <% if (heroBgVideo) { %>
+            <video class="hero-section__video" autoplay muted loop playsinline preload="auto" poster="<%= heroBgImage %>">
+                <source src="<%= heroBgVideo %>" type="video/mp4">
+            </video>
+        <% } else { %>
+            <div class="hero-section__image" style="background-image: url('<%= heroBgImage %>')"></div>
+        <% } %>
         <div class="hero-section__overlay"></div>
         <div class="hero-section__particles"></div>
     </div>
@@ -96,6 +104,17 @@ const currentUser = typeof user !== 'undefined' ? user : null;
 
 .hero-section__image:hover {
     transform: scale(1.05);
+}
+
+.hero-section__video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    filter: brightness(0.7) contrast(1.2) saturate(1.1);
 }
 
 .hero-section__overlay {
