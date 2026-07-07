@@ -75,8 +75,9 @@ test.describe('Quote information — campos owner/lead guest/contacto (smoke)', 
     await expect(page.locator('#contactFieldsWrapper')).toHaveCount(1);
     await expect(page.locator('#leadGuestIsFinalClient')).toHaveCount(1);
     await expect(page.locator('#leadGuestManualFields')).toHaveCount(1);
-    // Botón "Crear Cliente" del Cliente Final (en el encabezado de la tarjeta) presente.
-    await expect(page.locator('#createFinalClientBtn')).toHaveCount(1);
+    // El botón "Crear Cliente" del Cliente Final se ocultó: el alta se hace inline desde el
+    // combobox (escribir nombre nuevo + "guardar como cliente").
+    await expect(page.locator('#createFinalClientBtn')).toHaveCount(0);
     // Comboboxes de Cliente Final y Lead Guest (elegir de agencia o crear nuevo).
     await expect(page.locator('#clientFinalId')).toHaveCount(1);
     await expect(page.locator('#leadGuestClientId')).toHaveCount(1);
