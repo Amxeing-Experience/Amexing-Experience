@@ -156,6 +156,12 @@ class QuoteOwnershipManager {
             this.dataLoaded = true;
             console.log('Initial data loading complete, dataLoaded:', this.dataLoaded);
 
+            // Recalcular canTransfer y refrescar el display con userAccess YA cargado. En el
+            // Promise.all, loadOwnership llama displayOwner antes de que loadUserAccess termine,
+            // así que para un owner (no admin) canTransfer salía false y el botón "Cambiar" no
+            // aparecía hasta abrir el modal. Este segundo displayOwner lo corrige.
+            this.displayOwner();
+
             // Capture the originally saved client ID when page loads
             this.captureOriginalClient();
 
