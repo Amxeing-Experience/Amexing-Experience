@@ -2416,7 +2416,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${(experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes) ? `
                     <div class="content-section">
                         <h5><i class="ti ti-note me-2"></i>Notas de Reserva</h5>
-                        <p>${experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes}</p>
+                        <p style="white-space: pre-line;">${experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes}</p>
                     </div>
                 ` : ''}
             </div>
