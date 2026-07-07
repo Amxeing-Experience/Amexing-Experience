@@ -2325,6 +2325,37 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `);
 
+        // 2b. Itinerario (from serviceItems.subconcepts — mirrors old loadItineraryTab accessors, synchronous)
+        const subconcepts = experience.serviceItems?.subconcepts || [];
+        if (subconcepts.length) {
+            const sortedItin = [...subconcepts].sort((a, b) =>
+                parseItineraryTime(a.time || a.startTime) - parseItineraryTime(b.time || b.startTime)
+            );
+            const itinItems = sortedItin.map(item => {
+                const startTime = item.time || item.startTime || '';
+                const endTime = item.endTime || '';
+                const timeDisplay = startTime ? (endTime ? `${startTime} – ${endTime}` : startTime) : '';
+                const name = item.concept || 'Sin nombre';
+                const notes = item.notes || '';
+                return `
+                    <li class="exp-lux__itinerary-item">
+                        <span class="exp-lux__itinerary-dot"></span>
+                        <div class="exp-lux__itinerary-body">
+                            <span class="exp-lux__itinerary-name">${name}</span>
+                            ${timeDisplay ? `<span class="exp-lux__itinerary-time">${timeDisplay}</span>` : ''}
+                            ${notes ? `<p class="exp-lux__itinerary-notes">${notes}</p>` : ''}
+                        </div>
+                    </li>
+                `;
+            }).join('');
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">ITINERARIO</h4>
+                    <ul class="exp-lux__itinerary">${itinItems}</ul>
+                </div>
+            `);
+        }
+
         // 3. Incluye
         const inc = toArr(experience.includes);
         if (inc.length) {
@@ -2351,6 +2382,25 @@ document.addEventListener('DOMContentLoaded', function() {
             `);
         }
 
+        // 4b. Requisitos (string with newlines → pre-line, or array → list)
+        const reqIsArr = Array.isArray(experience.requirements);
+        const reqHas = reqIsArr ? experience.requirements.length > 0 : (experience.requirements && String(experience.requirements).trim() !== '');
+        if (reqHas) {
+            let reqBody;
+            if (reqIsArr) {
+                const items = experience.requirements.filter(x => x !== null && x !== undefined && String(x).trim() !== '');
+                reqBody = `<ul class="exp-lux__list">${items.map(i => `<li><span class="exp-lux__check">✓</span><span>${i}</span></li>`).join('')}</ul>`;
+            } else {
+                reqBody = `<p class="exp-lux__prewrap">${experience.requirements}</p>`;
+            }
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">REQUISITOS</h4>
+                    ${reqBody}
+                </div>
+            `);
+        }
+
         // 5. Galería (up to 4 thumbnails → fullscreen gallery)
         if (experience.photos && experience.photos.length > 0) {
             const thumbs = experience.photos.slice(0, 4).map((photo, index) => {
@@ -2366,12 +2416,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // 6. Notas de reserva (highlighted box)
-        if (experience.client_booking_notes) {
+        // Fall back to booking_notes/notas/notes so content isn't lost (old modal behavior).
+        const bookingNotes = experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes;
+        if (bookingNotes) {
             sections.push(`
                 <div class="exp-lux__section">
                     <div class="exp-lux__notebox">
                         <h4 class="exp-lux__heading">NOTAS DE RESERVA</h4>
-                        <p class="exp-lux__prewrap">${experience.client_booking_notes}</p>
+                        <p class="exp-lux__prewrap">${bookingNotes}</p>
                     </div>
                 </div>
             `);
@@ -2385,6 +2437,43 @@ document.addEventListener('DOMContentLoaded', function() {
         if (payMap[paymentType]) kv.push(['MÉTODO DE PAGO', payMap[paymentType]]);
         const tipo = experience.tipo || experience.experienceType;
         if (tipo) kv.push(['TIPO', String(tipo).charAt(0).toUpperCase() + String(tipo).slice(1)]);
+        // Ubicación
+        const ubic = experience.location || experience.address;
+        if (ubic) kv.push(['UBICACIÓN', ubic]);
+        // Días disponibles (precomputed string)
+        kv.push(['DÍAS DISPONIBLES', experience.displayAvailability || 'Todos los días']);
+        // Horarios disponibles: unique start times across availability entries, 12h am/pm.
+        const to12h = (hhmm) => {
+            const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/);
+            if (!m) return '';
+            let h = parseInt(m[1], 10);
+            const min = m[2];
+            const ampm = h >= 12 ? 'pm' : 'am';
+            h = h % 12; if (h === 0) h = 12;
+            return h + ':' + min + ' ' + ampm;
+        };
+        if (Array.isArray(experience.availability)) {
+            const seen = new Set();
+            const times = [];
+            experience.availability.forEach(entry => {
+                if (!entry || typeof entry !== 'object') return;
+                const starts = [];
+                if (Array.isArray(entry.times)) {
+                    entry.times.forEach(t => { if (t && t.start) starts.push(t.start); });
+                } else if (entry.startTime || entry.start_time) {
+                    starts.push(entry.startTime || entry.start_time);
+                }
+                starts.forEach(s => {
+                    const f = to12h(s);
+                    if (f && !seen.has(f)) { seen.add(f); times.push(f); }
+                });
+            });
+            if (times.length) {
+                kv.push([experience.fixed_schedule ? 'HORARIOS' : 'HORARIOS SUGERIDOS', times.join(', ')]);
+            }
+        }
+        // Tiempo de viaje
+        if (experience.travel_duration) kv.push(['TIEMPO DE VIAJE', formatTravelDuration(experience.travel_duration)]);
         const advMin = experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime);
         if (advMin) kv.push(['RESERVA ANTICIPADA', formatAdvanceBooking(advMin)]);
         if (experience.cancellation_policy) kv.push(['CANCELACIÓN', `<span class="exp-lux__prewrap">${experience.cancellation_policy}</span>`]);
@@ -4676,6 +4765,62 @@ document.addEventListener('DOMContentLoaded', function() {
 .exp-lux__thumb:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* Itinerary timeline */
+.exp-lux__itinerary {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.exp-lux__itinerary-item {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 16px 12px 14px;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    background: var(--exp-tile);
+    margin-bottom: 10px;
+}
+.exp-lux__itinerary-item:last-child {
+    margin-bottom: 0;
+}
+.exp-lux__itinerary-dot {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    margin-top: 7px;
+    border-radius: 50%;
+    background: var(--exp-olive);
+}
+.exp-lux__itinerary-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.exp-lux__itinerary-name {
+    display: block;
+    font-family: var(--exp-serif);
+    font-size: 1.05rem;
+    color: var(--exp-dark);
+    line-height: 1.4;
+}
+.exp-lux__itinerary-time {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--exp-olive);
+    font-weight: 600;
+}
+.exp-lux__itinerary-notes {
+    margin: 6px 0 0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--exp-muted);
+    white-space: pre-line;
 }
 
 /* Booking notes box */
