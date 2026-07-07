@@ -46,6 +46,9 @@ const selectOptions = typeof options !== 'undefined' ? options : [];
 const selectSelected = typeof selected !== 'undefined' ? selected : [];
 const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
 const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
+// Modo combobox (opt-in): permite crear una opción escribiendo un texto nuevo.
+const selectAllowCreate = typeof allowCreate !== 'undefined' ? allowCreate : false;
+const selectCreateLabel = typeof createLabel !== 'undefined' ? createLabel : 'Crear';
 %>
 
 <div class="mb-3 <%= selectAdditionalClasses %>">
@@ -116,6 +119,8 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
     
     const selectId = '<%= selectId %>';
     const isDisabled = <%= selectDisabled ? 'true' : 'false' %>;
+    const allowCreate = <%= selectAllowCreate ? 'true' : 'false' %>;
+    const createLabel = '<%= selectCreateLabel %>';
     const hiddenInput = document.getElementById(selectId);
     const displayElement = document.getElementById(selectId + '_display');
     const searchInput = document.getElementById(selectId + '_search');
@@ -126,6 +131,9 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
     
     let allOptions = [];
     let currentValue = '';
+    // Combobox: texto tecleado que NO corresponde a una opción existente.
+    let typedText = '';
+    let isTypedValue = false;
     
     // Initialize component
     function init() {
@@ -150,6 +158,9 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
                     clearOptions: clearOptions,
                     refreshOptions: refreshOptions,
                     getOption: getOption,
+                    getTypedText: () => typedText,
+                    isTyped: () => isTypedValue,
+                    setTypedValue: (t) => commitTypedValue(t),
                     on: () => {}, // Compatibility stub
                     open: () => openDropdown(),
                     close: () => closeDropdown()
@@ -257,25 +268,42 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
             }, 300); // 300ms debounce
         } else {
             // For other dropdowns, use local search immediately
-            performLocalSearch(searchTerm);
+            performLocalSearch(searchTerm, e.target.value);
         }
     }
     
-    // Local search function
-    function performLocalSearch(searchTerm) {
+    // Local search function. rawTerm conserva el texto tal cual se tecleó (mayúsculas)
+    // para el item "Crear «...»" del modo combobox.
+    function performLocalSearch(searchTerm, rawTerm) {
         allOptions.forEach(option => {
             const matches = option.text.toLowerCase().includes(searchTerm);
             option.element.style.display = matches ? 'block' : 'none';
         });
-        
-        // Show "no results" message if no matches
+
         const visibleOptions = allOptions.filter(opt => opt.element.style.display !== 'none');
-        showNoResultsMessage(visibleOptions.length === 0 && searchTerm.length > 0);
+
+        // Modo combobox: si se permite crear y el texto no coincide EXACTAMENTE con una
+        // opción existente, ofrecer "＋ Crear «texto»" en lugar del mensaje "sin resultados".
+        if (allowCreate && searchTerm) {
+            const exact = allOptions.some(opt => opt.text.toLowerCase() === searchTerm);
+            showCreateOption(rawTerm || searchTerm, !exact);
+            showNoResultsMessage(false);
+        } else {
+            showCreateOption('', false);
+            showNoResultsMessage(visibleOptions.length === 0 && searchTerm.length > 0);
+        }
     }
     
     // Handle option click
     function handleOptionClick(e) {
         e.preventDefault();
+
+        // Modo combobox: click en "＋ Crear «texto»".
+        const createEl = e.target.closest('.dropdown-option-create');
+        if (createEl) {
+            commitTypedValue(createEl.dataset.createText || '');
+            return;
+        }
 
         // Use closest() so clicks landing on inner elements (e.g. the small type
         // suffix) still resolve to the option anchor.
@@ -303,6 +331,7 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
             option.element.style.display = 'block';
         });
         showNoResultsMessage(false);
+        showCreateOption('', false);
     }
     
     // Handle dropdown close
@@ -321,6 +350,16 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
     function handleKeyDown(e) {
         if (e.key === 'Escape') {
             closeDropdown();
+            return;
+        }
+        // Modo combobox: Enter con item "Crear" visible → commitea el texto tecleado
+        // (preventDefault evita que el Enter envíe el formulario contenedor).
+        if (e.key === 'Enter' && allowCreate) {
+            const createEl = optionsContainer.querySelector('.dropdown-option-create');
+            if (createEl) {
+                e.preventDefault();
+                commitTypedValue(createEl.dataset.createText || searchInput.value);
+            }
         }
     }
     
@@ -345,7 +384,10 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
             hiddenInput.value = value;
             selectedTextSpan.textContent = option.text;
             selectedTextSpan.classList.remove('text-muted');
-            
+            // Se eligió una opción real → ya no es "texto tecleado".
+            isTypedValue = false;
+            typedText = '';
+
             // Trigger change event for compatibility
             const changeEvent = new Event('change', { bubbles: true });
             hiddenInput.dispatchEvent(changeEvent);
@@ -428,6 +470,48 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
             noResultsEl.remove();
         }
     }
+
+    // Combobox: item "＋ Crear «texto»" al inicio de la lista (des-duplicado).
+    function showCreateOption(text, show) {
+        let el = optionsContainer.querySelector('.dropdown-option-create');
+        if (show && text) {
+            if (!el) {
+                el = document.createElement('a');
+                el.className = 'dropdown-item dropdown-option-create';
+                el.href = '#';
+                optionsContainer.insertBefore(el, optionsContainer.firstChild);
+            }
+            el.dataset.createText = text;
+            // textContent para evitar inyección de HTML desde el texto tecleado.
+            el.textContent = '';
+            const icon = document.createElement('i');
+            icon.className = 'ti ti-plus me-1';
+            el.appendChild(icon);
+            el.appendChild(document.createTextNode(createLabel + ' «' + text + '»'));
+        } else if (el) {
+            el.remove();
+        }
+    }
+
+    // Combobox: commitea el texto tecleado como valor "nuevo" (no es un id de opción).
+    // Deja hiddenInput.value vacío (clave: no enviar texto como id) y notifica vía
+    // 'customselect:create' para que el consumidor decida qué hacer (crear cliente, etc.).
+    // silent=true (restauración en edición): solo pinta el display, sin disparar
+    // 'customselect:create' (evita side-effects de "cliente nuevo" al cargar).
+    function commitTypedValue(rawText, silent) {
+        const text = (rawText || '').trim();
+        if (!text) return;
+        typedText = text;
+        isTypedValue = true;
+        currentValue = '';
+        hiddenInput.value = '';
+        selectedTextSpan.textContent = text;
+        selectedTextSpan.classList.remove('text-muted');
+        closeDropdown();
+        if (silent) return;
+        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        hiddenInput.dispatchEvent(new CustomEvent('customselect:create', { bubbles: true, detail: { text: text } }));
+    }
     
     // Store reference for external access
     hiddenInput.customSelect = {
@@ -437,6 +521,9 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
         clearOptions: clearOptions,
         getOption: getOption,
         refreshOptions: refreshOptions,
+        getTypedText: () => typedText,
+        isTyped: () => isTypedValue,
+        setTypedValue: commitTypedValue,
         open: openDropdown,
         close: closeDropdown
     };
