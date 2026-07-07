@@ -755,12 +755,6 @@ const e = __isRes ? 'reservación' : 'cotización';
                         containerClass: 'mb-3'
                     }) %>
 
-                    <div class="mb-3">
-                        <label for="asc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
-                        <input type="text" class="form-control" id="asc_companyName" name="companyName" placeholder="Ej: Departamento de Ventas S.A.">
-                        <div class="form-text">Nombre específico de la empresa del cliente final</div>
-                    </div>
-
                     <%- include('../../../atoms/common/phone-input', {
                         name: 'phone',
                         id: 'asc_phone',
@@ -2415,7 +2409,6 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             lastName: document.getElementById('asc_lastName').value.trim(),
             email: document.getElementById('asc_email').value.trim() || undefined,
             phone: document.getElementById('asc_phone').value.trim() || undefined,
-            companyName: document.getElementById('asc_companyName').value.trim() || undefined,
             preferredLanguage: document.getElementById('asc_preferredLanguage').value || 'es',
             // Add the enterprise ID as the owner
             enterpriseId: selectedEnterpriseId
