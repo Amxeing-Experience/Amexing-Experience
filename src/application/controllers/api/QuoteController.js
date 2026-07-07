@@ -217,7 +217,7 @@ class QuoteController {
 
       // 2. Extract fields from request body
       const {
-        client, clientId, clientType, clientFinalId, contactPerson, contactEmail, contactPhone,
+        client, clientId, clientType, clientFinalId, clientFinalName, contactPerson, contactEmail, contactPhone,
         contactFirstName, contactLastName, notes, eventType,
         leadGuestFirstName, leadGuestLastName,
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
@@ -455,6 +455,9 @@ class QuoteController {
       quote.set('contactPhone', finalContactData.contactPhone);
       quote.set('leadGuestFirstName', leadGuestFirstName || '');
       quote.set('leadGuestLastName', leadGuestLastName || '');
+      // Cliente Final tecleado (no guardado como cliente): se persiste como texto libre.
+      // Mutuamente excluyente con clientFinalId (el frontend envía solo uno con valor).
+      quote.set('clientFinalName', clientFinalName || '');
       quote.set('notes', notes || '');
       quote.set('eventType', eventType || '');
 
@@ -735,6 +738,27 @@ class QuoteController {
         console.log('Quote client:', problemQuote.get('client')?.id);
       }
 
+      // Resolver el nombre del Cliente Final (clientFinalId es un string, no pointer) en un solo
+      // query por lote, para la columna "Cliente Final" de la tabla. Cubre AmexingUser y Client.
+      const finalClientIds = [...new Set(quotes.map((q) => q.get('clientFinalId')).filter(Boolean))];
+      const finalClientNameById = {};
+      if (finalClientIds.length) {
+        const auQ = new Parse.Query('AmexingUser');
+        auQ.containedIn('objectId', finalClientIds);
+        auQ.limit(finalClientIds.length);
+        const clQ = new Parse.Query('Client');
+        clQ.containedIn('objectId', finalClientIds);
+        clQ.limit(finalClientIds.length);
+        const [aus, cls] = await Promise.all([
+          auQ.find({ useMasterKey: true }).catch(() => []),
+          clQ.find({ useMasterKey: true }).catch(() => []),
+        ]);
+        [...aus, ...cls].forEach((u) => {
+          const fn = `${u.get('firstName') || ''} ${u.get('lastName') || ''}`.trim();
+          finalClientNameById[u.id] = u.get('companyName') || fn || u.get('email') || '';
+        });
+      }
+
       // Format data for DataTables and check for pending invoice requests
       const data = await Promise.all(
         quotes.map(async (quote) => {
@@ -886,6 +910,10 @@ class QuoteController {
             leadGuestLastName: quote.get('leadGuestLastName') || '',
             notes: quote.get('notes') || '',
             clientFinalId: quote.get('clientFinalId') || null,
+            clientFinalName: quote.get('clientFinalName') || '',
+            // Nombre a mostrar del Cliente Final: cliente resuelto por id, o texto libre tecleado.
+            clientFinalDisplay: (quote.get('clientFinalId') && finalClientNameById[quote.get('clientFinalId')])
+              || quote.get('clientFinalName') || '',
             validUntil: quote.get('validUntil'),
             active: quote.get('active'),
             hasPendingInvoiceRequest, // Add invoice status
@@ -1119,6 +1147,7 @@ class QuoteController {
         leadGuestLastName: quote.get('leadGuestLastName') || '',
         notes: quote.get('notes') || '',
         clientFinalId: quote.get('clientFinalId') || null,
+        clientFinalName: quote.get('clientFinalName') || '',
         status: quote.get('status') || 'quoted',
         validUntil: quote.get('validUntil'),
         serviceItems: quote.get('serviceItems') || {

@@ -46,6 +46,14 @@ const selectOptions = typeof options !== 'undefined' ? options : [];
 const selectSelected = typeof selected !== 'undefined' ? selected : [];
 const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
 const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
+// Modo combobox (opt-in): permite crear una opción escribiendo un texto nuevo.
+const selectAllowCreate = typeof allowCreate !== 'undefined' ? allowCreate : false;
+const selectCreateLabel = typeof createLabel !== 'undefined' ? createLabel : 'Crear';
+// Pista (no clickable) que se muestra al teclear un valor que no coincide con ninguna opción.
+const selectCreateHint = typeof createHint !== 'undefined' ? createHint : 'Escribe el nombre del nuevo cliente';
+// displayField (opcional): campo de la opción a mostrar en el input al seleccionar (p.ej.
+// 'firstName'), aunque la búsqueda/lista sigan usando el texto completo. '' = usar text.
+const selectDisplayField = typeof displayField !== 'undefined' ? displayField : '';
 %>
 
 <div class="mb-3 <%= selectAdditionalClasses %>">
@@ -61,38 +69,57 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
 
     <!-- Custom dropdown interface -->
     <div class="dropdown position-relative">
-        <div class="form-control dropdown-input-display <% if (selectDisabled) { %>disabled<% } %>" 
+    <% if (selectAllowCreate) { %>
+        <!-- Modo typeahead (allowCreate): campo de texto editable; al teclear aparece la lista.
+             Se siente como un input normal (sin la cajita de "Buscar" aparte). -->
+        <input type="text"
+               class="form-control dropdown-typeahead-input"
+               id="<%= selectId %>_display"
+               placeholder="<%= selectPlaceholder %>"
+               autocomplete="off"
+               <% if (selectDisabled) { %>disabled<% } %> />
+        <div class="dropdown-menu w-100 p-0" id="<%= selectId %>_menu" style="max-height: 300px; overflow-y: auto; top: 100%; left: 0;">
+            <div id="<%= selectId %>_options" class="dropdown-options">
+                <% if (selectOptions && selectOptions.length > 0) { %>
+                    <% selectOptions.forEach(function(option) { %>
+                        <a class="dropdown-item dropdown-option" href="#" data-value="<%= option.value %>" data-text="<%= option.text %>"><%= option.text %></a>
+                    <% }); %>
+                <% } %>
+            </div>
+        </div>
+    <% } else { %>
+        <div class="form-control dropdown-input-display <% if (selectDisabled) { %>disabled<% } %>"
              id="<%= selectId %>_display"
-             <% if (!selectDisabled) { %>data-bs-toggle="dropdown"<% } %> 
+             <% if (!selectDisabled) { %>data-bs-toggle="dropdown"<% } %>
              aria-expanded="false"
              style="cursor: <% if (selectDisabled) { %>not-allowed<% } else { %>pointer<% } %>; display: flex; justify-content: between; align-items: center; <% if (selectDisabled) { %>background-color: #e9ecef; opacity: 1;<% } %>">
             <span class="dropdown-selected-text text-muted"><%= selectPlaceholder %></span>
             <i class="ti ti-chevron-down ms-auto"></i>
         </div>
-        
+
         <div class="dropdown-menu w-100 p-0" id="<%= selectId %>_menu" style="max-height: 300px; overflow-y: auto;">
             <!-- Search input -->
             <div class="p-2 border-bottom position-relative">
-                <input type="text" 
-                       class="form-control form-control-sm" 
+                <input type="text"
+                       class="form-control form-control-sm"
                        id="<%= selectId %>_search"
-                       placeholder="Buscar..." 
+                       placeholder="Buscar..."
                        autocomplete="off">
                 <!-- Search loader -->
-                <div class="position-absolute top-50 end-0 translate-middle-y me-3 d-none" 
+                <div class="position-absolute top-50 end-0 translate-middle-y me-3 d-none"
                      id="<%= selectId %>_search_loader">
                     <div class="spinner-border spinner-border-sm text-primary" role="status">
                         <span class="visually-hidden">Buscando...</span>
                     </div>
                 </div>
             </div>
-            
+
             <!-- Options container -->
             <div id="<%= selectId %>_options" class="dropdown-options">
                 <% if (selectOptions && selectOptions.length > 0) { %>
                     <% selectOptions.forEach(function(option) { %>
-                        <a class="dropdown-item dropdown-option" 
-                           href="#" 
+                        <a class="dropdown-item dropdown-option"
+                           href="#"
                            data-value="<%= option.value %>"
                            data-text="<%= option.text %>">
                             <%= option.text %>
@@ -103,6 +130,7 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
                 <% } %>
             </div>
         </div>
+    <% } %>
     </div>
 
     <% if (selectHelpText) { %>
@@ -116,16 +144,38 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
     
     const selectId = '<%= selectId %>';
     const isDisabled = <%= selectDisabled ? 'true' : 'false' %>;
+    const allowCreate = <%= selectAllowCreate ? 'true' : 'false' %>;
+    const createLabel = '<%= selectCreateLabel %>';
+    const createHint = '<%= selectCreateHint %>';
+    const displayField = '<%= selectDisplayField %>';
+    const typeahead = allowCreate;
     const hiddenInput = document.getElementById(selectId);
     const displayElement = document.getElementById(selectId + '_display');
-    const searchInput = document.getElementById(selectId + '_search');
+    // En typeahead el propio campo editable es el buscador; no hay span/chevron/loader internos.
+    const searchInput = typeahead ? displayElement : document.getElementById(selectId + '_search');
     const searchLoader = document.getElementById(selectId + '_search_loader');
     const optionsContainer = document.getElementById(selectId + '_options');
-    const selectedTextSpan = displayElement.querySelector('.dropdown-selected-text');
-    const chevronIcon = displayElement.querySelector('.ti-chevron-down');
+    const menuElement = document.getElementById(selectId + '_menu');
+    const selectedTextSpan = typeahead ? null : displayElement.querySelector('.dropdown-selected-text');
+    const chevronIcon = typeahead ? null : displayElement.querySelector('.ti-chevron-down');
     
     let allOptions = [];
     let currentValue = '';
+    // Combobox: texto tecleado que NO corresponde a una opción existente.
+    let typedText = '';
+    let isTypedValue = false;
+
+    // Actualiza el texto visible: en typeahead escribe el value del input; en clásico, el span.
+    function setDisplayText(text, muted) {
+        if (typeahead) {
+            displayElement.value = text || '';
+        } else if (selectedTextSpan) {
+            selectedTextSpan.textContent = text;
+            selectedTextSpan.classList.toggle('text-muted', !!muted);
+        }
+    }
+    function openMenu() { if (menuElement) menuElement.classList.add('show'); }
+    function closeMenu() { if (menuElement) menuElement.classList.remove('show'); }
     
     // Initialize component
     function init() {
@@ -150,6 +200,9 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
                     clearOptions: clearOptions,
                     refreshOptions: refreshOptions,
                     getOption: getOption,
+                    getTypedText: () => typedText,
+                    isTyped: () => isTypedValue,
+                    setTypedValue: (t) => commitTypedValue(t),
                     on: () => {}, // Compatibility stub
                     open: () => openDropdown(),
                     close: () => closeDropdown()
@@ -190,16 +243,38 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
             return;
         }
         
+        if (typeahead) {
+            // Campo editable = buscador. La lista abre al enfocar/teclear y cierra al salir.
+            searchInput.addEventListener('input', handleSearch);
+            searchInput.addEventListener('keydown', handleKeyDown);
+            searchInput.addEventListener('focus', function () {
+                performLocalSearch((searchInput.value || '').toLowerCase(), searchInput.value);
+                if (allOptions.length || (searchInput.value || '').trim()) openMenu();
+            });
+            searchInput.addEventListener('blur', function () {
+                setTimeout(function () {
+                    closeMenu();
+                    // Si quedó texto sin elegir opción ni crear, commitearlo como "nuevo".
+                    const v = (searchInput.value || '').trim();
+                    if (v && !currentValue && !isTypedValue) commitTypedValue(v);
+                }, 150);
+            });
+            // Evita que el blur cierre el menú antes de registrar el click en una opción.
+            optionsContainer.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            optionsContainer.addEventListener('click', handleOptionClick);
+            return;
+        }
+
         // Search functionality
         searchInput.addEventListener('input', handleSearch);
-        
+
         // Option selection
         optionsContainer.addEventListener('click', handleOptionClick);
-        
+
         // Dropdown toggle
         displayElement.addEventListener('shown.bs.dropdown', handleDropdownOpen);
         displayElement.addEventListener('hidden.bs.dropdown', handleDropdownClose);
-        
+
         // Keyboard navigation
         searchInput.addEventListener('keydown', handleKeyDown);
     }
@@ -224,7 +299,13 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
     // Handle search input with debouncing for server-side search
     function handleSearch(e) {
         const searchTerm = e.target.value.toLowerCase();
-        
+        // Typeahead: cualquier tecleo mantiene la lista abierta y notifica el texto actual
+        // (para que el consumidor reaccione al "posible nuevo", p.ej. habilitar "guardar cliente").
+        if (typeahead) {
+            openMenu();
+            hiddenInput.dispatchEvent(new CustomEvent('customselect:input', { bubbles: true, detail: { text: e.target.value } }));
+        }
+
         // Clear existing timeout
         if (searchTimeout) {
             clearTimeout(searchTimeout);
@@ -257,20 +338,30 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
             }, 300); // 300ms debounce
         } else {
             // For other dropdowns, use local search immediately
-            performLocalSearch(searchTerm);
+            performLocalSearch(searchTerm, e.target.value);
         }
     }
     
-    // Local search function
-    function performLocalSearch(searchTerm) {
+    // Local search function. rawTerm conserva el texto tal cual se tecleó (mayúsculas)
+    // para el item "Crear «...»" del modo combobox.
+    function performLocalSearch(searchTerm, rawTerm) {
         allOptions.forEach(option => {
             const matches = option.text.toLowerCase().includes(searchTerm);
             option.element.style.display = matches ? 'block' : 'none';
         });
-        
-        // Show "no results" message if no matches
+
         const visibleOptions = allOptions.filter(opt => opt.element.style.display !== 'none');
-        showNoResultsMessage(visibleOptions.length === 0 && searchTerm.length > 0);
+
+        // Modo combobox: si se teclea algo que no coincide con una opción, mostrar la pista
+        // "escribe el nombre del nuevo cliente" (el alta se confirma con Enter o al salir).
+        if (allowCreate && searchTerm) {
+            const exact = allOptions.some(opt => opt.text.toLowerCase() === searchTerm);
+            showNewClientHint(!exact);
+            showNoResultsMessage(false);
+        } else {
+            showNewClientHint(false);
+            showNoResultsMessage(visibleOptions.length === 0 && searchTerm.length > 0);
+        }
     }
     
     // Handle option click
@@ -303,6 +394,7 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
             option.element.style.display = 'block';
         });
         showNoResultsMessage(false);
+        showNewClientHint(false);
     }
     
     // Handle dropdown close
@@ -321,6 +413,17 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
     function handleKeyDown(e) {
         if (e.key === 'Escape') {
             closeDropdown();
+            return;
+        }
+        // Modo combobox: Enter con texto que no coincide con una opción → commitea como "nuevo"
+        // (preventDefault evita que el Enter envíe el formulario contenedor).
+        if (e.key === 'Enter' && allowCreate) {
+            const v = (searchInput.value || '').trim();
+            const exact = allOptions.some(opt => opt.text.toLowerCase() === v.toLowerCase());
+            if (v && !exact) {
+                e.preventDefault();
+                commitTypedValue(v);
+            }
         }
     }
     
@@ -343,9 +446,12 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
             console.log('[CustomSelect] Option found:', option);
             currentValue = value;
             hiddenInput.value = value;
-            selectedTextSpan.textContent = option.text;
-            selectedTextSpan.classList.remove('text-muted');
-            
+            // displayField permite mostrar solo el Nombre (u otro campo) al seleccionar.
+            setDisplayText((displayField && option[displayField]) ? option[displayField] : option.text, false);
+            // Se eligió una opción real → ya no es "texto tecleado".
+            isTypedValue = false;
+            typedText = '';
+
             // Trigger change event for compatibility
             const changeEvent = new Event('change', { bubbles: true });
             hiddenInput.dispatchEvent(changeEvent);
@@ -403,12 +509,14 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
     
     // Open dropdown
     function openDropdown() {
+        if (typeahead) { openMenu(); return; }
         const dropdown = new bootstrap.Dropdown(displayElement);
         dropdown.show();
     }
-    
-    // Close dropdown  
+
+    // Close dropdown
     function closeDropdown() {
+        if (typeahead) { closeMenu(); return; }
         const dropdown = bootstrap.Dropdown.getInstance(displayElement);
         if (dropdown) {
             dropdown.hide();
@@ -428,6 +536,41 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
             noResultsEl.remove();
         }
     }
+
+    // Combobox: pista (no clickable) al teclear un valor sin coincidencia. El alta ocurre al
+    // presionar Enter o al salir del campo (blur) — no hay item "Crear" clickable.
+    function showNewClientHint(show) {
+        let el = optionsContainer.querySelector('.dropdown-typeahead-hint');
+        if (show) {
+            if (!el) {
+                el = document.createElement('div');
+                el.className = 'dropdown-item-text text-muted small dropdown-typeahead-hint';
+                optionsContainer.appendChild(el);
+            }
+            el.textContent = createHint;
+        } else if (el) {
+            el.remove();
+        }
+    }
+
+    // Combobox: commitea el texto tecleado como valor "nuevo" (no es un id de opción).
+    // Deja hiddenInput.value vacío (clave: no enviar texto como id) y notifica vía
+    // 'customselect:create' para que el consumidor decida qué hacer (crear cliente, etc.).
+    // silent=true (restauración en edición): solo pinta el display, sin disparar
+    // 'customselect:create' (evita side-effects de "cliente nuevo" al cargar).
+    function commitTypedValue(rawText, silent) {
+        const text = (rawText || '').trim();
+        if (!text) return;
+        typedText = text;
+        isTypedValue = true;
+        currentValue = '';
+        hiddenInput.value = '';
+        setDisplayText(text, false);
+        closeDropdown();
+        if (silent) return;
+        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        hiddenInput.dispatchEvent(new CustomEvent('customselect:create', { bubbles: true, detail: { text: text } }));
+    }
     
     // Store reference for external access
     hiddenInput.customSelect = {
@@ -437,6 +580,9 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
         clearOptions: clearOptions,
         getOption: getOption,
         refreshOptions: refreshOptions,
+        getTypedText: () => typedText,
+        isTyped: () => isTypedValue,
+        setTypedValue: commitTypedValue,
         open: openDropdown,
         close: closeDropdown
     };

@@ -355,6 +355,7 @@ class QuoteOwnershipService {
               email: quoteOwner.get('email') || '',
               firstName: quoteOwner.get('firstName') || 'Usuario',
               lastName: quoteOwner.get('lastName') || '',
+              phone: quoteOwner.get('phone') || '',
               ownershipStartDate: quote.get('lastEditedAt') || quote.get('createdAt'), // Use last edit as best guess for ownership date
               ownershipType: 'quote_owner_field',
               isFromQuoteField: true, // Indicates this is from Quote.owner field
@@ -428,6 +429,7 @@ class QuoteOwnershipService {
           email: createdBy.get('email') || '',
           firstName: createdBy.get('firstName') || 'Usuario',
           lastName: createdBy.get('lastName') || '',
+          phone: createdBy.get('phone') || '',
           ownershipStartDate: quote.get('createdAt'),
           ownershipType: 'created_by',
           isDefaultOwner: true, // Indicates this is from createdBy, not formal ownership
@@ -479,6 +481,7 @@ class QuoteOwnershipService {
         email: owner.get('email') || 'Sin correo',
         firstName: owner.get('firstName') || 'Sin nombre',
         lastName: owner.get('lastName') || '',
+        phone: owner.get('phone') || '',
         role: ownerRole,
         ownershipStartDate: ownership.getOwnershipStartDate() || new Date(),
         ownershipType: ownership.getOwnershipType() || 'initial',
