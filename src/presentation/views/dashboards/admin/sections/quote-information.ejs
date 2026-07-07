@@ -1066,6 +1066,23 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
     // lo vuelve a derivar con el propietario real.
     syncContactFieldsVisibility();
 
+    // Si se transfiere el propietario de la cotización (desde quote-ownership.js) mientras la
+    // página está abierta, actualizar window.__quoteOwner y refrescar el resumen del contacto —
+    // así, cuando "el contacto es el propietario" está activo, refleja al nuevo propietario sin
+    // recargar. El teléfono puede venir vacío (el endpoint de ownership no lo incluye); se
+    // completa al recargar (el GET del quote sí trae owner.phone).
+    document.addEventListener('quoteOwnerChanged', (e) => {
+        const o = e.detail || {};
+        window.__quoteOwner = {
+            firstName: o.firstName || '',
+            lastName: o.lastName || '',
+            email: o.email || '',
+            phone: o.phone || '',
+            fullName: (o.fullName || `${o.firstName || ''} ${o.lastName || ''}`).trim(),
+        };
+        syncContactFieldsVisibility();
+    });
+
     // Espejo Lead Guest → Contacto (mismo individuo por defecto). Si el usuario edita el
     // contacto a mano, deja de reflejarse. No aplica si el override "es propietario" está activo.
     ['contactFirstName', 'contactLastName'].forEach((id) => {
