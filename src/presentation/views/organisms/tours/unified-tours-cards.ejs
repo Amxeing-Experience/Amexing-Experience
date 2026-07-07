@@ -3240,7 +3240,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${tour.client_booking_notes ? `
                     <div class="content-section">
                         <h5><i class="ti ti-note me-2"></i>Notas de Reserva</h5>
-                        <p>${tour.client_booking_notes}</p>
+                        <p style="white-space: pre-line;">${tour.client_booking_notes}</p>
                     </div>
                 ` : ''}
 
@@ -3248,7 +3248,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${tour.notes ? `
                     <div class="content-section">
                         <h5><i class="ti ti-notes me-2"></i>Notas Adicionales</h5>
-                        <p>${tour.notes}</p>
+                        <p style="white-space: pre-line;">${tour.notes}</p>
                     </div>
                 ` : ''}
 
