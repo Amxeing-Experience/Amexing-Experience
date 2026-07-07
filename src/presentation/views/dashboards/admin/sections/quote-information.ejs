@@ -175,6 +175,10 @@ const e = __isRes ? 'reservación' : 'cotización';
                         <i class="ti ti-plus me-1"></i>Crear Cliente
                     </button>
                 </div>
+                <!-- Alertas locales de esta sección (p.ej. "selecciona una empresa antes de
+                     crear un cliente final"), para que se vean junto al botón y no arriba del
+                     formulario donde quedan fuera de vista. -->
+                <div id="finalClientAlerts"></div>
                 <div class="mb-2">
                     <%- include('../../../atoms/common/tom-select', {
                         id: 'clientFinalId',
@@ -2349,7 +2353,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         const selectedEnterpriseId = clientIdInput ? clientIdInput.value : null;
         
         if (!selectedEnterpriseId) {
-            showAlert('quoteInformationAlerts', 'Por favor selecciona una empresa antes de crear un cliente final', 'warning');
+            // Mostrar el aviso dentro de la propia sección Cliente Final (junto al botón),
+            // no en quoteInformationAlerts (arriba del formulario, fuera de vista).
+            clearAlerts('finalClientAlerts');
+            showAlert('finalClientAlerts', 'Por favor selecciona una empresa antes de crear un cliente final', 'warning');
             return;
         }
         
