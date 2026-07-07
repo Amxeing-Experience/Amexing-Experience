@@ -12,31 +12,36 @@ de tarjetas. La categoría activa se cambia con JS desde los datos de `fleet`.
 Created by Denisse Maldonado
 %>
 <%
-    // Datos por categoría. First Class viene del diseño; las demás usan el
-    // Suburban como plantilla hasta tener la info/imagen real de cada clase.
-    const suburban = {
-        name: 'Suburban',
-        models: '2024-2025 Models',
-        pax: 6,
-        carryOns: 9,
-        amenities: ['Green Class Amenities', 'Soda', 'Snacks', 'Streaming services', 'Unlimited Wi-Fi'],
-        image: '/images/suv_privada.png',
-        // galería (placeholders por ahora — reemplazar con las fotos reales por categoría)
-        gallery: [
-            '/images/suv_privada.png',
-            '/images/IniciosSuburbans.jpg',
-            '/images/hero-services.jpg',
-            '/images/IniciosSedan.jpg',
-            '/images/2t2.jpg'
-        ]
-    };
-    const fleet = [
-        { cat: 'economy',  label: 'Economy',     vehicle: suburban },
-        { cat: 'premium',  label: 'Premium',     vehicle: suburban },
-        { cat: 'green',    label: 'Green Class', vehicle: suburban },
-        { cat: 'first',    label: 'First Class', vehicle: suburban }
-    ];
-    const activeCat = 'first';
+    // La flota real viene agrupada por categoría (VehicleType) desde el controller
+    // (fleetByCategory). Si aún no hay vehículos activos, se usa un placeholder para no
+    // romper el diseño. Cada categoría tiene VARIOS vehículos (cards); el hero muestra el
+    // vehículo seleccionado.
+    const _vehiclePlaceholder = '/images/placeholder-heart.png';
+    const _fleetFallback = [{
+        code: 'suburban', label: 'Suburban',
+        vehicles: [{
+            name: 'Suburban', models: '2024-2025', pax: 6, carryOns: 9,
+            amenities: ['Green Class Amenities', 'Soda', 'Snacks', 'Streaming services', 'Unlimited Wi-Fi'],
+            image: '/images/suv_privada.png',
+            gallery: [
+                '/images/suv_privada.png',
+                '/images/IniciosSuburbans.jpg',
+                '/images/hero-services.jpg',
+                '/images/IniciosSedan.jpg',
+                '/images/2t2.jpg'
+            ]
+        }]
+    }];
+    const _fleetSource = (typeof fleetByCategory !== 'undefined' && Array.isArray(fleetByCategory) && fleetByCategory.length)
+        ? fleetByCategory
+        : _fleetFallback;
+    // Estructura que consume el markup/JS: { cat, label, vehicles: [...] }
+    const fleet = _fleetSource.map(function(c) {
+        return { cat: c.code, label: c.label, vehicles: c.vehicles };
+    });
+    // La categoría activa es la última (posición "destacada" del diseño); el tab activo
+    // siempre se mueve ahí. El hero muestra el primer vehículo de esa categoría.
+    const activeCat = fleet[fleet.length - 1].cat;
 %>
 <!DOCTYPE html>
 <html lang="es">
@@ -491,8 +496,8 @@ Created by Denisse Maldonado
 
     <section class="fleet">
         <div class="fleet__stage">
-            <% const active = fleet.find(f => f.cat === activeCat) || fleet[0]; const v = active.vehicle; %>
-            <img class="fleet__photo" src="<%= v.image %>" alt="<%= active.label %> — <%= v.name %>">
+            <% const active = fleet.find(f => f.cat === activeCat) || fleet[0]; const v = active.vehicles[0]; %>
+            <img class="fleet__photo" src="<%= v.image || _vehiclePlaceholder %>" alt="<%= active.label %> — <%= v.name %>">
 
             <div class="fleet__inner">
                 <h1 class="fleet__brand"><%= t('pages:fleet.brand1') %><br><%= t('pages:fleet.brand2') %></h1>
@@ -507,17 +512,17 @@ Created by Denisse Maldonado
 
                 <div class="fleet__detail">
                     <h2 class="fleet__class" data-bind="class"><%= active.label %></h2>
-                    <span class="fleet__pill" data-bind="name"><%= v.name %></span>
+                    <span class="fleet__pill" data-bind="type"><%= v.type %></span>
                     <p class="fleet__models" data-bind="models"><%= v.models %></p>
 
                     <div class="fleet__specs">
-                        <span class="fleet__spec"><i class="fa-solid fa-user"></i> <span data-bind="pax"><%= v.pax %></span> pax</span>
-                        <span class="fleet__spec"><i class="fa-solid fa-suitcase"></i> <span data-bind="carryOns"><%= v.carryOns %></span> carry-ons</span>
+                        <span class="fleet__spec"><i class="fa-solid fa-user"></i> <span data-bind="pax"><%= v.pax || '' %></span> pax</span>
+                        <span class="fleet__spec"><i class="fa-solid fa-suitcase"></i> <span data-bind="carryOns"><%= v.carryOns || '' %></span> carry-ons</span>
                     </div>
 
-                    <p class="fleet__amenities-title">Included Amenities:</p>
+                    <p class="fleet__amenities-title" data-bind="amenities-title" style="<%= (v.amenities && v.amenities.length) ? '' : 'display:none' %>">Included Amenities:</p>
                     <ul class="fleet__amenities" data-bind="amenities">
-                        <% v.amenities.forEach(function(a) { %><li><%= a %></li><% }); %>
+                        <% (v.amenities || []).forEach(function(a) { %><li><%= a %></li><% }); %>
                     </ul>
 
                     <button type="button" class="fleet__pay" data-gallery-open aria-label="<%= t('pages:fleet.aria.openGallery') %>">
@@ -530,12 +535,12 @@ Created by Denisse Maldonado
         </div>
 
         <div class="fleet__cards">
-            <% for (let i = 0; i < 3; i++) { %>
-                <figure class="fleet-card">
-                    <img class="fleet-card__img" src="<%= v.image %>" alt="<%= v.name %>">
-                    <figcaption class="fleet-card__caption" data-card-caption><%= v.name %> | <%= v.models %></figcaption>
+            <% active.vehicles.forEach(function(cardV, i) { %>
+                <figure class="fleet-card<%= i === 0 ? ' is-active' : '' %>" data-vidx="<%= i %>" role="button" tabindex="0">
+                    <img class="fleet-card__img" src="<%= cardV.image || _vehiclePlaceholder %>" alt="<%= cardV.name %>">
+                    <figcaption class="fleet-card__caption" data-card-caption><%= cardV.name %><%= cardV.models ? ' | ' + cardV.models : '' %></figcaption>
                 </figure>
-            <% } %>
+            <% }); %>
         </div>
     </section>
 
@@ -569,17 +574,70 @@ Created by Denisse Maldonado
     <script>
         (function () {
             const data = JSON.parse(document.getElementById('fleet-data').textContent);
+            const PLACEHOLDER = '/images/placeholder-heart.png';
             const byCat = Object.fromEntries(data.fleet.map(f => [f.cat, f]));
             const stage = document.querySelector('.fleet');
             const photo = stage.querySelector('.fleet__photo');
-            const cards = stage.querySelectorAll('.fleet-card');
-            let current = byCat[data.activeCat] || data.fleet[0];
+            const cardsWrap = stage.querySelector('.fleet__cards');
+            let currentCat = byCat[data.activeCat] || data.fleet[0];
+            let currentVehicle = currentCat.vehicles[0];
 
-            function render(cat) {
+            // Actualiza el hero con el vehículo (índice) de la categoría activa.
+            function renderVehicle(idx) {
+                const v = currentCat.vehicles[idx];
+                if (!v) return;
+                currentVehicle = v;
+
+                photo.src = v.image || PLACEHOLDER;
+                photo.alt = currentCat.label + ' — ' + v.name;
+                stage.querySelector('[data-bind="class"]').textContent = currentCat.label;
+                stage.querySelector('[data-bind="type"]').textContent = v.type || '';
+                stage.querySelector('[data-bind="models"]').textContent = v.models || '';
+                stage.querySelector('[data-bind="pax"]').textContent = v.pax || '';
+                stage.querySelector('[data-bind="carryOns"]').textContent = v.carryOns || '';
+
+                const amenities = v.amenities || [];
+                const amWrap = stage.querySelector('[data-bind="amenities"]');
+                amWrap.innerHTML = amenities.map(() => '<li></li>').join('');
+                amWrap.querySelectorAll('li').forEach((li, i) => { li.textContent = amenities[i]; });
+                const amTitle = stage.querySelector('[data-bind="amenities-title"]');
+                if (amTitle) amTitle.style.display = amenities.length ? '' : 'none';
+
+                cardsWrap.querySelectorAll('.fleet-card')
+                    .forEach((c, i) => c.classList.toggle('is-active', i === idx));
+            }
+
+            // Reconstruye las cards (una por vehículo) de la categoría activa.
+            function buildCards() {
+                cardsWrap.innerHTML = '';
+                currentCat.vehicles.forEach(function (cv, i) {
+                    const fig = document.createElement('figure');
+                    fig.className = 'fleet-card' + (i === 0 ? ' is-active' : '');
+                    fig.dataset.vidx = i;
+                    fig.setAttribute('role', 'button');
+                    fig.tabIndex = 0;
+                    const img = document.createElement('img');
+                    img.className = 'fleet-card__img';
+                    img.src = cv.image || PLACEHOLDER;
+                    img.alt = cv.name;
+                    const cap = document.createElement('figcaption');
+                    cap.className = 'fleet-card__caption';
+                    cap.setAttribute('data-card-caption', '');
+                    cap.textContent = cv.name + (cv.models ? ' | ' + cv.models : '');
+                    fig.appendChild(img);
+                    fig.appendChild(cap);
+                    fig.addEventListener('click', () => renderVehicle(i));
+                    fig.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); renderVehicle(i); }
+                    });
+                    cardsWrap.appendChild(fig);
+                });
+            }
+
+            function renderCategory(cat) {
                 const f = byCat[cat];
                 if (!f) return;
-                const v = f.vehicle;
-                current = f;
+                currentCat = f;
 
                 stage.querySelectorAll('.fleet__tab').forEach(t => {
                     const on = t.dataset.cat === cat;
@@ -587,33 +645,26 @@ Created by Denisse Maldonado
                     t.setAttribute('aria-selected', on ? 'true' : 'false');
                 });
 
-                // el tab activo siempre se mueve al último lugar (posición de First Class);
-                // los demás conservan su orden original
+                // el tab activo siempre se mueve al último lugar (posición destacada del
+                // diseño); los demás conservan su orden original
                 const tabsEl = stage.querySelector('.fleet__tabs');
                 data.fleet.map(x => x.cat).filter(c => c !== cat).concat(cat)
                     .forEach(c => tabsEl.appendChild(tabsEl.querySelector('[data-cat="' + c + '"]')));
 
-                photo.src = v.image;
-                photo.alt = f.label + ' — ' + v.name;
-                stage.querySelector('[data-bind="class"]').textContent = f.label;
-                stage.querySelector('[data-bind="name"]').textContent = v.name;
-                stage.querySelector('[data-bind="models"]').textContent = v.models;
-                stage.querySelector('[data-bind="pax"]').textContent = v.pax;
-                stage.querySelector('[data-bind="carryOns"]').textContent = v.carryOns;
-                stage.querySelector('[data-bind="amenities"]').innerHTML =
-                    v.amenities.map(a => '<li></li>').join('');
-                stage.querySelectorAll('[data-bind="amenities"] li')
-                    .forEach((li, i) => { li.textContent = v.amenities[i]; });
-
-                cards.forEach(card => {
-                    card.querySelector('.fleet-card__img').src = v.image;
-                    card.querySelector('.fleet-card__img').alt = v.name;
-                    card.querySelector('[data-card-caption]').textContent = v.name + ' | ' + v.models;
-                });
+                buildCards();
+                renderVehicle(0);
             }
 
             stage.querySelectorAll('.fleet__tab').forEach(tab => {
-                tab.addEventListener('click', () => render(tab.dataset.cat));
+                tab.addEventListener('click', () => renderCategory(tab.dataset.cat));
+            });
+
+            // Las cards iniciales las pinta el servidor (categoría activa); solo enlazamos.
+            cardsWrap.querySelectorAll('.fleet-card').forEach((fig, i) => {
+                fig.addEventListener('click', () => renderVehicle(i));
+                fig.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); renderVehicle(i); }
+                });
             });
 
             /* ---- Lightbox de galería ---- */
@@ -629,7 +680,7 @@ Created by Denisse Maldonado
                 if (!images.length) return;
                 index = (i + images.length) % images.length;
                 lbImg.src = images[index];
-                lbImg.alt = current.vehicle.name + ' — ' + (data.photoWord || 'foto') + ' ' + (index + 1);
+                lbImg.alt = currentVehicle.name + ' — ' + (data.photoWord || 'foto') + ' ' + (index + 1);
                 lbCounter.textContent = (index + 1) + ' / ' + images.length;
                 lbThumbs.querySelectorAll('.fleet-lightbox__thumb').forEach((t, i2) => {
                     t.classList.toggle('is-active', i2 === index);
@@ -637,9 +688,9 @@ Created by Denisse Maldonado
             }
 
             function openGallery() {
-                const v = current.vehicle;
-                images = (v.gallery && v.gallery.length) ? v.gallery : [v.image];
-                lbCaption.textContent = v.name + ' · ' + current.label;
+                const v = currentVehicle;
+                images = (v.gallery && v.gallery.length) ? v.gallery : [v.image || PLACEHOLDER];
+                lbCaption.textContent = v.name + ' · ' + currentCat.label;
                 lbThumbs.innerHTML = '';
                 images.forEach((src, i) => {
                     const t = document.createElement('img');

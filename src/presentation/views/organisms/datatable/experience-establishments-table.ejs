@@ -385,7 +385,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     </select>
                 </div>
             </div>
-            
+
+            <!-- Tipo de experiencia (categoría temática) -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Tipo de experiencia</label>
+                <select class="form-select experiencia-category-input">
+                    <option value="">Seleccionar</option>
+                    <option value="catas">Catas</option>
+                    <option value="arte">Arte</option>
+                    <option value="historia_arquitectura">Historia y Arquitectura</option>
+                    <option value="gastronomicas">Gastronómicas</option>
+                    <option value="aventura">Aventura</option>
+                    <option value="naturaleza">Naturaleza</option>
+                    <option value="de_temporada">De Temporada</option>
+                </select>
+            </div>
+
             <!-- Descripción -->
             <div class="mb-2">
                 <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Descripción <span class="text-danger">*</span></label>
@@ -458,11 +473,37 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 </div>
                 <div class="col-md-6">
                     <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Máx. Personas</label>
-                    <input type="number" class="form-control experiencia-max-people-input" min="1" step="1" 
+                    <input type="number" class="form-control experiencia-max-people-input" min="1" step="1"
                            placeholder="10">
                 </div>
             </div>
-            
+
+            <!-- Mínimo para privado + Buy-out -->
+            <div class="row mb-2">
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Mínimo para privado</label>
+                    <div class="input-group">
+                        <select class="form-select experiencia-private-min-type-input" style="max-width: 150px;">
+                            <option value="">N/A</option>
+                            <option value="personas">Por personas</option>
+                            <option value="monto">Monto fijo ($)</option>
+                        </select>
+                        <input type="number" class="form-control experiencia-private-min-value-input" min="0" step="0.01"
+                               placeholder="N° personas o monto">
+                    </div>
+                    <div class="form-text"><small>Personas mínimas o monto fijo para hacerlo privado</small></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Buy-out</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control experiencia-buyout-input" min="0" step="0.01"
+                               placeholder="0.00">
+                    </div>
+                    <div class="form-text"><small>Monto para reservar la experiencia completa (buy-out)</small></div>
+                </div>
+            </div>
+
             <!-- Incluye y No Incluye en 2 columnas -->
             <div class="row">
                 <div class="col-md-6">
@@ -813,6 +854,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         },
         // Lista angosta: sin colapso responsive; búsqueda arriba, tabla, info+paginación
         responsive: false,
+        // No medir el ancho por contenido (evita que un nombre largo ensanche la tabla).
+        autoWidth: false,
         dom: '<"mb-2"f>rt<"d-flex flex-wrap justify-content-between align-items-center mt-2 gap-2"ip>',
         drawCallback: function() {
             // Initialize tooltips
@@ -1435,9 +1478,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Disable save button and show appropriate message
             const saveBtn = $('#saveEstablishmentBtn');
             const originalText = saveBtn.html();
-            // Cuando guardamos sin cerrar, mantenemos el botón en "Guardando…" hasta
-            // que el reload de subexperiencias termine (no en el complete del save).
-            let establishmentReloadPending = false;
+            // Guardar sin cerrar: el botón queda en "Guardando…" hasta que el flujo async
+            // termine de verdad (guardar experiencias + optimizar + recargar), no en el complete.
             const restoreSaveBtn = () => saveBtn.prop('disabled', false).html(originalText);
             const initialButtonText = totalImagesToOptimize > 0 ? 
                 `<i class="spinner-border spinner-border-sm me-1"></i>Optimizando ${totalImagesToOptimize} imagen${totalImagesToOptimize > 1 ? 'es' : ''}...` : 
@@ -1767,7 +1809,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#establishmentId').val(finalEstablishmentId);
                         $('#establishmentModalTitle').text('Editar Establecimiento');
                         currentModalState = { mode: 'edit', establishmentId: finalEstablishmentId, isOpen: true, sessionId: currentModalState.sessionId };
-                        establishmentReloadPending = true;
                         loadEstablishmentExperiencias(finalEstablishmentId, function() {
                             const cards = document.querySelectorAll('#establishmentExperienciasList .experiencia-editable');
                             expandedIdx.forEach(i => { if (cards[i]) expandEstablishmentCard(cards[i]); });
@@ -1783,15 +1824,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     const error = xhr.responseJSON?.error || 'Error al guardar el establecimiento';
                     showEstablishmentError(error);
                 },
-                complete: function() {
-                    // Si vamos a recargar subexperiencias (guardar sin cerrar), el botón
-                    // se restaura al terminar ese reload, no aquí, para que no parezca
-                    // que ya acabó mientras las tarjetas siguen cargando.
-                    if (!establishmentReloadPending && totalImagesToOptimize === 0) {
+                complete: function(xhr, textStatus) {
+                    // OJO: el success es ASÍNCRONO (guarda cada experiencia, optimiza imágenes
+                    // y recarga la lista). jQuery dispara complete apenas INVOCA el success, sin
+                    // esperar sus await, así que aquí el guardado aún no terminó. Por eso NO
+                    // restauramos el botón en caso de éxito: lo hace el propio flujo async cuando
+                    // realmente acaba (tras recargar). Solo restauramos si la petición falló.
+                    if (textStatus !== 'success') {
                         saveBtn.prop('disabled', false).html(originalText);
                     }
-                    // If there are images being optimized, button will be re-enabled
-                    // after optimization completes in the success callback
                 }
             });
         });
@@ -2209,6 +2250,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     name: getName('.experiencia-name-input'),
                     description: getName('.experiencia-description-input'),
                     tipo: getName('.experiencia-tipo-input'),
+                    experience_category: getName('.experiencia-category-input'),
                     price: getNumber('.experiencia-price-input') || 0,
                     price_no_alcohol: getNumber('.experiencia-price-no-alcohol-input'),
                     price_child: getNumber('.experiencia-price-child-input'),
@@ -2217,6 +2259,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     advance_booking_time: getInt('.experiencia-advance-minutes-input'),
                     min_people: getInt('.experiencia-min-people-input'),
                     max_people: getInt('.experiencia-max-people-input'),
+                    private_min_type: getName('.experiencia-private-min-type-input'),
+                    private_min_value: getNumber('.experiencia-private-min-value-input'),
+                    buyout: getNumber('.experiencia-buyout-input'),
                     fixed_schedule: card.querySelector('.experiencia-fixed-schedule-input') ? card.querySelector('.experiencia-fixed-schedule-input').checked : false,
 
                     // Convert strings to arrays (like provider table)
@@ -2804,6 +2849,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-name-input').value = experiencia.name || '';
             card.querySelector('.experiencia-description-input').value = experiencia.description || '';
             card.querySelector('.experiencia-tipo-input').value = experiencia.tipo || experiencia.providerType || '';
+            card.querySelector('.experiencia-category-input').value = experiencia.experience_category || '';
             card.querySelector('.experiencia-price-input').value = experiencia.price || '';
             card.querySelector('.experiencia-price-no-alcohol-input').value = experiencia.price_no_alcohol || '';
             card.querySelector('.experiencia-price-child-input').value = experiencia.price_child || '';
@@ -2818,6 +2864,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-advance-minutes-input').value = experiencia.advance_booking_time || '';
             card.querySelector('.experiencia-min-people-input').value = experiencia.min_people || '';
             card.querySelector('.experiencia-max-people-input').value = experiencia.max_people || '';
+            card.querySelector('.experiencia-private-min-type-input').value = experiencia.private_min_type || '';
+            card.querySelector('.experiencia-private-min-value-input').value = (experiencia.private_min_value !== null && experiencia.private_min_value !== undefined) ? experiencia.private_min_value : '';
+            card.querySelector('.experiencia-buyout-input').value = (experiencia.buyout !== null && experiencia.buyout !== undefined) ? experiencia.buyout : '';
             const establishmentFixedScheduleInput = card.querySelector('.experiencia-fixed-schedule-input');
             if (establishmentFixedScheduleInput) establishmentFixedScheduleInput.checked = !!experiencia.fixed_schedule;
             card.querySelector('.experiencia-includes-input').value = Array.isArray(experiencia.includes) 
@@ -3054,6 +3103,12 @@ function showErrorAlert(message) {
 }
 .establishment-inbox #<%= dtTableId %> tbody tr {
     cursor: pointer;
+}
+/* Columna única fija al 100% del contenedor: evita que un nombre largo (text-truncate
+   usa white-space:nowrap) expanda la tabla y se desborde encima del panel de detalle. */
+.establishment-inbox-table {
+    table-layout: fixed;
+    width: 100%;
 }
 .establishment-inbox-table tbody td {
     padding: 0.65rem 0.5rem;

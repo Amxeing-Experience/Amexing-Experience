@@ -1,5 +1,15 @@
 const logger = require('../../infrastructure/logger');
 const tripAdvisorService = require('../services/tripAdvisorService');
+const POIService = require('../services/POIService');
+const FleetService = require('../services/FleetService');
+const PublicExperiencesService = require('../services/PublicExperiencesService');
+const PublicToursService = require('../services/PublicToursService');
+
+// Instancias únicas para el render público (resuelven destinos/flota/experiencias/tours + presigned URLs).
+const poiService = new POIService();
+const fleetService = new FleetService();
+const publicExperiencesService = new PublicExperiencesService();
+const publicToursService = new PublicToursService();
 
 /**
  * Home Controller - Handles public web pages and landing page functionality.
@@ -179,6 +189,19 @@ class HomeController {
         currentLang,
       };
 
+      // Tours: el strip horizontal muestra los DESTINOS tipo Tours activos (con su imagen)
+      // en vez de categorías fijas. Se resuelve server-side (página pública, sin auth).
+      if (view === 'servicios/tours') {
+        data.tourDestinos = await poiService.getActivePOIsWithImages('Tours');
+        data.toursByDestino = await publicToursService.getActiveToursByDestino(currentLang);
+      }
+
+      // Experiencias: los detail cards muestran las EXPERIENCIAS activas agrupadas por su
+      // categoría temática (experience_category). Se resuelve server-side (sin auth).
+      if (view === 'servicios/experiencias') {
+        data.experiencesByCategory = await publicExperiencesService.getActiveExperiencesByCategory(currentLang);
+      }
+
       res.render(view, data);
     } catch (error) {
       logger.error(`Error rendering service subpage (${view}):`, error);
@@ -253,6 +276,10 @@ class HomeController {
         t,
         currentLang,
       };
+
+      // Flota real agrupada por categoría (VehicleType) con sus imágenes, server-side.
+      // La vista cae a su placeholder si viene vacío.
+      data.fleetByCategory = await fleetService.getActiveFleetByCategory();
 
       res.render('nuestra-flota', data);
     } catch (error) {

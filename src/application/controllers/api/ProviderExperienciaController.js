@@ -241,6 +241,7 @@ class ProviderExperienciaController {
           description: exp.get('description'),
           price: exp.get('price'),
           tipo: exp.get('tipo'),
+          experience_category: exp.get('experience_category') || null,
           duration: exp.get('duration'),
           min_people: exp.get('min_people'),
           max_people: exp.get('max_people'),
@@ -497,6 +498,7 @@ class ProviderExperienciaController {
         fixed_schedule: fixedSchedule,
         displayOrder,
         tipo,
+        experience_category: experienceCategory,
         availability,
         includes,
         languages,
@@ -563,6 +565,9 @@ class ProviderExperienciaController {
       }
       if (tipo !== undefined && tipo !== null && tipo !== '') {
         experiencia.setTipo(tipo);
+      }
+      if (experienceCategory !== undefined && experienceCategory !== null && experienceCategory !== '') {
+        experiencia.set('experience_category', experienceCategory);
       }
       if (duration !== undefined && duration !== null) {
         experiencia.setDuration(duration);
@@ -717,6 +722,7 @@ class ProviderExperienciaController {
         displayOrder,
         active,
         tipo,
+        experience_category: experienceCategory,
         availability,
         includes,
         languages,
@@ -775,6 +781,7 @@ class ProviderExperienciaController {
         }
       }
       if (tipo !== undefined) experiencia.setTipo(tipo === '' ? null : tipo);
+      if (experienceCategory !== undefined) experiencia.set('experience_category', experienceCategory === '' ? null : experienceCategory);
       if (duration !== undefined) experiencia.setDuration(duration);
       if (travelDuration !== undefined) {
         if (travelDuration === null || travelDuration === '') {
@@ -1362,6 +1369,7 @@ class ProviderExperienciaController {
       price_no_alcohol: experiencia.get('price_no_alcohol') || null,
       price_child: experiencia.get('price_child') || null,
       tipo: experiencia.getTipo(),
+      experience_category: experiencia.get('experience_category') || null,
       duration: experiencia.getDuration(),
       travel_duration: experiencia.get('travel_duration') || null,
       min_people: experiencia.getMinPeople(),

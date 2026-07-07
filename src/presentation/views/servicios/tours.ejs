@@ -41,20 +41,30 @@ Created by Denisse Maldonado
         t: typeof t !== 'undefined' ? t : ((key) => key)
     }) %>
 
-    <%# Sección interactiva (compartida con Experiencias) — datos de Tours %>
-    <%- include('../organisms/servicios/categories-section', {
+    <%# Sección interactiva (mismo diseño que Experiencias, datos propios de Tours):
+        muestra los DESTINOS tipo Tours activos con su imagen. Si aún no hay destinos,
+        cae a las categorías por defecto para no dejar el strip vacío. %>
+    <%
+        const _tourPlaceholder = '/images/placeholder-heart.png';
+        const _destinos = (typeof tourDestinos !== 'undefined' && Array.isArray(tourDestinos)) ? tourDestinos : [];
+        const _tourCategories = _destinos.length > 0
+            ? _destinos.map(function(d) { return { label: d.name, img: d.imageUrl || _tourPlaceholder, value: d.id }; })
+            : [
+                { label: t('pages:categories.catas'), img: '/images/7.png' },
+                { label: t('pages:categories.arte'), img: '/images/4.png' },
+                { label: t('pages:categories.historiaArquitectura'), img: '/images/3.png' },
+                { label: t('pages:categories.gastronomicas'), img: '/images/6.png' },
+                { label: t('pages:categories.aventura'), img: '/images/5.png' },
+                { label: t('pages:categories.naturaleza'), img: '/images/2.png' },
+                { label: t('pages:categories.deTemporada'), img: '/images/1.png' }
+            ];
+    %>
+    <%- include('../organisms/servicios/tours-categories-section', {
         t: typeof t !== 'undefined' ? t : ((key) => key),
         pageTitle: t('pages:tours.title'),
         intro: t('pages:tours.intro'),
-        categories: [
-            { label: t('pages:categories.catas'), img: '/images/7.png' },
-            { label: t('pages:categories.arte'), img: '/images/4.png' },
-            { label: t('pages:categories.historiaArquitectura'), img: '/images/3.png' },
-            { label: t('pages:categories.gastronomicas'), img: '/images/6.png' },
-            { label: t('pages:categories.aventura'), img: '/images/5.png' },
-            { label: t('pages:categories.naturaleza'), img: '/images/2.png' },
-            { label: t('pages:categories.deTemporada'), img: '/images/1.png' }
-        ]
+        categories: _tourCategories,
+        toursByDestino: typeof toursByDestino !== 'undefined' ? toursByDestino : {}
     }) %>
 
     <%# CTA Contacto (reutilizable) %>

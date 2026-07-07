@@ -55,6 +55,20 @@
                         <textarea class="form-control" id="experienceDescription" name="description" rows="2" placeholder="Descripcion detallada de lo que incluye esta experiencia..."></textarea>
                         <div class="invalid-feedback" id="description-error"></div>
                     </div>
+                    <!-- Tipo de experiencia (categoría temática) -->
+                    <div class="mb-3">
+                        <label for="experienceCategory" class="form-label">Tipo de experiencia</label>
+                        <select class="form-control" id="experienceCategory" name="experience_category">
+                            <option value="">Seleccionar</option>
+                            <option value="catas">Catas</option>
+                            <option value="arte">Arte</option>
+                            <option value="historia_arquitectura">Historia y Arquitectura</option>
+                            <option value="gastronomicas">Gastronómicas</option>
+                            <option value="aventura">Aventura</option>
+                            <option value="naturaleza">Naturaleza</option>
+                            <option value="de_temporada">De Temporada</option>
+                        </select>
+                    </div>
                     <!-- Destino (Optional) -->
                     <div class="mb-3">
                         <label for="experienceDestino" class="form-label">
@@ -1301,6 +1315,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('experienceMaxPeople').value = data.max_people || '';
             document.getElementById('experienceCancellationPolicy').value = data.cancellation_policy || '';
             document.getElementById('experienceBuyout').value = (data.buyout !== null && data.buyout !== undefined) ? data.buyout : '';
+            document.getElementById('experienceCategory').value = data.experience_category || '';
             document.getElementById('experiencePrivateMinType').value = data.private_min_type || '';
             document.getElementById('experiencePrivateMinValue').value = (data.private_min_value !== null && data.private_min_value !== undefined) ? data.private_min_value : '';
             document.getElementById('experienceFixedSchedule').checked = !!data.fixed_schedule;
@@ -1760,6 +1775,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 max_people: parseInt(document.getElementById('experienceMaxPeople').value) || null,
                 cancellation_policy: document.getElementById('experienceCancellationPolicy').value.trim() || null,
                 buyout: parseFloat(document.getElementById('experienceBuyout').value) || null,
+                experience_category: document.getElementById('experienceCategory').value || null,
                 private_min_type: document.getElementById('experiencePrivateMinType').value || null,
                 private_min_value: parseFloat(document.getElementById('experiencePrivateMinValue').value) || null,
                 includes: stringToArray(capturedFormValues.includes) || textareaToArray('experienceIncludes'),

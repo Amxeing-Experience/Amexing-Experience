@@ -569,7 +569,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     </select>
                 </div>
             </div>
-            
+
+            <!-- Tipo de experiencia (categoría temática) -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium text-success">Tipo de experiencia</label>
+                <select class="form-select experiencia-category-input">
+                    <option value="">Seleccionar</option>
+                    <option value="catas">Catas</option>
+                    <option value="arte">Arte</option>
+                    <option value="historia_arquitectura">Historia y Arquitectura</option>
+                    <option value="gastronomicas">Gastronómicas</option>
+                    <option value="aventura">Aventura</option>
+                    <option value="naturaleza">Naturaleza</option>
+                    <option value="de_temporada">De Temporada</option>
+                </select>
+            </div>
+
             <!-- Descripción -->
             <div class="mb-2">
                 <label class="form-label form-label-sm fw-medium text-success">Descripción <span class="text-danger">*</span></label>
@@ -1075,6 +1090,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Bandeja: sin colapso responsive (interfiere con el click de fila en
             // columna angosta); la lista usa scroll horizontal del wrapper.
             responsive: false,
+            // No medir el ancho por contenido (evita que un nombre largo ensanche la tabla).
+            autoWidth: false,
             // Lista angosta: apila buscador arriba (full width), tabla, y luego
             // info + paginación, para que los controles no se encimen.
             dom: '<"mb-2"f>rt<"d-flex flex-wrap justify-content-between align-items-center mt-2 gap-2"ip>',
@@ -1564,6 +1581,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-name-input').value = experiencia.name || '';
             card.querySelector('.experiencia-description-input').value = experiencia.description || '';
             card.querySelector('.experiencia-tipo-input').value = experiencia.tipo || '';
+            card.querySelector('.experiencia-category-input').value = experiencia.experience_category || '';
             card.querySelector('.experiencia-price-input').value = experiencia.price || '';
             card.querySelector('.experiencia-price-no-alcohol-input').value = experiencia.price_no_alcohol || '';
             card.querySelector('.experiencia-price-child-input').value = experiencia.price_child || '';
@@ -1662,6 +1680,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             experiencia.name = card.find('.experiencia-name-input').val().trim();
             experiencia.description = card.find('.experiencia-description-input').val().trim();
             experiencia.tipo = card.find('.experiencia-tipo-input').val().trim() || null;
+            experiencia.experience_category = card.find('.experiencia-category-input').val() || null;
             experiencia.price = parseFloat(card.find('.experiencia-price-input').val()) || 0;
             experiencia.price_no_alcohol = card.find('.experiencia-price-no-alcohol-input').val() ? parseFloat(card.find('.experiencia-price-no-alcohol-input').val()) : null;
             experiencia.price_child = card.find('.experiencia-price-child-input').val() ? parseFloat(card.find('.experiencia-price-child-input').val()) : null;
@@ -2421,6 +2440,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     name: card.find('.experiencia-name-input').val().trim(),
                     description: card.find('.experiencia-description-input').val().trim(),
                     tipo: card.find('.experiencia-tipo-input').val().trim() || null,
+                    experience_category: card.find('.experiencia-category-input').val() || null,
                     price: parseFloat(card.find('.experiencia-price-input').val()) || 0,
                     price_no_alcohol: card.find('.experiencia-price-no-alcohol-input').val() ? parseFloat(card.find('.experiencia-price-no-alcohol-input').val()) : null,
                     price_child: card.find('.experiencia-price-child-input').val() ? parseFloat(card.find('.experiencia-price-child-input').val()) : null,
@@ -3726,6 +3746,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 }
 .provider-inbox #<%= dtTableId %> tbody tr {
     cursor: pointer;
+}
+/* Columna única fija al 100% del contenedor: evita que un nombre largo (text-truncate
+   usa white-space:nowrap) expanda la tabla y se desborde encima del panel de detalle. */
+.provider-inbox-table {
+    table-layout: fixed;
+    width: 100%;
 }
 .provider-inbox-table tbody td {
     padding: 0.65rem 0.5rem;
