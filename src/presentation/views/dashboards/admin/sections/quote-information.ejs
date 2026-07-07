@@ -1290,6 +1290,13 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         const cl = document.getElementById('contactLastName');
         if (cl && !cl.dataset.userEdited) cl.value = this.value;
     });
+    // Al teclear en el Nombre (posible cliente nuevo), habilitar "guardar como cliente".
+    const enableSave = (cbId) => {
+        const cb = document.getElementById(cbId);
+        if (cb) { cb.disabled = false; cb.closest('.form-check')?.classList.remove('opacity-50'); }
+    };
+    document.getElementById('clientFinalId')?.addEventListener('customselect:input', () => enableSave('saveFinalClientAsClient'));
+    document.getElementById('leadGuestClientId')?.addEventListener('customselect:input', () => enableSave('saveLeadGuestAsClient'));
 
     // Lead Guest combobox: elegir existente → llenar LG + contacto desde la opción.
     document.getElementById('leadGuestClientId')?.addEventListener('change', function () {

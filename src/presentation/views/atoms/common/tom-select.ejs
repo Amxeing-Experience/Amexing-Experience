@@ -299,8 +299,12 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
     // Handle search input with debouncing for server-side search
     function handleSearch(e) {
         const searchTerm = e.target.value.toLowerCase();
-        // Typeahead: cualquier tecleo mantiene la lista abierta.
-        if (typeahead) openMenu();
+        // Typeahead: cualquier tecleo mantiene la lista abierta y notifica el texto actual
+        // (para que el consumidor reaccione al "posible nuevo", p.ej. habilitar "guardar cliente").
+        if (typeahead) {
+            openMenu();
+            hiddenInput.dispatchEvent(new CustomEvent('customselect:input', { bubbles: true, detail: { text: e.target.value } }));
+        }
 
         // Clear existing timeout
         if (searchTimeout) {
