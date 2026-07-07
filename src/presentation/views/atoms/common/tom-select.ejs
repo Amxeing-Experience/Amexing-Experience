@@ -49,6 +49,8 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
 // Modo combobox (opt-in): permite crear una opción escribiendo un texto nuevo.
 const selectAllowCreate = typeof allowCreate !== 'undefined' ? allowCreate : false;
 const selectCreateLabel = typeof createLabel !== 'undefined' ? createLabel : 'Crear';
+// Pista (no clickable) que se muestra al teclear un valor que no coincide con ninguna opción.
+const selectCreateHint = typeof createHint !== 'undefined' ? createHint : 'Escribe el nombre del nuevo cliente';
 // displayField (opcional): campo de la opción a mostrar en el input al seleccionar (p.ej.
 // 'firstName'), aunque la búsqueda/lista sigan usando el texto completo. '' = usar text.
 const selectDisplayField = typeof displayField !== 'undefined' ? displayField : '';
@@ -144,6 +146,7 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
     const isDisabled = <%= selectDisabled ? 'true' : 'false' %>;
     const allowCreate = <%= selectAllowCreate ? 'true' : 'false' %>;
     const createLabel = '<%= selectCreateLabel %>';
+    const createHint = '<%= selectCreateHint %>';
     const displayField = '<%= selectDisplayField %>';
     const typeahead = allowCreate;
     const hiddenInput = document.getElementById(selectId);
@@ -345,14 +348,14 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
 
         const visibleOptions = allOptions.filter(opt => opt.element.style.display !== 'none');
 
-        // Modo combobox: si se permite crear y el texto no coincide EXACTAMENTE con una
-        // opción existente, ofrecer "＋ Crear «texto»" en lugar del mensaje "sin resultados".
+        // Modo combobox: si se teclea algo que no coincide con una opción, mostrar la pista
+        // "escribe el nombre del nuevo cliente" (el alta se confirma con Enter o al salir).
         if (allowCreate && searchTerm) {
             const exact = allOptions.some(opt => opt.text.toLowerCase() === searchTerm);
-            showCreateOption(rawTerm || searchTerm, !exact);
+            showNewClientHint(!exact);
             showNoResultsMessage(false);
         } else {
-            showCreateOption('', false);
+            showNewClientHint(false);
             showNoResultsMessage(visibleOptions.length === 0 && searchTerm.length > 0);
         }
     }
@@ -360,13 +363,6 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
     // Handle option click
     function handleOptionClick(e) {
         e.preventDefault();
-
-        // Modo combobox: click en "＋ Crear «texto»".
-        const createEl = e.target.closest('.dropdown-option-create');
-        if (createEl) {
-            commitTypedValue(createEl.dataset.createText || '');
-            return;
-        }
 
         // Use closest() so clicks landing on inner elements (e.g. the small type
         // suffix) still resolve to the option anchor.
@@ -394,7 +390,7 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
             option.element.style.display = 'block';
         });
         showNoResultsMessage(false);
-        showCreateOption('', false);
+        showNewClientHint(false);
     }
     
     // Handle dropdown close
@@ -415,13 +411,14 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
             closeDropdown();
             return;
         }
-        // Modo combobox: Enter con item "Crear" visible → commitea el texto tecleado
+        // Modo combobox: Enter con texto que no coincide con una opción → commitea como "nuevo"
         // (preventDefault evita que el Enter envíe el formulario contenedor).
         if (e.key === 'Enter' && allowCreate) {
-            const createEl = optionsContainer.querySelector('.dropdown-option-create');
-            if (createEl) {
+            const v = (searchInput.value || '').trim();
+            const exact = allOptions.some(opt => opt.text.toLowerCase() === v.toLowerCase());
+            if (v && !exact) {
                 e.preventDefault();
-                commitTypedValue(createEl.dataset.createText || searchInput.value);
+                commitTypedValue(v);
             }
         }
     }
@@ -536,23 +533,17 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
         }
     }
 
-    // Combobox: item "＋ Crear «texto»" al inicio de la lista (des-duplicado).
-    function showCreateOption(text, show) {
-        let el = optionsContainer.querySelector('.dropdown-option-create');
-        if (show && text) {
+    // Combobox: pista (no clickable) al teclear un valor sin coincidencia. El alta ocurre al
+    // presionar Enter o al salir del campo (blur) — no hay item "Crear" clickable.
+    function showNewClientHint(show) {
+        let el = optionsContainer.querySelector('.dropdown-typeahead-hint');
+        if (show) {
             if (!el) {
-                el = document.createElement('a');
-                el.className = 'dropdown-item dropdown-option-create';
-                el.href = '#';
-                optionsContainer.insertBefore(el, optionsContainer.firstChild);
+                el = document.createElement('div');
+                el.className = 'dropdown-item-text text-muted small dropdown-typeahead-hint';
+                optionsContainer.appendChild(el);
             }
-            el.dataset.createText = text;
-            // textContent para evitar inyección de HTML desde el texto tecleado.
-            el.textContent = '';
-            const icon = document.createElement('i');
-            icon.className = 'ti ti-plus me-1';
-            el.appendChild(icon);
-            el.appendChild(document.createTextNode(createLabel + ' «' + text + '»'));
+            el.textContent = createHint;
         } else if (el) {
             el.remove();
         }
