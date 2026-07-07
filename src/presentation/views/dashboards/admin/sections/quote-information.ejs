@@ -1172,12 +1172,26 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         if (summary) {
             summary.classList.toggle('d-none', !linked);
             if (linked) {
-                const first = document.getElementById('leadGuestFirstName')?.value.trim() || '';
-                const last = document.getElementById('leadGuestLastName')?.value.trim() || '';
-                const email = document.getElementById('contactEmail')?.value.trim() || '';
+                // Derivar del Cliente Final ACTUAL (opción existente o tecleado) y mantener el Lead
+                // Guest (fuente de verdad) en sync — así el resumen refleja siempre el CF vigente.
+                const cfInst = document.getElementById('clientFinalId')?.customSelect;
+                let first = '';
+                let last = '';
+                let email = '';
+                if (cfInst && cfInst.isTyped && cfInst.isTyped()) {
+                    first = (cfInst.getTypedText && cfInst.getTypedText() || '').trim();
+                    last = (document.getElementById('finalClientLastName')?.value || '').trim();
+                } else {
+                    const opt = getFinalClientOptionByValue(getSelectedFinalClientValue());
+                    if (opt) { first = opt.firstName || ''; last = opt.lastName || ''; email = opt.email || ''; }
+                }
+                const setLg = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+                setLg('leadGuestFirstName', first);
+                setLg('leadGuestLastName', last);
+                email = email || document.getElementById('contactEmail')?.value.trim() || '';
                 const name = `${first} ${last}`.trim();
                 const txt = document.getElementById('leadGuestFinalSummaryText');
-                if (txt) txt.textContent = name ? (email ? `${name} · ${email}` : name) : 'Selecciona un cliente final arriba';
+                if (txt) txt.textContent = name ? (email ? `${name} · ${email}` : name) : 'Selecciona o escribe un cliente final arriba';
             }
         }
         // La nota de "Guardar cliente" depende del modo agencia/directo y de la agencia seleccionada.
@@ -1284,11 +1298,16 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         }
         if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode();
     });
-    // Apellido del Cliente Final → contacto (si el contacto no es el propietario ni fue editado).
+    // Apellido del Cliente Final → contacto (si el contacto no es el propietario ni fue editado)
+    // y, si "el Lead Guest es el cliente final" está activo, refrescar el resumen del Lead Guest.
     document.getElementById('finalClientLastName')?.addEventListener('input', function () {
-        if (document.getElementById('contactDifferentFromOwner')?.checked) return;
-        const cl = document.getElementById('contactLastName');
-        if (cl && !cl.dataset.userEdited) cl.value = this.value;
+        if (!document.getElementById('contactDifferentFromOwner')?.checked) {
+            const cl = document.getElementById('contactLastName');
+            if (cl && !cl.dataset.userEdited) cl.value = this.value;
+        }
+        if (document.getElementById('leadGuestIsFinalClient')?.checked && typeof syncLeadGuestMode === 'function') {
+            syncLeadGuestMode();
+        }
     });
     // Al teclear en el Nombre (posible cliente nuevo), habilitar "guardar como cliente".
     const enableSave = (cbId) => {
