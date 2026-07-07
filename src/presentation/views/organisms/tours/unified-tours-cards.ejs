@@ -3121,6 +3121,24 @@ document.addEventListener('DOMContentLoaded', function() {
             return `${mins}min`;
         }
     }
+
+    // Reserva anticipada (minutos) → días si >=24h; si no, horas y minutos (sin decimales).
+    function formatAdvanceBooking(totalMinutes) {
+        const mins = parseInt(totalMinutes);
+        if (!mins || isNaN(mins) || mins <= 0) return 'Reserva inmediata';
+        if (mins >= 1440) {
+            const days = Math.floor(mins / 1440);
+            const remHours = Math.floor((mins % 1440) / 60);
+            let out = `${days} ${days === 1 ? 'día' : 'días'}`;
+            if (remHours > 0) out += ` ${remHours} ${remHours === 1 ? 'hora' : 'horas'}`;
+            return out;
+        }
+        const hours = Math.floor(mins / 60);
+        const minutes = mins % 60;
+        if (hours > 0 && minutes > 0) return `${hours}h ${minutes}min`;
+        if (hours > 0) return `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+        return `${minutes} min`;
+    }
     
     // Function to load Information tab
     function loadInformationTab(tour, tourName) {
@@ -3232,7 +3250,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${tour.advance_booking_time ? `
                     <div class="alert alert-warning">
                         <i class="ti ti-clock-hour-4 me-2"></i>
-                        <strong>Reservar con anticipación:</strong> Mínimo ${formatDuration(tour.advance_booking_time)} antes
+                        <strong>Reservar con anticipación:</strong> Mínimo ${formatAdvanceBooking(tour.advance_booking_time)} antes
                     </div>
                 ` : ''}
                 
