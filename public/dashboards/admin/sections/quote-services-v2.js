@@ -7663,8 +7663,9 @@ class ItineraryBuilder {
       }).join('')}
                                         </div>
                                     ` : ''}
-                                    ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide
-                                      && !(service.type === 'tour' && this.serviceIncludesMentionGuide(service)) ? `
+                                    ${((((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide)
+                                      || (service.type === 'experience' && service.experienceGuide))
+                                      && !((service.type === 'tour' || service.type === 'experience') && this.serviceIncludesMentionGuide(service))) ? `
                                         <div class="row g-2 text-success small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-user me-1"></i>
