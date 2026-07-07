@@ -406,13 +406,15 @@ const e = __isRes ? 'reservación' : 'cotización';
 </div>
 
 <!-- Quick Client Creation Modal -->
-<div class="modal fade" id="quickClientModal" tabindex="-1" aria-labelledby="quickClientModalLabel" aria-hidden="true">
+<div class="modal fade client-modal-v2" id="quickClientModal" tabindex="-1" aria-labelledby="quickClientModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="quickClientModalLabel">
-                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Rápido
-                </h5>
+                <div class="asc-hdr-icon"><i class="ti ti-user-plus"></i></div>
+                <div class="flex-grow-1">
+                    <h5 class="modal-title" id="quickClientModalLabel">Crear Cliente Rápido</h5>
+                    <div class="asc-subtitle">Se creará con la información mínima necesaria</div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
@@ -421,43 +423,47 @@ const e = __isRes ? 'reservación' : 'cotización';
                 <div id="quickClientModalAlerts"></div>
 
                 <form id="quickClientForm" class="needs-validation" novalidate>
-                    <div class="mb-3">
-                        <label for="qc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="qc_firstName" name="firstName" required placeholder="Ej: Juan">
-                        <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                    <p class="asc-section-label">Datos del cliente</p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="qc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="qc_firstName" name="firstName" required placeholder="Ej: Juan">
+                            <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="qc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="qc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                            <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="qc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="qc_lastName" name="lastName" required placeholder="Ej: Pérez">
-                        <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                    <div class="mt-3">
+                        <%- include('../../../atoms/common/email-input', {
+                            name: 'email',
+                            id: 'qc_email',
+                            label: 'Email',
+                            required: false,
+                            placeholder: 'email@ejemplo.com',
+                            helpText: 'Si no lo proporcionas, se generará un email temporal',
+                            containerClass: 'mb-3'
+                        }) %>
+
+                        <div class="mb-3">
+                            <label for="qc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
+                            <input type="text" class="form-control" id="qc_companyName" name="companyName" placeholder="Ej: Empresa S.A. de C.V.">
+                            <div class="form-text">Nombre de la empresa del cliente</div>
+                        </div>
+
+                        <%- include('../../../atoms/common/phone-input', {
+                            name: 'phone',
+                            id: 'qc_phone',
+                            label: 'Teléfono',
+                            required: false,
+                            helpText: 'Número de contacto del cliente',
+                            countryCode: 'MX',
+                            containerClass: 'mb-3'
+                        }) %>
                     </div>
-
-                    <%- include('../../../atoms/common/email-input', {
-                        name: 'email',
-                        id: 'qc_email',
-                        label: 'Email',
-                        required: false,
-                        placeholder: 'email@ejemplo.com',
-                        helpText: 'Si no lo proporcionas, se generará un email temporal',
-                        containerClass: 'mb-3'
-                    }) %>
-
-                    <div class="mb-3">
-                        <label for="qc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
-                        <input type="text" class="form-control" id="qc_companyName" name="companyName" placeholder="Ej: Empresa S.A. de C.V.">
-                        <div class="form-text">Nombre de la empresa del cliente</div>
-                    </div>
-
-                    <%- include('../../../atoms/common/phone-input', {
-                        name: 'phone',
-                        id: 'qc_phone',
-                        label: 'Teléfono',
-                        required: false,
-                        helpText: 'Número de contacto del cliente',
-                        countryCode: 'MX',
-                        containerClass: 'mb-3'
-                    }) %>
 
                     <div class="alert alert-info d-flex align-items-start" role="alert">
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
@@ -469,8 +475,8 @@ const e = __isRes ? 'reservación' : 'cotización';
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="ti ti-x me-1"></i>Cancelar
+                <button type="button" class="btn asc-btn-ghost" data-bs-dismiss="modal">
+                    Cancelar
                 </button>
                 <button type="button" class="btn btn-primary" id="saveQuickClientBtn">
                     <i class="ti ti-check me-1"></i>Crear Cliente
@@ -709,39 +715,42 @@ const e = __isRes ? 'reservación' : 'cotización';
 
 <!-- Admin Sub-Client Creation Modal (for admin creating sub-clients for selected enterprise) -->
 <style>
-    /* Rediseño del modal Crear Cliente Final — scopeado a #adminSubClientModal.
-       Usa las variables de tema (--bs-primary) para combinar con la app. */
-    #adminSubClientModal .modal-content { border:0; border-radius:16px; overflow:hidden; }
-    #adminSubClientModal .modal-header {
+    /* Rediseño compartido de modales de creación de cliente — clase .client-modal-v2.
+       La usan "Crear Cliente Final para Empresa" (#adminSubClientModal) y
+       "Crear Cliente Rápido" (#quickClientModal). Usa las variables de tema
+       (--bs-primary) para combinar con la app. */
+    .client-modal-v2 .modal-content { border:0; border-radius:16px; overflow:hidden; }
+    .client-modal-v2 .modal-header {
         background:linear-gradient(135deg, var(--bs-primary) 0%, rgba(var(--bs-primary-rgb), .82) 100%);
         color:#fff; border:0; padding:1.25rem 1.5rem; align-items:center;
     }
-    #adminSubClientModal .asc-hdr-icon {
+    .client-modal-v2 .asc-hdr-icon {
         width:44px; height:44px; border-radius:12px; background:rgba(255,255,255,.2);
         display:flex; align-items:center; justify-content:center; font-size:1.4rem; margin-right:.9rem; flex:0 0 auto;
     }
-    #adminSubClientModal .modal-title { font-size:1.1rem; font-weight:700; line-height:1.2; }
-    #adminSubClientModal .asc-subtitle { font-size:.8rem; opacity:.85; }
-    #adminSubClientModal .modal-header .btn-close { filter:invert(1) grayscale(1) brightness(2); opacity:.9; }
-    #adminSubClientModal .modal-body { padding:1.5rem; }
-    #adminSubClientModal .asc-ent-pill {
+    .client-modal-v2 .modal-title { font-size:1.1rem; font-weight:700; line-height:1.2; }
+    .client-modal-v2 .asc-subtitle { font-size:.8rem; opacity:.85; }
+    .client-modal-v2 .modal-header .btn-close { filter:invert(1) grayscale(1) brightness(2); opacity:.9; }
+    .client-modal-v2 .modal-body { padding:1.5rem; }
+    .client-modal-v2 .asc-ent-pill {
         display:flex; align-items:center; gap:.75rem; background:rgba(var(--bs-primary-rgb), .07);
         border:1px solid rgba(var(--bs-primary-rgb), .18); border-radius:12px; padding:.75rem 1rem; margin-bottom:1.25rem;
     }
-    #adminSubClientModal .asc-ent-ic {
+    .client-modal-v2 .asc-ent-ic {
         width:38px; height:38px; border-radius:9px; background:#fff; display:flex; align-items:center;
         justify-content:center; color:var(--bs-primary); font-size:1.2rem; flex:0 0 auto;
     }
-    #adminSubClientModal .asc-ent-lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:var(--bs-primary); font-weight:700; opacity:.8; }
-    #adminSubClientModal .asc-ent-name { font-weight:700; color:#3d3470; font-size:.95rem; }
-    #adminSubClientModal .asc-section-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#9ca3af; font-weight:700; margin:0 0 .6rem; }
-    #adminSubClientModal .form-control, #adminSubClientModal .form-select { border-radius:10px; }
-    #adminSubClientModal .modal-footer { border:0; padding:1rem 1.5rem 1.5rem; gap:.5rem; }
-    #adminSubClientModal .modal-footer .btn { border-radius:10px; padding:.55rem 1.2rem; font-weight:600; }
-    #adminSubClientModal .asc-btn-ghost { background:#f3f4f6; border:0; color:#6b7280; }
-    #adminSubClientModal .asc-btn-ghost:hover { background:#e5e7eb; color:#4b5563; }
+    .client-modal-v2 .asc-ent-lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:var(--bs-primary); font-weight:700; opacity:.8; }
+    .client-modal-v2 .asc-ent-name { font-weight:700; color:#3d3470; font-size:.95rem; }
+    .client-modal-v2 .asc-section-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#9ca3af; font-weight:700; margin:0 0 .6rem; }
+    .client-modal-v2 .form-control, .client-modal-v2 .form-select { border-radius:10px; }
+    .client-modal-v2 .alert { border-radius:12px; }
+    .client-modal-v2 .modal-footer { border:0; padding:1rem 1.5rem 1.5rem; gap:.5rem; }
+    .client-modal-v2 .modal-footer .btn { border-radius:10px; padding:.55rem 1.2rem; font-weight:600; }
+    .client-modal-v2 .asc-btn-ghost { background:#f3f4f6; border:0; color:#6b7280; }
+    .client-modal-v2 .asc-btn-ghost:hover { background:#e5e7eb; color:#4b5563; }
 </style>
-<div class="modal fade" id="adminSubClientModal" tabindex="-1" aria-labelledby="adminSubClientModalLabel" aria-hidden="true">
+<div class="modal fade client-modal-v2" id="adminSubClientModal" tabindex="-1" aria-labelledby="adminSubClientModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
