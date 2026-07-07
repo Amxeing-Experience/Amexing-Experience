@@ -32,7 +32,7 @@ const e = __isRes ? 'reservación' : 'cotización';
             <input type="hidden" id="quoteId" name="quoteId" value="<%= typeof quoteId !== 'undefined' ? quoteId : '' %>">
 
             <!-- Sección: Información del Cliente -->
-            <div class="mb-4">
+            <div class="border rounded p-3 mb-4">
                 <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
                     <i class="ti ti-user me-1"></i>
                     Información del Cliente
@@ -59,12 +59,6 @@ const e = __isRes ? 'reservación' : 'cotización';
                         <label class="btn btn-outline-primary" for="clientTypeDirect">
                             <i class="ti ti-user-check me-1"></i>Clientes Directos
                         </label>
-                    </div>
-                    <div class="form-text mt-1">
-                        <small id="clientTypeHelp">
-                            <span class="client-type-agency">Selecciona una agencia o empresa asociada</span>
-                            <span class="client-type-direct" style="display: none;">Selecciona un cliente directo de Amexing</span>
-                        </small>
                     </div>
                 </div>
                 <% } %>
@@ -100,19 +94,24 @@ const e = __isRes ? 'reservación' : 'cotización';
                 <div class="row" id="directClientRow" style="display: none;">
                     <!-- Category sub-filter: narrows the direct-client list by clientCategory -->
                     <div class="col-md-12 mb-2">
-                        <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Categoría de cliente directo" id="directClientCategoryGroup">
+                        <style>
+                            #directClientCategoryGroup { display: flex; flex-wrap: wrap; gap: .25rem; }
+                            #directClientCategoryGroup .cat-chip { margin: 0; border: 0; background: transparent; border-radius: 999px;
+                                padding: .35rem .85rem; font-size: .875rem; font-weight: 600; color: #7a7f70; cursor: pointer; transition: all .12s; }
+                            #directClientCategoryGroup .cat-chip:hover { background: rgba(var(--bs-primary-rgb), .08); color: var(--bs-primary); }
+                            #directClientCategoryGroup .btn-check:checked + .cat-chip { background: rgba(var(--bs-primary-rgb), .15); color: var(--bs-primary); }
+                        </style>
+                        <div role="group" aria-label="Categoría de cliente directo" id="directClientCategoryGroup">
                             <input type="radio" class="btn-check" name="directClientCategory" id="directCategoryAll" value="" checked>
-                            <label class="btn btn-outline-secondary" for="directCategoryAll">Todos</label>
+                            <label class="cat-chip" for="directCategoryAll">Todos</label>
                             <input type="radio" class="btn-check" name="directClientCategory" id="directCategoryDirect" value="direct_client">
-                            <label class="btn btn-outline-secondary" for="directCategoryDirect">Cliente Directo</label>
-                            <!-- TEMP: hidden per direction — uncomment to re-activate these client types
+                            <label class="cat-chip" for="directCategoryDirect">Cliente Directo</label>
                             <input type="radio" class="btn-check" name="directClientCategory" id="directCategoryWedding" value="wedding_planner">
-                            <label class="btn btn-outline-secondary" for="directCategoryWedding">Wedding Planner</label>
+                            <label class="cat-chip" for="directCategoryWedding">Wedding Planner</label>
                             <input type="radio" class="btn-check" name="directClientCategory" id="directCategoryConcierge" value="concierge">
-                            <label class="btn btn-outline-secondary" for="directCategoryConcierge">Concierge</label>
+                            <label class="cat-chip" for="directCategoryConcierge">Concierge</label>
                             <input type="radio" class="btn-check" name="directClientCategory" id="directCategoryHomeOwner" value="home_owner">
-                            <label class="btn btn-outline-secondary" for="directCategoryHomeOwner">Home Owner</label>
-                            -->
+                            <label class="cat-chip" for="directCategoryHomeOwner">Home Owner</label>
                         </div>
                     </div>
                     <div class="col-md-10">
@@ -123,7 +122,7 @@ const e = __isRes ? 'reservación' : 'cotización';
                             placeholder: 'Buscar cliente directo de Amexing',
                             label: 'Cliente',
                             required: true,
-                            helpText: 'Selecciona un cliente directo de Amexing',
+                            helpText: '',
                             options: [],
                             selected: [],
                             disabled: false
@@ -138,131 +137,180 @@ const e = __isRes ? 'reservación' : 'cotización';
                 </div>
             </div>
                 
-            <!-- Ownership and Sharing Controls -->
-            <div class="mb-4">
-                <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded border">
-                    <!-- Left: Owner Info -->
-                    <div class="d-flex align-items-center">
-                        <div class="badge bg-secondary me-3">
-                            <i class="ti ti-user me-1"></i>
-                            Propietario
-                        </div>
-                        <div>
-                            <div class="fw-medium" id="compactOwnerName">
-                                <div class="placeholder-glow" id="ownerLoader">
-                                    <span class="placeholder col-6 placeholder-sm"></span>
-                                </div>
-                            </div>
-                            <small class="text-muted" id="compactOwnerEmail">
-                                <div class="placeholder-glow" id="ownerEmailLoader">
-                                    <span class="placeholder col-8 placeholder-xs"></span>
-                                </div>
-                            </small>
+            <!-- Sección: Propietario -->
+            <div class="border rounded p-3 mb-4">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3 d-flex justify-content-between align-items-center">
+                    <span><i class="ti ti-user me-1"></i>Propietario</span>
+                    <button type="button" class="btn btn-sm btn-primary" id="btnManageCollaborators">
+                        <i class="ti ti-user-plus me-1"></i>Compartir
+                    </button>
+                </h6>
+                <div>
+                    <div class="fw-medium" id="compactOwnerName">
+                        <div class="placeholder-glow" id="ownerLoader">
+                            <span class="placeholder col-6 placeholder-sm"></span>
                         </div>
                     </div>
-                    
-                    <!-- Right: Compartir Button -->
-                    <button type="button" class="btn btn-primary" id="btnManageCollaborators">
-                        <i class="ti ti-user-plus me-1"></i>
-                        Compartir
-                    </button>
+                    <small class="text-muted" id="compactOwnerEmail">
+                        <div class="placeholder-glow" id="ownerEmailLoader">
+                            <span class="placeholder col-8 placeholder-xs"></span>
+                        </div>
+                    </small>
+                </div>
+            </div>
+
+            <!-- Sección: Cliente Final (solo agencias; la tarjeta se togglea por modo vía #finalClientRow) -->
+            <div class="border rounded p-3 mb-4 mt-4 flex-column" id="finalClientRow">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                    <i class="ti ti-user-check me-1"></i>
+                    Cliente Final
+                </h6>
+                <div class="mb-2">
+                    <%- include('../../../atoms/common/tom-select', {
+                        id: 'clientFinalId',
+                        name: 'clientFinalId',
+                        multiple: false,
+                        placeholder: 'Seleccionar cliente final (opcional)',
+                        label: '',
+                        required: false,
+                        helpText: 'Selecciona el cliente final; su información se usa como Lead Guest',
+                        options: [],
+                        selected: []
+                    }) %>
+                </div>
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="leadGuestIsFinalClient" checked>
+                    <label class="form-check-label" for="leadGuestIsFinalClient">
+                        El Lead Guest es el cliente final
+                    </label>
+                </div>
+            </div>
+
+            <!-- Sección: Lead Guest -->
+            <div class="border rounded p-3 mb-4 mt-4">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                    <i class="ti ti-user-star me-1"></i>
+                    Lead Guest
+                    <small class="text-muted fw-normal ms-1">(huésped principal)</small>
+                </h6>
+
+                <!-- Resumen cuando "es el cliente final" (oculto por defecto): quién es el Lead Guest -->
+                <div id="leadGuestFinalSummary" class="d-none d-flex align-items-center border rounded bg-light py-2 px-3 mb-0" style="color:#495057;">
+                    <i class="ti ti-user-star me-2 text-success"></i>
+                    <small style="color:#495057;">El Lead Guest es el <strong>cliente final</strong>: <span id="leadGuestFinalSummaryText" class="fw-semibold" style="color:#212529;">—</span></small>
                 </div>
 
+                <!-- Lead Guest manual: se oculta cuando "es el cliente final" está marcado (agencia) -->
+                <div id="leadGuestManualFields">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="leadGuestFirstName" class="form-label">Nombre</label>
+                            <input type="text" class="form-control" id="leadGuestFirstName" name="leadGuestFirstName" placeholder="Nombre">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="leadGuestLastName" class="form-label">Apellido</label>
+                            <input type="text" class="form-control" id="leadGuestLastName" name="leadGuestLastName" placeholder="Apellido">
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="saveLeadGuestAsClient">
+                        <label class="form-check-label" for="saveLeadGuestAsClient">
+                            <i class="ti ti-user-plus me-1"></i>Guardar cliente en el sistema<% if (typeof userRole !== 'undefined' && (userRole === 'admin' || userRole === 'superadmin')) { %> <span class="text-muted fw-normal" id="saveClientCategoryNote">(se guardará como cliente directo)</span><% } %>
+                        </label>
+                        <div class="form-text">Al guardar la cotización, se creará este cliente en el sistema para reutilizarlo.</div>
+                        <% if (typeof userRole !== 'undefined' && (userRole === 'admin' || userRole === 'superadmin')) { %>
+                        <!-- Categoría del cliente directo (solo admin, modo directo). En agencia se oculta. -->
+                        <div class="mt-2 d-none" id="saveClientCategoryWrap" style="max-width: 260px;">
+                            <label for="saveClientCategory" class="form-label small mb-1">Categoría del cliente</label>
+                            <select class="form-select form-select-sm" id="saveClientCategory">
+                                <option value="direct_client" selected>Cliente Directo</option>
+                                <option value="wedding_planner">Wedding Planner</option>
+                                <option value="concierge">Concierge</option>
+                                <option value="home_owner">Home Owner</option>
+                            </select>
+                        </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+
             <!-- Sección: Información de Contacto -->
-            <div class="mb-4">
+            <div class="border rounded p-3 mb-4">
                 <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
                     <i class="ti ti-phone me-1"></i>
                     Información de Contacto
                 </h6>
-                <div class="alert alert-info d-flex align-items-start" role="alert">
-                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
-                    <div>
-                        <small>Esta información se autocompletará al seleccionar un cliente, pero puedes editarla para esta <%= e %> específica.</small>
-                    </div>
+
+                <!-- Contacto = Lead Guest por defecto (id conserva el nombre viejo, pero la
+                     semántica se INVIRTIÓ: marcado = el contacto es el propietario). -->
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="contactDifferentFromOwner">
+                    <label class="form-check-label" for="contactDifferentFromOwner">
+                        El contacto es el propietario de la cotización
+                    </label>
                 </div>
 
-                <!-- Final Client Selection (only shown for agencies) -->
-                <div class="row" id="finalClientRow">
-                    <div class="col-md-10 mb-3">
-                        <%- include('../../../atoms/common/tom-select', {
-                            id: 'clientFinalId',
-                            name: 'clientFinalId',
-                            multiple: false,
-                            placeholder: 'Seleccionar cliente final (opcional)',
-                            label: 'Cliente Final',
-                            required: false,
-                            helpText: 'Selecciona un cliente final específico para prellenar la información de contacto',
-                            options: [],
-                            selected: []
-                        }) %>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label class="form-label">&nbsp;</label>
-                        <button type="button" class="btn btn-outline-primary w-100 px-2 py-2" id="createFinalClientBtn">
-                            <i class="ti ti-plus me-1"></i>Crear Cliente
-                        </button>
-                    </div>
+                <!-- Resumen cuando el contacto = propietario (oculto por defecto): se ve a quién se usará -->
+                <div id="contactOwnerSummary" class="d-none d-flex align-items-center border rounded bg-light py-2 px-3 mb-0" style="color:#495057;">
+                    <i class="ti ti-user-check me-2 text-success"></i>
+                    <small style="color:#495057;">Se usará al <strong>propietario</strong> como contacto: <span id="contactOwnerSummaryText" class="fw-semibold" style="color:#212529;">—</span></small>
                 </div>
 
-                <!-- Lead Guest Fields -->
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="leadGuestFirstName" class="form-label">Lead Guest - Nombre</label>
-                        <input type="text" class="form-control" id="leadGuestFirstName" name="leadGuestFirstName" placeholder="Nombre">
-                        <div class="form-text">Nombre del huésped principal</div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="leadGuestLastName" class="form-label">Lead Guest - Apellido</label>
-                        <input type="text" class="form-control" id="leadGuestLastName" name="leadGuestLastName" placeholder="Apellido">
-                        <div class="form-text">Apellido del huésped principal</div>
-                    </div>
-                </div>
-
-                <!-- Contact Name Fields -->
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="contactFirstName" class="form-label">Nombre</label>
-                        <input type="text" class="form-control" id="contactFirstName" name="contactFirstName" placeholder="Nombre">
-                        <div class="form-text">Nombre de la persona de contacto</div>
+                <!-- Campos de contacto (= Lead Guest): visibles por defecto; se ocultan si el contacto es el propietario -->
+                <div id="contactFieldsWrapper">
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <small>Esta información se autocompletará al seleccionar un cliente, pero puedes editarla para esta <%= e %> específica.</small>
+                        </div>
                     </div>
 
-                    <div class="col-md-6 mb-3">
-                        <label for="contactLastName" class="form-label">Apellido</label>
-                        <input type="text" class="form-control" id="contactLastName" name="contactLastName" placeholder="Apellido">
-                        <div class="form-text">Apellido de la persona de contacto</div>
-                    </div>
-                </div>
+                    <!-- Contact Name Fields -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="contactFirstName" class="form-label">Nombre</label>
+                            <input type="text" class="form-control" id="contactFirstName" name="contactFirstName" placeholder="Nombre">
+                            <div class="form-text">Nombre de la persona de contacto</div>
+                        </div>
 
-                <!-- Contact Email and Phone -->
-                <div class="row">
-                    <div class="col-md-6">
-                        <%- include('../../../atoms/common/email-input', {
-                            name: 'contactEmail',
-                            id: 'contactEmail',
-                            label: 'Email de Contacto',
-                            required: false,
-                            placeholder: 'email@ejemplo.com',
-                            helpText: `Email para enviar la ${e}`,
-                            containerClass: 'mb-3'
-                        }) %>
+                        <div class="col-md-6 mb-3">
+                            <label for="contactLastName" class="form-label">Apellido</label>
+                            <input type="text" class="form-control" id="contactLastName" name="contactLastName" placeholder="Apellido">
+                            <div class="form-text">Apellido de la persona de contacto</div>
+                        </div>
                     </div>
 
-                    <div class="col-md-6">
-                        <%- include('../../../atoms/common/phone-input', {
-                            name: 'contactPhone',
-                            id: 'contactPhone',
-                            label: 'Teléfono de Contacto',
-                            required: false,
-                            helpText: 'Teléfono de contacto directo',
-                            countryCode: 'MX',
-                            containerClass: 'mb-3'
-                        }) %>
+                    <!-- Contact Email and Phone -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <%- include('../../../atoms/common/email-input', {
+                                name: 'contactEmail',
+                                id: 'contactEmail',
+                                label: 'Email de Contacto',
+                                required: false,
+                                placeholder: 'email@ejemplo.com',
+                                helpText: `Email para enviar la ${e}`,
+                                containerClass: 'mb-3'
+                            }) %>
+                        </div>
+
+                        <div class="col-md-6">
+                            <%- include('../../../atoms/common/phone-input', {
+                                name: 'contactPhone',
+                                id: 'contactPhone',
+                                label: 'Teléfono de Contacto',
+                                required: false,
+                                helpText: 'Teléfono de contacto directo',
+                                countryCode: 'MX',
+                                containerClass: 'mb-3'
+                            }) %>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Sección: Detalles del Evento -->
-            <div class="mb-4">
+            <div class="border rounded p-3 mb-4">
                 <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
                     <i class="ti ti-calendar-event me-1"></i>
                     Detalles del Evento
@@ -306,7 +354,7 @@ const e = __isRes ? 'reservación' : 'cotización';
             </div>
 
             <!-- Sección: Notas Adicionales -->
-            <div class="mb-4">
+            <div class="border rounded p-3 mb-4">
                 <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
                     <i class="ti ti-notes me-1"></i>
                     Notas Adicionales
@@ -771,7 +819,341 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
     
     // Make currentUserData available globally for other scripts
     window.currentUserData = currentUserData;
-    
+
+    // ---- Contacto = propietario por defecto / Guardar lead guest como cliente ----
+    // Datos del propietario: al editar vienen del quote (window.__quoteOwner); al crear, el
+    // propietario es el usuario actual.
+    function getOwnerData() {
+        if (window.__quoteOwner && (window.__quoteOwner.firstName || window.__quoteOwner.email)) {
+            return window.__quoteOwner;
+        }
+        return {
+            firstName: currentUserData.firstName || '',
+            lastName: currentUserData.lastName || '',
+            email: currentUserData.email || '',
+            phone: currentUserData.phone || '',
+            fullName: currentUserData.name || `${currentUserData.firstName || ''} ${currentUserData.lastName || ''}`.trim(),
+        };
+    }
+
+    // Valores de contacto a guardar. Por defecto el contacto es el Lead Guest (campos de
+    // contacto, con fallback al Lead Guest si están vacíos). Si el checkbox "es propietario"
+    // está marcado, se usan los datos del propietario.
+    function resolveContactValues() {
+        const isOwner = !!document.getElementById('contactDifferentFromOwner')?.checked;
+        if (isOwner) {
+            const o = getOwnerData();
+            return {
+                firstName: (o.firstName || '').trim(),
+                lastName: (o.lastName || '').trim(),
+                contactEmail: (o.email || '').trim(),
+                contactPhone: (o.phone || '').trim(),
+            };
+        }
+        const cf = document.getElementById('contactFirstName').value.trim();
+        const cl = document.getElementById('contactLastName').value.trim();
+        const lgf = document.getElementById('leadGuestFirstName')?.value.trim() || '';
+        const lgl = document.getElementById('leadGuestLastName')?.value.trim() || '';
+        return {
+            firstName: cf || lgf,
+            lastName: cl || lgl,
+            contactEmail: document.getElementById('contactEmail').value.trim(),
+            contactPhone: document.getElementById('contactPhone').value.trim(),
+        };
+    }
+
+    // El checkbox "El contacto es el propietario" INVIERTE el default: por defecto el contacto es
+    // el Lead Guest (campos visibles); si se marca, el contacto es el propietario (campos ocultos
+    // + resumen con a quién se usará).
+    function syncContactFieldsVisibility() {
+        const isOwner = !!document.getElementById('contactDifferentFromOwner')?.checked;
+        document.getElementById('contactFieldsWrapper')?.classList.toggle('d-none', isOwner);
+        const summary = document.getElementById('contactOwnerSummary');
+        if (summary) {
+            summary.classList.toggle('d-none', !isOwner);
+            if (isOwner) {
+                const o = getOwnerData();
+                const name = (o.fullName || `${o.firstName || ''} ${o.lastName || ''}`).trim() || '—';
+                const email = (o.email || '').trim();
+                const txtEl = document.getElementById('contactOwnerSummaryText');
+                if (txtEl) txtEl.textContent = email ? `${name} · ${email}` : name;
+            }
+        }
+    }
+
+    // Deriva el estado del checkbox al cargar: marcado ("es propietario") si el contacto guardado
+    // coincide con el propietario; si hay contacto/lead guest que difiere → desmarcado (contacto =
+    // Lead Guest); si no hay nada capturado → propietario por defecto.
+    function initContactDifferentFromQuote(quote) {
+        const cb = document.getElementById('contactDifferentFromOwner');
+        if (!cb) return;
+        const o = getOwnerData();
+        const norm = (s) => (s || '').trim().toLowerCase();
+        const cEmail = norm(quote.contactEmail);
+        const oEmail = norm(o.email);
+        const cName = norm(quote.contactPerson) || norm(`${quote.contactFirstName || ''} ${quote.contactLastName || ''}`);
+        const oName = norm(o.fullName) || norm(`${o.firstName || ''} ${o.lastName || ''}`);
+        const hasLeadGuest = !!(quote.leadGuestFirstName || quote.leadGuestLastName);
+        let isOwner;
+        if (cEmail && oEmail) {
+            isOwner = cEmail === oEmail;
+        } else if (cName && oName) {
+            isOwner = cName === oName;
+        } else if (cEmail || cName || hasLeadGuest) {
+            isOwner = false; // hay contacto/lead guest capturado → no es el propietario
+        } else {
+            isOwner = true; // nada capturado → propietario por defecto
+        }
+        cb.checked = isOwner;
+        syncContactFieldsVisibility();
+    }
+
+    // ¿El cliente guardado desde Lead Guest quedará como cliente de una AGENCIA?
+    // Solo aplica a admin/superadmin en modo agencia (con agencia seleccionada): en ese caso el
+    // cliente debe pertenecer a esa agencia, no guardarse como directo de Amexing.
+    // DM/agente NO entran aquí: su /quick ya los guarda como agency_client de su propia agencia.
+    // (Detección por DOM, no por currentClientType, para evitar TDZ en llamadas tempranas.)
+    function leadGuestSavesAsAgencyClient() {
+        const isAmexingAdmin = (userRole === 'admin' || userRole === 'superadmin');
+        if (!isAmexingAdmin) return false;
+        const enterpriseId = document.getElementById('clientId')?.value || '';
+        if (!enterpriseId) return false;
+        const agencyRow = document.getElementById('agencyClientRow');
+        const directRow = document.getElementById('directClientRow');
+        const agencyVisible = !!agencyRow && window.getComputedStyle(agencyRow).display !== 'none';
+        const directVisible = !!directRow && window.getComputedStyle(directRow).display !== 'none';
+        return agencyVisible && !directVisible;
+    }
+    // Nota + selector junto a "Guardar cliente" (solo admin). En modo DIRECTO se puede elegir la
+    // categoría del cliente (selector visible, nota oculta); en modo AGENCIA queda como cliente de la
+    // agencia (nota visible, selector oculto).
+    function updateSaveClientNote() {
+        const note = document.getElementById('saveClientCategoryNote');
+        if (!note) return; // solo existe para admin/superadmin
+        const agencyRow = document.getElementById('agencyClientRow');
+        const directRow = document.getElementById('directClientRow');
+        const agencyVisible = !!agencyRow && window.getComputedStyle(agencyRow).display !== 'none';
+        const directVisible = !!directRow && window.getComputedStyle(directRow).display !== 'none';
+        const isDirect = directVisible && !agencyVisible;
+        note.textContent = isDirect
+            ? '(se guardará como cliente directo)'
+            : '(se guardará como cliente de la agencia)';
+        note.classList.toggle('d-none', isDirect); // en directo lo reemplaza el selector de categoría
+        const wrap = document.getElementById('saveClientCategoryWrap');
+        if (wrap) wrap.classList.toggle('d-none', !isDirect); // selector de categoría solo en directo
+    }
+    document.getElementById('clientId')?.addEventListener('change', updateSaveClientNote);
+
+    // Guarda el lead guest como cliente en el sistema (owned-clients) si se marcó el checkbox.
+    async function maybeSaveLeadGuestAsClient() {
+        const cb = document.getElementById('saveLeadGuestAsClient');
+        if (!cb || !cb.checked) return false;
+        const firstName = document.getElementById('leadGuestFirstName')?.value.trim();
+        const lastName = document.getElementById('leadGuestLastName')?.value.trim();
+        if (!firstName || !lastName) return false; // el endpoint requiere nombre y apellido
+        // Admin en cotización de AGENCIA → guardar como cliente de esa agencia (agency_client bajo
+        // el enterpriseId) vía admin-create-subclient. En cualquier otro caso → /quick (directo para
+        // admin; agencia propia para DM/agente).
+        const asAgencySubclient = leadGuestSavesAsAgencyClient();
+        const endpoint = asAgencySubclient
+            ? '/api/owned-clients/admin-create-subclient'
+            : '/api/owned-clients/quick';
+        // En /quick (admin directo) se manda la categoría elegida (Cliente Directo / Wedding Planner /
+        // Concierge / Home Owner). El backend la valida y solo la aplica al crear como directo; para
+        // DM/agente la ignora (siempre agency_client). En agencia va por enterpriseId, sin categoría.
+        const catSel = document.getElementById('saveClientCategory');
+        const payload = asAgencySubclient
+            ? { firstName, lastName, enterpriseId: document.getElementById('clientId')?.value || '' }
+            : { firstName, lastName, ...(catSel && catSel.value ? { clientCategory: catSel.value } : {}) };
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            const result = await response.json();
+            if (result && result.success) {
+                cb.checked = false; // evitar recrearlo en un guardado posterior
+                // Agregar el nuevo cliente al selector "Cliente Final" en caliente.
+                if (result.data) {
+                    try {
+                        const ts = await waitForTomSelect('clientFinalId');
+                        ts.addOption({
+                            value: result.data.value,
+                            text: result.data.label,
+                            email: result.data.email || '',
+                            contactPerson: result.data.contactPerson || result.data.label,
+                            phone: result.data.phone || '',
+                            firstName,
+                            lastName,
+                        });
+                    } catch (e) { /* selector no inicializado aún */ }
+                }
+                return true;
+            }
+        } catch (err) {
+            console.error('Error guardando lead guest como cliente:', err);
+        }
+        return false;
+    }
+
+    // Listener del checkbox "el contacto es el propietario" (delegado, sobrevive al render inicial).
+    document.addEventListener('change', (e) => {
+        if (e.target && e.target.id === 'contactDifferentFromOwner') {
+            syncContactFieldsVisibility();
+        }
+    });
+
+    // Estado inicial (cotización nueva: contacto = usuario actual). En edición, loadQuoteData
+    // lo vuelve a derivar con el propietario real.
+    syncContactFieldsVisibility();
+
+    // Espejo Lead Guest → Contacto (mismo individuo por defecto). Si el usuario edita el
+    // contacto a mano, deja de reflejarse. No aplica si el override "es propietario" está activo.
+    ['contactFirstName', 'contactLastName'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('input', (ev) => { ev.target.dataset.userEdited = '1'; });
+    });
+    const mirrorLeadGuestToContact = () => {
+        if (document.getElementById('contactDifferentFromOwner')?.checked) return; // override = propietario
+        const cf = document.getElementById('contactFirstName');
+        const cl = document.getElementById('contactLastName');
+        if (cf && !cf.dataset.userEdited) cf.value = document.getElementById('leadGuestFirstName')?.value || '';
+        if (cl && !cl.dataset.userEdited) cl.value = document.getElementById('leadGuestLastName')?.value || '';
+    };
+    document.getElementById('leadGuestFirstName')?.addEventListener('input', mirrorLeadGuestToContact);
+    document.getElementById('leadGuestLastName')?.addEventListener('input', mirrorLeadGuestToContact);
+    // Re-evaluar el bloqueo de "Guardar cliente" al teclear el Lead Guest o cambiar el Cliente Final
+    // (puede volverse igual/distinto al cliente final ya guardado sin tocar el checkbox de enlace).
+    const _resyncSave = () => { if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode(); };
+    document.getElementById('leadGuestFirstName')?.addEventListener('input', _resyncSave);
+    document.getElementById('leadGuestLastName')?.addEventListener('input', _resyncSave);
+    document.getElementById('clientFinalId')?.addEventListener('change', _resyncSave);
+
+    // Modo Lead Guest (agencia): con "El Lead Guest es el cliente final" marcado, el Lead Guest sale
+    // del dropdown Cliente Final → se ocultan los campos manuales. Desmarcado (o en directo, donde el
+    // dropdown no se muestra) → captura manual.
+    function syncLeadGuestMode() {
+        const finalRow = document.getElementById('finalClientRow');
+        const agencyVisible = !!finalRow && window.getComputedStyle(finalRow).display !== 'none';
+        const isFinal = !!document.getElementById('leadGuestIsFinalClient')?.checked;
+        const linked = agencyVisible && isFinal;
+        document.getElementById('leadGuestManualFields')?.classList.toggle('d-none', linked);
+        // "Guardar cliente" sobra (y duplicaría) cuando el Lead Guest ya existe como cliente final:
+        // sea porque está enlazado (checkbox), o porque —aun desmarcado— el nombre capturado COINCIDE
+        // con el cliente final seleccionado. En ambos casos se desmarca y deshabilita; si no, se rehabilita.
+        const norm = (s) => (s || '').trim().toLowerCase();
+        const lgFirst = norm(document.getElementById('leadGuestFirstName')?.value);
+        const lgLast = norm(document.getElementById('leadGuestLastName')?.value);
+        const selOpt = agencyVisible ? getFinalClientOptionByValue(getSelectedFinalClientValue()) : null;
+        const matchesFinal = !!selOpt && (lgFirst || lgLast) &&
+            lgFirst === norm(selOpt.firstName) && lgLast === norm(selOpt.lastName);
+        const alreadySaved = linked || matchesFinal;
+        const saveCb = document.getElementById('saveLeadGuestAsClient');
+        if (saveCb) {
+            if (alreadySaved) saveCb.checked = false;
+            saveCb.disabled = alreadySaved;
+            saveCb.closest('.form-check')?.classList.toggle('opacity-50', alreadySaved);
+        }
+        const summary = document.getElementById('leadGuestFinalSummary');
+        if (summary) {
+            summary.classList.toggle('d-none', !linked);
+            if (linked) {
+                const first = document.getElementById('leadGuestFirstName')?.value.trim() || '';
+                const last = document.getElementById('leadGuestLastName')?.value.trim() || '';
+                const email = document.getElementById('contactEmail')?.value.trim() || '';
+                const name = `${first} ${last}`.trim();
+                const txt = document.getElementById('leadGuestFinalSummaryText');
+                if (txt) txt.textContent = name ? (email ? `${name} · ${email}` : name) : 'Selecciona un cliente final arriba';
+            }
+        }
+        // La nota de "Guardar cliente" depende del modo agencia/directo y de la agencia seleccionada.
+        if (typeof updateSaveClientNote === 'function') updateSaveClientNote();
+    }
+    // Aplica los datos del cliente final al Lead Guest (y al contacto).
+    function applyFinalClientToLeadGuest(opt) {
+        const first = opt.firstName || '';
+        const last = opt.lastName || '';
+        const set = (id, v, clearEdited) => {
+            const el = document.getElementById(id);
+            if (el) { el.value = v; if (clearEdited) el.dataset.userEdited = ''; }
+        };
+        set('leadGuestFirstName', first);
+        set('leadGuestLastName', last);
+        set('contactFirstName', first, true);
+        set('contactLastName', last, true);
+        set('contactEmail', opt.email || '');
+        let p = opt.phone || '';
+        if (p.startsWith('52') && p.length > 10) p = p.substring(2);
+        else if (p.startsWith('1') && p.length === 11) p = p.substring(1);
+        set('contactPhone', p);
+    }
+    // Valor seleccionado del dropdown Cliente Final (soporta customSelect y TomSelect).
+    function getSelectedFinalClientValue() {
+        const el = document.getElementById('clientFinalId');
+        const inst = el && (el.customSelect || el.tomselect);
+        return (inst && inst.getValue) ? inst.getValue() : (el ? el.value : '');
+    }
+    // Objeto de opción (firstName/lastName/email/phone) del Cliente Final por valor.
+    // clientFinalId usa el dropdown custom (customSelect.getOption) — NO expone .options
+    // como TomSelect, por eso hay que resolverlo por ambas vías.
+    function getFinalClientOptionByValue(val) {
+        if (!val) return null;
+        const el = document.getElementById('clientFinalId');
+        if (el && el.customSelect && el.customSelect.getOption) {
+            const o = el.customSelect.getOption(val);
+            if (o) return o;
+        }
+        const ts = el && el.tomselect;
+        if (ts && ts.options && ts.options[val]) return ts.options[val];
+        return null;
+    }
+    // Al marcar "El Lead Guest es el cliente final": el Lead Guest debe volverse el cliente final.
+    // Si hay uno seleccionado y el Lead Guest actual DIFIERE, se confirma antes de reemplazar (si
+    // cancelan, se desmarca). Sin cliente final → solo se muestra el resumen que pide seleccionar uno.
+    document.getElementById('leadGuestIsFinalClient')?.addEventListener('change', async function () {
+        const cb = this;
+        if (cb.checked) {
+            let opt = null;
+            try {
+                opt = getFinalClientOptionByValue(getSelectedFinalClientValue());
+            } catch (e) { /* dropdown no disponible (p.ej. modo directo) */ }
+            if (opt) {
+                const norm = (s) => (s || '').trim().toLowerCase();
+                const lgFirst = document.getElementById('leadGuestFirstName')?.value.trim() || '';
+                const lgLast = document.getElementById('leadGuestLastName')?.value.trim() || '';
+                const hasLeadGuest = !!(lgFirst || lgLast);
+                const differs = norm(lgFirst) !== norm(opt.firstName) || norm(lgLast) !== norm(opt.lastName);
+                if (hasLeadGuest && differs) {
+                    const ok = window.confirm('Se reemplazará el Lead Guest actual por el cliente final seleccionado. ¿Continuar?');
+                    if (!ok) { cb.checked = false; syncLeadGuestMode(); return; }
+                }
+                applyFinalClientToLeadGuest(opt);
+            }
+        }
+        syncLeadGuestMode();
+    });
+    // Re-sincroniza cuando el modo (agencia/directo) togglea la visibilidad del dropdown.
+    const _finalRowEl = document.getElementById('finalClientRow');
+    if (_finalRowEl && window.MutationObserver) {
+        new MutationObserver(syncLeadGuestMode).observe(_finalRowEl, { attributes: true, attributeFilter: ['style', 'class'] });
+    }
+    syncLeadGuestMode();
+
+    // Fix bfcache: al volver con "atrás" del navegador después de guardar (que redirige a
+    // Servicios), la página de Información se restaura de memoria SIN re-ejecutar el JS, y el
+    // botón "Actualizar" se quedaba con el spinner. Aquí lo reseteamos al restaurarse.
+    window.addEventListener('pageshow', (event) => {
+        if (!event.persisted) return;
+        const btn = document.getElementById('createQuoteBtn');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = 'Siguiente <i class="ti ti-arrow-right ms-1"></i>';
+        }
+    });
+
     // Also set currentUser if not already set (for compatibility with ownership manager)
     if (!window.currentUser) {
         window.currentUser = {
@@ -1379,9 +1761,24 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 if (selectedClientFinalId) {
                     // Check if the option exists and set it
                     const optionExists = employeeTS.getOption && employeeTS.getOption(selectedClientFinalId);
-                    
+
                     if (optionExists) {
+                        // Deriva "El Lead Guest es el cliente final" comparando el Lead Guest GUARDADO
+                        // con el cliente final. Se pone el checkbox en false ANTES del setValue para que
+                        // el auto-llenado no pise el Lead Guest guardado durante la carga.
+                        const lgCb = document.getElementById('leadGuestIsFinalClient');
+                        if (lgCb) lgCb.checked = false;
                         employeeTS.setValue(selectedClientFinalId);
+                        if (lgCb) {
+                            const opt = getFinalClientOptionByValue(selectedClientFinalId) || {};
+                            const norm = (s) => (s || '').trim().toLowerCase();
+                            const lgFirst = norm(document.getElementById('leadGuestFirstName')?.value);
+                            const lgLast = norm(document.getElementById('leadGuestLastName')?.value);
+                            const noLeadGuest = !lgFirst && !lgLast;
+                            // Marcado solo si no hay Lead Guest capturado, o si coincide con el cliente final.
+                            lgCb.checked = noLeadGuest || (lgFirst === norm(opt.firstName) && lgLast === norm(opt.lastName));
+                            if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode();
+                        }
                     } else {
                         console.warn('⚠️ Cliente Final option not found:', selectedClientFinalId);
                     }
@@ -1611,7 +2008,7 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             // Listen for change events on the hidden input
             employeeInput.addEventListener('change', async function(event) {
                 const value = event.target.value;
-                
+
                 console.log('🎯 Cliente Final selection changed:', {
                     newValue: value,
                     timestamp: new Date().toISOString()
@@ -1699,7 +2096,20 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                             // Auto-fill contact name fields
                             document.getElementById('contactFirstName').value = firstName;
                             document.getElementById('contactLastName').value = lastName;
-                            
+
+                            // El Cliente Final ES el Lead Guest (solo si el checkbox está marcado):
+                            // llenar también el Lead Guest.
+                            if (document.getElementById('leadGuestIsFinalClient')?.checked) {
+                                const lgFirst = document.getElementById('leadGuestFirstName');
+                                const lgLast = document.getElementById('leadGuestLastName');
+                                if (lgFirst) lgFirst.value = firstName;
+                                if (lgLast) lgLast.value = lastName;
+                            }
+                            // El contacto se auto-llenó desde el cliente → limpiar la marca de edición
+                            // manual (para que el espejo Lead Guest→Contacto siga aplicando).
+                            document.getElementById('contactFirstName').dataset.userEdited = '';
+                            document.getElementById('contactLastName').dataset.userEdited = '';
+
                             // Auto-fill email and phone
                             document.getElementById('contactEmail').value = option.email || '';
                             
@@ -1721,6 +2131,9 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                             }
                             
                             console.log('✅ Successfully auto-filled all contact fields from Cliente Final');
+
+                            // Refrescar el resumen "El Lead Guest es el cliente final".
+                            if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode();
                         } else {
                             console.warn('⚠️ No option data found for Cliente Final value:', value);
                         }
@@ -2170,8 +2583,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                             el.style.display = 'inline';
                         });
                         
-                        // Load direct clients before setting the value
-                        await loadActiveClients('', 1, 'direct');
+                        // Cargar la lista de clientes DIRECTOS en el dropdown #directClientId (el que
+                        // usa admin en modo directo). Antes llamaba loadActiveClients(...,'direct'), que
+                        // llena #clientId (agencia) → el dropdown directo quedaba SIN opciones.
+                        await loadDirectClients('', 1);
                     }
                 }
 
@@ -2210,8 +2625,14 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 
                 if (userRole === 'admin' || userRole === 'superadmin') {
                     if (isDirectClient) {
-                        // For direct client quotes, use companyClientPtr
-                        if (quote.companyClientPtr && quote.companyClientPtr.id) {
+                        // Cliente directo (end_client): el cliente vive en quote.client (AmexingUser).
+                        // Antes estaba en companyClientPtr (Client legado, YA MIGRADO); esta preselección
+                        // seguía leyendo el campo viejo → no seleccionaba nada. Se usa quote.client y se
+                        // deja companyClientPtr como fallback para quotes legacy.
+                        if (quote.client && quote.client.id) {
+                            selectedClientId = quote.client.id;
+                            selectedClientData = quote.client;
+                        } else if (quote.companyClientPtr && quote.companyClientPtr.id) {
                             selectedClientId = quote.companyClientPtr.id;
                             selectedClientData = quote.companyClientPtr;
                         }
@@ -2411,6 +2832,20 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 if (leadGuestFirstNameEl) leadGuestFirstNameEl.value = quote.leadGuestFirstName || '';
                 if (leadGuestLastNameEl) leadGuestLastNameEl.value = quote.leadGuestLastName || '';
 
+                // Cotización existente: por defecto NO asumir "es el cliente final" (evita marcar el
+                // checkbox cuando el Lead Guest guardado no corresponde al cliente final). Si hay un
+                // cliente final que coincide, loadClientEmployees lo re-marca al cargar el dropdown.
+                const lgFinalCbLoad = document.getElementById('leadGuestIsFinalClient');
+                if (lgFinalCbLoad) {
+                    lgFinalCbLoad.checked = false;
+                    if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode();
+                }
+
+                // Guardar propietario y derivar el checkbox "el contacto es el propietario"
+                // (contacto = Lead Guest por defecto; se marca solo si el contacto guardado == propietario).
+                window.__quoteOwner = quote.owner || null;
+                initContactDifferentFromQuote(quote);
+
                 if (quote.contactEmail) {
                     document.getElementById('contactEmail').value = quote.contactEmail;
                 }
@@ -2501,11 +2936,12 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             console.log('Cliente Final dropdown not initialized yet');
         }
 
-        // Get form data
-        const firstName = document.getElementById('contactFirstName').value.trim();
-        const lastName = document.getElementById('contactLastName').value.trim();
+        // Get form data — contacto = propietario por defecto. Si NO se marcó "diferente al
+        // propietario", se copian nombre/email/teléfono del propietario (evita doble captura).
+        const contactVals = resolveContactValues();
+        const { firstName, lastName, contactEmail, contactPhone } = contactVals;
         const contactPerson = [firstName, lastName].filter(n => n).join(' ') || undefined;
-        
+
         const formData = {
             clientId: clientId,  // Include clientId for update
             eventType: document.getElementById('eventType').value.trim() || undefined,
@@ -2517,8 +2953,8 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             contactPerson: contactPerson,
             contactFirstName: firstName || undefined,
             contactLastName: lastName || undefined,
-            contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
-            contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
+            contactEmail: contactEmail || undefined,
+            contactPhone: contactPhone || undefined,
             leadGuestFirstName: document.getElementById('leadGuestFirstName')?.value.trim() || undefined,
             leadGuestLastName: document.getElementById('leadGuestLastName')?.value.trim() || undefined,
             notes: document.getElementById('notes').value.trim() || undefined
@@ -2562,7 +2998,9 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             const result = await response.json();
 
             if (result.success) {
-                showAlert('quoteInformationAlerts', `${QE} actualizada exitosamente`, 'success');
+                // Si se marcó "Guardar cliente en el sistema", crear el lead guest como cliente.
+                const clientSaved = await maybeSaveLeadGuestAsClient();
+                showAlert('quoteInformationAlerts', `${QE} actualizada exitosamente${clientSaved ? ' · Cliente guardado en el sistema' : ''}`, 'success');
 
                 // Redirect to quote detail page with services section (use appropriate dashboard path)
                 const dashboardPathMap = { department_manager: '/dashboard/department_manager', client: '/dashboard/client' };
@@ -2651,11 +3089,11 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             console.log('Cliente Final dropdown not initialized yet');
         }
 
-        // Get form data
-        const firstName = document.getElementById('contactFirstName').value.trim();
-        const lastName = document.getElementById('contactLastName').value.trim();
+        // Get form data — contacto = propietario por defecto (ver resolveContactValues).
+        const contactVals = resolveContactValues();
+        const { firstName, lastName, contactEmail, contactPhone } = contactVals;
         const contactPerson = [firstName, lastName].filter(n => n).join(' ') || undefined;
-        
+
         const formData = {
             clientId: clientId,
             eventType: document.getElementById('eventType').value.trim() || undefined,
@@ -2667,8 +3105,8 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             contactPerson: contactPerson,
             contactFirstName: firstName || undefined,
             contactLastName: lastName || undefined,
-            contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
-            contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
+            contactEmail: contactEmail || undefined,
+            contactPhone: contactPhone || undefined,
             leadGuestFirstName: document.getElementById('leadGuestFirstName')?.value.trim() || undefined,
             leadGuestLastName: document.getElementById('leadGuestLastName')?.value.trim() || undefined,
             notes: document.getElementById('notes').value.trim() || undefined
@@ -2715,7 +3153,9 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             const result = await response.json();
 
             if (result.success && result.data) {
-                showAlert('quoteInformationAlerts', result.message || 'Cotización creada exitosamente', 'success');
+                // Si se marcó "Guardar cliente en el sistema", crear el lead guest como cliente.
+                const clientSaved = await maybeSaveLeadGuestAsClient();
+                showAlert('quoteInformationAlerts', `${result.message || 'Cotización creada exitosamente'}${clientSaved ? ' · Cliente guardado en el sistema' : ''}`, 'success');
 
                 // Redirect to quote detail page with services section (use appropriate dashboard path)
                 const dashboardPathMap = { department_manager: '/dashboard/department_manager', client: '/dashboard/client' };
@@ -2900,6 +3340,9 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 if (languageSelect) {
                     languageSelect.value = 'es';
                 }
+
+                // Al cambiar agencia/directo cambia dónde se guardará el cliente del Lead Guest.
+                if (typeof updateSaveClientNote === 'function') updateSaveClientNote();
             });
         });
 

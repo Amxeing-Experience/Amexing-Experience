@@ -322,7 +322,10 @@ class PublicQuoteController {
   async resolveClientFinalName(clientFinalId) {
     if (!clientFinalId) return null;
     try {
-      const cf = await new Parse.Query('Client').get(clientFinalId, { useMasterKey: true });
+      // El cliente final ahora vive en AmexingUser (end_client); fallback a Client legado.
+      let cf = await new Parse.Query('AmexingUser').get(clientFinalId, { useMasterKey: true }).catch(() => null);
+      if (!cf) cf = await new Parse.Query('Client').get(clientFinalId, { useMasterKey: true }).catch(() => null);
+      if (!cf) return null;
       const companyName = cf.get('contextualData')?.companyName || '';
       const firstName = cf.get('firstName') || cf.get('contactFirstName') || '';
       const lastName = cf.get('lastName') || cf.get('contactLastName') || '';
@@ -696,6 +699,7 @@ class PublicQuoteController {
    * available on the public view). Mutates quoteData.serviceItems in place.
    * @param {object} quoteData - Prepared quote data with serviceItems.
    * @returns {Promise<void>}
+   * @example
    */
   async injectServiceIncludes(quoteData) {
     try {

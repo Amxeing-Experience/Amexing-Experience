@@ -1,5 +1,5 @@
 /**
- * postalLookupService - Resolves a postal code to its state/province and city using the free
+ * PostalLookupService - Resolves a postal code to its state/province and city using the free
  * Zippopotam.us public API (no key required). Used by the client address form to auto-fill
  * Estado/Ciudad. Results are cached in memory since postal data is effectively static.
  */
@@ -14,6 +14,7 @@ const cache = new Map();
  * @param {string} country - ISO country code (mx | us | ca).
  * @param {string} code - The postal code (digits for MX/US, alphanumeric FSA for CA).
  * @returns {Promise<{country: string, postalCode: string, state: string, city: string}|null>}
+ * @example
  */
 async function lookup(country, code) {
   const iso = String(country || '').toLowerCase().trim();

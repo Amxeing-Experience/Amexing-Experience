@@ -217,6 +217,7 @@ class VehicleTypeController {
         code: type.get('code'),
         capacity: type.get('defaultCapacity') || 4,
         trunkCapacity: type.get('trunkCapacity') || 2,
+        amenities: type.get('amenities') || [],
         icon: type.get('icon') || 'car',
       }));
 
@@ -268,6 +269,8 @@ class VehicleTypeController {
         description: vehicleType.get('description'),
         icon: vehicleType.get('icon'),
         defaultCapacity: vehicleType.get('defaultCapacity'),
+        trunkCapacity: vehicleType.get('trunkCapacity') || 2,
+        amenities: vehicleType.get('amenities') || [],
         sortOrder: vehicleType.get('sortOrder'),
         active: vehicleType.get('active'),
         createdAt: vehicleType.createdAt,
@@ -284,6 +287,27 @@ class VehicleTypeController {
 
       return this.sendError(res, 'Error al obtener el tipo de vehículo', 500);
     }
+  }
+
+  /**
+   * Normaliza amenidades a un arreglo de textos únicos, sin vacíos, recortados y con topes.
+   * @param {*} input - Valor recibido del body (idealmente un arreglo de strings).
+   * @returns {string[]} Amenidades saneadas (máx. 30, cada una máx. 60 chars).
+   * @example
+   */
+  normalizeAmenities(input) {
+    if (!Array.isArray(input)) return [];
+    const seen = new Set();
+    const out = [];
+    for (const raw of input) {
+      const s = String(raw == null ? '' : raw).trim().slice(0, 60);
+      const key = s.toLowerCase();
+      if (s && !seen.has(key) && out.length < 30) {
+        seen.add(key);
+        out.push(s);
+      }
+    }
+    return out;
   }
 
   /**
@@ -310,7 +334,7 @@ class VehicleTypeController {
       }
 
       const {
-        name, description, icon, defaultCapacity, trunkCapacity, sortOrder,
+        name, description, icon, defaultCapacity, trunkCapacity, sortOrder, amenities,
       } = req.body;
 
       // Validate required fields
@@ -349,6 +373,7 @@ class VehicleTypeController {
       vehicleType.set('defaultCapacity', parseInt(defaultCapacity, 10) || 4);
       vehicleType.set('trunkCapacity', parseInt(trunkCapacity, 10) || 2);
       vehicleType.set('sortOrder', parseInt(sortOrder, 10) || 0);
+      vehicleType.set('amenities', this.normalizeAmenities(amenities));
       vehicleType.set('active', true);
       vehicleType.set('exists', true);
 
@@ -427,7 +452,7 @@ class VehicleTypeController {
       }
 
       const {
-        name, description, icon, defaultCapacity, trunkCapacity, sortOrder, active,
+        name, description, icon, defaultCapacity, trunkCapacity, sortOrder, active, amenities,
       } = req.body;
 
       // Check name uniqueness if name is being changed
@@ -461,6 +486,7 @@ class VehicleTypeController {
       if (defaultCapacity) vehicleType.set('defaultCapacity', parseInt(defaultCapacity, 10));
       if (trunkCapacity !== undefined) vehicleType.set('trunkCapacity', parseInt(trunkCapacity, 10));
       if (sortOrder !== undefined) vehicleType.set('sortOrder', parseInt(sortOrder, 10));
+      if (amenities !== undefined) vehicleType.set('amenities', this.normalizeAmenities(amenities));
       if (active !== undefined) vehicleType.set('active', active);
 
       // Save changes with user context for audit trail

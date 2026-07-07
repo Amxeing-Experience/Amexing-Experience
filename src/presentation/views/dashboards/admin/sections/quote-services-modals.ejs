@@ -11,6 +11,8 @@ const e = __isRes ? 'reservación' : 'cotización';
 // Define role-based permissions at the top of the file
 const currentUserRole = typeof userRole !== 'undefined' ? userRole : '';
 const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
+// Notas del administrador: solo admin/superadmin las editan; DM/agente las ven en solo lectura.
+const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
 %>
 
 <style>
@@ -35,6 +37,18 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
     #aDisposicionAdditionalVehiclesHeader small,
     #extraAdditionalVehiclesHeader small {
         font-size: 0.9rem;
+    }
+    /* Resalta el dropdown de vehículo y el input de precio cuando la ruta no tiene precio de
+       catálogo ("precio pendiente"): borde amarillo para que se entienda que $0 es de referencia. */
+    .field-price-pending,
+    .field-price-pending:focus {
+        border-color: #ffc107 !important;
+        box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.35) !important;
+    }
+    /* Cuando el precio está dentro de un .input-group, resaltamos todo el grupo. */
+    .input-group.field-price-pending .form-control,
+    .input-group.field-price-pending .input-group-text {
+        border-color: #ffc107 !important;
     }
 </style>
 
@@ -214,6 +228,20 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
                             
+                            <!-- Horario disponible del tour (autollena hora de inicio/fin). Se muestra
+                                 solo cuando el tour seleccionado (con vehículo) tiene horarios/días. -->
+                            <div class="row mb-3 d-none" id="tourScheduleRow">
+                                <div class="col-md-12">
+                                    <label for="tourScheduleSelect" class="form-label">
+                                        <i class="ti ti-calendar-clock me-1"></i>Horario disponible del tour
+                                    </label>
+                                    <select class="form-select" id="tourScheduleSelect">
+                                        <option value="">Seleccionar horario...</option>
+                                    </select>
+                                    <div class="form-text">Al elegir un horario se autollenan la hora de inicio y de fin.</div>
+                                </div>
+                            </div>
+
                             <!-- Hora de inicio / Hora de fin (user input) -->
                             <div class="row mb-3">
                                 <div class="col-md-6">
@@ -409,13 +437,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                         <input type="text" class="form-control d-none" id="transportDestinationText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
                                     </div>
                                 </div>
-                                <!-- Pickup / Drop-off address (Punto a Punto only) -->
+                                <!-- Pickup / Drop-off address (Punto a Punto + Local: ambas columnas;
+                                     Aeropuerto one-way ARRIVAL: solo drop-off — el pick-up es el aeropuerto). -->
                                 <div class="row d-none" id="papAddressesRow">
-                                    <div class="col-md-6 mb-3">
+                                    <div class="col-md-6 mb-3" id="papPickupCol">
                                         <label class="form-label" for="transportPickupAddress">Dirección de pick-up</label>
                                         <input type="text" class="form-control" id="transportPickupAddress" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
                                     </div>
-                                    <div class="col-md-6 mb-3">
+                                    <div class="col-md-6 mb-3" id="papDropoffCol">
                                         <label class="form-label" for="transportDropoffAddress">Dirección de drop-off</label>
                                         <input type="text" class="form-control" id="transportDropoffAddress" placeholder="Ej: Aeropuerto BJX, Casa particular...">
                                     </div>
@@ -544,14 +573,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             </select>
                                         </div>
                                     </div>
-                                    <!-- Pickup / Drop-off addresses for Ida (Punto a Punto + Local) — sits right
-                                         below Origen/Destino so the route detail fields stay together. -->
+                                    <!-- Pickup / Drop-off addresses for Ida — sits right below Origen/Destino so the
+                                         route detail fields stay together. Punto a Punto + Local: ambas columnas.
+                                         Aeropuerto ARRIVAL (pierna Ida): solo drop-off — el pick-up es el aeropuerto. -->
                                     <div class="row d-none" id="papAddressesRowIda">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6 mb-3" id="papPickupColIda">
                                             <label class="form-label" for="roundTripPickupAddressIda">Dirección de pick-up</label>
                                             <input type="text" class="form-control" id="roundTripPickupAddressIda" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
                                         </div>
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6 mb-3" id="papDropoffColIda">
                                             <label class="form-label" for="roundTripDropoffAddressIda">Dirección de drop-off</label>
                                             <input type="text" class="form-control" id="roundTripDropoffAddressIda" placeholder="Ej: Aeropuerto BJX, Casa particular...">
                                         </div>
@@ -653,14 +683,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <input type="text" class="form-control d-none" id="roundTripDestinationVueltaText" placeholder="Ej: Hotel Rosewood, Casa en Aldama 15...">
                                         </div>
                                     </div>
-                                    <!-- Pickup / Drop-off addresses for Vuelta (Punto a Punto + Local) — sits right
-                                         below Origen/Destino so the route detail fields stay together. -->
+                                    <!-- Pickup / Drop-off addresses for Vuelta — sits right below Origen/Destino so the
+                                         route detail fields stay together. Punto a Punto + Local: ambas columnas.
+                                         Aeropuerto DEPARTURE (pierna Vuelta): solo pick-up — el drop-off es el aeropuerto. -->
                                     <div class="row d-none" id="papAddressesRowVuelta">
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6 mb-3" id="papPickupColVuelta">
                                             <label class="form-label" for="roundTripPickupAddressVuelta">Dirección de pick-up</label>
                                             <input type="text" class="form-control" id="roundTripPickupAddressVuelta" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
                                         </div>
-                                        <div class="col-md-6 mb-3">
+                                        <div class="col-md-6 mb-3" id="papDropoffColVuelta">
                                             <label class="form-label" for="roundTripDropoffAddressVuelta">Dirección de drop-off</label>
                                             <input type="text" class="form-control" id="roundTripDropoffAddressVuelta" placeholder="Ej: Aeropuerto BJX, Casa particular...">
                                         </div>
@@ -823,6 +854,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                             <i class="ti ti-user-check me-1"></i>Incluir Greeter
                                         </label>
                                     </div>
+                                    <!-- Sub-opción: el greeter viaja en el vehículo (ocupa 1 asiento). Espejo de transporte. -->
+                                    <div class="form-check ms-3 d-none" id="aDisposicionGreeterInVehicleContainer">
+                                        <input class="form-check-input" type="checkbox" id="aDisposicionGreeterInVehicle">
+                                        <label class="form-check-label small text-muted" for="aDisposicionGreeterInVehicle">Viaja en el vehículo</label>
+                                    </div>
+                                </div>
+                                <!-- Nota de capacidad (a-disposición): el guía/greeter que viaja ocupa un asiento -->
+                                <div class="col-12">
+                                    <small id="aDisposicionVehicleCapacityNote" class="text-info d-none d-block mt-1"><i class="ti ti-info-circle me-1"></i><span id="aDisposicionVehicleCapacityNoteText"></span></small>
                                 </div>
                             </div>
 
@@ -859,11 +899,21 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <label for="conceptoClientPrice" class="form-label">Precio Unitario (efectivo)</label>
                                     <input type="number" class="form-control" id="conceptoClientPrice" placeholder="0.00" step="0.01" min="0">
                                     <small class="text-muted">Precio unitario del concepto</small>
+                                    <!-- Aplicar/excluir el precio unitario del desglose (el valor se conserva). -->
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input" type="checkbox" id="conceptoApplyUnitPrice" checked>
+                                        <label class="form-check-label small" for="conceptoApplyUnitPrice">Aplicar al total</label>
+                                    </div>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="conceptoPricePerPerson" class="form-label">Precio por Persona (efectivo)</label>
                                     <input type="number" class="form-control" id="conceptoPricePerPerson" placeholder="0.00" step="0.01" min="0">
                                     <small class="text-muted">Precio por persona del concepto</small>
+                                    <!-- Aplicar/excluir el precio por persona del desglose (el valor se conserva). -->
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input" type="checkbox" id="conceptoApplyPerPerson" checked>
+                                        <label class="form-check-label small" for="conceptoApplyPerPerson">Aplicar al total</label>
+                                    </div>
                                 </div>
                             </div>
                             <!-- Surcharges checkbox kept in DOM (hidden) so existing JS handlers still work -->
@@ -896,15 +946,15 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                             <!-- People Quantities for Concepto -->
                             <div class="row">
                                 <div class="col-md-4 mb-3">
-                                    <label for="conceptoAdultsQuantity" class="form-label">Adultos</label>
+                                    <label for="conceptoAdultsQuantity" class="form-label">Número de adultos (12+)</label>
                                     <input type="number" class="form-control concepto-quantity-input" id="conceptoAdultsQuantity" min="0" max="50" placeholder="0">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="conceptoChildrenQuantity" class="form-label">Niños</label>
+                                    <label for="conceptoChildrenQuantity" class="form-label">Número de niños (3-12)</label>
                                     <input type="number" class="form-control concepto-quantity-input" id="conceptoChildrenQuantity" min="0" max="50" placeholder="0">
                                 </div>
                                 <div class="col-md-4 mb-3">
-                                    <label for="conceptoAdultsNoAlcoholQuantity" class="form-label">Adultos sin Alcohol</label>
+                                    <label for="conceptoAdultsNoAlcoholQuantity" class="form-label">Número de infantes (0-2)</label>
                                     <input type="number" class="form-control concepto-quantity-input" id="conceptoAdultsNoAlcoholQuantity" min="0" max="50" placeholder="0">
                                 </div>
                             </div>
@@ -974,6 +1024,20 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         </div>
                     </div>
 
+                    <!-- Aviso full-width: ruta sin precio en catálogo -> "precio pendiente" (Parte B/C).
+                         Banda ancha debajo del vehículo (arriba de Opcionales) para que abarque ambos campos. -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-warning d-flex align-items-start gap-2 py-2 px-3 mb-3 d-none" id="transportPricePendingNotice" role="alert">
+                                <i class="ti ti-alert-triangle mt-1"></i>
+                                <div>
+                                    <strong>Precio pendiente</strong>
+                                    <span class="d-block small" id="transportPricePendingNoticeText">Esta ruta no está en el catálogo de precios. Los vehículos y el precio mostrados ($0) son solo de referencia; el administrador confirmará la tarifa. El servicio se guarda igual.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Opcionales (transporte / tour): guía + greeter -->
                     <div class="row" id="transportOptionsRow">
                         <div class="col-12 mb-3">
@@ -992,6 +1056,11 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                     <label class="form-check-label small text-muted" for="greeterInVehicle">Viaja en el vehículo</label>
                                 </div>
                             </div>
+                            <!-- Aviso: guía/greeter marcado pero la ruta SIN duración → el costo no se
+                                 puede calcular y queda pendiente hasta capturar la "Duración de ruta". -->
+                            <small class="text-warning d-block mt-2 d-none" id="guideGreeterDurationNotice">
+                                <i class="ti ti-alert-triangle me-1"></i>Falta la <strong>duración de la ruta</strong> para calcular el costo de guía/greeter. Ingrésala en “Duración de ruta”; si no, ese costo quedará <strong>pendiente</strong>.
+                            </small>
                         </div>
                     </div>
 
@@ -1114,12 +1183,19 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
                         </div>
-                        <!-- Duración (horas): se autollena de la experiencia seleccionada y es editable. Full width, debajo del horario. -->
+                        <!-- Duración (horas): se autollena de la experiencia seleccionada y es editable.
+                             Al lado, checkbox opcional "Guía". -->
                         <div class="row mb-3">
-                            <div class="col-md-12">
+                            <div class="col-md-10">
                                 <label for="experienceDuration" class="form-label">Duración <small class="text-muted">(horas)</small></label>
                                 <input type="number" min="0" step="0.5" class="form-control" id="experienceDuration" placeholder="Ej: 2" autocomplete="off">
                                 <small class="text-muted d-block">Se autollena de la experiencia; puedes modificarla.</small>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-center">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" id="experienceGuide">
+                                    <label class="form-check-label" for="experienceGuide">Guía</label>
+                                </div>
                             </div>
                         </div>
                         
@@ -1253,9 +1329,14 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
                         <div id="serviceAttendeesList"></div>
                     </div>
 
+                    <div class="mb-3" id="adminNotesWrap">
+                        <label for="serviceNotes" class="form-label">Notas del administrador<% if (!canEditAdminNotes) { %> <span class="text-muted fw-normal">(solo lectura)</span><% } %></label>
+                        <textarea class="form-control" id="serviceNotes" rows="2" placeholder="<%= canEditAdminNotes ? 'Notas del administrador para este servicio...' : 'Sin notas del administrador' %>" style="min-height: 60px; resize: none; overflow-y: hidden;" <% if (!canEditAdminNotes) { %>readonly<% } %>></textarea>
+                    </div>
+
                     <div class="mb-3">
-                        <label for="serviceNotes" class="form-label">Notas Adicionales</label>
-                        <textarea class="form-control" id="serviceNotes" rows="2" placeholder="Información adicional del servicio..."></textarea>
+                        <label for="serviceAgencyNotes" class="form-label">Notas del cliente</label>
+                        <textarea class="form-control" id="serviceAgencyNotes" rows="2" placeholder="Notas del cliente para este servicio..." style="min-height: 60px; resize: none; overflow-y: hidden;"></textarea>
                     </div>
 
                     <!-- Preview -->
@@ -1323,3 +1404,40 @@ const canEditPrices = ['admin', 'superadmin'].includes(currentUserRole);
         </div>
     </div>
 </div>
+
+<script>
+// Auto-grow de "Notas Adicionales": el cuadro crece con el contenido (al teclear, al poblar en
+// editar y al abrir el modal) en vez de dejar un cuadro chico con scroll. Tope 50vh → luego scroll.
+(function () {
+    const IDS = ['serviceNotes', 'serviceAgencyNotes'];
+    function growEl(ta) {
+        if (!ta) return;
+        ta.style.height = 'auto';
+        const max = Math.round(window.innerHeight * 0.5); // tope 50vh
+        ta.style.height = Math.min(ta.scrollHeight, max) + 'px';
+        ta.style.overflowY = ta.scrollHeight > max ? 'auto' : 'hidden';
+    }
+    function growAll() { IDS.forEach((id) => growEl(document.getElementById(id))); }
+    function initServiceNotesAutoGrow() {
+        IDS.forEach((id) => {
+            const ta = document.getElementById(id);
+            if (!ta || ta.dataset.autogrow) return;
+            ta.dataset.autogrow = '1';
+            ta.addEventListener('input', () => growEl(ta));
+        });
+        // Expuesto para recalcular tras poblar por código (editar) o resetear (crear).
+        window.autoGrowServiceNotes = growAll;
+        // Recalcular cuando el modal termina de mostrarse (el contenido ya está puesto).
+        const modal = document.getElementById('serviceModal');
+        if (modal && !modal.dataset.notesAutogrow) {
+            modal.dataset.notesAutogrow = '1';
+            modal.addEventListener('shown.bs.modal', growAll);
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initServiceNotesAutoGrow);
+    } else {
+        initServiceNotesAutoGrow();
+    }
+})();
+</script>

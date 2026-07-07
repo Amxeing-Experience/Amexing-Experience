@@ -1243,8 +1243,16 @@ router.post(
   handlePassportUpload,
   clientProfileController.uploadPassportDocument
 );
-// Full-number reveal: admin/superadmin only, audited by the vault.
-router.post('/:clientId/passports/:id/reveal', validateClientAccess, writeOperationsLimiter, clientProfileController.revealPassportNumber);
+// Full-number reveal: admin/superadmin only, audited by the vault. Uses the READ limiter
+// (not the write budget) — revealing is a read; sharing writeOperationsLimiter let a few
+// eye-clicks + saves exhaust the 30/15min budget and 429 every later action ("deja de jalar").
+router.post('/:clientId/passports/:id/reveal', validateClientAccess, clientApiLimiter, clientProfileController.revealPassportNumber);
+
+// Client documents (base64-in-JSON upload — multipart is blocked by the WAF, HTTP 426).
+router.get('/:clientId/documents', validateClientAccess, clientProfileController.getDocuments);
+router.post('/:clientId/documents', validateClientAccess, writeOperationsLimiter, clientProfileController.uploadDocument);
+router.put('/:clientId/documents/:docId', validateClientAccess, writeOperationsLimiter, clientProfileController.updateDocument);
+router.delete('/:clientId/documents/:docId', validateClientAccess, writeOperationsLimiter, clientProfileController.deleteDocument);
 
 router.get('/:clientId/trips', validateClientAccess, clientProfileController.getTrips);
 

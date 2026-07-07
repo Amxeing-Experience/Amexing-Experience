@@ -137,7 +137,7 @@
         </div>
     </div>
 
-    <!-- Financial Summary Card -->
+    <!-- Resumen Financiero + Cargos Adicionales -->
     <div class="card border-0 shadow-sm mb-4" id="financialSummaryCard" style="display:none;">
         <div class="card-header" style="background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%); border: none;">
             <div class="d-flex justify-content-between align-items-center">
@@ -145,12 +145,43 @@
                     <i class="ti ti-calculator me-2"></i>Resumen Financiero
                 </h5>
                 <button class="btn btn-sm btn-light d-none" id="addAdjustmentBtn">
-                    <i class="ti ti-plus me-1"></i>Agregar
+                    <i class="ti ti-plus me-1"></i>Ajuste
                 </button>
             </div>
         </div>
-        <div class="card-body" id="financialSummaryBody">
-            <!-- Rendered by JS -->
+        <div class="card-body">
+            <div id="financialSummaryBody">
+                <!-- Resumen (totales + saldo) — rendered by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagos — sección propia, separada de Cargos Adicionales (antes vivían en la misma tarjeta).
+         Colapsable: se auto-colapsa una vez cargados los pagos si ya hay al menos uno registrado
+         (ver loadPayments), para no obligar a hacer scroll por una tabla que el usuario ya conoce. -->
+    <div class="card border-0 shadow-sm mb-4" id="paymentsCard" style="display:none;">
+        <div class="card-header" style="background: linear-gradient(135deg, #0d6efd 0%, #6ea8fe 100%); border: none;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center flex-grow-1" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#paymentsCollapse" aria-expanded="true" aria-controls="paymentsCollapse">
+                    <h5 class="card-title mb-0 text-white">
+                        <i class="ti ti-cash me-2"></i>Pagos
+                        <span class="badge bg-light text-primary ms-2 d-none" id="paymentsCountBadge"></span>
+                    </h5>
+                    <i class="ti ti-chevron-up text-white ms-2" id="paymentsChevron"></i>
+                </div>
+                <button class="btn btn-sm btn-light d-none" id="addPaymentBtn">
+                    <i class="ti ti-plus me-1"></i>Agregar pago
+                </button>
+            </div>
+        </div>
+        <div class="collapse show" id="paymentsCollapse">
+            <div class="card-body">
+                <!-- Inline payment form (replaces the old modal) -->
+                <div id="paymentFormWrap" class="border rounded p-3 mb-3 bg-light" style="display:none;"></div>
+                <div id="paymentsBody">
+                    <!-- Payments table — rendered by JS -->
+                </div>
+            </div>
         </div>
     </div>
 
@@ -285,6 +316,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    // Read the freshest token at call time: the const above is captured once on page load and can go
+    // stale during a long session (token rotation/expiry) → 401 "malformed token" until a hard reload.
+    const authToken = () => localStorage.getItem('token') || sessionStorage.getItem('token') || token;
     const reservationId = '<%= reservationId %>';
     // Role from server-side renderRoleView (admin / superadmin / department_manager / client / etc.)
     // Used to gate visibility of internal note channels.
@@ -457,7 +491,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 try {
                     const res = await fetch(`/api/quotes/${quoteId}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken()}` },
                         body: JSON.stringify({ status: newStatus, reason: 'Updated from booking detail' }),
                     });
                     const json = await res.json();
@@ -509,6 +543,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `<span class="badge ${s.cls}" title="Estado de la reservación">${s.label}</span>`;
     }
 
+    // Estado de pago — solid badge + text-white salvo bg-warning (text-dark).
+    const PAYMENT_STATUS_MAP = {
+        pending: { label: 'Pendiente de pago', cls: 'bg-secondary text-white' },
+        partial: { label: 'Pago parcial', cls: 'bg-warning text-dark' },
+        paid: { label: 'Pagado', cls: 'bg-success text-white' },
+        refunded: { label: 'Reembolsado', cls: 'bg-info text-white' },
+    };
+
+    function getPaymentStatusBadge(status) {
+        if (!status) return '';
+        const s = PAYMENT_STATUS_MAP[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado de pago">${s.label}</span>`;
+    }
+
     function formatDate(dateStr) {
         if (!dateStr) return '—';
         return new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
@@ -517,6 +565,43 @@ document.addEventListener('DOMContentLoaded', async function() {
     function formatCurrency(amount, currency) {
         const sym = currency === 'USD' ? 'USD $' : '$';
         return `${sym}${(amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    // Live thousands-separator for amount text inputs: groups the integer part with commas while
+    // typing (100000 -> 100,000), keeps up to 2 decimals, and preserves the caret position.
+    function formatThousandsInput(el) {
+        const raw = el.value;
+        const caret = el.selectionStart || 0;
+        const digitsBeforeCaret = (raw.slice(0, caret).match(/\d/g) || []).length;
+        let clean = raw.replace(/[^\d.]/g, '');
+        const dot = clean.indexOf('.');
+        if (dot !== -1) clean = clean.slice(0, dot + 1) + clean.slice(dot + 1).replace(/\./g, '');
+        let [intPart = '', decPart] = clean.split('.');
+        intPart = intPart.replace(/^0+(?=\d)/, '');
+        const grouped = intPart ? Number(intPart).toLocaleString('en-US') : '';
+        let out = grouped;
+        if (decPart !== undefined) out += `.${decPart.slice(0, 2)}`;
+        el.value = out;
+        // Restore the caret after the same number of digits it was before reformatting.
+        let pos = 0;
+        let seen = 0;
+        while (pos < out.length && seen < digitsBeforeCaret) {
+            if (/\d/.test(out[pos])) seen += 1;
+            pos += 1;
+        }
+        el.setSelectionRange(pos, pos);
+    }
+
+    // Attach live thousands formatting to a text amount input and format its initial value.
+    function attachThousands(el) {
+        if (!el) return;
+        el.addEventListener('input', () => formatThousandsInput(el));
+        if (el.value) formatThousandsInput(el);
+    }
+
+    // Parse an amount that may carry thousands separators ("1,234.56" -> 1234.56).
+    function parseAmount(value) {
+        return parseFloat(String(value == null ? '' : value).replace(/,/g, ''));
     }
 
     function getServiceTypeIcon(type) {
@@ -567,7 +652,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function loadReservation() {
         try {
             const response = await fetch(`/api/reservations/${reservationId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${authToken()}` }
             });
             const result = await response.json();
             if (!result.success) {
@@ -679,17 +764,27 @@ document.addEventListener('DOMContentLoaded', async function() {
         const exportBtnHtml = folio
             ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir vista pública (incluye Exportar a PDF)"><i class="ti ti-file-export me-1"></i>Exportar</a>`
             : '';
-        const cancelBtnHtml = canAssign ? `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>` : '';
-        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
-        if (canAssign) {
-            document.getElementById('cancelResBtn')?.addEventListener('click', () => {
-                // Use shared utility with existing reservation data and loadReservation callback
-                openReservationCancelModalWithData(reservationData, loadReservation);
-            });
+        // En vez del botón de cancelar: si ya está cancelada, mostrar etiqueta
+        // "Cancelada"; si tiene una solicitud de cancelación pendiente, mostrar
+        // "Pendiente de cancelación" (evita además crear solicitudes duplicadas).
+        let cancelBtnHtml = '';
+        if (d.status === 'cancelled') {
+            cancelBtnHtml = `<span class="badge bg-danger text-white"><i class="ti ti-x me-1"></i>Cancelada</span>`;
+        } else if (d.hasPendingCancellation) {
+            cancelBtnHtml = `<span class="badge bg-warning text-dark border border-danger-subtle" title="Tiene una solicitud de cancelación pendiente de aprobación"><i class="ti ti-clock me-1"></i>Pendiente de cancelación</span>`;
+        } else if (canAssign) {
+            cancelBtnHtml = `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>`;
         }
+        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
+        // El listener solo aplica cuando se renderizó el botón (no en las etiquetas).
+        document.getElementById('cancelResBtn')?.addEventListener('click', () => {
+            // Use shared utility with existing reservation data and loadReservation callback
+            openReservationCancelModalWithData(reservationData, loadReservation);
+        });
 
         renderServices(d.services);
         renderFinancialSummary();
+        loadPayments();
 
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('reservationContent').style.display = '';
@@ -776,15 +871,17 @@ document.addEventListener('DOMContentLoaded', async function() {
             let rawTime = '';
             let timeLabel = '';
             if (isDeparture && (svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested)) {
+                // Salida: la hora sugerida ES la hora de pick-up del servicio.
                 rawTime = svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested;
-                timeLabel = 'Hora de salida sugerida';
+                timeLabel = 'Horario';
             } else if (isArrival) {
+                // Llegada: el pick-up ocurre a la hora de llegada del pasajero.
                 rawTime = sub.startTime || sub.time || svc.time || '';
                 if (!rawTime && sub.selectedSchedule) {
                     const m = String(sub.selectedSchedule).match(/^(\d{1,2}:\d{2})/);
                     if (m) rawTime = m[1];
                 }
-                timeLabel = 'Hora de llegada';
+                timeLabel = 'Horario';
             }
             const rounded = rawTime ? roundTimeToNearest15(rawTime) : '';
             if (rounded) horarioItems.push(detailLine('clock', rounded, timeLabel));
@@ -850,7 +947,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         const vuelosItems = [];
         if (svc.type === 'transport') {
             if (sub.airline || sub.flightNumber) {
-                vuelosItems.push(detailLine('plane', `${sub.airline || ''} ${sub.flightNumber || ''}`.trim()));
+                const flightLabel = `${sub.airline || ''} ${sub.flightNumber || ''}`.trim();
+                // Hora real del vuelo (llegada o salida del avión), distinta al pick-up del Horario.
+                const fm = String(svc.time || sub.selectedSchedule || sub.time || '').match(/^(\d{1,2}:\d{2})/);
+                const flightTime = fm ? fm[1] : '';
+                vuelosItems.push(detailLine('plane', flightTime ? `${flightLabel} @ ${flightTime}` : flightLabel));
             }
             if (Array.isArray(sub.additionalFlights) && sub.additionalFlights.length > 0) {
                 sub.additionalFlights.forEach((f) => {
@@ -888,8 +989,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         const isAdmin = userRole === 'admin' || userRole === 'superadmin';
         const isClientFacing = isAdmin || userRole === 'department_manager' || userRole === 'client';
         const noteChannels = [
-            { label: 'Notas', icon: 'notes', color: '#adb5bd', text: (sub.notes || svc.notes || '').trim(), visible: true },
-            { label: 'Notas del cliente', icon: 'user', color: '#0d6efd', text: (sub.clientNotes || '').trim(), visible: isClientFacing },
+            { label: 'Notas del administrador', icon: 'notes', color: '#adb5bd', text: (sub.notes || svc.notes || '').trim(), visible: true },
+            { label: 'Notas del cliente', icon: 'user', color: '#0dcaf0', text: (sub.agencyNotes || '').trim(), visible: true },
+            { label: 'Notas del cliente (catálogo)', icon: 'book', color: '#0d6efd', text: (sub.clientNotes || '').trim(), visible: isClientFacing },
             { label: 'Notas del proveedor', icon: 'building', color: '#198754', text: (sub.providerNotes || '').trim(), visible: isAdmin },
             { label: 'Notas del equipo', icon: 'users', color: '#fd7e14', text: (sub.teamNotes || '').trim(), visible: isAdmin },
             { label: 'Notas internas', icon: 'lock', color: '#6f42c1', text: (sub.internalNotes || '').trim(), visible: isAdmin },
@@ -1091,7 +1193,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         try {
             const response = await fetch(`/api/reservations/${reservationId}/services/${serviceId}/status`, {
                 method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                headers: { 'Authorization': `Bearer ${authToken()}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus }),
             });
             const result = await response.json();
@@ -1111,7 +1213,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (employeesCache) return employeesCache;
         try {
             const response = await fetch('/api/employees?limit=500', {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${authToken()}` }
             });
             const result = await response.json();
             employeesCache = result.data?.users || result.data || result.results || [];
@@ -1123,7 +1225,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (vehiclesCache) return vehiclesCache;
         try {
             const response = await fetch('/api/vehicles?limit=500', {
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 'Authorization': `Bearer ${authToken()}` }
             });
             const result = await response.json();
             vehiclesCache = result.data || result.results || [];
@@ -1399,7 +1501,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const response = await fetch(`/api/reservations/${reservationId}/services/${serviceId}/assign`, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${authToken()}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ driverId, guideId, greeterId, vehicleId, serviceCustomerId, extraAssignments }),
@@ -1435,7 +1537,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const response = await fetch(`/api/reservations/${reservationId}/service-customer`, {
                 method: 'PUT',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${authToken()}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ serviceCustomerId }),
@@ -1526,6 +1628,30 @@ document.addEventListener('DOMContentLoaded', async function() {
             <span class="fw-bold fs-5 text-success">${formatCurrency(finalTotal, curr)}</span>
         </div>`;
 
+        // Payment block — estado de pago + pagado / saldo / total con IVA.
+        const pay = d.payment;
+        if (pay) {
+            const balanceCls = (pay.balance || 0) > 0 ? 'text-danger' : 'text-success';
+            html += `<div class="border-top mt-2 pt-2">
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
+                    ${getPaymentStatusBadge(pay.paymentStatus)}
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total con IVA</span>
+                    <span class="fw-semibold">${formatCurrency(pay.total, curr)}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-check me-2"></i>Pagado</span>
+                    <span class="fw-semibold text-success">${formatCurrency(pay.paidAmount, curr)}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2">
+                    <span class="text-muted"><i class="ti ti-wallet me-2"></i>Saldo</span>
+                    <span class="fw-semibold ${balanceCls}">${formatCurrency(pay.balance, curr)}</span>
+                </div>
+            </div>`;
+        }
+
         body.innerHTML = html;
 
         // Bind remove buttons
@@ -1535,21 +1661,464 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     async function removeAdjustment(adjId) {
-        if (!confirm('Eliminar este ajuste?')) return;
+        if (!(await pmConfirm({
+            title: 'Eliminar ajuste', message: '¿Eliminar este ajuste?', confirmText: 'Eliminar', danger: true,
+        }))) return;
         try {
             const response = await fetch(`/api/reservations/${reservationId}/adjustments/${adjId}`, {
                 method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` },
+                headers: { 'Authorization': `Bearer ${authToken()}` },
             });
             const result = await response.json();
             if (result.success) {
                 await loadReservation();
+                pmToast('Ajuste eliminado', 'success');
             } else {
-                alert(result.error || 'Error al eliminar ajuste');
+                pmToast(result.error || 'Error al eliminar ajuste', 'error');
             }
         } catch (err) {
             console.error('Remove adjustment error:', err);
-            alert('Error al eliminar ajuste');
+            pmToast('Error al eliminar ajuste', 'error');
+        }
+    }
+
+    // ===== PAYMENTS =====
+
+    let paymentsCache = [];
+    // Auto-collapse only once (first load) — re-collapsing after every add/edit save would fight the user.
+    let paymentsAutoCollapseDone = false;
+
+    function paymentsCollapseInstance() {
+        const el = document.getElementById('paymentsCollapse');
+        return el ? bootstrap.Collapse.getOrCreateInstance(el, { toggle: false }) : null;
+    }
+
+    const PAYMENT_METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
+
+    async function loadPayments() {
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/payments`, {
+                headers: { 'Authorization': `Bearer ${authToken()}` },
+            });
+            const result = await response.json();
+            paymentsCache = result?.data?.payments || [];
+            // GET returns the fresh summary too — keep the saldo (Total/Pagado/Saldo) in sync on every reload.
+            if (result?.data?.summary) applyPaymentSummary(result.data.summary);
+        } catch (err) {
+            // Keep the existing cache on a transient network error instead of blanking the list.
+            console.error('Error loading payments:', err);
+        }
+        renderPayments();
+    }
+
+    function renderPayments() {
+        const body = document.getElementById('paymentsBody');
+        const addBtn = document.getElementById('addPaymentBtn');
+        if (!body) return;
+
+        // Pagos now lives in its own card (split out of Resumen Financiero) — show it here
+        // since it's no longer unhidden as a side effect of renderFinancialSummary().
+        const card = document.getElementById('paymentsCard');
+        if (card) card.style.display = '';
+
+        const d = reservationData;
+        const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
+        const curr = d.currency || 'MXN';
+
+        if (addBtn) { if (canEdit) addBtn.classList.remove('d-none'); else addBtn.classList.add('d-none'); }
+
+        const countBadge = document.getElementById('paymentsCountBadge');
+        if (countBadge) {
+            if (paymentsCache.length) {
+                countBadge.textContent = paymentsCache.length;
+                countBadge.classList.remove('d-none');
+            } else {
+                countBadge.classList.add('d-none');
+            }
+        }
+
+        // First load only: collapse the section when there's already data (nothing new to review),
+        // keep it open when empty (invites registering the first payment).
+        if (!paymentsAutoCollapseDone) {
+            paymentsAutoCollapseDone = true;
+            if (paymentsCache.length) paymentsCollapseInstance()?.hide();
+        }
+
+        if (!paymentsCache.length) {
+            body.innerHTML = '<div class="text-center py-3 text-muted">Sin pagos registrados</div>';
+            return;
+        }
+
+        const rows = paymentsCache.map((p) => {
+            const ref = p.reference ? p.reference : '<span class="text-muted">—</span>';
+            const tipHtml = p.tip ? `<small class="text-muted d-block">+ propina ${formatCurrency(p.tip, curr)}</small>` : '';
+            const receipt = p.receiptUrl
+                ? `<a href="${p.receiptUrl}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
+                : '<span class="text-muted">—</span>';
+            return `<tr>
+                <td>${formatDate(p.paidAt || p.createdAt)}</td>
+                <td><span class="badge bg-secondary-subtle text-secondary">${PAYMENT_METHOD_LABELS[p.method] || p.method || '—'}</span></td>
+                <td>${ref}</td>
+                <td class="text-end">${formatCurrency(p.amount, curr)}${tipHtml}</td>
+                <td>${p.origCurrency || curr}</td>
+                <td class="text-center">${receipt}</td>
+                <td class="text-end">
+                    ${canEdit ? `<button class="btn btn-sm btn-outline-primary py-0 px-1 edit-payment-btn" data-payment-id="${p.id}" title="Editar"><i class="ti ti-edit"></i></button>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1 delete-payment-btn" data-payment-id="${p.id}" title="Eliminar"><i class="ti ti-trash"></i></button>` : ''}
+                </td>
+            </tr>`;
+        }).join('');
+
+        body.innerHTML = `<div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Método</th>
+                        <th>Referencia</th>
+                        <th class="text-end">Monto</th>
+                        <th>Moneda</th>
+                        <th class="text-center">Comprobante</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+
+        body.querySelectorAll('.edit-payment-btn').forEach((btn) => {
+            btn.addEventListener('click', () => renderPaymentForm(btn.dataset.paymentId));
+        });
+        body.querySelectorAll('.delete-payment-btn').forEach((btn) => {
+            btn.addEventListener('click', () => deletePayment(btn.dataset.paymentId));
+        });
+    }
+
+    // Read a File as base64 (strip the "data:...;base64," prefix) for the JSON receipt upload.
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+            reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Upload a payment receipt in a SEPARATE request (decoupled from the save). The payment is
+    // already persisted, so this never risks it: returns null on success, or a warning string if
+    // the comprobante couldn't be uploaded (the user can retry by editing the payment).
+    async function uploadReceipt(paymentId, file) {
+        try {
+            const body = JSON.stringify({
+                fileBase64: await fileToBase64(file), fileName: file.name, mimeType: file.type,
+            });
+            const resp = await fetch(`/api/reservations/${reservationId}/payments/${paymentId}/receipt`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken()}`, 'Content-Type': 'application/json' },
+                body,
+            });
+            const r = await resp.json().catch(() => ({}));
+            if (resp.ok && r.success) return null;
+            return r.error
+                ? `Pago guardado, pero el comprobante no se subió: ${r.error}`
+                : 'Pago guardado, pero el comprobante no se subió. Reinténtalo editando el pago.';
+        } catch (err) {
+            console.error('Receipt upload error:', err);
+            return 'Pago guardado, pero el comprobante no se subió (se cortó la conexión). Reinténtalo editando el pago.';
+        }
+    }
+
+    // Inline payment form (replaces the old modal). null = nuevo, id = editar el pago.
+    function renderPaymentForm(paymentId) {
+        const wrap = document.getElementById('paymentFormWrap');
+        if (!wrap) return;
+        // The form lives inside the collapsible Pagos section — expand it so the form is actually visible.
+        paymentsCollapseInstance()?.show();
+        const existing = paymentId ? paymentsCache.find((p) => p.id === paymentId) : null;
+        const curr = existing?.origCurrency || 'MXN';
+        const paidAt = existing?.paidAt ? new Date(existing.paidAt).toISOString().slice(0, 10) : '';
+        // Payment date allows the future (reservations later); shared standard 1900 .. today + 20y.
+        const paidAtMax = (() => { const dt = new Date(); dt.setFullYear(dt.getFullYear() + 20); return dt.toISOString().slice(0, 10); })();
+        const opt = (v, label, sel) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${label}</option>`;
+        const method = existing?.method || 'efectivo';
+        const receiptLink = existing?.receiptUrl
+            ? `<a href="${existing.receiptUrl}" target="_blank" class="small d-block mt-1"><i class="ti ti-file-invoice me-1"></i>Ver comprobante actual</a>` : '';
+
+        wrap.innerHTML = `
+            <h6 class="fw-bold mb-2">${existing ? '<i class="ti ti-edit me-1"></i>Editar pago' : '<i class="ti ti-cash me-1"></i>Registrar pago'}</h6>
+            <input type="hidden" id="paymentId" value="${existing ? existing.id : ''}">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="paymentAmount">Monto</label>
+                    <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentAmount" placeholder="0.00" value="${existing ? (existing.origAmount ?? existing.amount ?? '') : ''}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="paymentCurrency">Moneda</label>
+                    <select class="form-select form-select-sm" id="paymentCurrency">${opt('MXN', 'MXN', curr)}${opt('USD', 'USD', curr)}</select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="paymentMethod">Método</label>
+                    <select class="form-select form-select-sm" id="paymentMethod">${opt('efectivo', 'Efectivo', method)}${opt('transferencia', 'Transferencia', method)}${opt('tarjeta', 'Tarjeta', method)}</select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
+                    <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="paymentTip">Propina</label>
+                    <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentTip" placeholder="0.00" value="${existing?.tip || ''}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
+                    <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${(existing?.reference || '').replace(/"/g, '&quot;')}">
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold small" for="paymentReceipt">Comprobante (imagen o PDF)</label>
+                    <input type="file" class="form-control form-control-sm" id="paymentReceipt" accept="image/*,application/pdf">
+                    ${receiptLink}
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold small" for="paymentNotes">Notas</label>
+                    <textarea class="form-control form-control-sm" id="paymentNotes" rows="2" maxlength="300" placeholder="Notas del pago">${existing?.notes || ''}</textarea>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelPaymentBtn">Cancelar</button>
+                <button type="button" class="btn btn-sm btn-primary px-4" id="savePaymentBtn"><i class="ti ti-check me-1"></i>Guardar</button>
+            </div>`;
+        // Make the inline form obvious (it lives above the payments table): a clearly bordered panel
+        // centered in the viewport, so opening "Editar/Registrar pago" no longer desconcierta.
+        wrap.style.cssText = 'border:2px solid #0d6efd;border-radius:.5rem;padding:1rem 1.25rem;background:#f5f9ff';
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        document.getElementById('cancelPaymentBtn').addEventListener('click', () => { wrap.style.display = 'none'; wrap.innerHTML = ''; });
+        document.getElementById('savePaymentBtn').addEventListener('click', () => savePayment(existing ? existing.id : ''));
+        attachThousands(document.getElementById('paymentAmount'));
+        attachThousands(document.getElementById('paymentTip'));
+    }
+
+    // Refresh the Financial Summary numbers from a POST/PUT/DELETE response summary
+    // (paymentStatus, paidAmount, balance, total) without a full reload.
+    function applyPaymentSummary(summary) {
+        if (!summary || !reservationData.payment) return;
+        Object.assign(reservationData.payment, summary);
+        renderFinancialSummary();
+    }
+
+    document.getElementById('addPaymentBtn')?.addEventListener('click', () => renderPaymentForm(null));
+
+    // Flip the chevron with the actual collapse state (works whether it was toggled by the header
+    // click or programmatically via paymentsCollapseInstance()).
+    document.getElementById('paymentsCollapse')?.addEventListener('show.bs.collapse', () => {
+        document.getElementById('paymentsChevron')?.classList.replace('ti-chevron-down', 'ti-chevron-up');
+    });
+    document.getElementById('paymentsCollapse')?.addEventListener('hide.bs.collapse', () => {
+        document.getElementById('paymentsChevron')?.classList.replace('ti-chevron-up', 'ti-chevron-down');
+    });
+
+    async function savePayment(paymentId) {
+        const amount = parseAmount(document.getElementById('paymentAmount').value);
+        const tipRaw = parseAmount(document.getElementById('paymentTip').value);
+        const paidAt = document.getElementById('paymentPaidAt').value;
+
+        if (!amount || amount <= 0) { pmToast('El monto debe ser mayor a 0', 'warning'); return; }
+        if (amount > 100000000) { pmToast('El monto no puede exceder 100,000,000', 'warning'); return; }
+
+        const payload = {
+            amount,
+            currency: document.getElementById('paymentCurrency').value,
+            method: document.getElementById('paymentMethod').value,
+            reference: document.getElementById('paymentReference').value.trim(),
+            notes: document.getElementById('paymentNotes').value.trim(),
+        };
+        if (!Number.isNaN(tipRaw) && tipRaw > 0) payload.tip = tipRaw;
+        if (paidAt) payload.paidAt = paidAt;
+
+        // Receipt (optional) — validated here but uploaded in a SEPARATE request AFTER the payment is
+        // saved (see uploadReceipt). The receipt no longer travels inside the payment save, so a slow
+        // S3 upload can never block or lose the payment itself.
+        const fileInput = document.getElementById('paymentReceipt');
+        const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+        if (file) {
+            if (file.size > 10 * 1024 * 1024) { pmToast('El comprobante supera el límite de 10MB', 'warning'); return; }
+            if (!/^image\//.test(file.type) && file.type !== 'application/pdf') { pmToast('El comprobante debe ser imagen o PDF', 'warning'); return; }
+        }
+
+        const isEdit = !!paymentId;
+        const url = isEdit
+            ? `/api/reservations/${reservationId}/payments/${paymentId}`
+            : `/api/reservations/${reservationId}/payments`;
+        const httpMethod = isEdit ? 'PUT' : 'POST';
+        // Snapshot the current payment count so a LOST response can be reconciled afterwards:
+        // the request usually reaches the server and saves even when the reply never comes back.
+        const prevCount = paymentsCache.length;
+
+        const btn = document.getElementById('savePaymentBtn');
+        if (btn) btn.disabled = true;
+        try {
+            const response = await fetch(url, {
+                method: httpMethod,
+                headers: {
+                    'Authorization': `Bearer ${authToken()}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            // Read the raw body first so a non-JSON response (e.g. an HTML error page) surfaces a
+            // clear message instead of the generic "Error al guardar el pago".
+            const rawBody = await response.text();
+            let result;
+            try {
+                result = JSON.parse(rawBody);
+            } catch (parseErr) {
+                pmToast(`Error del servidor (HTTP ${response.status})`, 'error');
+                if (btn) btn.disabled = false;
+                return;
+            }
+            if (result.success) {
+                const savedId = result.data?.payment?.id || paymentId;
+                // Upload the receipt in its own request now that the payment is safely saved. If it
+                // fails, the payment stays — we just warn so the user can retry the comprobante.
+                let receiptWarn = result.warning || null;
+                if (file && savedId) receiptWarn = await uploadReceipt(savedId, file);
+                const wrap = document.getElementById('paymentFormWrap');
+                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+                applyPaymentSummary(result.data?.summary);
+                await loadPayments();
+                if (receiptWarn) pmToast(receiptWarn, 'warning');
+                else pmToast('Pago guardado', 'success');
+            } else {
+                // Build a clear message from the real reason (status + server detail/code).
+                let msg = result.error || 'No se pudo guardar el pago';
+                if (result.detail) msg += ` — ${result.detail}`;
+                if (response.status === 401) {
+                    msg = `Sesión/token inválido (${result.detail || result.code || '401'}). Recarga la página (Ctrl+Shift+R) e intenta de nuevo.`;
+                }
+                pmToast(msg, 'error');
+                if (btn) btn.disabled = false;
+            }
+        } catch (err) {
+            // Network error (e.g. "Failed to fetch"): the request commonly reaches the server and
+            // saves even though the response is lost in transit (connection dropped). Instead of a
+            // false failure, reconcile from the server — the same thing a manual Ctrl+R would show.
+            console.error('Save payment network error, reconciling from server:', err);
+            await loadPayments(); // refreshes paymentsCache + saldo
+            let saved = !isEdit && paymentsCache.length > prevCount;
+            if (!saved && !isEdit) {
+                // The save may still be finishing — give it one more reload before giving up.
+                await new Promise((resolve) => setTimeout(resolve, 700));
+                await loadPayments();
+                saved = paymentsCache.length > prevCount;
+            }
+            const wrap = document.getElementById('paymentFormWrap');
+            if (saved) {
+                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+                pmToast('Pago guardado (se recuperó tras un corte de conexión)', 'success');
+            } else if (isEdit) {
+                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+                pmToast('La respuesta se perdió, pero la lista ya se actualizó — verifica que el pago sea correcto.', 'warning');
+            } else {
+                pmToast('No se pudo confirmar el guardado. Revisa la lista; si el pago no aparece, regístralo otra vez.', 'warning');
+                if (btn) btn.disabled = false;
+            }
+        }
+    }
+
+    // ---- Styled confirm + toasts (replace the native confirm/alert in the payments card) ----
+    const pmEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    function pmConfirm({ title = 'Confirmar', message = '', confirmText = 'Aceptar', danger = false } = {}) {
+        return new Promise((resolve) => {
+            let el = document.getElementById('pmConfirmModal');
+            if (!el) {
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal fade" id="pmConfirmModal" tabindex="-1" aria-hidden="true">
+                      <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg" style="border-radius:0.85rem;overflow:hidden">
+                          <div class="modal-body text-center px-4 pt-4 pb-2">
+                            <div data-pm-icon class="d-inline-flex align-items-center justify-content-center mb-3" style="width:56px;height:56px;border-radius:50%"></div>
+                            <h5 class="fw-bold mb-2" data-pm-title></h5>
+                            <p class="text-muted mb-0" data-pm-msg></p>
+                          </div>
+                          <div class="modal-footer border-0 justify-content-center pt-1 pb-4 gap-2">
+                            <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn px-4" data-pm-ok></button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>`);
+                el = document.getElementById('pmConfirmModal');
+            }
+            el.querySelector('[data-pm-title]').textContent = title;
+            el.querySelector('[data-pm-msg]').textContent = message;
+            const icon = el.querySelector('[data-pm-icon]');
+            icon.classList.remove('bg-danger-subtle', 'text-danger', 'bg-primary-subtle', 'text-primary');
+            icon.classList.add(danger ? 'bg-danger-subtle' : 'bg-primary-subtle', danger ? 'text-danger' : 'text-primary');
+            icon.innerHTML = `<i class="ti ${danger ? 'ti-alert-triangle' : 'ti-help-circle'}" style="font-size:1.75rem"></i>`;
+            const old = el.querySelector('[data-pm-ok]');
+            const ok = old.cloneNode(true);
+            ok.textContent = confirmText;
+            ok.className = `btn px-4 ${danger ? 'btn-danger' : 'btn-primary'}`;
+            old.replaceWith(ok);
+            const modal = bootstrap.Modal.getOrCreateInstance(el);
+            let confirmed = false;
+            ok.addEventListener('click', () => { confirmed = true; modal.hide(); });
+            el.addEventListener('hidden.bs.modal', () => resolve(confirmed), { once: true });
+            modal.show();
+        });
+    }
+
+    function pmToast(message, type = 'info') {
+        let c = document.getElementById('pmToastContainer');
+        if (!c) {
+            document.body.insertAdjacentHTML('beforeend', '<div id="pmToastContainer" class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1090"></div>');
+            c = document.getElementById('pmToastContainer');
+        }
+        const bg = {
+            error: 'bg-danger text-white', success: 'bg-success text-white',
+            warning: 'bg-warning text-dark', info: 'bg-dark text-white',
+        }[type] || 'bg-dark text-white';
+        const wrap = document.createElement('div');
+        wrap.className = `toast align-items-center ${bg} border-0`;
+        wrap.setAttribute('role', 'alert');
+        wrap.innerHTML = `<div class="d-flex"><div class="toast-body">${pmEsc(message)}</div>`
+            + `<button type="button" class="btn-close ${type === 'warning' ? '' : 'btn-close-white'} me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>`;
+        c.appendChild(wrap);
+        const t = new bootstrap.Toast(wrap, { delay: 4500 });
+        t.show();
+        wrap.addEventListener('hidden.bs.toast', () => wrap.remove());
+    }
+
+    async function deletePayment(paymentId) {
+        if (!(await pmConfirm({
+            title: 'Eliminar pago', message: '¿Eliminar este pago? Esta acción no se puede deshacer.',
+            confirmText: 'Eliminar', danger: true,
+        }))) return;
+        const existedBefore = paymentsCache.some((p) => p.id === paymentId);
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/payments/${paymentId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${authToken()}` },
+            });
+            const result = await response.json();
+            if (result.success) {
+                applyPaymentSummary(result.data?.summary);
+                await loadPayments();
+                pmToast('Pago eliminado', 'success');
+            } else {
+                pmToast(result.error || 'Error al eliminar el pago', 'error');
+            }
+        } catch (err) {
+            // Lost response — the delete may have gone through. Reconcile from the server instead
+            // of reporting a false failure (same idea as the save path).
+            console.error('Delete payment network error, reconciling from server:', err);
+            await loadPayments();
+            const stillThere = paymentsCache.some((p) => p.id === paymentId);
+            if (existedBefore && !stillThere) {
+                pmToast('Pago eliminado (se recuperó tras un corte de conexión)', 'success');
+            } else {
+                pmToast('No se pudo confirmar la eliminación. Revisa la lista; si el pago sigue ahí, inténtalo otra vez.', 'warning');
+            }
         }
     }
 
@@ -1588,15 +2157,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     });
 
+    attachThousands(document.getElementById('adjAmount'));
+
     document.getElementById('saveAdjustmentBtn')?.addEventListener('click', async () => {
         const type = document.querySelector('input[name="adjType"]:checked').value;
         const description = document.getElementById('adjDescription').value.trim();
-        const rawValue = parseFloat(document.getElementById('adjAmount').value);
+        const rawValue = parseAmount(document.getElementById('adjAmount').value);
         const isPercent = type === 'discount' && document.getElementById('adjModePercent').checked;
 
-        if (!description) { alert('La descripcion es requerida'); return; }
-        if (!rawValue || rawValue <= 0) { alert('El valor debe ser mayor a 0'); return; }
-        if (isPercent && rawValue > 100) { alert('El porcentaje no puede ser mayor a 100'); return; }
+        if (!description) { pmToast('La descripción es requerida', 'warning'); return; }
+        if (!rawValue || rawValue <= 0) { pmToast('El valor debe ser mayor a 0', 'warning'); return; }
+        if (isPercent && rawValue > 100) { pmToast('El porcentaje no puede ser mayor a 100', 'warning'); return; }
 
         const payload = { type, description };
         if (isPercent) {
@@ -1611,7 +2182,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const response = await fetch(`/api/reservations/${reservationId}/adjustments`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${authToken()}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(payload),
@@ -1620,12 +2191,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (result.success) {
                 bootstrap.Modal.getInstance(document.getElementById('addAdjustmentModal'))?.hide();
                 await loadReservation();
+                pmToast('Ajuste agregado', 'success');
             } else {
-                alert(result.error || 'Error al agregar ajuste');
+                pmToast(result.error || 'Error al agregar ajuste', 'error');
             }
         } catch (err) {
             console.error('Add adjustment error:', err);
-            alert('Error al agregar ajuste');
+            pmToast('Error al agregar ajuste', 'error');
         }
         btn.disabled = false;
     });
@@ -1689,7 +2261,7 @@ document.addEventListener('click', function(e) {
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-semibold small" for="adjDescription">Descripcion</label>
-                    <input type="text" class="form-control form-control-sm" id="adjDescription" placeholder="Ej: Estacionamiento aeropuerto" required>
+                    <input type="text" class="form-control form-control-sm" id="adjDescription" maxlength="150" placeholder="Ej: Estacionamiento aeropuerto" required>
                 </div>
                 <div class="mb-3" id="adjAmountModeGroup" style="display:none;">
                     <label class="form-label fw-semibold small">Modo</label>
@@ -1708,7 +2280,7 @@ document.addEventListener('click', function(e) {
                     <label class="form-label fw-semibold small" for="adjAmount" id="adjAmountLabel">Monto</label>
                     <div class="input-group input-group-sm">
                         <span class="input-group-text" id="adjAmountPrefix">$</span>
-                        <input type="number" class="form-control form-control-sm" id="adjAmount" min="0.01" step="0.01" placeholder="0.00" required>
+                        <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="adjAmount" placeholder="0.00" required>
                     </div>
                 </div>
             </div>
@@ -1721,3 +2293,5 @@ document.addEventListener('click', function(e) {
         </div>
     </div>
 </div>
+
+<!-- El formulario de pago ahora es inline dentro de #paymentFormWrap (ver renderPaymentForm) -->

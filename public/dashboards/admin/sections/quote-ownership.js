@@ -105,6 +105,9 @@ class QuoteOwnershipManager {
 
             if (isNewQuote) {
                 console.log('New quote detected, skipping ownership/collaborator loading');
+                // En una cotización nueva el propietario es el usuario actual (creador): pintar el
+                // display compacto para no dejar los skeleton loaders girando indefinidamente.
+                this.renderCurrentUserAsOwner();
                 // Setup event listeners even for new quotes
                 this.setupEventListeners();
                 this.dataLoaded = true; // Mark as loaded for new quotes
@@ -383,6 +386,27 @@ class QuoteOwnershipManager {
 
         // Update compact owner display in quote information form
         this.updateCompactOwnerDisplay();
+    }
+
+    // Cotización nueva: el propietario es el usuario actual (creador). No hay owner en el backend
+    // todavía, así que se pinta el display compacto directo desde window.currentUserData.
+    renderCurrentUserAsOwner() {
+        const compactNameEl = document.getElementById('compactOwnerName');
+        const compactEmailEl = document.getElementById('compactOwnerEmail');
+        const ownerLoader = document.getElementById('ownerLoader');
+        const ownerEmailLoader = document.getElementById('ownerEmailLoader');
+        if (!compactNameEl || !compactEmailEl) return; // no existe en esta página
+
+        const u = window.currentUserData || window.currentUser || {};
+        const name = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.name || '';
+        const email = u.email || '';
+
+        if (ownerLoader) ownerLoader.style.display = 'none';
+        if (ownerEmailLoader) ownerEmailLoader.style.display = 'none';
+        compactNameEl.textContent = name || 'Tú';
+        compactNameEl.style.display = 'block';
+        compactEmailEl.textContent = email;
+        compactEmailEl.style.display = 'block';
     }
 
     updateCompactOwnerDisplay() {
@@ -1218,6 +1242,16 @@ class QuoteOwnershipManager {
 
     // Capture the originally saved client ID when page loads
     captureOriginalClient() {
+        // El dropdown #clientId solo se renderiza en la sección "Información". El panel de ownership
+        // se incluye en TODAS las secciones (Información/Servicios/Resumen), así que en Servicios y
+        // Resumen el campo no existe: no hay cliente que capturar y NO es un error. Salimos en
+        // silencio para no ensuciar la consola con 5 reintentos + warning (las secciones son
+        // server-rendered: si el campo no está en el primer intento, no aparecerá después).
+        if (!document.getElementById('clientId')) {
+            console.log('captureOriginalClient: sección sin #clientId (no es Información); se omite.');
+            return;
+        }
+
         console.log('Starting captureOriginalClient...');
 
         // Try multiple times with increasing delays to ensure dropdown is ready

@@ -261,6 +261,8 @@ const currentPath = '/dashboard/admin/clients';
                             </div>
                         </div>
 
+                        <%# Una Agencia es una empresa, no una persona: no lleva fecha de nacimiento.
+                            El cumpleaños vive en Cliente Directo y en los Agentes de la agencia. %>
                         <%- include('../../molecules/common/form-field', {
                             type: 'url',
                             name: 'website',
@@ -383,11 +385,9 @@ const currentPath = '/dashboard/admin/clients';
                                     <label class="form-label" for="directClientCategory">Tipo de Cliente</label>
                                     <select class="form-select" id="directClientCategory" name="clientCategory">
                                         <option value="direct_client" selected>Cliente Directo</option>
-                                        <!-- TEMP: hidden per direction — uncomment to re-activate these client types
                                         <option value="wedding_planner">Wedding Planner</option>
                                         <option value="concierge">Concierge</option>
                                         <option value="home_owner">Home Owner</option>
-                                        -->
                                     </select>
                                 </div>
                             </div>
@@ -435,6 +435,19 @@ const currentPath = '/dashboard/admin/clients';
                                         countryCode: 'MX',
                                         placeholder: '999 123 4567',
                                         helpText: 'Número de contacto principal'
+                                    }) %>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <%- include('../../atoms/form/datepicker', {
+                                        name: 'birthDate',
+                                        id: 'directClientBirthDate',
+                                        label: 'Fecha de nacimiento',
+                                        required: false,
+                                        min: '1900-01-01',
+                                        max: new Date().toISOString().split('T')[0]
                                     }) %>
                                 </div>
                             </div>
@@ -1249,12 +1262,16 @@ const currentPath = '/dashboard/admin/clients';
                 console.log('Client form validation passed');
 
                 const formData = {
+                    // Tipo de cliente directo (direct_client | wedding_planner | concierge | home_owner)
+                    clientCategory: document.getElementById('directClientCategory').value || undefined,
+
                     // Basic information
                     firstName: document.getElementById('directClientFirstName').value.trim(),
                     lastName: document.getElementById('directClientLastName').value.trim(),
                     email: document.getElementById('directClientEmail').value.trim() || undefined,
                     phone: document.getElementById('directClientPhone').value.trim() || undefined,
-                    
+                    birthDate: document.getElementById('directClientBirthDate')?.value || undefined,
+
                     // Contact information
                     contactFirstName: document.getElementById('directClientContactFirstName').value.trim() || undefined,
                     contactLastName: document.getElementById('directClientContactLastName').value.trim() || undefined,

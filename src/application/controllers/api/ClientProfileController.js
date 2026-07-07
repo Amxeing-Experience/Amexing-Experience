@@ -16,12 +16,19 @@ const logger = require('../../../infrastructure/logger');
 const ClientAddress = require('../../../domain/models/ClientAddress');
 const TravelPreference = require('../../../domain/models/TravelPreference');
 const ClientPassport = require('../../../domain/models/ClientPassport');
+const ClientDocument = require('../../../domain/models/ClientDocument');
 const FileStorageService = require('../../services/FileStorageService');
 const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 
-// Accepted document types for a passport copy (image or PDF) and the upload size cap.
+// Accepted document types for a passport copy (image or PDF) and the upload size cap. The (?!svg)
+// excludes image/svg+xml: SVG can carry script that would execute when the presigned URL is opened.
 const PASSPORT_DOC_MAX_BYTES = 5 * 1024 * 1024; // 5MB
-const PASSPORT_DOC_MIME = /^(image\/|application\/pdf$)/;
+const PASSPORT_DOC_MIME = /^(image\/(?!svg)|application\/pdf$)/;
+
+// Client documents (base64-in-JSON upload — WAF returns 426 for multipart binary): image or PDF, ≤10MB.
+const CLIENT_DOC_MAX_BYTES = 10 * 1024 * 1024; // 10MB
+const CLIENT_DOC_MIME = /^(image\/(?!svg)|application\/pdf$)/;
+const CLIENT_DOC_LABEL_MAX = 60;
 
 // Multer (memory storage) for the passport document upload — mirrors ProfileImageController.
 const passportUpload = multer({
@@ -61,6 +68,10 @@ class ClientProfileController {
     this.uploadPassportDocument = this.uploadPassportDocument.bind(this);
     this.deletePassport = this.deletePassport.bind(this);
     this.revealPassportNumber = this.revealPassportNumber.bind(this);
+    this.getDocuments = this.getDocuments.bind(this);
+    this.uploadDocument = this.uploadDocument.bind(this);
+    this.updateDocument = this.updateDocument.bind(this);
+    this.deleteDocument = this.deleteDocument.bind(this);
     this.getTrips = this.getTrips.bind(this);
   }
 
@@ -72,12 +83,16 @@ class ClientProfileController {
   /**
    * Derive the owner (type and id) from the request route params.
    * @param {object} req - Express request.
-   * @returns {{ownerType: string, ownerId: string}} The resolved owner descriptor.
+   * @returns {Promise<{ownerType: string, ownerId: string}>} The resolved owner descriptor.
    * @example
    */
-  resolveOwner(req) {
+  async resolveOwner(req) {
     if (req.params.agentId) return { ownerType: 'amexingUser', ownerId: req.params.agentId };
-    return { ownerType: 'client', ownerId: req.params.clientId };
+    const ownerId = req.params.clientId;
+    // El cliente puede ser AmexingUser (end_client, modelo nuevo) o Client legado.
+    const isAmexingUser = await new Parse.Query('AmexingUser')
+      .get(ownerId, { useMasterKey: true }).then(() => true).catch(() => false);
+    return { ownerType: isAmexingUser ? 'amexingUser' : 'client', ownerId };
   }
 
   // Validate the owner exists, branching on type. Returns the Parse object.
@@ -173,7 +188,7 @@ class ClientProfileController {
   // ---------- addresses ----------
 
   async getAddresses(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const addresses = await ClientAddress.getByOwner(owner.ownerType, owner.ownerId);
@@ -192,7 +207,7 @@ class ClientProfileController {
    * @example
    */
   async createAddress(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
 
@@ -213,7 +228,7 @@ class ClientProfileController {
   }
 
   async updateAddress(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const address = await this.findOwnedRecord('ClientAddress', req.params.id, owner);
@@ -243,7 +258,7 @@ class ClientProfileController {
    * @example
    */
   async deleteAddress(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const address = await this.findOwnedRecord('ClientAddress', req.params.id, owner);
@@ -268,7 +283,7 @@ class ClientProfileController {
   // ---------- travel preferences ----------
 
   async getTravelPreferences(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const prefs = await TravelPreference.getByOwner(owner.ownerType, owner.ownerId);
@@ -287,7 +302,7 @@ class ClientProfileController {
    * @example
    */
   async createTravelPreference(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
 
@@ -305,7 +320,7 @@ class ClientProfileController {
   }
 
   async updateTravelPreference(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const pref = await this.findOwnedRecord('TravelPreference', req.params.id, owner);
@@ -327,7 +342,7 @@ class ClientProfileController {
    * @example
    */
   async deleteTravelPreference(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const pref = await this.findOwnedRecord('TravelPreference', req.params.id, owner);
@@ -339,9 +354,15 @@ class ClientProfileController {
     }
   }
 
-  // Replace the owner's whole preference set in one save (the UI sends all categories at once).
+  /**
+   * Reemplaza todo el set de preferencias de viaje del owner en un solo guardado
+   * (la UI envía todas las categorías a la vez).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   */
   async saveTravelPreferences(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
 
@@ -370,7 +391,7 @@ class ClientProfileController {
   // ---------- loyalty programs (loyaltyPrograms array of { type, number } on the owner) ----------
 
   async getLoyaltyPrograms(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       const ownerObj = await this.validateOwnerExists(owner);
       this.sendSuccess(res, { loyaltyPrograms: ownerObj.get('loyaltyPrograms') || [] }, 'Loyalty programs retrieved successfully');
@@ -389,7 +410,7 @@ class ClientProfileController {
    * @example
    */
   async saveLoyaltyPrograms(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       const ownerObj = await this.validateOwnerExists(owner);
 
@@ -414,7 +435,30 @@ class ClientProfileController {
     return passportUpload.single('document');
   }
 
-  // Serialize a passport, resolving the presigned passportDocument URL from its S3 key when set.
+  // Verify the file's real content matches its declared mimetype by magic bytes. The browser-sent
+  // mimetype can lie: a macOS AppleDouble "._" metadata file, or a spoofed/script payload renamed to
+  // look like an image. Returns true only when the bytes are a recognized PDF or raster image
+  // consistent with `mimetype`. Shared by the passport and document upload paths.
+  static contentMatchesMime(buffer, mimetype) {
+    const sig = buffer.slice(0, 16);
+    const isPdf = buffer.slice(0, 1024).includes('%PDF');
+    const isImage = (sig[0] === 0xFF && sig[1] === 0xD8) // JPEG
+      || (sig[0] === 0x89 && sig[1] === 0x50 && sig[2] === 0x4E && sig[3] === 0x47) // PNG
+      || (sig[0] === 0x47 && sig[1] === 0x49 && sig[2] === 0x46) // GIF
+      || (sig.slice(0, 4).toString('latin1') === 'RIFF' && sig.slice(8, 12).toString('latin1') === 'WEBP')
+      || (sig.slice(4, 8).toString('latin1') === 'ftyp') // AVIF/HEIC
+      || (sig[0] === 0x42 && sig[1] === 0x4D); // BMP
+    if (mimetype === 'application/pdf') return isPdf;
+    if (mimetype.startsWith('image/')) return isImage;
+    return false;
+  }
+
+  /**
+   * Serializa un pasaporte resolviendo la URL presignada del documento desde su S3 key.
+   * @param {Parse.Object} passport - El pasaporte a serializar.
+   * @param {object} [ctx] - Contexto para toSafeJSON.
+   * @returns {Promise<object>} JSON seguro del pasaporte (con passportDocument URL si aplica).
+   */
   async serializePassport(passport, ctx = {}) {
     const json = await passport.toSafeJSON(ctx);
     if (json.passportDocumentS3Key) {
@@ -424,7 +468,7 @@ class ClientProfileController {
   }
 
   async getPassports(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passports = await ClientPassport.getByOwner(owner.ownerType, owner.ownerId);
@@ -446,7 +490,7 @@ class ClientProfileController {
    * @example
    */
   async createPassport(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
 
@@ -468,10 +512,19 @@ class ClientProfileController {
   }
 
   async updatePassport(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
+
+      // Validate incoming date changes against the shared standard, merging with the stored values so
+      // the expiry-after-issue check still holds when only one of the two dates is edited.
+      const dateErrors = ClientPassport.validate({
+        ownerId: owner.ownerId,
+        dateOfIssue: req.body.dateOfIssue !== undefined ? req.body.dateOfIssue : passport.getDateOfIssue(),
+        expirationDate: req.body.expirationDate !== undefined ? req.body.expirationDate : passport.getExpirationDate(),
+      });
+      if (dateErrors.length) return this.sendError(res, dateErrors.join(', '), 400);
 
       const setters = {
         label: 'setLabel',
@@ -498,9 +551,14 @@ class ClientProfileController {
     }
   }
 
-  // Upload the passport copy via the S3 pipeline: images → optimizer, PDFs → direct S3 upload.
+  /**
+   * Sube la copia del pasaporte por el pipeline S3 (imágenes → optimizador, PDFs → subida directa).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   */
   async uploadPassportDocument(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
@@ -515,20 +573,11 @@ class ClientProfileController {
         return this.sendError(res, 'El archivo supera el límite de 5MB', 400);
       }
 
-      // The mimetype the browser sends can lie: a macOS AppleDouble "._" metadata file (magic
-      // 0x00051607) gets picked instead of the real PDF and uploaded as application/pdf, producing an
-      // unreadable document. Verify the actual content by magic bytes before storing anything.
-      const sig = file.buffer.slice(0, 16);
-      const isPdf = file.buffer.slice(0, 1024).includes('%PDF');
-      const isImage = (sig[0] === 0xFF && sig[1] === 0xD8) // JPEG
-        || (sig[0] === 0x89 && sig[1] === 0x50 && sig[2] === 0x4E && sig[3] === 0x47) // PNG
-        || (sig[0] === 0x47 && sig[1] === 0x49 && sig[2] === 0x46) // GIF
-        || (sig.slice(0, 4).toString('latin1') === 'RIFF' && sig.slice(8, 12).toString('latin1') === 'WEBP')
-        || (sig.slice(4, 8).toString('latin1') === 'ftyp') // AVIF/HEIC
-        || (sig[0] === 0x42 && sig[1] === 0x4D); // BMP
-      if ((file.mimetype === 'application/pdf' && !isPdf) || (file.mimetype.startsWith('image/') && !isImage)) {
+      // Verify the actual content by magic bytes before storing anything (the browser mimetype lies
+      // for a macOS "._" metadata file, etc.). Shared helper — same check the document path uses.
+      if (!ClientProfileController.contentMatchesMime(file.buffer, file.mimetype)) {
         logger.warn('Rejected passport document with mismatched content', {
-          mimetype: file.mimetype, first8Hex: sig.slice(0, 8).toString('hex'), originalname: file.originalname,
+          mimetype: file.mimetype, first8Hex: file.buffer.slice(0, 8).toString('hex'), originalname: file.originalname,
         });
         return this.sendError(
           res,
@@ -584,7 +633,7 @@ class ClientProfileController {
    * @example
    */
   async deletePassport(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
@@ -605,7 +654,7 @@ class ClientProfileController {
    * @example
    */
   async revealPassportNumber(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const passport = await this.findOwnedRecord('ClientPassport', req.params.id, owner);
@@ -621,25 +670,258 @@ class ClientProfileController {
     }
   }
 
+  // ---------- documents (ClientDocument; files in S3, no field-level encryption) ----------
+
+  /**
+   * Serializa un documento resolviendo la URL presignada (documentUrl) desde su S3 key.
+   * @param {Parse.Object} doc - El documento a serializar.
+   * @returns {Promise<object>} JSON seguro del documento (con documentUrl si aplica).
+   */
+  async serializeDocument(doc) {
+    const json = doc.toSafeJSON();
+    if (json.s3Key) {
+      json.documentUrl = await this.fileStorageService.getPresignedUrl(json.s3Key);
+    }
+    return json;
+  }
+
+  async getDocuments(req, res) {
+    const owner = this.resolveOwner(req);
+    try {
+      await this.validateOwnerExists(owner);
+      const documents = await ClientDocument.getByOwner(owner.ownerType, owner.ownerId);
+      const data = await Promise.all(documents.map((d) => this.serializeDocument(d)));
+      this.sendSuccess(res, { documents: data }, 'Documents retrieved successfully');
+    } catch (error) {
+      logger.error('Error in ClientProfileController.getDocuments', { error: error.message, ownerId: owner.ownerId });
+      this.sendError(res, 'Failed to retrieve documents', error.status || 500);
+    }
+  }
+
+  // Validate a base64 document payload and store it via the same S3 pipeline as the passport copy
+  // (images → optimizer with AVIF/WebP variants, PDFs → direct). Returns { s3Key, size, safeName }.
+  // Throws an Error with `.status` 400 on bad input (the caller's catch turns it into the response).
+  async storeDocumentFile(owner, {
+    fileBase64, fileName, mimeType, label, userId,
+  }) {
+    /**
+     * Crea un Error con `.status` 400 (el catch del caller lo convierte en la respuesta).
+     * @param {string} msg - Mensaje de error.
+     * @returns {Error} Error con status 400.
+     */
+    const fail = (msg) => Object.assign(new Error(msg), { status: 400 });
+
+    if (!fileBase64) throw fail('No se recibió ningún archivo');
+    if (!mimeType || !CLIENT_DOC_MIME.test(mimeType)) throw fail('Tipo de archivo no permitido. Solo imágenes o PDF.');
+    // Reject clearly-oversized payloads before allocating the Buffer (base64 is ~1.37× the bytes).
+    if (typeof fileBase64 !== 'string' || fileBase64.length > Math.ceil(CLIENT_DOC_MAX_BYTES * 1.4)) {
+      throw fail('El archivo supera el límite de 10MB');
+    }
+
+    const buffer = Buffer.from(fileBase64, 'base64');
+    if (!buffer.length) throw fail('Archivo inválido');
+    if (buffer.length > CLIENT_DOC_MAX_BYTES) throw fail('El archivo supera el límite de 10MB');
+    // The declared mimeType can lie; verify the real content by magic bytes.
+    if (!ClientProfileController.contentMatchesMime(buffer, mimeType)) {
+      logger.warn('Rejected client document with mismatched content', {
+        mimeType, first8Hex: buffer.slice(0, 8).toString('hex'), fileName,
+      });
+      throw fail('El archivo no es un PDF o imagen válido.');
+    }
+
+    const entityPath = `documents/${owner.ownerId}`;
+    const safeName = (fileName || 'documento').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const uniqueName = `document-${owner.ownerId}-${Date.now()}-${safeName}`;
+
+    let s3Key;
+    if (mimeType.startsWith('image/')) {
+      const result = await this.serverOptimizationService.uploadOptimizedImage(
+        buffer,
+        uniqueName,
+        mimeType,
+        { entityPath, entityId: owner.ownerId }
+      );
+      s3Key = result && result.originalS3Key;
+    } else {
+      const result = await this.fileStorageService.uploadFile(buffer, uniqueName, mimeType, {
+        entityId: entityPath,
+        metadata: { label, ownerType: owner.ownerType, ownerId: owner.ownerId },
+        userContext: { userId },
+      });
+      s3Key = result && result.s3Key;
+    }
+    if (!s3Key) throw new Error('Error al subir el documento');
+    return { s3Key, size: buffer.length, safeName };
+  }
+
+  /**
+   * Sube un documento del cliente vía base64-en-JSON (multipart lo bloquea el WAF, HTTP 426).
+   * Body: { fileBase64, fileName, mimeType, label }.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   */
+  async uploadDocument(req, res) {
+    const owner = this.resolveOwner(req);
+    try {
+      await this.validateOwnerExists(owner);
+
+      const { fileBase64, fileName, mimeType } = req.body;
+
+      // The document type is free text (the admin types it; the predefined labels are only datalist
+      // suggestions), so any document the existing tags don't cover is allowed. Trim + clamp length.
+      const label = (req.body.label || '').trim().slice(0, CLIENT_DOC_LABEL_MAX);
+      if (!label) return this.sendError(res, 'Escribe el tipo de documento', 400);
+
+      const stored = await this.storeDocumentFile(owner, {
+        fileBase64, fileName, mimeType, label, userId: req.user?.id,
+      });
+
+      const doc = ClientDocument.create({
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
+        label,
+        customLabel: '',
+        fileName: fileName || stored.safeName,
+        mimeType,
+        size: stored.size,
+        s3Key: stored.s3Key,
+        isSensitive: ClientDocument.isSensitiveLabel(label),
+        uploadedBy: req.user,
+      });
+      await doc.save(null, { useMasterKey: true });
+
+      logger.info('Client document uploaded', {
+        ...owner, documentId: doc.id, s3Key: stored.s3Key, userId: req.user?.id,
+      });
+      this.sendSuccess(res, { document: await this.serializeDocument(doc) }, 'Documento subido exitosamente', 201);
+    } catch (error) {
+      logger.error('Error in ClientProfileController.uploadDocument', { error: error.message, ownerId: owner.ownerId });
+      this.sendError(res, error.message, error.status || 500);
+    }
+  }
+
+  // Update a document's type (label) and optionally replace its file — mirrors the passport edit:
+  // the PUT updates fields, and if a new file is sent it's stored via the same pipeline and the old
+  // S3 object is cleaned up. Body: { label, [fileBase64, fileName, mimeType] }.
+  async updateDocument(req, res) {
+    const owner = this.resolveOwner(req);
+    try {
+      await this.validateOwnerExists(owner);
+      const doc = await this.findOwnedRecord('ClientDocument', req.params.docId, owner);
+
+      const label = (req.body.label || '').trim().slice(0, CLIENT_DOC_LABEL_MAX);
+      if (!label) return this.sendError(res, 'Escribe el tipo de documento', 400);
+      doc.setLabel(label);
+      doc.setSensitive(ClientDocument.isSensitiveLabel(label));
+
+      // File replacement is optional — when no new file is sent the current one is kept.
+      const { fileBase64, fileName, mimeType } = req.body;
+      if (fileBase64) {
+        const oldS3Key = doc.getS3Key();
+        const stored = await this.storeDocumentFile(owner, {
+          fileBase64, fileName, mimeType, label, userId: req.user?.id,
+        });
+        doc.setS3Key(stored.s3Key);
+        doc.setFileName(fileName || stored.safeName);
+        doc.setMimeType(mimeType);
+        doc.setSize(stored.size);
+        // Best-effort cleanup of the replaced file (the row already points at the new one).
+        if (oldS3Key && oldS3Key !== stored.s3Key) {
+          try {
+            await this.fileStorageService.deleteFile(oldS3Key);
+          } catch (e) {
+            logger.warn('Failed to delete replaced document file from S3', { s3Key: oldS3Key, error: e.message });
+          }
+        }
+      }
+
+      await doc.save(null, { useMasterKey: true });
+      this.sendSuccess(res, { document: await this.serializeDocument(doc) }, 'Documento actualizado');
+    } catch (error) {
+      logger.error('Error in ClientProfileController.updateDocument', { error: error.message, ownerId: owner.ownerId });
+      this.sendError(res, error.message, error.status || 500);
+    }
+  }
+
+  /**
+   * Soft-delete a document owned by the request owner (and remove the S3 file).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async deleteDocument(req, res) {
+    const owner = this.resolveOwner(req);
+    try {
+      await this.validateOwnerExists(owner);
+      const doc = await this.findOwnedRecord('ClientDocument', req.params.docId, owner);
+      const s3Key = doc.getS3Key();
+      await doc.softDelete(req.user);
+      // Best-effort S3 cleanup; the row is already soft-deleted regardless.
+      if (s3Key) {
+        try {
+          await this.fileStorageService.deleteFile(s3Key);
+        } catch (e) {
+          logger.warn('Failed to delete document file from S3', { s3Key, error: e.message });
+        }
+      }
+      this.sendSuccess(res, { id: req.params.docId }, 'Documento eliminado');
+    } catch (error) {
+      logger.error('Error in ClientProfileController.deleteDocument', { error: error.message, ownerId: owner.ownerId });
+      this.sendError(res, error.message, error.status || 500);
+    }
+  }
+
   // ---------- trips (read-only: quotes/reservations linked to this client) ----------
 
   async getTrips(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       const ownerObj = await this.validateOwnerExists(owner);
 
-      // A migrated person's trips can be linked by either of two pointers:
-      //   new quotes  → Quote.client (Pointer<AmexingUser>) + clientType 'direct'
-      //   old quotes  → Quote.companyClientPtr (Pointer<Client> == legacyClientId)
+      /**
+       * Nombre visible de un usuario: nombre+apellido, o email/username como fallback.
+       * @param {Parse.Object} u - AmexingUser (o null).
+       * @returns {string} Nombre a mostrar, o cadena vacía.
+       */
+      const userName = (u) => (u
+        ? (`${u.get('firstName') || ''} ${u.get('lastName') || ''}`.trim() || u.get('email') || u.get('username') || '')
+        : '');
+      /**
+       * Nombre de la AGENCIA dueña de la cotización (via el pointer `client`, un AmexingUser
+       * role department_manager). Usa contextualData.companyName (p.ej. 'Nuba'), con fallbacks.
+       * @param {Parse.Object} clientPtr - Pointer al cliente/agencia.
+       * @returns {string} Nombre de la agencia, o cadena vacía si no aplica.
+       */
+      const agencyNameOf = (clientPtr) => {
+        if (!clientPtr || clientPtr.get('role') !== 'department_manager') return '';
+        const cd = clientPtr.get('contextualData') || {};
+        return cd.companyName || cd.agencyName || userName(clientPtr);
+      };
+
       let query;
-      if (owner.ownerType === 'amexingUser') {
+      if (owner.ownerType === 'amexingUser' && ownerObj.get('role') === 'department_manager') {
+        // Agency view: every quote of the agency points to this department manager via `client`
+        // (regardless of which agent owns/created it). One simple query covers the whole agency.
+        const AmexingUser = Parse.Object.extend('AmexingUser');
+        query = new Parse.Query('Quote');
+        query.equalTo('client', AmexingUser.createWithoutData(owner.ownerId));
+      } else if (owner.ownerType === 'amexingUser') {
+        // A migrated person's trips can be linked by either of two pointers:
+        //   new quotes  → Quote.client (Pointer<AmexingUser>) + clientType 'direct'
+        //   old quotes  → Quote.companyClientPtr (Pointer<Client> == legacyClientId)
         const AmexingUser = Parse.Object.extend('AmexingUser');
         const userPtr = AmexingUser.createWithoutData(owner.ownerId);
         const byClient = new Parse.Query('Quote');
         byClient.equalTo('client', userPtr);
         byClient.equalTo('clientType', 'direct');
 
-        const subQueries = [byClient];
+        // Clientes de agencia se referencian en la quote como clientFinalId (string).
+        const byFinal = new Parse.Query('Quote');
+        byFinal.equalTo('clientFinalId', owner.ownerId);
+
+        const subQueries = [byClient, byFinal];
         const legacyClientId = ownerObj.get('legacyClientId');
         if (legacyClientId) {
           const Client = Parse.Object.extend('Client');
@@ -657,18 +939,37 @@ class ClientProfileController {
 
       query.equalTo('exists', true);
       query.descending('createdAt');
-      query.limit(100);
+      query.limit(1000); // the trips table paginates client-side (DataTables) — load the full list
+      query.include('client'); // the agency (department manager)
+      query.include('owner'); // responsible person (exposed as a plus)
+      query.include('createdBy');
       const quotes = await query.find({ useMasterKey: true });
 
-      const trips = quotes.map((q) => ({
-        id: q.id,
-        folio: q.get('folio') || '',
-        eventType: q.get('eventType') || '',
-        status: q.get('status') || '',
-        startDate: q.get('startDate') || null,
-        endDate: q.get('endDate') || null,
-        createdAt: q.get('createdAt'),
-      }));
+      const trips = quotes.map((q) => {
+        // Services are denormalized on the quote: serviceItems.days[].subconcepts[]. Count them
+        // (one subconcept = one service, matching what the itinerary shows) — no extra queries.
+        const si = q.get('serviceItems');
+        const serviceCount = si && Array.isArray(si.days)
+          ? si.days.reduce((sum, d) => sum + (Array.isArray(d.subconcepts) ? d.subconcepts.length : 0), 0)
+          : 0;
+        // Responsible person (the "plus"): owner, falling back to creator when owner has no name.
+        const ownerPtr = q.get('owner');
+        const createdByPtr = q.get('createdBy');
+        const agentObj = (ownerPtr && (ownerPtr.get('firstName') || ownerPtr.get('lastName') || ownerPtr.get('email')))
+          ? ownerPtr : createdByPtr;
+        return {
+          id: q.id,
+          folio: q.get('folio') || '',
+          eventType: q.get('eventType') || '',
+          status: q.get('status') || '',
+          startDate: q.get('startDate') || null,
+          endDate: q.get('endDate') || null,
+          createdAt: q.get('createdAt'),
+          serviceCount,
+          agency: agencyNameOf(q.get('client')),
+          agent: userName(agentObj),
+        };
+      });
 
       this.sendSuccess(res, { trips }, 'Trips retrieved successfully');
     } catch (error) {

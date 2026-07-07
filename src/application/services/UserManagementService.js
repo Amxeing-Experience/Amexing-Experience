@@ -1668,6 +1668,11 @@ class UserManagementService {
       }
     }
 
+    // Birth date — shared date standard (utils/dateValidation): 1900-01-01 .. today, no future.
+    const { validateDate } = require('../utils/dateValidation');
+    const birthDateError = validateDate(userData.birthDate, { fieldName: 'Fecha de nacimiento', allowFuture: false });
+    if (birthDateError) errors.push(birthDateError);
+
     if (errors.length > 0) {
       throw new Error(`Validation failed: ${errors.join(', ')}`);
     }

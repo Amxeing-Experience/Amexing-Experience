@@ -83,8 +83,16 @@ router.put('/:agentId/passports/:id', requireAdmin, writeOperationsLimiter, clie
 router.delete('/:agentId/passports/:id', requireAdmin, writeOperationsLimiter, clientProfileController.deletePassport);
 // Document upload (image or PDF) via the S3 pipeline; multer parses the multipart body.
 router.post('/:agentId/passports/:id/document', requireAdmin, writeOperationsLimiter, handlePassportUpload, clientProfileController.uploadPassportDocument);
-// Full-number reveal: admin/superadmin only, audited by the vault.
-router.post('/:agentId/passports/:id/reveal', requireAdmin, writeOperationsLimiter, clientProfileController.revealPassportNumber);
+// Full-number reveal: admin/superadmin only, audited by the vault. NOT under the write budget —
+// revealing is a read; sharing writeOperationsLimiter let eye-clicks + saves exhaust the
+// 50/15min budget and 429 every later action ("deja de jalar"). Audit (vault) is the control here.
+router.post('/:agentId/passports/:id/reveal', requireAdmin, clientProfileController.revealPassportNumber);
+
+// Agent documents (base64-in-JSON upload — multipart is blocked by the WAF, HTTP 426).
+router.get('/:agentId/documents', requireAdmin, clientProfileController.getDocuments);
+router.post('/:agentId/documents', requireAdmin, writeOperationsLimiter, clientProfileController.uploadDocument);
+router.put('/:agentId/documents/:docId', requireAdmin, writeOperationsLimiter, clientProfileController.updateDocument);
+router.delete('/:agentId/documents/:docId', requireAdmin, writeOperationsLimiter, clientProfileController.deleteDocument);
 
 router.get('/:agentId/trips', requireAdmin, clientProfileController.getTrips);
 

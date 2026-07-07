@@ -176,29 +176,31 @@ function initializeCancellationRequestsTable() {
                 orderable: false,
                 searchable: false,
                 render: function(data, type, row) {
+                    // CSP no permite handlers inline (onclick); se usan data-attrs +
+                    // delegación de eventos (ver listener tras inicializar la tabla).
                     let actions = `
-                        <button type="button" class="btn btn-sm btn-outline-primary me-1" 
-                                onclick="viewRequest('${row.id}')" 
+                        <button type="button" class="btn btn-sm btn-outline-primary me-1"
+                                data-action="view" data-id="${row.id}"
                                 title="Ver detalles">
                             <i class="ti ti-eye"></i>
                         </button>
                     `;
-                    
+
                     if (row.status === 'pending') {
                         actions += `
-                            <button type="button" class="btn btn-sm btn-outline-success me-1" 
-                                    onclick="reviewRequest('${row.id}', 'approve')" 
+                            <button type="button" class="btn btn-sm btn-outline-success me-1"
+                                    data-action="approve" data-id="${row.id}"
                                     title="Aprobar">
                                 <i class="ti ti-check"></i>
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-danger" 
-                                    onclick="reviewRequest('${row.id}', 'reject')" 
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    data-action="reject" data-id="${row.id}"
                                     title="Rechazar">
                                 <i class="ti ti-x"></i>
                             </button>
                         `;
                     }
-                    
+
                     return actions;
                 }
             }
@@ -218,6 +220,19 @@ function initializeCancellationRequestsTable() {
  * Attach event listeners
  */
 function attachEventListeners() {
+    // Action buttons (Ver / Aprobar / Rechazar): delegación de eventos en el tbody
+    // en lugar de onclick inline, que la CSP bloquea (no hay 'unsafe-inline').
+    $('#cancellationRequestsTable tbody').on('click', 'button[data-action]', function() {
+        const id = this.getAttribute('data-id');
+        const action = this.getAttribute('data-action');
+        if (!id) return;
+        if (action === 'view') {
+            viewRequest(id);
+        } else if (action === 'approve' || action === 'reject') {
+            reviewRequest(id, action);
+        }
+    });
+
     // Filter change handlers
     $('input[name="statusFilter"], input[name="typeFilter"]').on('change', function() {
         cancellationRequestsTable.ajax.reload();
@@ -286,110 +301,89 @@ function showRequestDetails(request) {
             minute: '2-digit'
         }) : 'No definida';
 
-    let statusBadge = '';
-    switch (request.status) {
-        case 'pending':
-            statusBadge = '<span class="badge bg-warning"><i class="ti ti-clock me-1"></i>Pendiente</span>';
-            break;
-        case 'approved':
-            statusBadge = '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Aprobada</span>';
-            break;
-        case 'rejected':
-            statusBadge = '<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Rechazada</span>';
-            break;
-    }
+    const statusMap = {
+        pending:  { label: 'Pendiente', cls: 'bg-warning text-dark', icon: 'ti-clock' },
+        approved: { label: 'Aprobada',  cls: 'bg-success',           icon: 'ti-check' },
+        rejected: { label: 'Rechazada', cls: 'bg-danger',            icon: 'ti-x' },
+    };
+    const st = statusMap[request.status] || { label: request.status || 'N/A', cls: 'bg-secondary', icon: 'ti-help-circle' };
+    const statusBadge = `<span class="badge ${st.cls} px-3 py-2 fs-6"><i class="ti ${st.icon} me-1"></i>${st.label}</span>`;
 
-    const typeBadge = request.cancellationType === 'reservation' ?
-        '<span class="badge bg-success"><i class="ti ti-calendar me-1"></i>Reservación</span>' :
-        '<span class="badge bg-primary"><i class="ti ti-file-text me-1"></i>Cotización</span>';
+    const isReservation = request.cancellationType === 'reservation';
+    const typeBadge = isReservation
+        ? '<span class="badge bg-success-subtle text-success border border-success-subtle"><i class="ti ti-calendar me-1"></i>Reservación</span>'
+        : '<span class="badge bg-primary-subtle text-primary border border-primary-subtle"><i class="ti ti-file-text me-1"></i>Cotización</span>';
+    // Mostrar solo el folio que corresponde al tipo: el de la reservación cuando es
+    // reservación, el de la cotización cuando es cotización (congruente entre ambos).
+    const primaryFolio = isReservation
+        ? (request.reservationFolio || request.quoteFolio || 'N/A')
+        : (request.quoteFolio || 'N/A');
+
+    const hours = request.hoursBeforeEvent ?? 0;
+    const urgent = hours < 24;
+    const hoursBadge = `<span class="badge ${urgent ? 'bg-danger' : 'bg-success'}">${hours} horas</span>`;
+
+    // Tarjeta compacta de dato: ícono + etiqueta + valor.
+    const infoItem = (icon, label, value) => `
+        <div class="col-md-6">
+            <div class="d-flex align-items-start gap-2">
+                <i class="ti ${icon} fs-5 text-muted mt-1"></i>
+                <div class="flex-grow-1" style="min-width:0;">
+                    <div class="text-muted text-uppercase fw-semibold" style="font-size:.7rem; letter-spacing:.04em;">${label}</div>
+                    <div class="fw-medium">${value}</div>
+                </div>
+            </div>
+        </div>`;
 
     const content = `
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">ID de Solicitud</label>
-                    <div class="form-control-plaintext font-monospace">${request.id}</div>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 p-3 mb-4 rounded-3 border bg-light">
+            <div>
+                <div class="text-muted text-uppercase fw-semibold" style="font-size:.7rem; letter-spacing:.05em;">Solicitud de cancelación</div>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    ${typeBadge}
+                    <span class="fw-bold fs-5">${primaryFolio}</span>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Estado</label>
-                    <div class="form-control-plaintext">${statusBadge}</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Tipo</label>
-                    <div class="form-control-plaintext">${typeBadge}</div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Folio</label>
-                    <div class="form-control-plaintext">
-                        <code class="text-primary">${request.quoteFolio || 'N/A'}</code>
-                        ${request.reservationFolio ? `<br><small class="text-muted">Reservación: ${request.reservationFolio}</small>` : ''}
-                    </div>
-                </div>
+            <div class="text-end">
+                ${statusBadge}
+                <div class="small text-muted mt-2 font-monospace">${request.id}</div>
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Cliente</label>
-                    <div class="form-control-plaintext">${request.clientName || 'N/A'}</div>
-                </div>
+        ${(urgent && request.status === 'pending') ? `
+            <div class="alert alert-warning d-flex align-items-center py-2 mb-3">
+                <i class="ti ti-alert-triangle me-2"></i>
+                <span class="small">Cancelación con menos de 24 horas de anticipación — requiere tu aprobación.</span>
             </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Solicitado por</label>
-                    <div class="form-control-plaintext">${request.requestedByName || 'Usuario desconocido'}</div>
-                </div>
-            </div>
+        ` : ''}
+
+        <div class="row g-3 mb-2">
+            ${infoItem('ti-user', 'Cliente', request.clientName || 'N/A')}
+            ${infoItem('ti-user-check', 'Solicitado por', request.requestedByName || 'Usuario desconocido')}
+            ${infoItem('ti-calendar-event', 'Fecha del evento', eventDate)}
+            ${infoItem('ti-hourglass', 'Horas antes del evento', hoursBadge)}
         </div>
 
-        <div class="row">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Horas antes del evento</label>
-                    <div class="form-control-plaintext">
-                        <span class="badge ${request.hoursBeforeEvent < 24 ? 'bg-danger' : 'bg-success'}">
-                            ${request.hoursBeforeEvent || 0} horas
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Fecha del evento</label>
-                    <div class="form-control-plaintext">${eventDate}</div>
-                </div>
-            </div>
-        </div>
+        <hr class="my-3">
 
         <div class="mb-3">
-            <label class="form-label fw-semibold">Motivo de cancelación</label>
-            <div class="form-control-plaintext border rounded p-2 bg-light">
-                ${request.reason || 'Sin motivo especificado'}
+            <div class="text-muted text-uppercase fw-semibold mb-1" style="font-size:.7rem; letter-spacing:.04em;"><i class="ti ti-message-2 me-1"></i>Motivo de cancelación</div>
+            <div class="border-start border-3 border-secondary-subtle ps-3 py-1">
+                ${request.reason || '<span class="text-muted fst-italic">Sin motivo especificado</span>'}
             </div>
         </div>
 
         ${request.adminComments ? `
             <div class="mb-3">
-                <label class="form-label fw-semibold">Comentarios del administrador</label>
-                <div class="form-control-plaintext border rounded p-2 bg-light">
+                <div class="text-muted text-uppercase fw-semibold mb-1" style="font-size:.7rem; letter-spacing:.04em;"><i class="ti ti-message-circle me-1"></i>Comentarios del administrador</div>
+                <div class="border-start border-3 border-info-subtle ps-3 py-1">
                     ${request.adminComments}
                 </div>
             </div>
         ` : ''}
 
-        <div class="mb-3">
-            <label class="form-label fw-semibold">Fecha de solicitud</label>
-            <div class="form-control-plaintext">${createdAt}</div>
+        <div class="d-flex align-items-center text-muted small mt-3 pt-2 border-top">
+            <i class="ti ti-clock me-1"></i>Solicitada el ${createdAt}
         </div>
     `;
 
@@ -413,9 +407,10 @@ function showRequestDetails(request) {
 function reviewRequest(requestId, action) {
     currentRequestId = requestId;
     currentAction = action;
-    
-    // First load the request details
-    viewRequest(requestId);
+
+    // Ir directo al diálogo de confirmación (con comentarios), sin pasar por el
+    // modal de detalle — para revisar primero está el botón "Ver".
+    showApprovalModal(action);
 }
 
 /**
@@ -441,10 +436,16 @@ function showApprovalModal(action) {
     const confirmBtn = $('#confirmActionBtn');
     confirmBtn.removeClass('btn-success btn-danger').addClass(isApproval ? 'btn-success' : 'btn-danger');
     confirmBtn.html(`<i class="ti ${isApproval ? 'ti-check' : 'ti-x'} me-2"></i>${isApproval ? 'Aprobar' : 'Rechazar'}`);
+    confirmBtn.prop('disabled', false);
     
-    // Clear previous comments
+    // Clear previous comments and reflect that rejecting requires a comment.
     $('#adminComments').val('');
-    
+    if (isApproval) {
+        $('label[for="adminComments"]').text('Comentarios (opcional)');
+    } else {
+        $('label[for="adminComments"]').html('Comentarios <span class="text-danger">*</span> <small class="text-muted">(requerido para rechazar)</small>');
+    }
+
     $('#reviewModal').modal('hide');
     $('#approvalModal').modal('show');
 }
@@ -459,9 +460,19 @@ async function processReviewAction() {
     }
 
     const comments = $('#adminComments').val().trim();
+
+    // Rechazar requiere un comentario (lo valida también el backend); avisar aquí
+    // evita un viaje al servidor para fallar.
+    const isReject = currentAction === 'reject' || currentAction === 'rejected';
+    if (isReject && !comments) {
+        showAlert('Debes agregar un comentario para rechazar la solicitud', 'error');
+        $('#adminComments').focus();
+        return;
+    }
+
     const confirmBtn = $('#confirmActionBtn');
     const originalText = confirmBtn.html();
-    
+
     // Show loading state
     confirmBtn.html('<span class="spinner-border spinner-border-sm me-2"></span>Procesando...');
     confirmBtn.prop('disabled', true);
@@ -495,11 +506,11 @@ async function processReviewAction() {
     } catch (error) {
         console.error('Error processing review:', error);
         showAlert(`Error: ${error.message}`, 'error');
-        
-        // Restore button state
+    } finally {
+        // Restaurar el botón SIEMPRE (éxito o error); antes solo se restauraba en el
+        // catch, así que tras aprobar/rechazar quedaba deshabilitado en "Procesando…".
         confirmBtn.html(originalText);
         confirmBtn.prop('disabled', false);
-    } finally {
         // Reset current values
         currentRequestId = null;
         currentAction = null;

@@ -1,9 +1,12 @@
 <!-- Created by Denisse Maldonado -->
 # TODO — Round-trip: greeter ×2, duración de viaje y regreso distinto
 
-> **Estado:** PENDIENTE DE CONFIRMACIÓN DEL CLIENTE.
-> Rama: `feature/quotes-ajustes-2` (commiteado, **sin mergear** — no llega a producción hasta confirmar).
-> Fecha: 2026-06-25. Created by Denisse Maldonado.
+> **Estado:** ✅ CONFIRMADO POR EL CLIENTE (2026-06-30). Implementado en `feature/quotes-ajustes-8`.
+> Decisión: **greeter ×2** y **guía ×4** en round-trip (= 2× el valor de one-way); **one-way sin cambio**
+> (guía conserva su ×2 base del motor, greeter ×1). Se aplicó en las DOS rutas (guardado
+> `collectServiceData` y preview `updateDevPaymentBreakdown`). NO se hizo el punto 2 (guía ×1 en
+> one-way) ni el punto 3 (regreso con duración distinta) — el cliente NO los pidió.
+> Fecha original: 2026-06-25. Created by Denisse Maldonado.
 
 ## Contexto
 En transporte **round-trip**, la duración de viaje y los add-ons (greeter/guía) deben reflejar

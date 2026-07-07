@@ -178,6 +178,7 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                                     <th>Propietario</th>
                                     <th>Motivo de Viaje</th>
                                     <th>Cliente Final</th>
+                                    <th>Persona de Contacto</th>
                                     <th class="text-center">Fecha Inicio</th>
                                     <th class="text-center">Personas</th>
                                     <th class="text-center">Servicios</th>
@@ -282,6 +283,12 @@ document.addEventListener('DOMContentLoaded', function() {
             s = { label: 'Agendado', cls: 'bg-info text-white' };
         }
         return `<span class="badge ${s.cls}" title="Estado de la reservación">${s.label}</span>`;
+    }
+
+    // Una cancelación <24h crea una solicitud pendiente de aprobación; la reserva
+    // sigue en su estatus real, así que se muestra un badge extra para señalarlo.
+    function getPendingCancellationBadge() {
+        return `<span class="badge bg-warning text-dark border border-danger-subtle" title="Tiene una solicitud de cancelación pendiente de aprobación"><i class="ti ti-clock me-1"></i>Pendiente de cancelación</span>`;
     }
 
     function formatDate(dateStr) {
@@ -443,6 +450,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             },
             {
+                // Persona de Contacto: nombre + teléfono. Si no hay contacto propio capturado,
+                // se usa al propietario (mismo nombre repetido) con su teléfono.
+                data: null,
+                orderable: false,
+                render: function(data, type, row) {
+                    const contactName = (row.contactPerson && row.contactPerson.trim())
+                        || `${row.leadGuestFirstName || ''} ${row.leadGuestLastName || ''}`.trim();
+                    const name = contactName || row.owner || '';
+                    const phone = row.contactPhone || row.ownerPhone || '';
+                    if (type !== 'display') return `${name} ${phone}`.trim();
+                    if (!name && !phone) return '<em class="text-muted">—</em>';
+                    const nameHtml = name ? `<span>${name}</span>` : '';
+                    const phoneHtml = phone
+                        ? `<small class="text-muted d-block"><i class="ti ti-phone me-1"></i>${phone}</small>`
+                        : '';
+                    return `${nameHtml}${phoneHtml}` || '<em class="text-muted">—</em>';
+                }
+            },
+            {
                 data: 'startDate',
                 className: 'text-center',
                 render: function(data, type, row) {
@@ -463,15 +489,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 responsivePriority: 1,  // High priority - always show
                 render: function(data, type, row) {
                     const isAdminView = <%= (typeof basePath !== 'undefined' && basePath === 'admin') ? 'true' : 'false' %>;
+                    const pendingCancelBadge = row.hasPendingCancellation ? ' ' + getPendingCancellationBadge() : '';
                     // Agentes (DM/client): un solo badge de alto nivel (Bloqueado →
                     // Agendado → Confirmado), sin el detalle operativo.
                     if (!isAdminView) {
-                        return getAgentUnifiedStatusBadge(row.quoteStatus, row.status);
+                        return getAgentUnifiedStatusBadge(row.quoteStatus, row.status) + pendingCancelBadge;
                     }
                     // Admin: estado de cotización + estado operativo de la reserva.
-                    const quoteBadge = getQuoteStatusBadge(row.quoteStatus);
+                    // Si la reserva ya está cancelada, se omite el badge de la cotización
+                    // (siempre sería "cancelled") para no duplicar con "Cancelada".
+                    const quoteBadge = row.status === 'cancelled' ? '' : getQuoteStatusBadge(row.quoteStatus);
                     const reservationBadge = getReservationStatusBadge(row.status);
-                    return `${quoteBadge} ${reservationBadge}`;
+                    return `${quoteBadge} ${reservationBadge}${pendingCancelBadge}`.trim();
                 }
             },
             {
@@ -494,7 +523,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-text"></i></a>`;
                         <% } %>
                     }
-                    if (row.status !== 'cancelled' && row.status !== 'completed') {
+                    // No mostrar "Cancelar" si ya hay una solicitud de cancelación
+                    // pendiente (evita solicitudes duplicadas), ni si ya está
+                    // cancelada/completada.
+                    if (row.status !== 'cancelled' && row.status !== 'completed' && !row.hasPendingCancellation) {
                         actions += `<button class="btn btn-sm btn-outline-danger cancel-res-btn" data-id="${row.id}" title="Cancelar"><i class="ti ti-x"></i></button>`;
                     }
                     return actions;
@@ -502,14 +534,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         ],
         columnDefs: [
-            // Solo "Fecha Inicio" (col 5) es ordenable; el resto se deshabilita.
+            // Solo "Fecha Inicio" (col 6) es ordenable; el resto se deshabilita.
             // Cliente, Propietario y Servicios no tienen un campo de orden fiable en
             // Parse, y se optó por dejar el ordenamiento únicamente por fecha de inicio.
-            { orderable: false, targets: [0, 1, 2, 3, 4, 6, 7, 8, 9, 10] },
+            { orderable: false, targets: [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11] },
         ],
         // Orden por defecto: Fecha Inicio asc (pill inicial = Próximas).
         // En cada cambio de pill se reajusta con applyDefaultOrder().
-        order: [[5, 'asc']],
+        order: [[6, 'asc']],
         language: {
             processing: 'Cargando...',
             search: 'Buscar:',
@@ -598,8 +630,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return false;
     }
 
-    // Índice de la columna "Fecha Inicio" en la tabla (Folio=0 ... Fecha Inicio=5).
-    const STARTDATE_COL = 5;
+    // Índice de la columna "Fecha Inicio" en la tabla (Folio=0 ... Persona de Contacto=5, Fecha Inicio=6).
+    const STARTDATE_COL = 6;
 
     // Dirección de orden por defecto de "Fecha Inicio" según el pill activo:
     //   Próximas / En curso → asc (lo más próximo primero)

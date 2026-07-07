@@ -22,6 +22,7 @@
 
 const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
+const ImageOptimizationService = require('./ImageOptimizationService');
 
 /**
  * POIService class implementing POI business logic.
@@ -42,6 +43,90 @@ class POIService {
       admin: 6,
       employee_amexing: 3,
     };
+
+    // Para resolver presigned URLs de la imagen del destino (misma carpeta S3 `pois/…`).
+    this.imageService = new ImageOptimizationService({
+      baseFolder: 'pois',
+      isPublic: false,
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+    });
+  }
+
+  /**
+   * Resuelve la presigned URL de la imagen de un destino, prefiriendo una variante
+   * optimizada y ampliamente compatible para background-image (webp → jpeg → avif),
+   * y si no hay variantes, el original. Devuelve null si no hay imagen o falla.
+   * @param {object|null} image - Objeto imagen persistido en el POI.
+   * @returns {Promise<string|null>} URL servible o null.
+   * @example
+   * const url = await service.resolvePOIImageUrl(poi.get('image'));
+   */
+  async resolvePOIImageUrl(image) {
+    if (!image) {
+      return null;
+    }
+
+    try {
+      let s3Key = null;
+      const variants = image.optimizedVariants;
+      if (variants && typeof variants === 'object') {
+        const keyFrom = (v) => (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
+        s3Key = ['webp', 'jpeg', 'avif'].map((fmt) => keyFrom(variants[fmt])).find(Boolean) || null;
+      }
+      if (!s3Key) {
+        s3Key = image.s3Key || null;
+      }
+      if (!s3Key) {
+        return null;
+      }
+
+      return await this.imageService.getPresignedUrl(s3Key);
+    } catch (error) {
+      logger.warn('Error resolving POI image url', { error: error.message });
+      return null;
+    }
+  }
+
+  /**
+   * Devuelve los destinos ACTIVOS de un tipo de traslado dado, con su imagen resuelta.
+   * Pensado para render público (p.ej. el strip de la página de Tours).
+   * @param {string} serviceTypeName - Nombre del ServiceType (p.ej. 'Tours').
+   * @returns {Promise<Array<{id:string,name:string,imageUrl:string|null}>>} Destinos.
+   * @example
+   * const destinos = await service.getActivePOIsWithImages('Tours');
+   */
+  async getActivePOIsWithImages(serviceTypeName) {
+    try {
+      const serviceTypeQuery = new Parse.Query('ServiceType');
+      serviceTypeQuery.equalTo('name', serviceTypeName);
+      serviceTypeQuery.equalTo('active', true);
+      serviceTypeQuery.equalTo('exists', true);
+      const serviceType = await serviceTypeQuery.first({ useMasterKey: true });
+      if (!serviceType) {
+        return [];
+      }
+
+      const query = new Parse.Query('POI');
+      query.equalTo('active', true);
+      query.equalTo('exists', true);
+      query.equalTo('serviceType', serviceType);
+      query.ascending('name');
+      query.limit(1000);
+      const pois = await query.find({ useMasterKey: true });
+
+      return await Promise.all(pois.map(async (poi) => ({
+        id: poi.id,
+        name: poi.get('name'),
+        imageUrl: await this.resolvePOIImageUrl(poi.get('image')),
+      })));
+    } catch (error) {
+      logger.error('Error getting active POIs with images', {
+        error: error.message,
+        serviceTypeName,
+      });
+      return [];
+    }
   }
 
   /**

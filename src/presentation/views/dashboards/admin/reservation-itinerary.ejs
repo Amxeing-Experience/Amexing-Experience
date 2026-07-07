@@ -327,6 +327,9 @@ const iconKey = (sc) => {
             <% const desc = sc.clientNotes || sc.notes || ''; if (desc) { %>
               <div class="itin-desc"><%- renderNotes(desc) %></div>
             <% } %>
+            <% const agencyD = (sc.agencyNotes || '').trim(); if (agencyD) { %>
+              <div class="itin-desc"><%- renderNotes(agencyD) %></div>
+            <% } %>
 
             <!-- Thumbnail is a placeholder until per-service photos are provided -->
             <div class="itin-place">

@@ -130,6 +130,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <input type="hidden" id="sortOrder" name="sortOrder" value="0">
                     </div>
 
+                    <!-- Sección: Amenidades -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-sparkles me-1"></i>
+                            Amenidades
+                        </h6>
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control" id="amenityInput" maxlength="60" placeholder="Ej: WiFi, A/C, Agua, Cargador USB...">
+                            <button type="button" class="btn btn-outline-primary" id="addAmenityBtn">
+                                <i class="ti ti-plus me-1"></i>Agregar
+                            </button>
+                        </div>
+                        <div id="amenitiesChips" class="d-flex flex-wrap gap-2"></div>
+                        <div class="form-text">Escribe una amenidad y presiona Agregar (o Enter). Se guardan por tipo de vehículo.</div>
+                    </div>
+
                     <!-- Alert informativo -->
                     <div class="alert alert-info d-flex align-items-start" role="alert">
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
@@ -335,6 +351,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             saveVehicleType();
         });
 
+        // Amenidades: agregar por botón o Enter (sin submitear el form).
+        $('#addAmenityBtn').on('click', addAmenityFromInput);
+        $('#amenityInput').on('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); addAmenityFromInput(); }
+        });
+
         // Functions
         function openVehicleTypeModal(isEdit = false) {
             // Clear any previous modal alerts
@@ -346,6 +368,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#vehicleTypeModal').modal('show');
             $('#vehicleTypeForm')[0].reset();
             $('#vehicleTypeId').val('');
+            setAmenities([]); // form.reset() no limpia el contenedor de chips (es un div)
             $('#modalTitle').text(isEdit ? 'Editar Tipo de Vehículo' : 'Crear Nuevo Tipo de Vehículo');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Tipo');
 
@@ -379,6 +402,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#defaultCapacity').val(type.defaultCapacity || 4);
                         $('#trunkCapacity').val(type.trunkCapacity || 2);
                         $('#sortOrder').val(type.sortOrder || 0);
+                        setAmenities(type.amenities || []);
                     } else {
                         showErrorAlert('Formato de respuesta inválido');
                     }
@@ -389,6 +413,47 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     showModalError(errorMessage);
                 }
             });
+        }
+
+        // --- Amenidades (chips libres) ---
+        function makeAmenityChip(value) {
+            const safe = String(value);
+            const chip = document.createElement('span');
+            chip.className = 'badge bg-primary-subtle text-primary d-inline-flex align-items-center gap-1 py-2 px-3';
+            chip.dataset.amenity = safe;
+            const icon = document.createElement('i');
+            icon.className = 'ti ti-sparkles';
+            const label = document.createElement('span');
+            label.textContent = safe; // textContent evita inyección
+            const rm = document.createElement('button');
+            rm.type = 'button';
+            rm.className = 'btn-close btn-close-sm ms-1';
+            rm.setAttribute('aria-label', 'Quitar');
+            rm.addEventListener('click', () => chip.remove());
+            chip.appendChild(icon); chip.appendChild(label); chip.appendChild(rm);
+            return chip;
+        }
+        function getAmenities() {
+            return Array.from(document.querySelectorAll('#amenitiesChips [data-amenity]'))
+                .map(el => el.dataset.amenity);
+        }
+        function setAmenities(list) {
+            const box = document.getElementById('amenitiesChips');
+            if (!box) return;
+            box.innerHTML = '';
+            (Array.isArray(list) ? list : []).forEach(v => {
+                const s = String(v == null ? '' : v).trim();
+                if (s) box.appendChild(makeAmenityChip(s));
+            });
+        }
+        function addAmenityFromInput() {
+            const input = document.getElementById('amenityInput');
+            const val = (input.value || '').trim().slice(0, 60);
+            if (!val) return;
+            const exists = getAmenities().some(a => a.toLowerCase() === val.toLowerCase());
+            if (!exists) document.getElementById('amenitiesChips').appendChild(makeAmenityChip(val));
+            input.value = '';
+            input.focus();
         }
 
         function saveVehicleType() {
@@ -407,7 +472,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 icon: $('#icon').val() || 'car',
                 defaultCapacity: parseInt($('#defaultCapacity').val()) || 4,
                 trunkCapacity: parseInt($('#trunkCapacity').val()) || 2,
-                sortOrder: parseInt($('#sortOrder').val()) || 0
+                sortOrder: parseInt($('#sortOrder').val()) || 0,
+                amenities: getAmenities()
             };
 
             const url = isEdit ? `${apiEndpoint}/${typeId}` : apiEndpoint;

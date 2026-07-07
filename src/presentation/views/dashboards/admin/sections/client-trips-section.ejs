@@ -5,6 +5,8 @@
     const clientId = root.dataset.clientId;
     // People-type clients are AmexingUser → trips live under /api/agents/:id (fallback: client).
     const base = root.dataset.ownerBase || `/api/clients/${clientId}`;
+    const box = document.getElementById('tripsContainer');
+
     const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const fmt = (v) => { if (!v) return '—'; const d = new Date(v); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-ES', { dateStyle: 'medium' }); };
@@ -14,8 +16,43 @@
         scheduled: 'bg-success', rejected: 'bg-danger', cancelled: 'bg-danger',
     };
 
+    // Same DataTable setup as the rest of the dashboard tables (see employees-table.ejs).
+    // Use the page's jQuery via $/window.jQuery — `jQuery` global may be unset (noConflict).
+    function initDataTable() {
+        const jq = window.jQuery || window.$;
+        if (!jq || !jq.fn || !jq.fn.dataTable) {
+            initDataTable._tries = (initDataTable._tries || 0) + 1;
+            if (initDataTable._tries < 50) setTimeout(initDataTable, 100);
+            return;
+        }
+        if (jq.fn.dataTable.isDataTable('#tripsDataTable')) return;
+        try {
+            const dt = jq('#tripsDataTable').DataTable({
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            order: [],
+            pagingType: 'full_numbers',
+            columnDefs: [{ orderable: false, targets: -1 }],
+            language: {
+                processing: 'Procesando...',
+                search: 'Buscar:',
+                lengthMenu: 'Mostrar _MENU_ registros',
+                info: 'Mostrando _START_ a _END_ de _TOTAL_ registros',
+                infoEmpty: 'Mostrando 0 a 0 de 0 registros',
+                infoFiltered: '(filtrado de _MAX_ registros totales)',
+                loadingRecords: 'Cargando...',
+                zeroRecords: 'No se encontraron viajes coincidentes',
+                emptyTable: 'No hay viajes registrados',
+                paginate: { first: 'Primero', previous: 'Anterior', next: 'Siguiente', last: 'Último' },
+            },
+            });
+            // If the table was built in a hidden tab, realign column widths when a tab is shown.
+            jq(document).off('shown.bs.tab.trips').on('shown.bs.tab.trips', function () { try { dt.columns.adjust(); } catch (err) { /* noop */ } });
+        } catch (e) { /* DataTables unavailable — leave the plain table rather than break the tab */ }
+    }
+
     async function load() {
-        const box = document.getElementById('tripsContainer');
         try {
             const res = await fetch(`${base}/trips`, {
                 credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -25,17 +62,20 @@
             const trips = json.data.trips || [];
             if (!trips.length) { box.innerHTML = '<p class="text-muted mb-0">Este cliente no tiene cotizaciones ni reservaciones.</p>'; return; }
             box.innerHTML = `
-                <div class="table-responsive"><table class="table table-hover align-middle mb-0">
-                    <thead class="table-light"><tr><th>Folio</th><th>Evento</th><th>Fechas</th><th>Estado</th><th></th></tr></thead>
+                <div class="table-responsive"><table class="table table-hover align-middle" id="tripsDataTable" style="width:100%">
+                    <thead class="table-light"><tr><th>Folio</th><th>Evento</th><th>Agencia</th><th>Fechas</th><th class="text-center">Servicios</th><th>Estado</th><th></th></tr></thead>
                     <tbody>${trips.map((t) => `
                         <tr>
                             <td class="fw-semibold">${esc(t.folio) || '—'}</td>
                             <td>${esc(t.eventType) || '—'}</td>
+                            <td>${t.agency ? `<span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">${esc(t.agency)}</span>` : '—'}</td>
                             <td class="text-muted small">${fmt(t.startDate)} – ${fmt(t.endDate)}</td>
+                            <td class="text-center">${t.serviceCount || 0}</td>
                             <td><span class="badge ${STATUS[t.status] || 'bg-secondary'}">${esc(t.status) || '—'}</span></td>
                             <td class="text-end"><a class="btn btn-sm btn-light" href="/dashboard/admin/quotes/${t.id}" title="Ver"><i class="ti ti-eye"></i></a></td>
                         </tr>`).join('')}</tbody>
                 </table></div>`;
+            initDataTable();
         } catch (e) { box.innerHTML = `<p class="text-danger mb-0">${esc(e.message)}</p>`; }
     }
 

@@ -123,10 +123,11 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    return res.status(401).json({
-      success: false,
-      error: 'Invalid or malformed token',
-    });
+    const payload = { success: false, error: 'Invalid or malformed token' };
+    // Surface the underlying reason outside production so auth failures are diagnosable from the
+    // client (e.g. "jwt expired" / "invalid signature" vs a downstream/network error).
+    if (process.env.NODE_ENV !== 'production') payload.detail = error.message;
+    return res.status(401).json(payload);
   }
 };
 
@@ -564,7 +565,9 @@ const extractUser = (req, res, next) => {
  */
 const authRateLimit = expressRateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 requests per windowMs for auth endpoints
+  // Prod: 10 intentos/15min (seguridad). Dev: alto, para no bloquear pruebas locales / e2e
+  // (los demás limiters ya están gateados así en securityMiddleware.js; este faltaba).
+  max: process.env.NODE_ENV === 'development' ? 1000 : 10,
   message: {
     success: false,
     error: 'Too many authentication attempts, please try again later',

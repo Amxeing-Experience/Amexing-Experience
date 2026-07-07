@@ -52,6 +52,88 @@ Created by Denisse Maldonado
             height: auto;
         }
 
+        /* Stage con hotspots interactivos sobre el mapa: corazón ROJO en hover.
+           El corazón usa heart_black.png como máscara rellena de rojo, así escala
+           a cada recuadro calibrado sin depender de una imagen roja. */
+        /* container-type para dimensionar el corazón como % del ancho del mapa (cqw),
+           así queda constante entre ciudades sin importar el tamaño del recuadro. */
+        .transfers-map__stage { position: relative; line-height: 0; container-type: inline-size; }
+
+        .transfers-hotspot { position: absolute; cursor: pointer; }
+
+        /* El corazón es una capa INDEPENDIENTE (no vive dentro del hotspot): se
+           posiciona por su cuenta (hx/hy) para caer justo sobre el corazón del mapa
+           —que suele estar arriba de la pastilla y no siempre centrado—. Se enciende
+           en rojo al hacer hover en su hotspot. --heart-size ajusta el tamaño. */
+        .transfers-heart {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            width: var(--heart-size, 2.6cqw);
+            aspect-ratio: 1 / 1;
+            background-color: #e11d1d;
+            -webkit-mask: url('/images/heart_black.png') center / contain no-repeat;
+            mask: url('/images/heart_black.png') center / contain no-repeat;
+            opacity: 0;
+            transition: opacity .18s ease;
+            pointer-events: auto; /* el propio corazón también es zona de hover */
+            z-index: 4;
+        }
+        .transfers-heart.is-on { opacity: 1; }
+
+        /* Modo calibración (?calibrar): cuadros de hover (azul) + corazones (rojo),
+           ambos arrastrables; los cuadros además se redimensionan. */
+        .transfers-map__stage.is-calibrating .transfers-hotspot {
+            cursor: move;
+            outline: 2px dashed rgba(60, 120, 255, 0.9);
+            background: rgba(60, 120, 255, 0.12);
+            touch-action: none;
+        }
+        .transfers-map__stage.is-calibrating .transfers-hotspot.is-active-calib {
+            outline-color: #ffd000;
+            background: rgba(255, 208, 0, 0.18);
+            z-index: 9;
+        }
+        .transfers-map__stage.is-calibrating .transfers-hotspot::after {
+            content: attr(data-index);
+            position: absolute; top: 2px; left: 4px;
+            font: 700 12px/1 monospace; color: #fff;
+            background: rgba(60, 120, 255, 0.9);
+            padding: 1px 4px; border-radius: 3px;
+        }
+        .transfers-map__stage.is-calibrating .transfers-heart {
+            opacity: 0.6;
+            pointer-events: auto;
+            cursor: move;
+            outline: 2px dashed rgba(255, 60, 60, 0.95);
+            touch-action: none;
+        }
+        .transfers-map__stage.is-calibrating .transfers-heart.is-active-calib { outline-color: #ffd000; }
+        .transfers-handle {
+            position: absolute; width: 12px; height: 12px;
+            background: #ffd000; border: 1px solid #7a5b00; border-radius: 2px; z-index: 3;
+        }
+        .transfers-handle--n  { top: -6px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+        .transfers-handle--s  { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+        .transfers-handle--e  { right: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+        .transfers-handle--w  { left: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+        .transfers-handle--ne { top: -6px; right: -6px; cursor: nesw-resize; }
+        .transfers-handle--nw { top: -6px; left: -6px; cursor: nwse-resize; }
+        .transfers-handle--se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+        .transfers-handle--sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+        .transfers-calib {
+            position: fixed; top: 90px; left: 12px; z-index: 9999;
+            background: rgba(20, 20, 20, 0.92); color: #eaeaea; font: 12px/1.5 monospace;
+            padding: 10px 12px; border-radius: 8px; max-width: 360px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+        .transfers-calib h4 { margin: 0 0 6px; font-size: 12px; color: #ffd000; }
+        .transfers-calib-live { color: #8fe08f; margin-bottom: 6px; }
+        .transfers-calib-list { white-space: pre; max-height: 230px; overflow: auto; }
+        .transfers-calib button {
+            margin-top: 8px; font: 11px monospace; cursor: pointer;
+            background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; padding: 4px 10px;
+        }
+
         /* ---- Traslados punto a punto ---- */
         .book-vehicles {
             position: relative;
@@ -377,17 +459,20 @@ Created by Denisse Maldonado
 
     <%# Header: banner con la imagen de la flota %>
     <section class="transporte-hero">
-        <img src="/images/transportes_services.jpg" alt="<%= t('pages:transporte.heroAlt') %>" class="transporte-hero__img">
+        <video class="transporte-hero__img" autoplay muted loop playsinline preload="metadata"
+               poster="/images/video_tesla_poster.jpg" aria-label="<%= t('pages:transporte.heroAlt') %>">
+            <source src="/images/video_tesla.mp4" type="video/mp4">
+        </video>
     </section>
 
     <%# Opciones de vehículos %>
     <%
         const vehiculos = [
-            { name: t('pages:transporte.vehicles.sedan'), img: '/images/sedan_privado.png', side: 'left', color: 'dark',
+            { name: t('pages:transporte.vehicles.sedan'), img: '/images/DSC_3383.jpg', side: 'left', color: 'dark',
               para: [t('pages:transporte.audiences.couples'), t('pages:transporte.audiences.individual'), t('pages:transporte.audiences.business')] },
-            { name: t('pages:transporte.vehicles.suv'), img: '/images/suv_privada.png', side: 'right', color: 'green',
+            { name: t('pages:transporte.vehicles.suv'), img: '/images/DSC_2981.jpg', side: 'right', color: 'green',
               para: [t('pages:transporte.audiences.couples'), t('pages:transporte.audiences.individual'), t('pages:transporte.audiences.business'), t('pages:transporte.audiences.smallFamilies')] },
-            { name: t('pages:transporte.vehicles.van'), img: '/images/van_privada.png', side: 'left', color: 'olive',
+            { name: t('pages:transporte.vehicles.van'), img: '/images/DSC_2228.jpg', side: 'left', color: 'olive',
               para: [t('pages:transporte.audiences.business'), t('pages:transporte.audiences.largeFamilies'), t('pages:transporte.audiences.largeGroups')] }
         ];
     %>
@@ -420,10 +505,181 @@ Created by Denisse Maldonado
         </div>
     </section>
 
-    <%# Mapa: transfers al aeropuerto %>
+    <%# Mapa: transfers al aeropuerto — 8 ciudades con corazón rojo en hover.
+        Posiciones x/y/w/h en %; calibrar abriendo la página con ?calibrar. %>
+    <%
+        // x/y/w/h = cuadro de HOVER (sobre la pastilla); hx/hy = CENTRO del corazón.
+        const transferSpots = [
+            { city: 'Ciudad 1', x: 52.0, y: 24.4, w: 28.1, h: 3.6, hx: 65.9, hy: 22.3 },
+            { city: 'Ciudad 2', x: 18.8, y: 36.0, w: 28.0, h: 3.6, hx: 32.8, hy: 34.1 },
+            { city: 'Ciudad 3', x: 37.1, y: 41.8, w: 19.9, h: 3.8, hx: 47.8, hy: 40.0 },
+            { city: 'Ciudad 4', x: 15.1, y: 47.4, w: 27.5, h: 3.8, hx: 28.8, hy: 45.5 },
+            { city: 'Ciudad 5', x: 45.6, y: 55.2, w: 27.9, h: 3.9, hx: 59.6, hy: 53.4 },
+            { city: 'Ciudad 6', x: 49.1, y: 65.4, w: 28.5, h: 3.6, hx: 63.2, hy: 63.4 },
+            { city: 'Ciudad 7', x: 30.4, y: 70.3, w: 28.1, h: 3.7, hx: 44.1, hy: 68.4 },
+            { city: 'Ciudad 8', x: 53.0, y: 75.2, w: 27.9, h: 3.8, hx: 66.8, hy: 73.2 }
+        ];
+    %>
     <section class="transfers-map">
-        <img src="/images/map_transfers.jpg" alt="<%= t('pages:transporte.mapAlt') %>" class="transfers-map__img">
+        <div class="transfers-map__stage" id="transfersStage">
+            <img src="/images/map_transfers.jpg" alt="<%= t('pages:transporte.mapAlt') %>" class="transfers-map__img">
+            <% transferSpots.forEach(function (spot, idx) { %>
+                <div class="transfers-hotspot"
+                     style="left: <%= spot.x %>%; top: <%= spot.y %>%; width: <%= spot.w %>%; height: <%= spot.h %>%;"
+                     data-index="<%= idx + 1 %>" data-city="<%= spot.city %>"
+                     role="button" tabindex="0" aria-label="<%= spot.city %>"></div>
+            <% }); %>
+            <% transferSpots.forEach(function (spot, idx) { %>
+                <span class="transfers-heart"
+                      style="left: <%= spot.hx %>%; top: <%= spot.hy %>%;"
+                      data-index="<%= idx + 1 %>" aria-hidden="true"></span>
+            <% }); %>
+        </div>
     </section>
+
+    <script>
+    (function () {
+        var stage = document.getElementById('transfersStage');
+        if (!stage) return;
+        var img = stage.querySelector('.transfers-map__img');
+        var hotspots = Array.prototype.slice.call(stage.querySelectorAll('.transfers-hotspot'));
+        var hearts = Array.prototype.slice.call(stage.querySelectorAll('.transfers-heart'));
+        var calibrar = /[?&]calibrar/i.test(location.search);
+
+        // ===== MODO NORMAL: hover del cuadro O del corazón enciende el corazón =====
+        if (!calibrar) {
+            hotspots.forEach(function (h, i) {
+                var heart = hearts[i];
+                if (!heart) return;
+                // Contador para no apagar al cruzar el cursor entre cuadro y corazón.
+                var count = 0;
+                var on = function () { count++; heart.classList.add('is-on'); };
+                var off = function () { count = Math.max(0, count - 1); if (!count) heart.classList.remove('is-on'); };
+                h.addEventListener('mouseenter', on);
+                h.addEventListener('mouseleave', off);
+                h.addEventListener('focus', on);
+                h.addEventListener('blur', off);
+                heart.addEventListener('mouseenter', on);
+                heart.addEventListener('mouseleave', off);
+            });
+            return;
+        }
+
+        // ===== MODO CALIBRACIÓN: cuadros (mover+resize) + corazones (mover) =====
+        stage.classList.add('is-calibrating');
+        var MIN = 2;
+
+        var panel = document.createElement('div');
+        panel.className = 'transfers-calib';
+        panel.innerHTML =
+            '<h4>Calibración — arrastra los CUADROS (azul) sobre la pastilla y los CORAZONES (rojo) sobre el corazón del mapa. Bordes/esquinas del cuadro = redimensionar.</h4>' +
+            '<div class="transfers-calib-live">listo</div>' +
+            '<div class="transfers-calib-list"></div>' +
+            '<button type="button" data-act="copy">Copiar coordenadas</button>';
+        document.body.appendChild(panel);
+        var live = panel.querySelector('.transfers-calib-live');
+        var list = panel.querySelector('.transfers-calib-list');
+
+        var DIRS = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+        var action = null;
+
+        function pct(e) {
+            var t = e.touches && e.touches[0] ? e.touches[0] : e;
+            var r = img.getBoundingClientRect();
+            return { x: ((t.clientX - r.left) / r.width) * 100, y: ((t.clientY - r.top) / r.height) * 100 };
+        }
+        function rectOf(el, isHeart) {
+            return {
+                x: parseFloat(el.style.left) || 0,
+                y: parseFloat(el.style.top) || 0,
+                w: isHeart ? 0 : (parseFloat(el.style.width) || 0),
+                h: isHeart ? 0 : (parseFloat(el.style.height) || 0)
+            };
+        }
+        function lineFor(i) {
+            var b = rectOf(hotspots[i], false), c = rectOf(hearts[i], true);
+            return "{ city: '" + hotspots[i].dataset.city + "', x: " + b.x.toFixed(1) + ", y: " + b.y.toFixed(1) +
+                ", w: " + b.w.toFixed(1) + ", h: " + b.h.toFixed(1) +
+                ", hx: " + c.x.toFixed(1) + ", hy: " + c.y.toFixed(1) + " },";
+        }
+        function renderList() {
+            var out = [];
+            for (var i = 0; i < hotspots.length; i++) out.push((i + 1) + ": " + lineFor(i));
+            list.textContent = out.join('\n');
+        }
+
+        function start(type, el, dir, isHeart, e) {
+            e.preventDefault();
+            var p = pct(e);
+            action = { type: type, el: el, dir: dir, isHeart: isHeart, startX: p.x, startY: p.y, box: rectOf(el, isHeart) };
+            hotspots.concat(hearts).forEach(function (x) { x.classList.remove('is-active-calib'); });
+            el.classList.add('is-active-calib');
+        }
+        function move(e) {
+            if (!action) return;
+            e.preventDefault();
+            var p = pct(e);
+            var dx = p.x - action.startX, dy = p.y - action.startY;
+            var b = action.box, nb = { x: b.x, y: b.y, w: b.w, h: b.h };
+            if (action.type === 'move') {
+                if (action.isHeart) {
+                    nb.x = Math.max(0, Math.min(100, b.x + dx));
+                    nb.y = Math.max(0, Math.min(100, b.y + dy));
+                } else {
+                    nb.x = Math.max(0, Math.min(100 - b.w, b.x + dx));
+                    nb.y = Math.max(0, Math.min(100 - b.h, b.y + dy));
+                }
+            } else {
+                var dir = action.dir;
+                if (dir.indexOf('e') > -1) nb.w = Math.max(MIN, Math.min(100 - b.x, b.w + dx));
+                if (dir.indexOf('s') > -1) nb.h = Math.max(MIN, Math.min(100 - b.y, b.h + dy));
+                if (dir.indexOf('w') > -1) { var right = b.x + b.w; nb.x = Math.max(0, Math.min(right - MIN, b.x + dx)); nb.w = right - nb.x; }
+                if (dir.indexOf('n') > -1) { var bottom = b.y + b.h; nb.y = Math.max(0, Math.min(bottom - MIN, b.y + dy)); nb.h = bottom - nb.y; }
+            }
+            action.el.style.left = nb.x + '%';
+            action.el.style.top = nb.y + '%';
+            if (!action.isHeart) { action.el.style.width = nb.w + '%'; action.el.style.height = nb.h + '%'; }
+            live.textContent = action.isHeart
+                ? ('corazón #' + (hearts.indexOf(action.el) + 1) + '  hx:' + nb.x.toFixed(1) + ' hy:' + nb.y.toFixed(1))
+                : ('cuadro #' + (hotspots.indexOf(action.el) + 1) + '  x:' + nb.x.toFixed(1) + ' y:' + nb.y.toFixed(1) + ' w:' + nb.w.toFixed(1) + ' h:' + nb.h.toFixed(1));
+            renderList();
+        }
+        function end() { action = null; }
+
+        hotspots.forEach(function (h) {
+            DIRS.forEach(function (dir) {
+                var handle = document.createElement('span');
+                handle.className = 'transfers-handle transfers-handle--' + dir;
+                handle.addEventListener('mousedown', function (e) { e.stopPropagation(); start('resize', h, dir, false, e); });
+                handle.addEventListener('touchstart', function (e) { e.stopPropagation(); start('resize', h, dir, false, e); }, { passive: false });
+                h.appendChild(handle);
+            });
+            h.addEventListener('mousedown', function (e) { start('move', h, null, false, e); });
+            h.addEventListener('touchstart', function (e) { start('move', h, null, false, e); }, { passive: false });
+        });
+        hearts.forEach(function (heart) {
+            heart.addEventListener('mousedown', function (e) { e.stopPropagation(); start('move', heart, null, true, e); });
+            heart.addEventListener('touchstart', function (e) { e.stopPropagation(); start('move', heart, null, true, e); }, { passive: false });
+        });
+
+        document.addEventListener('mousemove', move);
+        document.addEventListener('touchmove', move, { passive: false });
+        document.addEventListener('mouseup', end);
+        document.addEventListener('touchend', end);
+
+        panel.querySelector('[data-act="copy"]').addEventListener('click', function () {
+            var out = [];
+            for (var i = 0; i < hotspots.length; i++) out.push(lineFor(i));
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(out.join('\n')).then(function () {
+                    live.textContent = '¡Copiado! Pégamelo en el chat ✓';
+                }, function () { live.textContent = 'No se pudo copiar; copia manual del recuadro'; });
+            }
+        });
+
+        renderList();
+    })();
+    </script>
 
     <%# Traslados punto a punto %>
     <section class="book-vehicles">

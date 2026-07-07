@@ -15,14 +15,14 @@ Created by Denisse Maldonado
     // Equipo: x/y = esquina superior izquierda (en % de la imagen), w/h = tamaño (en %).
     // Recalibrar con ?calibrar cuando llegue la imagen final.
     const teamMembers = [
-        { name: 'Colaborador 1', since: 2026, x: 25.3, y: 43.7, w: 6.9, h: 48.0 },
-        { name: 'Colaborador 2', since: 2026, x: 33.4, y: 43.4, w: 5.9, h: 45.4 },
-        { name: 'Colaborador 3', since: 2026, x: 41.1, y: 46.6, w: 5.3, h: 40.4 },
-        { name: 'Colaborador 4', since: 2026, x: 46.9, y: 46.9, w: 5.7, h: 40.1 },
-        { name: 'Colaborador 5', since: 2026, x: 53.3, y: 46.6, w: 5.7, h: 39.9 },
-        { name: 'Colaborador 6', since: 2026, x: 59.8, y: 46.3, w: 5.9, h: 41.3 },
-        { name: 'Colaborador 7', since: 2026, x: 66.6, y: 44.9, w: 6.5, h: 47.1 },
-        { name: 'Colaborador 8', since: 2026, x: 74.6, y: 45.8, w: 7.2, h: 48.1 }
+        { name: 'Omar Dominguez', since: 2004, x: 24.2, y: 59.5, w: 6.5, h: 33.2 },
+        { name: 'Heriberto Hernandez', since: 2015, x: 31.9, y: 59.6, w: 6.6, h: 30.5 },
+        { name: 'Luis Enrique', since: 2011, x: 40.4, y: 61.9, w: 5.0, h: 27.8 },
+        { name: 'Mario Salazar', since: 2001, x: 45.2, y: 61.8, w: 5.7, h: 26.8 },
+        { name: 'Juan Acosta', since: 2016, x: 51.5, y: 61.3, w: 5.7, h: 27.0 },
+        { name: 'Juan Carlos', since: 2021, x: 57.7, y: 61.6, w: 5.9, h: 27.0 },
+        { name: 'Juan Ignacio Rodriguez', since: 2014, x: 64.1, y: 61.4, w: 6.4, h: 29.7 },
+        { name: 'Luis Ángel Hernández', since: 2022, x: 71.6, y: 60.8, w: 6.4, h: 32.0 }
     ];
 %>
 
@@ -41,7 +41,7 @@ Created by Denisse Maldonado
             <%# El escenario se escala (zoom) — imagen + indicadores juntos %>
             <div class="team-section__stage" id="teamStage">
                 <div class="team-section__image-wrapper">
-                    <img src="/images/contacto_header.jpg" alt="Nuestro Equipo Amexing Experience" class="team-section__image">
+                    <img src="/images/AMEXING79.jpg" alt="Nuestro Equipo Amexing Experience" class="team-section__image">
                 </div>
 
                 <%# Zonas activas (una por persona) %>
@@ -54,7 +54,7 @@ Created by Denisse Maldonado
                             data-index="<%= idx + 1 %>"
                             data-name="<%= member.name %>"
                             data-since="<%= member.since %>"
-                            aria-label="<%= member.name %> — Desde <%= member.since %>"
+                            aria-label="<%= member.name %> — <%= t('pages:about.team.since') %> <%= member.since %>"
                         >
                             <img src="/images/indicador.png" alt="" class="team-section__marker" aria-hidden="true">
                         </button>
@@ -65,8 +65,8 @@ Created by Denisse Maldonado
             <%# Banner con el nombre del colaborador (fuera del zoom, tamaño fijo).
                 El span "reserve" (oculto) fija el ancho al del texto por defecto. %>
             <div class="team-section__banner" id="teamBanner">
-                <span class="team-section__banner-reserve" aria-hidden="true">Nombre del Colaborador | Desde 2026</span>
-                <span class="team-section__banner-text">Nombre del Colaborador | Desde 2026</span>
+                <span class="team-section__banner-reserve" aria-hidden="true"><%= t('pages:about.team.bannerHint') %></span>
+                <span class="team-section__banner-text"><%= t('pages:about.team.bannerHint') %></span>
             </div>
         </div>
     </div>
@@ -347,30 +347,41 @@ Created by Denisse Maldonado
 
     /* ============ MODO NORMAL: hover / selección ============ */
     if (!calibrar) {
-        function show(hotspot) {
-            if (current) current.classList.remove('is-selected');
-            current = hotspot;
-            hotspot.classList.add('is-selected');
-            bannerText.textContent =
-                hotspot.getAttribute('data-name') + ' | Desde ' + hotspot.getAttribute('data-since');
+        // Hotspot "fijado" por clic/tap (persiste al quitar el cursor); null = ninguno.
+        var pinned = null;
+        function label(hotspot) {
+            return hotspot.getAttribute('data-name') + ' | <%= t('pages:about.team.since') %> ' + hotspot.getAttribute('data-since');
         }
-        function hide() {
-            if (current) current.classList.remove('is-selected');
-            current = null;
-            bannerText.textContent = defaultBanner;
+        // Aplica el estado visual + banner para el hotspot dado (o el default si es null).
+        function apply(hotspot) {
+            hotspots.forEach(function (x) { x.classList.remove('is-selected'); });
+            current = hotspot || null;
+            if (hotspot) {
+                hotspot.classList.add('is-selected');
+                bannerText.textContent = label(hotspot);
+            } else {
+                bannerText.textContent = defaultBanner;
+            }
         }
         hotspots.forEach(function (hotspot) {
-            hotspot.addEventListener('mouseenter', function () { show(hotspot); });
-            hotspot.addEventListener('mouseleave', hide);
-            hotspot.addEventListener('focus', function () { show(hotspot); });
-            hotspot.addEventListener('blur', hide);
+            // Hover/foco: vista previa. Al salir, vuelve al fijado (clic) o al default.
+            hotspot.addEventListener('mouseenter', function () { apply(hotspot); });
+            hotspot.addEventListener('mouseleave', function () { apply(pinned); });
+            hotspot.addEventListener('focus', function () { apply(hotspot); });
+            hotspot.addEventListener('blur', function () { apply(pinned); });
+            // Clic/tap: fija SIEMPRE a la persona clickeada (idempotente, se mantiene
+            // sin cursor). stopPropagation evita que el clic burbujee al document y se
+            // interprete como "clic afuera".
             hotspot.addEventListener('click', function (e) {
                 e.preventDefault();
-                if (current === hotspot) { hide(); } else { show(hotspot); }
+                e.stopPropagation();
+                pinned = hotspot;
+                apply(hotspot);
             });
         });
+        // Clic fuera de la foto: quita el fijado y vuelve a la pista por defecto.
         document.addEventListener('click', function (e) {
-            if (!stage.contains(e.target)) hide();
+            if (!stage.contains(e.target)) { pinned = null; apply(null); }
         });
         return;
     }
@@ -418,8 +429,8 @@ Created by Denisse Maldonado
     function renderList() {
         list.textContent = Array.prototype.map.call(hotspots, function (h, i) {
             var b = box(h);
-            return (i + 1) + ": { name: '" + h.dataset.name + "', role: '" + h.dataset.role +
-                "', x: " + b.x.toFixed(1) + ", y: " + b.y.toFixed(1) +
+            return (i + 1) + ": { name: '" + h.dataset.name + "', since: " + h.dataset.since +
+                ", x: " + b.x.toFixed(1) + ", y: " + b.y.toFixed(1) +
                 ", w: " + b.w.toFixed(1) + ", h: " + b.h.toFixed(1) + " },";
         }).join('\n');
     }
@@ -494,8 +505,8 @@ Created by Denisse Maldonado
     panel.querySelector('[data-act="copy"]').addEventListener('click', function () {
         var txt = Array.prototype.map.call(hotspots, function (h) {
             var b = box(h);
-            return "{ name: '" + h.dataset.name + "', role: '" + h.dataset.role +
-                "', x: " + b.x.toFixed(1) + ", y: " + b.y.toFixed(1) +
+            return "{ name: '" + h.dataset.name + "', since: " + h.dataset.since +
+                ", x: " + b.x.toFixed(1) + ", y: " + b.y.toFixed(1) +
                 ", w: " + b.w.toFixed(1) + ", h: " + b.h.toFixed(1) + " },";
         }).join('\n');
         if (navigator.clipboard) {

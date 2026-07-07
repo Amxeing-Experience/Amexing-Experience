@@ -1,13 +1,14 @@
 <%
 /**
  * Generic Agency/Client filter (molecule)
- * Reusable across tables (reservations, quotes, ...). A 3-state type toggle
- * (Todos / Agencia / Cliente) + a searchable select populated from
- * GET /api/clients/mixed.
+ * Reusable across tables (reservations, quotes, ...). A type toggle
+ * (Todos / Agencia / Cliente / Wedding Planner / Concierge / Home Owner) +
+ * a searchable select populated from GET /api/clients/mixed.
  *
  *   - "Todos"   → no filter (default). The picker is hidden.
- *   - "Agencia" / "Cliente" → reveals the searchable picker; the table is only
- *     filtered once a specific entity is chosen ("Todas/Todos" = no filter).
+ *   - "Agencia" / "Cliente" / a specialty category → reveals the searchable
+ *     picker; picking Agencia/Cliente/category already filters the table by
+ *     type, and choosing a specific entity narrows it further.
  *
  * Uses Choices.js (loaded globally in the dashboard layout) for the searchable
  * dropdown, with a graceful fallback to a plain <select> if Choices is absent.
@@ -43,6 +44,15 @@ const idPrefix = (locals && locals.idPrefix) ? locals.idPrefix : 'default';
 
         <input type="radio" class="btn-check" name="<%= idPrefix %>-acType" id="<%= idPrefix %>-acType-client" value="client">
         <label class="btn btn-outline-primary" for="<%= idPrefix %>-acType-client"><i class="ti ti-user me-1"></i>Cliente</label>
+
+        <input type="radio" class="btn-check" name="<%= idPrefix %>-acType" id="<%= idPrefix %>-acType-wedding" value="wedding_planner">
+        <label class="btn btn-outline-primary" for="<%= idPrefix %>-acType-wedding"><i class="ti ti-heart me-1"></i>Wedding Planner</label>
+
+        <input type="radio" class="btn-check" name="<%= idPrefix %>-acType" id="<%= idPrefix %>-acType-concierge" value="concierge">
+        <label class="btn btn-outline-primary" for="<%= idPrefix %>-acType-concierge"><i class="ti ti-bell me-1"></i>Concierge</label>
+
+        <input type="radio" class="btn-check" name="<%= idPrefix %>-acType" id="<%= idPrefix %>-acType-homeowner" value="home_owner">
+        <label class="btn btn-outline-primary" for="<%= idPrefix %>-acType-homeowner"><i class="ti ti-home me-1"></i>Home Owner</label>
     </div>
 
     <!-- Ancho acotado; oculto por defecto (estado "Todos" = sin filtro) -->
@@ -71,7 +81,8 @@ const idPrefix = (locals && locals.idPrefix) ? locals.idPrefix : 'default';
     var useChoices = (typeof window.Choices !== 'undefined');
     var choices = null;
 
-    // Estado por instancia, legible por la página anfitriona. type: all|agency|client.
+    // Estado por instancia, legible por la página anfitriona.
+    // type: all|agency|client|wedding_planner|concierge|home_owner.
     window.clientAgencyFilters = window.clientAgencyFilters || {};
     var state = window.clientAgencyFilters[PREFIX] = { type: 'all', id: '' };
 
@@ -85,7 +96,7 @@ const idPrefix = (locals && locals.idPrefix) ? locals.idPrefix : 'default';
     }
 
     function allLabel() {
-        return state.type === 'client' ? 'Todos los clientes' : 'Todas las agencias';
+        return state.type === 'agency' ? 'Todas las agencias' : 'Todos los clientes';
     }
 
     // Clave efectiva del filtro para la tabla. "Todos" => sin filtro ('none').
@@ -171,7 +182,17 @@ const idPrefix = (locals && locals.idPrefix) ? locals.idPrefix : 'default';
     function load() {
         ensureChoices();
         setLoading();
-        var apiType = state.type === 'client' ? 'clients' : 'agencies';
+        // agency → 'agencies'; 'client' → 'clients' (direct_client); las categorías
+        // especiales (wedding_planner/concierge/home_owner) van con su propio nombre,
+        // que getMixedClients trata como tab de categoría (isCategoryTab).
+        var apiType;
+        if (state.type === 'agency') {
+            apiType = 'agencies';
+        } else if (state.type === 'client') {
+            apiType = 'clients';
+        } else {
+            apiType = state.type;
+        }
         fetch('/api/clients/mixed?type=' + apiType + '&limit=1000', {
             headers: { 'Authorization': 'Bearer ' + token() }
         })

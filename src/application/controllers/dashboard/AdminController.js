@@ -201,8 +201,8 @@ class AdminController extends RoleBasedController {
         breadcrumb: null, // Disable automatic breadcrumb generation
       };
 
-      // Add DataTables assets if employees or tarifario section is active
-      if (section === 'employees' || section === 'tarifario') {
+      // Add DataTables assets if employees, tarifario or trips (quotes) section is active
+      if (section === 'employees' || section === 'tarifario' || section === 'quotes') {
         viewData.pageStyles = [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
           'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
@@ -781,6 +781,7 @@ class AdminController extends RoleBasedController {
       let reservationFolio = '';
       let reservationId = '';
       let reservationStatus = '';
+      let hasPendingCancellation = false;
       if (isReservation && !isNewQuote) {
         try {
           const Parse = require('parse/node');
@@ -793,6 +794,17 @@ class AdminController extends RoleBasedController {
             reservationFolio = reservation.get('folio') || '';
             reservationId = reservation.id;
             reservationStatus = reservation.get('status') || '';
+          }
+          // A <24h cancellation creates a pending CancellationRequest instead of
+          // cancelling immediately; surface it so the status control can show
+          // "Cancelación solicitada" instead of silently staying "Confirmada".
+          if (reservationStatus !== 'cancelled') {
+            const pendingQuery = new Parse.Query('CancellationRequest');
+            pendingQuery.equalTo('quote', { __type: 'Pointer', className: 'Quote', objectId: quoteId });
+            pendingQuery.equalTo('status', 'pending');
+            pendingQuery.equalTo('exists', true);
+            const pendingCount = await pendingQuery.count({ useMasterKey: true });
+            hasPendingCancellation = pendingCount > 0;
           }
         } catch (e) {
           reservationFolio = '';
@@ -811,6 +823,7 @@ class AdminController extends RoleBasedController {
         reservationFolio,
         reservationId,
         reservationStatus,
+        hasPendingCancellation,
         currentSection: section,
         pageStyles: ['https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css'],
         footerScripts: `

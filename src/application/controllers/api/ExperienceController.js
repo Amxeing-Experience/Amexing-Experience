@@ -228,6 +228,7 @@ class ExperienceController {
       max_people: experience.get('max_people') || null,
       cancellation_policy: experience.get('cancellation_policy') || null,
       buyout: (experience.get('buyout') !== undefined ? experience.get('buyout') : null),
+      experience_category: experience.get('experience_category') || null,
       private_min_type: experience.get('private_min_type') || null,
       private_min_value: (experience.get('private_min_value') !== undefined ? experience.get('private_min_value') : null),
       time_journey: experience.get('time_journey'),
@@ -649,6 +650,7 @@ class ExperienceController {
       max_people: maxPeople,
       cancellation_policy: cancellationPolicy,
       buyout,
+      experience_category: experienceCategory,
       private_min_type: privateMinType,
       private_min_value: privateMinValue,
       time_journey: timeJourney,
@@ -691,6 +693,9 @@ class ExperienceController {
     }
     if (buyout !== undefined && buyout !== null && buyout !== '') {
       experienceObj.set('buyout', parseFloat(buyout));
+    }
+    if (experienceCategory !== undefined && experienceCategory !== null && experienceCategory !== '') {
+      experienceObj.set('experience_category', experienceCategory);
     }
     if (privateMinType !== undefined && privateMinType !== null && privateMinType !== '') {
       experienceObj.set('private_min_type', privateMinType);
@@ -741,7 +746,9 @@ class ExperienceController {
       experienceObj.set('team_notes', teamNotes);
     }
     experienceObj.set('cost', parseFloat(cost));
-    experienceObj.set('active', true);
+    // F3 (draft-first): permite crear como borrador oculto (active:false) cuando se
+    // pide explícitamente; por defecto la experiencia se crea activa.
+    experienceObj.set('active', !(data.active === false || data.active === 'false'));
     experienceObj.set('exists', true);
 
     // Handle destinationPOI pointer relationship
@@ -913,6 +920,7 @@ class ExperienceController {
       max_people: maxPeople,
       cancellation_policy: cancellationPolicy,
       buyout,
+      experience_category: experienceCategory,
       private_min_type: privateMinType,
       private_min_value: privateMinValue,
       time_journey: timeJourney,
@@ -1068,6 +1076,10 @@ class ExperienceController {
         }
         experienceObj.set('buyout', parseFloat(buyout));
       }
+    }
+
+    if (experienceCategory !== undefined) {
+      experienceObj.set('experience_category', (experienceCategory === null || experienceCategory === '') ? null : experienceCategory);
     }
 
     if (privateMinType !== undefined) {
@@ -1926,6 +1938,7 @@ class ExperienceController {
       min_people: experience.get('min_people'),
       cancellation_policy: experience.get('cancellation_policy') || null,
       buyout: (experience.get('buyout') !== undefined ? experience.get('buyout') : null),
+      experience_category: experience.get('experience_category') || null,
       private_min_type: experience.get('private_min_type') || null,
       private_min_value: (experience.get('private_min_value') !== undefined ? experience.get('private_min_value') : null),
       experienciasCount,

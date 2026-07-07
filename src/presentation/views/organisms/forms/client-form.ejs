@@ -79,6 +79,19 @@ const isEdit = locals.isEdit || true;
                 }) %>
             </div>
         </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../atoms/form/datepicker', {
+                    name: 'birthDate',
+                    id: idPrefix + 'BirthDate',
+                    label: 'Fecha de nacimiento',
+                    required: false,
+                    min: '1900-01-01',
+                    max: new Date().toISOString().split('T')[0]
+                }) %>
+            </div>
+        </div>
     </div>
 
     <!-- Sección: Persona de Contacto y Emergencia -->
