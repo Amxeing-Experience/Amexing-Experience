@@ -75,8 +75,12 @@ test.describe('Quote information — campos owner/lead guest/contacto (smoke)', 
     await expect(page.locator('#contactFieldsWrapper')).toHaveCount(1);
     await expect(page.locator('#leadGuestIsFinalClient')).toHaveCount(1);
     await expect(page.locator('#leadGuestManualFields')).toHaveCount(1);
-    // El botón "Crear Cliente" del Cliente Final se eliminó (redundante con "Guardar cliente").
+    // El botón "Crear Cliente" del Cliente Final se ocultó: el alta se hace inline desde el
+    // combobox (escribir nombre nuevo + "guardar como cliente").
     await expect(page.locator('#createFinalClientBtn')).toHaveCount(0);
+    // Comboboxes de Cliente Final y Lead Guest (elegir de agencia o crear nuevo).
+    await expect(page.locator('#clientFinalId')).toHaveCount(1);
+    await expect(page.locator('#leadGuestClientId')).toHaveCount(1);
     // Chips del filtro de categorías (existen en el DOM aunque el modo sea agencia).
     await expect(page.locator('.cat-chip')).toHaveCount(5);
 
@@ -106,10 +110,26 @@ test.describe('Quote information — campos owner/lead guest/contacto (smoke)', 
     // 5. Guardado con "es propietario" marcado → contacto = propietario; + guardar lead guest.
     const stamp = Date.now();
     const owner = await page.evaluate(() => window.__quoteOwner);
-    // Desmarcar "El Lead Guest es el cliente final" para mostrar los campos manuales.
+    // Desmarcar "El Lead Guest es el cliente final" para capturar un Lead Guest propio.
     await setChecked(page, 'leadGuestIsFinalClient', false);
-    await page.fill('#leadGuestFirstName', 'SmokeLead');
-    await page.fill('#leadGuestLastName', `T${stamp}`);
+    // El Lead Guest ahora es un combobox en modo agencia (inputs de nombre ocultos). Escribimos un
+    // nombre nuevo vía su API typed (dispara customselect:create → llena leadGuestFirstName/LastName);
+    // en modo directo, los inputs de nombre son visibles y se llenan directo.
+    await page.evaluate(({ first, last }) => {
+      // Nombre: combobox en agencia (setTypedValue → firstName), input plano en directo.
+      const comboRow = document.getElementById('leadGuestComboRow');
+      const agency = comboRow && !comboRow.classList.contains('d-none');
+      const el = document.getElementById('leadGuestClientId');
+      if (agency && el && el.customSelect && el.customSelect.setTypedValue) {
+        el.customSelect.setTypedValue(first);
+      } else {
+        const f = document.getElementById('leadGuestFirstName');
+        if (f) { f.value = first; f.dispatchEvent(new Event('input', { bubbles: true })); }
+      }
+      // Apellido: siempre en su campo.
+      const l = document.getElementById('leadGuestLastName');
+      if (l) { l.value = last; l.dispatchEvent(new Event('input', { bubbles: true })); }
+    }, { first: 'SmokeLead', last: `T${stamp}` });
     await setChecked(page, 'saveLeadGuestAsClient', true);
     await setChecked(page, 'contactDifferentFromOwner', true); // override: contacto = propietario
 
