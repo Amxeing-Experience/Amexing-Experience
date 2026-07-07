@@ -692,8 +692,12 @@
             const includesRaw = Array.isArray(service.includes) ? service.includes.join(' ') : (service.includes || '');
             const includesLower = String(includesRaw).toLowerCase();
             const includesMentionsGuide = includesLower.includes('guia') || includesLower.includes('guía');
-            if ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide
-                && !(service.type === 'tour' && includesMentionsGuide)) {
+            // Guía aplica en: tours/a-disposición (includeGuide) y experiencias (experienceGuide).
+            // Para tours y experiencias, si el "Incluye" ya menciona guía, se omite el label (no duplicar).
+            const guideApplies = ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide)
+                || (service.type === 'experience' && service.experienceGuide);
+            const skipGuideLabel = (service.type === 'tour' || service.type === 'experience') && includesMentionsGuide;
+            if (guideApplies && !skipGuideLabel) {
                 html += `<div class="service-detail-item text-success mt-1">
                     <i class="ti ti-user me-1"></i>
                     <strong>${service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía'}</strong>
@@ -1129,6 +1133,15 @@
                     <i class="ti ti-user me-1"></i>
                     <strong>${guideLabel}</strong>
                 </div>`;
+            } else if (service.type === 'experience' && service.experienceGuide) {
+                // Experiencia con guía: label "Incluye Guía", salvo que el "Incluye" ya mencione guía.
+                const inclG = String(Array.isArray(service.includes) ? service.includes.join(' ') : (service.includes || '')).toLowerCase();
+                if (!(inclG.includes('guia') || inclG.includes('guía'))) {
+                    html += `<div class="service-detail-item mt-1" style="color: #7a7f6b;">
+                        <i class="ti ti-user me-1"></i>
+                        <strong>Incluye Guía</strong>
+                    </div>`;
+                }
             }
 
             // Greeter
@@ -1259,6 +1272,15 @@
                     <i class="ti ti-user me-1"></i>
                     <strong>${guideLabel}</strong>
                 </div>`;
+            } else if (service.type === 'experience' && service.experienceGuide) {
+                // Experiencia con guía: label "Incluye Guía", salvo que el "Incluye" ya mencione guía.
+                const inclG = String(Array.isArray(service.includes) ? service.includes.join(' ') : (service.includes || '')).toLowerCase();
+                if (!(inclG.includes('guia') || inclG.includes('guía'))) {
+                    html += `<div class="service-detail-item text-success">
+                        <i class="ti ti-user me-1"></i>
+                        <strong>Incluye Guía</strong>
+                    </div>`;
+                }
             }
 
             // Greeter

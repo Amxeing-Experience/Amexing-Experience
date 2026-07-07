@@ -1452,14 +1452,136 @@ ItineraryBuilder.prototype.showTourDetails = function (tour) {
     }
 };
 
+// Busca el walking tour de "San Miguel de Allende" en el catálogo (para el "Guía" de experiencias).
+ItineraryBuilder.prototype.getSanMiguelWalkingTour = function () {
+    const all = this.toursCache && this.toursCache.get('all');
+    if (!Array.isArray(all)) return null;
+    const norm = (s) => String(s == null ? '' : s).toLowerCase();
+    const isSMA = (t) => {
+        const poi = t.destinationPOI && (t.destinationPOI.name || t.destinationPOI);
+        return /san miguel de allende/.test(norm(poi)) || /san miguel de allende/.test(norm(t.description));
+    };
+    return all.find((t) => t.isWalkingTour && isSMA(t)) || null;
+};
+
+// Costo base (MXN, sin recargo) del "Guía" de una experiencia: precio tipo walking tour de SMA =
+// tier(por nº de personas) × duración (horas). 0 si el checkbox está apagado o falta info.
+ItineraryBuilder.prototype.getExperienceGuideCostMXN = function () {
+    const cb = document.getElementById('experienceGuide');
+    if (!cb || !cb.checked) return 0;
+    const tour = this.getSanMiguelWalkingTour();
+    if (!tour) return 0;
+    const num = (id) => parseInt(document.getElementById(id) && document.getElementById(id).value, 10) || 0;
+    const people = num('adultsQuantity') + num('childrenQuantity') + num('adultsNoAlcoholQuantity');
+    const duration = parseFloat(document.getElementById('experienceDuration') && document.getElementById('experienceDuration').value) || 0;
+    if (people <= 0 || duration <= 0) return 0;
+    return this.getWalkingTourPrice(tour, people, duration) || 0;
+};
+
 ItineraryBuilder.prototype.clearTourSchedule = function () {
     const scheduleInfoDiv = document.getElementById('tourScheduleInfo');
     if (scheduleInfoDiv) scheduleInfoDiv.classList.add('d-none');
+
+    // Ocultar/limpiar el dropdown de horarios disponibles del tour.
+    const scheduleRow = document.getElementById('tourScheduleRow');
+    const scheduleSelect = document.getElementById('tourScheduleSelect');
+    if (scheduleRow) scheduleRow.classList.add('d-none');
+    if (scheduleSelect) scheduleSelect.innerHTML = '<option value="">Seleccionar horario...</option>';
 
     const tourStartTime = document.getElementById('tourStartTime');
     const tourEndTime = document.getElementById('tourEndTime');
     if (tourStartTime) tourStartTime.value = '';
     if (tourEndTime) tourEndTime.value = '';
+};
+
+// Puebla el dropdown "Horario disponible del tour" con los slots (día + horas) del tour.
+// Solo para tours con vehículo. Formato nuevo: availability = [{day, startTime, endTime}].
+// Legacy: availableDays (nombres) + startTime/endTime a nivel tour. Sin horas → se oculta.
+ItineraryBuilder.prototype.populateTourScheduleDropdown = function (tour) {
+    const row = document.getElementById('tourScheduleRow');
+    const select = document.getElementById('tourScheduleSelect');
+    if (!row || !select) return;
+
+    const reset = () => {
+        row.classList.add('d-none');
+        select.innerHTML = '<option value="">Seleccionar horario...</option>';
+    };
+
+    if (!tour || tour.isWalkingTour) { reset(); return; }
+
+    const dayNamesEs = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const fmt = (t) => (typeof this.formatTime === 'function' ? this.formatTime(t) : String(t || ''));
+    const slots = []; // { label, start, end }
+
+    // Formato nuevo: availability = [{ day, startTime, endTime }].
+    if (Array.isArray(tour.availability) && tour.availability.length) {
+        tour.availability.forEach((a) => {
+            if (!a || !a.startTime || !a.endTime) return;
+            const dayName = (typeof a.day === 'number' && dayNamesEs[a.day]) ? `${dayNamesEs[a.day]} · ` : '';
+            slots.push({ label: `${dayName}${fmt(a.startTime)} – ${fmt(a.endTime)}`, start: fmt(a.startTime), end: fmt(a.endTime) });
+        });
+    }
+
+    // Legacy: días por nombre + startTime/endTime a nivel tour (mismo horario para todos los días).
+    if (!slots.length && Array.isArray(tour.availableDays) && tour.availableDays.length
+        && tour.startTime && tour.endTime) {
+        tour.availableDays.forEach((d) => {
+            slots.push({ label: `${d} · ${fmt(tour.startTime)} – ${fmt(tour.endTime)}`, start: fmt(tour.startTime), end: fmt(tour.endTime) });
+        });
+    }
+
+    if (!slots.length) { reset(); return; }
+
+    const seen = new Set();
+    let html = '<option value="">Seleccionar horario...</option>';
+    slots.forEach((s) => {
+        if (seen.has(s.label)) return;
+        seen.add(s.label);
+        html += `<option value="${s.start}|${s.end}">${s.label}</option>`;
+    });
+    select.innerHTML = html;
+    row.classList.remove('d-none');
+
+    // Autollenar Hora de inicio/fin al elegir un horario. Bind directo en el <select> (onchange),
+    // re-asignado en cada populate → siempre enganchado al elemento vigente. Se difiere un tick con
+    // setTimeout para no chocar con el mask del .time-input / calculateTourEndTime, y se asigna
+    // .value directo sin despachar (despachar los re-limpia).
+    select.onchange = function () {
+        const val = select.value;
+        if (!val) return;
+        const parts = val.split('|');
+        const start = parts[0];
+        const end = parts[1];
+        setTimeout(function () {
+            const s = document.getElementById('tourStartTime');
+            const e = document.getElementById('tourEndTime');
+            if (s) s.value = start || '';
+            if (e) e.value = end || '';
+        }, 0);
+    };
+
+    // Si ya hay hora de inicio/fin cargada (edición), preseleccionar el slot que coincida.
+    this.syncTourScheduleSelection();
+};
+
+// Preselecciona en el dropdown de horarios del tour el slot que coincide con la hora de inicio/fin
+// actual (útil al editar, donde las horas del servicio se cargan tras poblar el dropdown).
+ItineraryBuilder.prototype.syncTourScheduleSelection = function () {
+    const select = document.getElementById('tourScheduleSelect');
+    if (!select) return;
+    const cs = (document.getElementById('tourStartTime') || {}).value;
+    const ce = (document.getElementById('tourEndTime') || {}).value;
+    const start = (cs || '').trim();
+    const end = (ce || '').trim();
+    const match = (start && end) ? `${start}|${end}` : '';
+    // Preseleccionar el slot que coincide con la hora actual; si no hay horas o no coincide con
+    // ningún slot, DESELECCIONAR (evita que un tour sin horario quede preseleccionado por valores
+    // remanentes de una edición previa).
+    if (match && Array.prototype.some.call(select.options, (o) => o.value === match)) {
+        select.value = match;
+    } else {
+        select.value = '';
+    }
 };
 
 ItineraryBuilder.prototype.clearExperienceSchedule = function () {

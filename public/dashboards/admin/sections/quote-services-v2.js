@@ -502,6 +502,19 @@ class ItineraryBuilder {
     // Service Management
     document.getElementById('saveServiceBtn')?.addEventListener('click', () => this.saveService());
 
+    // (El autollenado de Hora de inicio/fin desde "Horario disponible del tour" se bindea en
+    //  populateTourScheduleDropdown vía select.onchange — ver quote-services-v2-helpers.js.)
+
+    // Checkbox "Guía" de experiencia → recalcular precio (el guía se cotiza como walking tour SMA).
+    const guideCb = document.getElementById('experienceGuide');
+    if (guideCb) {
+      guideCb.onchange = () => {
+        this.serviceModified = true;
+        this.updateDevPaymentBreakdown();
+        this.updateServicePriceBreakdown();
+      };
+    }
+
     // Service Type Toggle
     document.querySelectorAll('input[name="serviceType"]').forEach((radio) => {
       radio.addEventListener('change', (e) => this.handleServiceTypeChange(e.target.value));
@@ -1200,6 +1213,9 @@ class ItineraryBuilder {
     // Duración de experiencia (editable): solo marca el servicio como modificado (no afecta precio).
     document.getElementById('experienceDuration')?.addEventListener('input', () => {
       this.serviceModified = true;
+      // El costo del "Guía" depende de la duración (tier×personas × duración), así que recalcular.
+      this.updateDevPaymentBreakdown();
+      this.updateServicePriceBreakdown();
     });
 
     // Local transfers: recompute the estimated arrival when the pick-up time changes.
@@ -3981,6 +3997,9 @@ class ItineraryBuilder {
         // Duración editable de la experiencia (autollenada del catálogo, modificable). Se guarda en
         // data.duration (ya persistido) — informativa; no afecta el precio (que es por persona).
         data.duration = parseFloat(document.getElementById('experienceDuration')?.value) || null;
+        // Checkbox "Guía": cuando está marcado, el precio incluye el guía (walking tour SMA:
+        // tier×personas × duración) sumado en el dev breakdown. Se persiste el flag para restaurarlo.
+        data.experienceGuide = document.getElementById('experienceGuide')?.checked || false;
         data.adultsQuantity = parseInt(document.getElementById('adultsQuantity')?.value || 0);
         data.childrenQuantity = parseInt(document.getElementById('childrenQuantity')?.value || 0);
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
@@ -5263,6 +5282,11 @@ class ItineraryBuilder {
             if (service.adultsNoAlcoholQuantity !== undefined) {
               adultsNoAlcoholQuantityField.value = service.adultsNoAlcoholQuantity;
             }
+
+            // Restaurar el checkbox "Guía" (el precio guardado ya incluye el costo del guía).
+            // Se setea antes de recalcular el desglose para que el guía se incluya.
+            const experienceGuideField = document.getElementById('experienceGuide');
+            if (experienceGuideField) experienceGuideField.checked = !!service.experienceGuide;
 
             // Also restore price fields when fields are ready
             const adultPriceField = document.getElementById('adultPrice');
@@ -6786,16 +6810,17 @@ class ItineraryBuilder {
       includeGreeterCheckbox.checked = service.includeGreeter;
     }
 
-    // Step 6c: Restore start and end times
+    // Step 6c: Restore start and end times. Se asigna SIEMPRE (aunque vacío) para no dejar valores
+    // remanentes de un servicio editado antes: un tour sin horario debe quedar con inicio/fin vacíos.
     const startTimeField = document.getElementById('tourStartTime');
-    if (startTimeField && service.startTime) {
-      startTimeField.value = service.startTime;
-    }
+    if (startTimeField) startTimeField.value = service.startTime || '';
 
     const endTimeField = document.getElementById('tourEndTime');
-    if (endTimeField && service.endTime) {
-      endTimeField.value = service.endTime;
-    }
+    if (endTimeField) endTimeField.value = service.endTime || '';
+
+    // Preseleccionar en "Horario disponible del tour" el slot que coincide con las horas restauradas
+    // (o deseleccionar si el tour no tiene horario).
+    this.syncTourScheduleSelection();
 
     // Step 7: Restore vehicle tour override checkbox so the breakdown reads
     // the saved custom price (we live in the vehicle tour form, so the
@@ -7638,8 +7663,9 @@ class ItineraryBuilder {
       }).join('')}
                                         </div>
                                     ` : ''}
-                                    ${(service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide
-                                      && !(service.type === 'tour' && this.serviceIncludesMentionGuide(service)) ? `
+                                    ${((((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide)
+                                      || (service.type === 'experience' && service.experienceGuide))
+                                      && !((service.type === 'tour' || service.type === 'experience') && this.serviceIncludesMentionGuide(service))) ? `
                                         <div class="row g-2 text-success small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-user me-1"></i>
@@ -9219,8 +9245,13 @@ class ItineraryBuilder {
       const childrenTotal = childrenQty * childPrice;
       const noAlcoholTotal = noAlcoholQty * noAlcoholPrice;
 
+      // Guía opcional (checkbox): costo base tipo walking tour de SMA (tier por nº de personas ×
+      // duración). Se suma a la base ANTES del recargo para que el motor lo cotice consistente
+      // (impacta total, pricesByType, guardado y desglose de una sola vez).
+      const guideCost = this.getExperienceGuideCostMXN();
+
       // Calculate base total (efectivo)
-      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal;
+      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal + guideCost;
 
       // Totales por forma de pago vía el motor único (un solo nodo: el total base).
       const experiencePricing = window.PricingEngine
@@ -9261,6 +9292,10 @@ class ItineraryBuilder {
         if (efectivoBreakdown) efectivoBreakdown += '\n';
         efectivoBreakdown += `Sin alcohol: ${noAlcoholQty} × $${noAlcoholPrice.toFixed(2)} = $${noAlcoholTotal.toFixed(2)}`;
       }
+      if (guideCost > 0) {
+        if (efectivoBreakdown) efectivoBreakdown += '\n';
+        efectivoBreakdown += `Guía: $${guideCost.toFixed(2)}`;
+      }
       if (efectivoBreakdown) efectivoBreakdown += '\n';
       efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
 
@@ -9278,6 +9313,10 @@ class ItineraryBuilder {
         if (transferenciaBreakdown) transferenciaBreakdown += '\n';
         transferenciaBreakdown += `Sin alcohol: ${noAlcoholQty} × $${(noAlcoholPrice * tMult).toFixed(2)} = $${(noAlcoholTotal * tMult).toFixed(2)}`;
       }
+      if (guideCost > 0) {
+        if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+        transferenciaBreakdown += `Guía: $${(guideCost * tMult).toFixed(2)}`;
+      }
       if (transferenciaBreakdown) transferenciaBreakdown += '\n';
       transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
 
@@ -9294,6 +9333,10 @@ class ItineraryBuilder {
       if (noAlcoholQty > 0 && noAlcoholPrice > 0) {
         if (tarjetaBreakdown) tarjetaBreakdown += '\n';
         tarjetaBreakdown += `Sin alcohol: ${noAlcoholQty} × $${(noAlcoholPrice * cMult).toFixed(2)} = $${(noAlcoholTotal * cMult).toFixed(2)}`;
+      }
+      if (guideCost > 0) {
+        if (tarjetaBreakdown) tarjetaBreakdown += '\n';
+        tarjetaBreakdown += `Guía: $${(guideCost * cMult).toFixed(2)}`;
       }
       if (tarjetaBreakdown) tarjetaBreakdown += '\n';
       tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
@@ -11875,6 +11918,8 @@ class ItineraryBuilder {
             adultPrice: subconcept.adultPrice || 0,
             childPrice: subconcept.childPrice || 0,
             noAlcoholPrice: subconcept.noAlcoholPrice || 0,
+            // Checkbox "Guía" de experiencia (incluye guía tipo walking tour SMA en el precio).
+            experienceGuide: subconcept.experienceGuide || false,
             // Tour-specific fields (from backend)
             duration: subconcept.duration || 1,
             includeGuide: subconcept.includeGuide || false,
@@ -13859,9 +13904,13 @@ class ItineraryBuilder {
     // Check if price override is enabled (admin only)
     const isPriceOverride = document.getElementById('experienceOverridePrices')?.checked || false;
 
+    // Precio ADULTO del catálogo: la experiencia lo guarda en `cost` (no `price`, que es null para
+    // experiencias propias). Fallback a `price` para experiencias de proveedor.
+    const adultCatalogPrice = experience.cost || experience.price;
+
     // Store calculated prices for potential restoration
-    if (experience.price) {
-      this.calculatedPrices.experience.adult = experience.price;
+    if (adultCatalogPrice) {
+      this.calculatedPrices.experience.adult = adultCatalogPrice;
     }
     if (experience.price_child) {
       this.calculatedPrices.experience.child = experience.price_child;
@@ -13872,8 +13921,8 @@ class ItineraryBuilder {
 
     // Only update prices if override is NOT enabled or if fields are empty
     if (!isPriceOverride || !this.canEditPrices) {
-      if (adultPriceField && experience.price) {
-        adultPriceField.value = experience.price;
+      if (adultPriceField && adultCatalogPrice) {
+        adultPriceField.value = adultCatalogPrice;
       }
 
       if (childPriceField && experience.price_child) {
@@ -13885,8 +13934,8 @@ class ItineraryBuilder {
       }
     } else {
       // If override is enabled and fields are empty, populate with calculated values as starting point
-      if (adultPriceField && !adultPriceField.value && experience.price) {
-        adultPriceField.value = experience.price;
+      if (adultPriceField && !adultPriceField.value && adultCatalogPrice) {
+        adultPriceField.value = adultCatalogPrice;
       }
       if (childPriceField && !childPriceField.value && experience.price_child) {
         childPriceField.value = experience.price_child;
@@ -13902,7 +13951,7 @@ class ItineraryBuilder {
       const el = document.getElementById(id);
       if (el) el.textContent = (val && Number(val) > 0) ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(val)}` : '';
     };
-    setExpListPrice('adultPriceListPrice', experience.price);
+    setExpListPrice('adultPriceListPrice', adultCatalogPrice);
     setExpListPrice('childPriceListPrice', experience.price_child);
     setExpListPrice('noAlcoholPriceListPrice', experience.price_no_alcohol);
 
@@ -19322,6 +19371,9 @@ class ItineraryBuilder {
       suggestedTimesDiv.textContent = suggestedTimes.join(' • ');
       scheduleInfoDiv.classList.remove('d-none');
     }
+
+    // Dropdown interactivo de horarios disponibles (autollena hora inicio/fin al seleccionar).
+    this.populateTourScheduleDropdown(tour);
   }
 
 
@@ -19902,6 +19954,8 @@ class ItineraryBuilder {
             adultsQuantity: service.adultsQuantity ?? null,
             childrenQuantity: service.childrenQuantity ?? null,
             adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity ?? null,
+            // Flag "Guía" de experiencia (el precio ya incluye el costo del guía en pricesByType).
+            experienceGuide: service.experienceGuide || false,
             infantsQuantity: service.infantsQuantity ?? null,
             // Schedule for experiences
             selectedSchedule: service.selectedSchedule || null,

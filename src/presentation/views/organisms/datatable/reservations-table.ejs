@@ -178,6 +178,7 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                                     <th>Propietario</th>
                                     <th>Motivo de Viaje</th>
                                     <th>Cliente Final</th>
+                                    <th>Persona de Contacto</th>
                                     <th class="text-center">Fecha Inicio</th>
                                     <th class="text-center">Personas</th>
                                     <th class="text-center">Servicios</th>
@@ -449,6 +450,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             },
             {
+                // Persona de Contacto: nombre + teléfono. Si no hay contacto propio capturado,
+                // se usa al propietario (mismo nombre repetido) con su teléfono.
+                data: null,
+                orderable: false,
+                render: function(data, type, row) {
+                    const contactName = (row.contactPerson && row.contactPerson.trim())
+                        || `${row.leadGuestFirstName || ''} ${row.leadGuestLastName || ''}`.trim();
+                    const name = contactName || row.owner || '';
+                    const phone = row.contactPhone || row.ownerPhone || '';
+                    if (type !== 'display') return `${name} ${phone}`.trim();
+                    if (!name && !phone) return '<em class="text-muted">—</em>';
+                    const nameHtml = name ? `<span>${name}</span>` : '';
+                    const phoneHtml = phone
+                        ? `<small class="text-muted d-block"><i class="ti ti-phone me-1"></i>${phone}</small>`
+                        : '';
+                    return `${nameHtml}${phoneHtml}` || '<em class="text-muted">—</em>';
+                }
+            },
+            {
                 data: 'startDate',
                 className: 'text-center',
                 render: function(data, type, row) {
@@ -514,14 +534,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         ],
         columnDefs: [
-            // Solo "Fecha Inicio" (col 5) es ordenable; el resto se deshabilita.
+            // Solo "Fecha Inicio" (col 6) es ordenable; el resto se deshabilita.
             // Cliente, Propietario y Servicios no tienen un campo de orden fiable en
             // Parse, y se optó por dejar el ordenamiento únicamente por fecha de inicio.
-            { orderable: false, targets: [0, 1, 2, 3, 4, 6, 7, 8, 9, 10] },
+            { orderable: false, targets: [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11] },
         ],
         // Orden por defecto: Fecha Inicio asc (pill inicial = Próximas).
         // En cada cambio de pill se reajusta con applyDefaultOrder().
-        order: [[5, 'asc']],
+        order: [[6, 'asc']],
         language: {
             processing: 'Cargando...',
             search: 'Buscar:',
@@ -610,8 +630,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return false;
     }
 
-    // Índice de la columna "Fecha Inicio" en la tabla (Folio=0 ... Fecha Inicio=5).
-    const STARTDATE_COL = 5;
+    // Índice de la columna "Fecha Inicio" en la tabla (Folio=0 ... Persona de Contacto=5, Fecha Inicio=6).
+    const STARTDATE_COL = 6;
 
     // Dirección de orden por defecto de "Fecha Inicio" según el pill activo:
     //   Próximas / En curso → asc (lo más próximo primero)
