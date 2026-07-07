@@ -116,17 +116,19 @@ test.describe('Quote information — campos owner/lead guest/contacto (smoke)', 
     // nombre nuevo vía su API typed (dispara customselect:create → llena leadGuestFirstName/LastName);
     // en modo directo, los inputs de nombre son visibles y se llenan directo.
     await page.evaluate(({ first, last }) => {
+      // Nombre: combobox en agencia (setTypedValue → firstName), input plano en directo.
       const comboRow = document.getElementById('leadGuestComboRow');
       const agency = comboRow && !comboRow.classList.contains('d-none');
       const el = document.getElementById('leadGuestClientId');
       if (agency && el && el.customSelect && el.customSelect.setTypedValue) {
-        el.customSelect.setTypedValue(`${first} ${last}`);
+        el.customSelect.setTypedValue(first);
       } else {
         const f = document.getElementById('leadGuestFirstName');
-        const l = document.getElementById('leadGuestLastName');
         if (f) { f.value = first; f.dispatchEvent(new Event('input', { bubbles: true })); }
-        if (l) { l.value = last; l.dispatchEvent(new Event('input', { bubbles: true })); }
       }
+      // Apellido: siempre en su campo.
+      const l = document.getElementById('leadGuestLastName');
+      if (l) { l.value = last; l.dispatchEvent(new Event('input', { bubbles: true })); }
     }, { first: 'SmokeLead', last: `T${stamp}` });
     await setChecked(page, 'saveLeadGuestAsClient', true);
     await setChecked(page, 'contactDifferentFromOwner', true); // override: contacto = propietario

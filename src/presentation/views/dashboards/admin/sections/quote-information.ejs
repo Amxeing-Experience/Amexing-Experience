@@ -174,31 +174,31 @@ const e = __isRes ? 'reservación' : 'cotización';
                      crear un cliente final"), para que se vean junto al botón y no arriba del
                      formulario donde quedan fuera de vista. -->
                 <div id="finalClientAlerts"></div>
-                <div class="mb-2">
-                    <%- include('../../../atoms/common/tom-select', {
-                        id: 'clientFinalId',
-                        name: 'clientFinalId',
-                        multiple: false,
-                        placeholder: 'Buscar o escribir cliente final',
-                        label: '',
-                        required: false,
-                        allowCreate: true,
-                        createLabel: 'Crear',
-                        helpText: 'Elige un cliente de la agencia o escribe un nombre nuevo',
-                        options: [],
-                        selected: []
-                    }) %>
-                </div>
-                <!-- Cliente Final nuevo (tecleado): Nombre/Apellido para darlo de alta correctamente
-                     (prellenados del texto; editables). Oculto salvo typed-new. -->
-                <div class="row g-2 mb-2 d-none" id="finalClientNameRow">
-                    <div class="col-6">
-                        <label for="finalClientFirstName" class="form-label small mb-1">Nombre</label>
-                        <input type="text" class="form-control form-control-sm" id="finalClientFirstName" placeholder="Nombre">
+                <!-- Nombre (combobox: busca clientes de la agencia o escribe uno nuevo) + Apellido.
+                     Al elegir un cliente existente se llenan Nombre y Apellido (displayField='firstName'
+                     muestra solo el nombre en el combobox). Al escribir uno nuevo, el Nombre es el
+                     tecleado y el Apellido se captura aparte. -->
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label mb-1">Nombre</label>
+                        <%- include('../../../atoms/common/tom-select', {
+                            id: 'clientFinalId',
+                            name: 'clientFinalId',
+                            multiple: false,
+                            placeholder: 'Buscar o escribir nombre',
+                            label: '',
+                            required: false,
+                            allowCreate: true,
+                            createLabel: 'Crear',
+                            displayField: 'firstName',
+                            helpText: '',
+                            options: [],
+                            selected: []
+                        }) %>
                     </div>
-                    <div class="col-6">
-                        <label for="finalClientLastName" class="form-label small mb-1">Apellido</label>
-                        <input type="text" class="form-control form-control-sm" id="finalClientLastName" placeholder="Apellido">
+                    <div class="col-md-6 mb-2">
+                        <label for="finalClientLastName" class="form-label mb-1">Apellido</label>
+                        <input type="text" class="form-control" id="finalClientLastName" placeholder="Apellido">
                     </div>
                 </div>
                 <!-- Cliente Final tecleado (nuevo): opción de guardarlo como cliente de la agencia.
@@ -234,29 +234,30 @@ const e = __isRes ? 'reservación' : 'cotización';
 
                 <!-- Lead Guest manual: se oculta cuando "es el cliente final" está marcado (agencia) -->
                 <div id="leadGuestManualFields">
-                    <!-- Modo AGENCIA: combobox (elegir cliente de la agencia o escribir uno nuevo).
-                         Escribe en los inputs ocultos leadGuestFirstName/LastName (fuente de verdad
-                         del payload). Se muestra solo en agencia (toggle por JS: syncLeadGuestNameUi). -->
-                    <div class="d-none" id="leadGuestComboRow">
-                        <%- include('../../../atoms/common/tom-select', {
-                            id: 'leadGuestClientId',
-                            name: 'leadGuestClientId',
-                            multiple: false,
-                            placeholder: 'Buscar o escribir Lead Guest',
-                            label: '',
-                            required: false,
-                            allowCreate: true,
-                            createLabel: 'Crear',
-                            helpText: 'Elige un cliente de la agencia o escribe un nombre nuevo',
-                            options: [],
-                            selected: []
-                        }) %>
-                    </div>
-                    <!-- Modo DIRECTO: nombre/apellido a mano (sin cambios). En agencia se oculta,
-                         pero los inputs siguen siendo la fuente de verdad (los alimenta el combobox). -->
-                    <div class="row" id="leadGuestNameRow">
+                    <!-- Nombre (combobox en agencia: busca clientes o escribe uno nuevo; input plano
+                         en directo) + Apellido. displayField='firstName' muestra solo el nombre al
+                         elegir un cliente. leadGuestFirstName/LastName son la fuente de verdad. -->
+                    <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="leadGuestFirstName" class="form-label">Nombre</label>
+                            <label class="form-label">Nombre</label>
+                            <!-- Agencia: combobox Nombre -->
+                            <div class="d-none" id="leadGuestComboRow">
+                                <%- include('../../../atoms/common/tom-select', {
+                                    id: 'leadGuestClientId',
+                                    name: 'leadGuestClientId',
+                                    multiple: false,
+                                    placeholder: 'Buscar o escribir nombre',
+                                    label: '',
+                                    required: false,
+                                    allowCreate: true,
+                                    createLabel: 'Crear',
+                                    displayField: 'firstName',
+                                    helpText: '',
+                                    options: [],
+                                    selected: []
+                                }) %>
+                            </div>
+                            <!-- Directo: input Nombre (en agencia se oculta; sigue siendo fuente de verdad). -->
                             <input type="text" class="form-control" id="leadGuestFirstName" name="leadGuestFirstName" placeholder="Nombre">
                         </div>
                         <div class="col-md-6 mb-3">
@@ -1228,18 +1229,11 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         const finalRow = document.getElementById('finalClientRow');
         return !!finalRow && window.getComputedStyle(finalRow).display !== 'none';
     }
-    // En agencia el Lead Guest usa el combobox; en directo, los inputs de nombre.
-    // Los inputs Nombre/Apellido se muestran en directo siempre, y en agencia SOLO cuando se
-    // escribió un nombre nuevo (typed-new) — para editar/confirmar el split antes del alta.
+    // Nombre: combobox en agencia, input plano en directo. Apellido (leadGuestLastName) siempre visible.
     function syncLeadGuestNameUi() {
         const agency = isAgencyModeVisible();
         document.getElementById('leadGuestComboRow')?.classList.toggle('d-none', !agency);
-        const nameRow = document.getElementById('leadGuestNameRow');
-        if (nameRow) {
-            const inst = document.getElementById('leadGuestClientId')?.customSelect;
-            const typedNew = agency && inst && inst.isTyped && inst.isTyped();
-            nameRow.classList.toggle('d-none', agency && !typedNew);
-        }
+        document.getElementById('leadGuestFirstName')?.classList.toggle('d-none', agency);
     }
     // Puebla el combobox de Lead Guest con los mismos clientes de la agencia que el Cliente Final.
     async function populateLeadGuestOptions(clients) {
@@ -1255,36 +1249,42 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') };
     }
 
-    // Cliente Final: elegir existente (change no-typed) → ocultar el checkbox "guardar".
+    // Cliente Final: elegir existente (change no-typed) → ocultar "guardar" y llenar Apellido.
     document.getElementById('clientFinalId')?.addEventListener('change', function () {
         const inst = this.customSelect;
         if (inst && inst.isTyped && inst.isTyped()) return; // el typed lo maneja customselect:create
         document.getElementById('saveFinalClientWrap')?.classList.add('d-none');
-        document.getElementById('finalClientNameRow')?.classList.add('d-none');
         const saveCb = document.getElementById('saveFinalClientAsClient');
         if (saveCb) saveCb.checked = false;
+        // Al elegir un cliente existente, llenar el Apellido desde la opción.
+        const val = inst && inst.getValue ? inst.getValue() : this.value;
+        const opt = val && inst && inst.getOption ? inst.getOption(val) : null;
+        if (opt) {
+            const lastEl = document.getElementById('finalClientLastName');
+            if (lastEl) lastEl.value = opt.lastName || '';
+        }
     });
-    // Cliente Final tecleado (nuevo): mostrar checkbox "guardar" y derivar el contacto del texto.
+    // Cliente Final tecleado (nuevo): el texto es el Nombre; el Apellido se captura en su campo.
     document.getElementById('clientFinalId')?.addEventListener('customselect:create', function (e) {
-        const { firstName, lastName } = splitLeadName((e.detail && e.detail.text) || '');
+        const firstName = ((e.detail && e.detail.text) || '').trim();
         document.getElementById('saveFinalClientWrap')?.classList.remove('d-none');
         const set = (id, v, clearEdited) => {
             const el = document.getElementById(id);
             if (el) { el.value = v; if (clearEdited) el.dataset.userEdited = ''; }
         };
-        // Nombre/Apellido editables (prellenados del split) para el alta correcta.
-        set('finalClientFirstName', firstName);
-        set('finalClientLastName', lastName);
-        document.getElementById('finalClientNameRow')?.classList.remove('d-none');
         if (!document.getElementById('contactDifferentFromOwner')?.checked) {
             set('contactFirstName', firstName, true);
-            set('contactLastName', lastName, true);
         }
         if (document.getElementById('leadGuestIsFinalClient')?.checked) {
             set('leadGuestFirstName', firstName);
-            set('leadGuestLastName', lastName);
         }
         if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode();
+    });
+    // Apellido del Cliente Final → contacto (si el contacto no es el propietario ni fue editado).
+    document.getElementById('finalClientLastName')?.addEventListener('input', function () {
+        if (document.getElementById('contactDifferentFromOwner')?.checked) return;
+        const cl = document.getElementById('contactLastName');
+        if (cl && !cl.dataset.userEdited) cl.value = this.value;
     });
 
     // Lead Guest combobox: elegir existente → llenar LG + contacto desde la opción.
@@ -1302,12 +1302,11 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         if (typeof mirrorLeadGuestToContact === 'function') mirrorLeadGuestToContact();
         if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode();
     });
-    // Lead Guest tecleado (nuevo): dividir en first/last y mostrar "guardar como cliente".
+    // Lead Guest tecleado (nuevo): el texto es el Nombre; el Apellido se captura en su campo.
     document.getElementById('leadGuestClientId')?.addEventListener('customselect:create', function (e) {
-        const { firstName, lastName } = splitLeadName((e.detail && e.detail.text) || '');
-        const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-        set('leadGuestFirstName', firstName);
-        set('leadGuestLastName', lastName);
+        const firstName = ((e.detail && e.detail.text) || '').trim();
+        const el = document.getElementById('leadGuestFirstName');
+        if (el) el.value = firstName;
         if (typeof mirrorLeadGuestToContact === 'function') mirrorLeadGuestToContact();
         if (typeof syncLeadGuestMode === 'function') syncLeadGuestMode();
     });
@@ -1324,14 +1323,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         if (!inst) return { clientFinalId: (el && el.value) || '', clientFinalName: '' };
         const typed = inst.isTyped && inst.isTyped();
         if (!typed) return { clientFinalId: inst.getValue() || '', clientFinalName: '' };
-        const text = (inst.getTypedText && inst.getTypedText()) || '';
-        // Nombre/Apellido separados (editables) para el alta; fallback al split del texto.
-        const nrFirst = (document.getElementById('finalClientFirstName')?.value || '').trim();
-        const nrLast = (document.getElementById('finalClientLastName')?.value || '').trim();
-        const split = splitLeadName(text);
-        const firstName = nrFirst || split.firstName;
-        const lastName = nrLast || split.lastName;
-        const fullName = `${firstName} ${lastName}`.trim() || text;
+        // Nombre = texto tecleado en el combobox; Apellido = su campo.
+        const firstName = ((inst.getTypedText && inst.getTypedText()) || '').trim();
+        const lastName = (document.getElementById('finalClientLastName')?.value || '').trim();
+        const fullName = `${firstName} ${lastName}`.trim() || firstName;
         const saveCb = document.getElementById('saveFinalClientAsClient');
         if (saveCb && saveCb.checked) {
             if (firstName && lastName) {
@@ -3063,15 +3058,13 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                     try {
                         if (!isAgencyModeVisible()) return;
                         const lgFirst = quote.leadGuestFirstName || '';
-                        const lgLast = quote.leadGuestLastName || '';
-                        const full = `${lgFirst} ${lgLast}`.trim();
-                        if (!full) return;
+                        if (!lgFirst && !quote.leadGuestLastName) return;
                         const ts = await waitForTomSelect('leadGuestClientId');
                         if (quoteClientFinalId && ts.getOption && ts.getOption(quoteClientFinalId)
                             && document.getElementById('leadGuestIsFinalClient')?.checked) {
-                            ts.setValue(quoteClientFinalId);
-                        } else if (ts.setTypedValue) {
-                            ts.setTypedValue(full, true);
+                            ts.setValue(quoteClientFinalId); // muestra el Nombre vía displayField
+                        } else if (lgFirst && ts.setTypedValue) {
+                            ts.setTypedValue(lgFirst, true); // Nombre = firstName; el Apellido ya se restauró
                         }
                     } catch (e) { /* combobox no listo */ }
                 }, 1100);

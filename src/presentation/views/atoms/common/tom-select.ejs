@@ -49,6 +49,9 @@ const selectDisabled = typeof disabled !== 'undefined' ? disabled : false;
 // Modo combobox (opt-in): permite crear una opción escribiendo un texto nuevo.
 const selectAllowCreate = typeof allowCreate !== 'undefined' ? allowCreate : false;
 const selectCreateLabel = typeof createLabel !== 'undefined' ? createLabel : 'Crear';
+// displayField (opcional): campo de la opción a mostrar en el input al seleccionar (p.ej.
+// 'firstName'), aunque la búsqueda/lista sigan usando el texto completo. '' = usar text.
+const selectDisplayField = typeof displayField !== 'undefined' ? displayField : '';
 %>
 
 <div class="mb-3 <%= selectAdditionalClasses %>">
@@ -121,6 +124,7 @@ const selectCreateLabel = typeof createLabel !== 'undefined' ? createLabel : 'Cr
     const isDisabled = <%= selectDisabled ? 'true' : 'false' %>;
     const allowCreate = <%= selectAllowCreate ? 'true' : 'false' %>;
     const createLabel = '<%= selectCreateLabel %>';
+    const displayField = '<%= selectDisplayField %>';
     const hiddenInput = document.getElementById(selectId);
     const displayElement = document.getElementById(selectId + '_display');
     const searchInput = document.getElementById(selectId + '_search');
@@ -382,7 +386,8 @@ const selectCreateLabel = typeof createLabel !== 'undefined' ? createLabel : 'Cr
             console.log('[CustomSelect] Option found:', option);
             currentValue = value;
             hiddenInput.value = value;
-            selectedTextSpan.textContent = option.text;
+            // displayField permite mostrar solo el Nombre (u otro campo) al seleccionar.
+            selectedTextSpan.textContent = (displayField && option[displayField]) ? option[displayField] : option.text;
             selectedTextSpan.classList.remove('text-muted');
             // Se eligió una opción real → ya no es "texto tecleado".
             isTypedValue = false;
