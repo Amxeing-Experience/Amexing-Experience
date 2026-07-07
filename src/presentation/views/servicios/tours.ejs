@@ -48,7 +48,7 @@ Created by Denisse Maldonado
         const _tourPlaceholder = '/images/placeholder-heart.png';
         const _destinos = (typeof tourDestinos !== 'undefined' && Array.isArray(tourDestinos)) ? tourDestinos : [];
         const _tourCategories = _destinos.length > 0
-            ? _destinos.map(function(d) { return { label: d.name, img: d.imageUrl || _tourPlaceholder }; })
+            ? _destinos.map(function(d) { return { label: d.name, img: d.imageUrl || _tourPlaceholder, value: d.id }; })
             : [
                 { label: t('pages:categories.catas'), img: '/images/7.png' },
                 { label: t('pages:categories.arte'), img: '/images/4.png' },
@@ -59,11 +59,12 @@ Created by Denisse Maldonado
                 { label: t('pages:categories.deTemporada'), img: '/images/1.png' }
             ];
     %>
-    <%- include('../organisms/servicios/categories-section', {
+    <%- include('../organisms/servicios/tours-categories-section', {
         t: typeof t !== 'undefined' ? t : ((key) => key),
         pageTitle: t('pages:tours.title'),
         intro: t('pages:tours.intro'),
-        categories: _tourCategories
+        categories: _tourCategories,
+        toursByDestino: typeof toursByDestino !== 'undefined' ? toursByDestino : {}
     }) %>
 
     <%# CTA Contacto (reutilizable) %>
