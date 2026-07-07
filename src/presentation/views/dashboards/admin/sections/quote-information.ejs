@@ -201,9 +201,9 @@ const e = __isRes ? 'reservación' : 'cotización';
                         <input type="text" class="form-control" id="finalClientLastName" placeholder="Apellido">
                     </div>
                 </div>
-                <!-- Cliente Final tecleado (nuevo): opción de guardarlo como cliente de la agencia.
-                     Oculto salvo cuando el CF es "typed-new" (evento customselect:create). -->
-                <div class="form-check mb-2 d-none" id="saveFinalClientWrap">
+                <!-- Guardar el Cliente Final como cliente de la agencia (como en Lead Guest).
+                     Siempre visible; se deshabilita al elegir un cliente existente (ya guardado). -->
+                <div class="form-check mb-2" id="saveFinalClientWrap">
                     <input class="form-check-input" type="checkbox" id="saveFinalClientAsClient">
                     <label class="form-check-label" for="saveFinalClientAsClient">
                         <i class="ti ti-user-plus me-1"></i>Guardar cliente en el sistema
@@ -1249,25 +1249,29 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') };
     }
 
-    // Cliente Final: elegir existente (change no-typed) → ocultar "guardar" y llenar Apellido.
+    // Cliente Final: elegir existente (change no-typed) → llenar Apellido y deshabilitar "guardar"
+    // (ya está en el sistema). Sin selección → habilitar (por si escriben uno nuevo).
     document.getElementById('clientFinalId')?.addEventListener('change', function () {
         const inst = this.customSelect;
         if (inst && inst.isTyped && inst.isTyped()) return; // el typed lo maneja customselect:create
-        document.getElementById('saveFinalClientWrap')?.classList.add('d-none');
         const saveCb = document.getElementById('saveFinalClientAsClient');
-        if (saveCb) saveCb.checked = false;
-        // Al elegir un cliente existente, llenar el Apellido desde la opción.
         const val = inst && inst.getValue ? inst.getValue() : this.value;
         const opt = val && inst && inst.getOption ? inst.getOption(val) : null;
         if (opt) {
             const lastEl = document.getElementById('finalClientLastName');
             if (lastEl) lastEl.value = opt.lastName || '';
+            if (saveCb) { saveCb.checked = false; saveCb.disabled = true; }
+        } else if (saveCb) {
+            saveCb.disabled = false;
         }
+        saveCb?.closest('.form-check')?.classList.toggle('opacity-50', !!opt);
     });
     // Cliente Final tecleado (nuevo): el texto es el Nombre; el Apellido se captura en su campo.
     document.getElementById('clientFinalId')?.addEventListener('customselect:create', function (e) {
         const firstName = ((e.detail && e.detail.text) || '').trim();
-        document.getElementById('saveFinalClientWrap')?.classList.remove('d-none');
+        const saveCb = document.getElementById('saveFinalClientAsClient');
+        if (saveCb) saveCb.disabled = false;
+        saveCb?.closest('.form-check')?.classList.remove('opacity-50');
         const set = (id, v, clearEdited) => {
             const el = document.getElementById(id);
             if (el) { el.value = v; if (clearEdited) el.dataset.userEdited = ''; }
