@@ -708,13 +708,48 @@ const e = __isRes ? 'reservación' : 'cotización';
 </div>
 
 <!-- Admin Sub-Client Creation Modal (for admin creating sub-clients for selected enterprise) -->
+<style>
+    /* Rediseño del modal Crear Cliente Final — scopeado a #adminSubClientModal.
+       Usa las variables de tema (--bs-primary) para combinar con la app. */
+    #adminSubClientModal .modal-content { border:0; border-radius:16px; overflow:hidden; }
+    #adminSubClientModal .modal-header {
+        background:linear-gradient(135deg, var(--bs-primary) 0%, rgba(var(--bs-primary-rgb), .82) 100%);
+        color:#fff; border:0; padding:1.25rem 1.5rem; align-items:center;
+    }
+    #adminSubClientModal .asc-hdr-icon {
+        width:44px; height:44px; border-radius:12px; background:rgba(255,255,255,.2);
+        display:flex; align-items:center; justify-content:center; font-size:1.4rem; margin-right:.9rem; flex:0 0 auto;
+    }
+    #adminSubClientModal .modal-title { font-size:1.1rem; font-weight:700; line-height:1.2; }
+    #adminSubClientModal .asc-subtitle { font-size:.8rem; opacity:.85; }
+    #adminSubClientModal .modal-header .btn-close { filter:invert(1) grayscale(1) brightness(2); opacity:.9; }
+    #adminSubClientModal .modal-body { padding:1.5rem; }
+    #adminSubClientModal .asc-ent-pill {
+        display:flex; align-items:center; gap:.75rem; background:rgba(var(--bs-primary-rgb), .07);
+        border:1px solid rgba(var(--bs-primary-rgb), .18); border-radius:12px; padding:.75rem 1rem; margin-bottom:1.25rem;
+    }
+    #adminSubClientModal .asc-ent-ic {
+        width:38px; height:38px; border-radius:9px; background:#fff; display:flex; align-items:center;
+        justify-content:center; color:var(--bs-primary); font-size:1.2rem; flex:0 0 auto;
+    }
+    #adminSubClientModal .asc-ent-lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:var(--bs-primary); font-weight:700; opacity:.8; }
+    #adminSubClientModal .asc-ent-name { font-weight:700; color:#3d3470; font-size:.95rem; }
+    #adminSubClientModal .asc-section-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:#9ca3af; font-weight:700; margin:0 0 .6rem; }
+    #adminSubClientModal .form-control, #adminSubClientModal .form-select { border-radius:10px; }
+    #adminSubClientModal .modal-footer { border:0; padding:1rem 1.5rem 1.5rem; gap:.5rem; }
+    #adminSubClientModal .modal-footer .btn { border-radius:10px; padding:.55rem 1.2rem; font-weight:600; }
+    #adminSubClientModal .asc-btn-ghost { background:#f3f4f6; border:0; color:#6b7280; }
+    #adminSubClientModal .asc-btn-ghost:hover { background:#e5e7eb; color:#4b5563; }
+</style>
 <div class="modal fade" id="adminSubClientModal" tabindex="-1" aria-labelledby="adminSubClientModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="adminSubClientModalLabel">
-                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Final para Empresa
-                </h5>
+                <div class="asc-hdr-icon"><i class="ti ti-user-plus"></i></div>
+                <div class="flex-grow-1">
+                    <h5 class="modal-title" id="adminSubClientModalLabel">Crear Cliente Final</h5>
+                    <div class="asc-subtitle">Se agregará a la empresa seleccionada</div>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
@@ -723,62 +758,65 @@ const e = __isRes ? 'reservación' : 'cotización';
                 <div id="adminSubClientModalAlerts"></div>
 
                 <form id="adminSubClientForm" class="needs-validation" novalidate>
-                    <!-- Enterprise Info -->
-                    <div class="alert alert-info d-flex align-items-start" role="alert">
-                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                    <!-- Empresa seleccionada (pill): id preservado para el JS que setea el nombre -->
+                    <div class="asc-ent-pill">
+                        <div class="asc-ent-ic"><i class="ti ti-building"></i></div>
                         <div>
-                            <small><strong>Empresa seleccionada:</strong> <span id="selectedEnterpriseName">No hay empresa seleccionada</span></small>
-                            <br>
-                            <small>Este cliente final pertenecerá a la empresa seleccionada.</small>
+                            <div class="asc-ent-lbl">Empresa</div>
+                            <div class="asc-ent-name" id="selectedEnterpriseName">No hay empresa seleccionada</div>
                         </div>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="asc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="asc_firstName" name="firstName" required placeholder="Ej: Juan">
-                        <div class="invalid-feedback">Por favor ingresa el nombre</div>
+
+                    <p class="asc-section-label">Datos del cliente</p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="asc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="asc_firstName" name="firstName" required placeholder="Ej: Juan">
+                            <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="asc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="asc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                            <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="asc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="asc_lastName" name="lastName" required placeholder="Ej: Pérez">
-                        <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                    <div class="mt-3">
+                        <%- include('../../../atoms/common/email-input', {
+                            name: 'email',
+                            id: 'asc_email',
+                            label: 'Email',
+                            required: false,
+                            placeholder: 'email@ejemplo.com',
+                            helpText: 'Email de contacto del cliente final',
+                            containerClass: 'mb-3'
+                        }) %>
+
+                        <%- include('../../../atoms/common/phone-input', {
+                            name: 'phone',
+                            id: 'asc_phone',
+                            label: 'Teléfono',
+                            required: false,
+                            helpText: 'Número de contacto del cliente final',
+                            countryCode: 'MX',
+                            containerClass: 'mb-3'
+                        }) %>
+
+                        <%- include('../../../atoms/common/language-select', {
+                            id: 'asc_preferredLanguage',
+                            name: 'preferredLanguage',
+                            label: 'Idioma de Preferencia',
+                            required: false,
+                            helpText: 'Idioma preferido para comunicación',
+                            value: 'es'
+                        }) %>
                     </div>
-
-                    <%- include('../../../atoms/common/email-input', {
-                        name: 'email',
-                        id: 'asc_email',
-                        label: 'Email',
-                        required: false,
-                        placeholder: 'email@ejemplo.com',
-                        helpText: 'Email de contacto del cliente final',
-                        containerClass: 'mb-3'
-                    }) %>
-
-                    <%- include('../../../atoms/common/phone-input', {
-                        name: 'phone',
-                        id: 'asc_phone',
-                        label: 'Teléfono',
-                        required: false,
-                        helpText: 'Número de contacto del cliente final',
-                        countryCode: 'MX',
-                        containerClass: 'mb-3'
-                    }) %>
-                    
-                    <%- include('../../../atoms/common/language-select', {
-                        id: 'asc_preferredLanguage',
-                        name: 'preferredLanguage',
-                        label: 'Idioma de Preferencia',
-                        required: false,
-                        helpText: 'Idioma preferido para comunicación',
-                        value: 'es'
-                    }) %>
                 </form>
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="ti ti-x me-1"></i>Cancelar
+                <button type="button" class="btn asc-btn-ghost" data-bs-dismiss="modal">
+                    Cancelar
                 </button>
                 <button type="button" class="btn btn-primary" id="saveAdminSubClientBtn">
                     <i class="ti ti-check me-1"></i>Crear Cliente Final
