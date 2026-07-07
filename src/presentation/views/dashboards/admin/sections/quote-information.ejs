@@ -161,10 +161,20 @@ const e = __isRes ? 'reservación' : 'cotización';
 
             <!-- Sección: Cliente Final (solo agencias; la tarjeta se togglea por modo vía #finalClientRow) -->
             <div class="border rounded p-3 mb-4 mt-4 flex-column" id="finalClientRow">
-                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                    <i class="ti ti-user-check me-1"></i>
-                    Cliente Final
-                </h6>
+                <!-- Encabezado con acción "Crear Cliente" a la derecha. Cubre el caso de una
+                     agencia SIN clientes finales (dropdown vacío): el listener #createFinalClientBtn
+                     ya existe y abre el modal correcto según rol (admin → sub-cliente de empresa;
+                     dept_manager/client → cliente propio), y al guardar lo agrega al dropdown y lo
+                     selecciona. La tarjeta solo se muestra en modo agencia. -->
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                    <h6 class="fw-bold text-primary mb-0">
+                        <i class="ti ti-user-check me-1"></i>
+                        Cliente Final
+                    </h6>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="createFinalClientBtn">
+                        <i class="ti ti-plus me-1"></i>Crear Cliente
+                    </button>
+                </div>
                 <div class="mb-2">
                     <%- include('../../../atoms/common/tom-select', {
                         id: 'clientFinalId',
