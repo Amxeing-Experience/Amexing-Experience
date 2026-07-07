@@ -67,38 +67,57 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
 
     <!-- Custom dropdown interface -->
     <div class="dropdown position-relative">
-        <div class="form-control dropdown-input-display <% if (selectDisabled) { %>disabled<% } %>" 
+    <% if (selectAllowCreate) { %>
+        <!-- Modo typeahead (allowCreate): campo de texto editable; al teclear aparece la lista.
+             Se siente como un input normal (sin la cajita de "Buscar" aparte). -->
+        <input type="text"
+               class="form-control dropdown-typeahead-input"
+               id="<%= selectId %>_display"
+               placeholder="<%= selectPlaceholder %>"
+               autocomplete="off"
+               <% if (selectDisabled) { %>disabled<% } %> />
+        <div class="dropdown-menu w-100 p-0" id="<%= selectId %>_menu" style="max-height: 300px; overflow-y: auto; top: 100%; left: 0;">
+            <div id="<%= selectId %>_options" class="dropdown-options">
+                <% if (selectOptions && selectOptions.length > 0) { %>
+                    <% selectOptions.forEach(function(option) { %>
+                        <a class="dropdown-item dropdown-option" href="#" data-value="<%= option.value %>" data-text="<%= option.text %>"><%= option.text %></a>
+                    <% }); %>
+                <% } %>
+            </div>
+        </div>
+    <% } else { %>
+        <div class="form-control dropdown-input-display <% if (selectDisabled) { %>disabled<% } %>"
              id="<%= selectId %>_display"
-             <% if (!selectDisabled) { %>data-bs-toggle="dropdown"<% } %> 
+             <% if (!selectDisabled) { %>data-bs-toggle="dropdown"<% } %>
              aria-expanded="false"
              style="cursor: <% if (selectDisabled) { %>not-allowed<% } else { %>pointer<% } %>; display: flex; justify-content: between; align-items: center; <% if (selectDisabled) { %>background-color: #e9ecef; opacity: 1;<% } %>">
             <span class="dropdown-selected-text text-muted"><%= selectPlaceholder %></span>
             <i class="ti ti-chevron-down ms-auto"></i>
         </div>
-        
+
         <div class="dropdown-menu w-100 p-0" id="<%= selectId %>_menu" style="max-height: 300px; overflow-y: auto;">
             <!-- Search input -->
             <div class="p-2 border-bottom position-relative">
-                <input type="text" 
-                       class="form-control form-control-sm" 
+                <input type="text"
+                       class="form-control form-control-sm"
                        id="<%= selectId %>_search"
-                       placeholder="Buscar..." 
+                       placeholder="Buscar..."
                        autocomplete="off">
                 <!-- Search loader -->
-                <div class="position-absolute top-50 end-0 translate-middle-y me-3 d-none" 
+                <div class="position-absolute top-50 end-0 translate-middle-y me-3 d-none"
                      id="<%= selectId %>_search_loader">
                     <div class="spinner-border spinner-border-sm text-primary" role="status">
                         <span class="visually-hidden">Buscando...</span>
                     </div>
                 </div>
             </div>
-            
+
             <!-- Options container -->
             <div id="<%= selectId %>_options" class="dropdown-options">
                 <% if (selectOptions && selectOptions.length > 0) { %>
                     <% selectOptions.forEach(function(option) { %>
-                        <a class="dropdown-item dropdown-option" 
-                           href="#" 
+                        <a class="dropdown-item dropdown-option"
+                           href="#"
                            data-value="<%= option.value %>"
                            data-text="<%= option.text %>">
                             <%= option.text %>
@@ -109,6 +128,7 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
                 <% } %>
             </div>
         </div>
+    <% } %>
     </div>
 
     <% if (selectHelpText) { %>
@@ -125,19 +145,34 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
     const allowCreate = <%= selectAllowCreate ? 'true' : 'false' %>;
     const createLabel = '<%= selectCreateLabel %>';
     const displayField = '<%= selectDisplayField %>';
+    const typeahead = allowCreate;
     const hiddenInput = document.getElementById(selectId);
     const displayElement = document.getElementById(selectId + '_display');
-    const searchInput = document.getElementById(selectId + '_search');
+    // En typeahead el propio campo editable es el buscador; no hay span/chevron/loader internos.
+    const searchInput = typeahead ? displayElement : document.getElementById(selectId + '_search');
     const searchLoader = document.getElementById(selectId + '_search_loader');
     const optionsContainer = document.getElementById(selectId + '_options');
-    const selectedTextSpan = displayElement.querySelector('.dropdown-selected-text');
-    const chevronIcon = displayElement.querySelector('.ti-chevron-down');
+    const menuElement = document.getElementById(selectId + '_menu');
+    const selectedTextSpan = typeahead ? null : displayElement.querySelector('.dropdown-selected-text');
+    const chevronIcon = typeahead ? null : displayElement.querySelector('.ti-chevron-down');
     
     let allOptions = [];
     let currentValue = '';
     // Combobox: texto tecleado que NO corresponde a una opción existente.
     let typedText = '';
     let isTypedValue = false;
+
+    // Actualiza el texto visible: en typeahead escribe el value del input; en clásico, el span.
+    function setDisplayText(text, muted) {
+        if (typeahead) {
+            displayElement.value = text || '';
+        } else if (selectedTextSpan) {
+            selectedTextSpan.textContent = text;
+            selectedTextSpan.classList.toggle('text-muted', !!muted);
+        }
+    }
+    function openMenu() { if (menuElement) menuElement.classList.add('show'); }
+    function closeMenu() { if (menuElement) menuElement.classList.remove('show'); }
     
     // Initialize component
     function init() {
@@ -205,16 +240,38 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
             return;
         }
         
+        if (typeahead) {
+            // Campo editable = buscador. La lista abre al enfocar/teclear y cierra al salir.
+            searchInput.addEventListener('input', handleSearch);
+            searchInput.addEventListener('keydown', handleKeyDown);
+            searchInput.addEventListener('focus', function () {
+                performLocalSearch((searchInput.value || '').toLowerCase(), searchInput.value);
+                if (allOptions.length || (searchInput.value || '').trim()) openMenu();
+            });
+            searchInput.addEventListener('blur', function () {
+                setTimeout(function () {
+                    closeMenu();
+                    // Si quedó texto sin elegir opción ni crear, commitearlo como "nuevo".
+                    const v = (searchInput.value || '').trim();
+                    if (v && !currentValue && !isTypedValue) commitTypedValue(v);
+                }, 150);
+            });
+            // Evita que el blur cierre el menú antes de registrar el click en una opción.
+            optionsContainer.addEventListener('mousedown', function (e) { e.preventDefault(); });
+            optionsContainer.addEventListener('click', handleOptionClick);
+            return;
+        }
+
         // Search functionality
         searchInput.addEventListener('input', handleSearch);
-        
+
         // Option selection
         optionsContainer.addEventListener('click', handleOptionClick);
-        
+
         // Dropdown toggle
         displayElement.addEventListener('shown.bs.dropdown', handleDropdownOpen);
         displayElement.addEventListener('hidden.bs.dropdown', handleDropdownClose);
-        
+
         // Keyboard navigation
         searchInput.addEventListener('keydown', handleKeyDown);
     }
@@ -239,7 +296,9 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
     // Handle search input with debouncing for server-side search
     function handleSearch(e) {
         const searchTerm = e.target.value.toLowerCase();
-        
+        // Typeahead: cualquier tecleo mantiene la lista abierta.
+        if (typeahead) openMenu();
+
         // Clear existing timeout
         if (searchTimeout) {
             clearTimeout(searchTimeout);
@@ -387,8 +446,7 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
             currentValue = value;
             hiddenInput.value = value;
             // displayField permite mostrar solo el Nombre (u otro campo) al seleccionar.
-            selectedTextSpan.textContent = (displayField && option[displayField]) ? option[displayField] : option.text;
-            selectedTextSpan.classList.remove('text-muted');
+            setDisplayText((displayField && option[displayField]) ? option[displayField] : option.text, false);
             // Se eligió una opción real → ya no es "texto tecleado".
             isTypedValue = false;
             typedText = '';
@@ -450,12 +508,14 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
     
     // Open dropdown
     function openDropdown() {
+        if (typeahead) { openMenu(); return; }
         const dropdown = new bootstrap.Dropdown(displayElement);
         dropdown.show();
     }
-    
-    // Close dropdown  
+
+    // Close dropdown
     function closeDropdown() {
+        if (typeahead) { closeMenu(); return; }
         const dropdown = bootstrap.Dropdown.getInstance(displayElement);
         if (dropdown) {
             dropdown.hide();
@@ -510,8 +570,7 @@ const selectDisplayField = typeof displayField !== 'undefined' ? displayField : 
         isTypedValue = true;
         currentValue = '';
         hiddenInput.value = '';
-        selectedTextSpan.textContent = text;
-        selectedTextSpan.classList.remove('text-muted');
+        setDisplayText(text, false);
         closeDropdown();
         if (silent) return;
         hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
