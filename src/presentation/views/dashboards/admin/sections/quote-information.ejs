@@ -31,8 +31,11 @@ const e = __isRes ? 'reservación' : 'cotización';
             <!-- Hidden field for quote ID (for editing) -->
             <input type="hidden" id="quoteId" name="quoteId" value="<%= typeof quoteId !== 'undefined' ? quoteId : '' %>">
 
-            <!-- Sección: Información del Cliente -->
-            <div class="border rounded p-3 mb-4">
+            <!-- Sección: Información del Cliente.
+                 Para department_manager/client el cliente se asigna por rol, así que la tarjeta se
+                 OCULTA (display:none) pero se conserva en el DOM: el input #clientId y su customSelect
+                 siguen inicializando y alimentando todo el flujo (no se pierden referencias). -->
+            <div class="border rounded p-3 mb-4"<% if (typeof userRole !== 'undefined' && (userRole === 'department_manager' || userRole === 'client')) { %> style="display:none;"<% } %>>
                 <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
                     <i class="ti ti-user me-1"></i>
                     Información del Cliente
