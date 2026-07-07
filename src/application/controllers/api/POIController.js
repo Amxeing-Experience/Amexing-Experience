@@ -213,6 +213,13 @@ class POIController {
         filteredQuery.matches('name', searchValue, 'i');
       }
 
+      // Filtro por tipo de traslado (ServiceType) desde las pills.
+      const serviceTypeFilter = req.query.serviceType || '';
+      if (serviceTypeFilter) {
+        const ServiceType = Parse.Object.extend('ServiceType');
+        filteredQuery.equalTo('serviceType', ServiceType.createWithoutData(serviceTypeFilter));
+      }
+
       // Get count of filtered results
       const recordsFiltered = await filteredQuery.count({ useMasterKey: true });
 

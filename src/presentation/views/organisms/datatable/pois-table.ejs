@@ -42,6 +42,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     </div>
 
     <div class="card-body" id="pois-content">
+        <!-- Filtro por tipo de traslado (pills) -->
+        <div class="mb-3 d-flex flex-wrap align-items-center gap-2" id="serviceTypeFilterPills" role="group" aria-label="Filtro por tipo de traslado">
+            <span class="text-muted small me-1"><i class="ti ti-filter me-1"></i>Tipo de traslado:</span>
+            <input type="radio" class="btn-check" name="serviceTypeFilter" id="stFilterAll" value="" checked>
+            <label class="btn btn-sm btn-outline-primary" for="stFilterAll">Todos</label>
+        </div>
+
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
@@ -195,8 +202,19 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         const select = $('#serviceType');
                         select.find('option:not(:first)').remove(); // Clear all except first option
 
+                        // Pills de filtro por tipo de traslado (además del dropdown del modal)
+                        const pills = $('#serviceTypeFilterPills');
+                        pills.find('.st-filter-pill').remove();
+
                         response.data.forEach(function(type) {
                             select.append(new Option(type.label, type.value));
+
+                            const pillId = 'stFilter_' + String(type.value).replace(/[^a-zA-Z0-9_-]/g, '');
+                            const input = $('<input type="radio" class="btn-check st-filter-pill" name="serviceTypeFilter">')
+                                .attr('id', pillId).val(type.value);
+                            const label = $('<label class="btn btn-sm btn-outline-primary st-filter-pill"></label>')
+                                .attr('for', pillId).text(type.label);
+                            pills.append(input).append(label);
                         });
                     }
                 },
@@ -226,6 +244,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             ajax: {
                 url: apiEndpoint,
                 type: 'GET',
+                data: function(d) {
+                    // Filtro por tipo de traslado (pill activa)
+                    d.serviceType = $('input[name="serviceTypeFilter"]:checked').val() || '';
+                    return d;
+                },
                 beforeSend: function(xhr) {
                     const token = getAccessToken();
                     if (token) {
@@ -347,6 +370,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         // Event Handlers
         $('#createPOIBtn').on('click', function() {
             openPOIModal();
+        });
+
+        // Filtro por tipo de traslado: al cambiar la pill, recarga la tabla (server-side).
+        $(document).on('change', 'input[name="serviceTypeFilter"]', function() {
+            dataTable.ajax.reload();
         });
 
         // Edit POI
