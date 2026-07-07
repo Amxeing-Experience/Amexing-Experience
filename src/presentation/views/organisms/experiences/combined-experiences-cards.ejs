@@ -96,115 +96,49 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
     </div>
 </div>
 
-<!-- Experience Details Modal -->
-<div class="modal fade" id="experienceDetailsModal" tabindex="-1" aria-labelledby="experienceDetailsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header p-0 border-0">
-                <div class="tour-hero w-100">
-                    <div class="experience-hero-image-container">
-                        <img id="experienceHeroImage" src="" alt="" class="experience-hero-image">
-                        <div class="tour-hero-overlay">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <h3 id="experienceHeroTitle" class="text-white mb-0"></h3>
+<!-- Experience Details Modal (Luxury redesign) -->
+<div class="modal fade exp-lux-modal" id="experienceDetailsModal" tabindex="-1" aria-labelledby="experienceDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered exp-lux__dialog">
+        <div class="modal-content exp-lux__content">
+            <div class="exp-lux__grid">
+                <!-- LEFT: media pane -->
+                <div class="exp-lux__media">
+                    <img id="experienceHeroImage" src="" alt="" class="exp-lux__media-img">
+                    <div class="exp-lux__media-overlay"></div>
+                    <div class="exp-lux__media-caption">
+                        <span class="exp-lux__category" id="experienceHeroCategory" style="display:none;"></span>
+                        <h3 id="experienceHeroTitle" class="exp-lux__title"></h3>
+                        <span class="exp-lux__title-underline"></span>
+                    </div>
+                </div>
+
+                <!-- RIGHT: content pane -->
+                <div class="exp-lux__panel">
+                    <div class="exp-lux__header">
+                        <span class="exp-lux__eyebrow">AMEXING · DETALLE</span>
+                        <button type="button" class="exp-lux__close" data-bs-dismiss="modal" aria-label="Close">
+                            <i class="ti ti-x"></i>
+                        </button>
+                    </div>
+
+                    <div class="exp-lux__body">
+                        <div id="experienceModalLoading" class="exp-lux__loading" style="display: none;">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Cargando detalles de la experiencia...</span>
                             </div>
                         </div>
+                        <div id="experienceDetailBody"></div>
                     </div>
+
+                    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+                    <div class="exp-lux__footer" id="experienceModalFooter">
+                        <button type="button" class="exp-lux__cta add-to-quote-from-modal-btn">
+                            AGREGAR A COTIZACIÓN <span class="exp-lux__cta-arrow">→</span>
+                        </button>
+                    </div>
+                    <% } %>
                 </div>
-                <button type="button" class="btn-close-custom" data-bs-dismiss="modal" aria-label="Close">
-                    <i class="ti ti-x"></i>
-                </button>
             </div>
-            <!-- Tab Navigation -->
-            <div class="tour-tabs-container">
-                <ul class="nav nav-pills tour-nav-tabs" id="experienceTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="info-tab" data-bs-toggle="pill" data-bs-target="#info" type="button" role="tab">
-                            <i class="ti ti-info-circle me-1"></i>
-                            Información
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation" id="itineraryTabItem" style="display: none;">
-                        <button class="nav-link" id="itinerary-tab" data-bs-toggle="pill" data-bs-target="#itinerary" type="button" role="tab">
-                            <i class="ti ti-list-numbers me-1"></i>
-                            Itinerario
-                            <span class="badge bg-primary ms-1" id="itineraryCountBadge">0</span>
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="gallery-tab" data-bs-toggle="pill" data-bs-target="#gallery" type="button" role="tab">
-                            <i class="ti ti-photo me-1"></i>
-                            Galería
-                            <span class="badge bg-primary ms-1" id="galleryPhotoBadge">0</span>
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="details-tab" data-bs-toggle="pill" data-bs-target="#details" type="button" role="tab">
-                            <i class="ti ti-list-details me-1"></i>
-                            Detalles
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="prices-tab" data-bs-toggle="pill" data-bs-target="#prices" type="button" role="tab">
-                            <i class="ti ti-currency-dollar me-1"></i>
-                            Precios
-                        </button>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- Tab Content -->
-            <div class="modal-body p-0">
-                <div class="tab-content" id="experienceTabContent" style="display: none;">
-                    <!-- Information Tab -->
-                    <div class="tab-pane fade show active" id="info" role="tabpanel">
-                        <div id="infoContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Itinerary Tab -->
-                    <div class="tab-pane fade" id="itinerary" role="tabpanel">
-                        <div id="itineraryContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Gallery Tab -->
-                    <div class="tab-pane fade" id="gallery" role="tabpanel">
-                        <div id="galleryContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Details Tab -->
-                    <div class="tab-pane fade" id="details" role="tabpanel">
-                        <div id="detailsContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Prices Tab -->
-                    <div class="tab-pane fade" id="prices" role="tabpanel">
-                        <div id="pricesContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Loading State -->
-                <div id="experienceModalLoading" class="text-center py-5" style="display: none;">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando detalles de la experiencia...</span>
-                    </div>
-                </div>
-                <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-                <div class="modal-footer border-top" id="experienceModalFooter">
-                    <button type="button" class="btn btn-primary add-to-quote-from-modal-btn">
-                        <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
-                    </button>
-                </div>
-                <% } %>
         </div>
     </div>
 </div>
@@ -1471,9 +1405,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('filterCurrency').addEventListener('change', function() {
         // Only update display to recalculate prices, don't filter
         displayExperiences();
-        
-        // If modal is open, refresh the pricing tab
-        const modal = document.getElementById('experienceModal');
+
+        // If modal is open, refresh the pricing section
+        const modal = document.getElementById('experienceDetailsModal');
         if (modal && modal.classList.contains('show') && window._selectedExperience) {
             loadPricesTab(window._selectedExperience);
         }
@@ -1481,9 +1415,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('filterPayment').addEventListener('change', function() {
         // Only update display to recalculate prices, don't filter
         displayExperiences();
-        
-        // If modal is open, refresh the pricing tab
-        const modal = document.getElementById('experienceModal');
+
+        // If modal is open, refresh the pricing section
+        const modal = document.getElementById('experienceDetailsModal');
         if (modal && modal.classList.contains('show') && window._selectedExperience) {
             loadPricesTab(window._selectedExperience);
         }
@@ -2076,15 +2010,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const modal = new bootstrap.Modal(document.getElementById('experienceDetailsModal'));
         const heroTitle = document.getElementById('experienceHeroTitle');
         const heroImage = document.getElementById('experienceHeroImage');
+        const heroCategory = document.getElementById('experienceHeroCategory');
         const modalLoading = document.getElementById('experienceModalLoading');
-        const tabContent = document.getElementById('experienceTabContent');
-        
+        const detailBody = document.getElementById('experienceDetailBody');
+
         // Set initial data and show loading
         heroTitle.textContent = experienceName;
+        if (heroCategory) { heroCategory.style.display = 'none'; heroCategory.textContent = ''; }
         heroImage.src = '/img/amexing_logo_horizontal.avif'; // Show placeholder while loading
         modalLoading.style.display = 'block';
-        tabContent.style.display = 'none';
-        
+        if (detailBody) detailBody.innerHTML = '';
+
         // Show modal
         modal.show();
         
@@ -2211,8 +2147,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 displayImage: processedExperience.displayImage
             });
             
+            // Store the full processed experience so the currency/payment filter
+            // handlers can re-render the prices section (loadPricesTab).
+            window._selectedExperience = processedExperience;
+
             await loadExperienceDetailsIntoModal(processedExperience, experienceName);
-            
+
         } catch (error) {
             console.error('Error loading experience details:', error);
             showModalError('No se pudieron cargar los detalles de la experiencia');
@@ -2222,9 +2162,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to load experience data into modal
     async function loadExperienceDetailsIntoModal(experience, experienceName) {
         const modalLoading = document.getElementById('experienceModalLoading');
-        const tabContent = document.getElementById('experienceTabContent');
         const heroImage = document.getElementById('experienceHeroImage');
-        
+        const heroTitle = document.getElementById('experienceHeroTitle');
+        const heroCategory = document.getElementById('experienceHeroCategory');
+        const detailBody = document.getElementById('experienceDetailBody');
+
         try {
             // Set optimized hero image with progressive loading
             const heroImageContainer = heroImage.parentElement;
@@ -2297,23 +2239,193 @@ document.addEventListener('DOMContentLoaded', function() {
                 heroImage.dispatchEvent(new Event('load'));
             }
             
-            // Load content into each tab
-            loadInformationTab(experience, experienceName);
-            loadGalleryTab(experience, experienceName);
-            loadDetailsTab(experience);
+            // ---- LEFT pane caption: title + category badge ----
+            if (heroTitle) heroTitle.textContent = experience.name || experienceName || '';
+            if (heroCategory) {
+                const catLabel = categoryLabel(experience.experience_category);
+                if (catLabel) {
+                    heroCategory.textContent = '· ' + catLabel.toUpperCase();
+                    heroCategory.style.display = '';
+                } else {
+                    heroCategory.style.display = 'none';
+                }
+            }
+
+            // ---- Store photos for the fullscreen gallery (reused mechanism) ----
+            if (experience.photos && experience.photos.length > 0) {
+                storeGalleryPhotos = experience.photos.map((photo, index) => ({
+                    ...photo,
+                    alt: `${experienceName} - Foto ${index + 1}`
+                }));
+            } else {
+                storeGalleryPhotos = [];
+            }
+
+            // ---- Render the single-scroll body ----
+            detailBody.innerHTML = renderExperienceDetailBody(experience, experienceName);
+
+            // Wire gallery thumbnails to the existing fullscreen gallery
+            detailBody.querySelectorAll('.exp-lux__thumb').forEach((el) => {
+                el.addEventListener('click', () => {
+                    const idx = parseInt(el.dataset.photoIndex, 10) || 0;
+                    openFullscreenGallery(idx);
+                });
+            });
+
+            // Render the prices section (kept separate for currency/payment refresh)
             loadPricesTab(experience);
 
-            // Hide loading and show content (don't wait for itinerary images)
+            // Hide loading
             modalLoading.style.display = 'none';
-            tabContent.style.display = 'block';
 
-            // Load itinerary in background (fetches images async)
-            loadItineraryTab(experience);
-            
         } catch (error) {
             console.error('Error loading experience details into modal:', error);
             showModalError('Error al cargar los detalles de la experiencia');
         }
+    }
+
+    // Build the full luxury detail body (all sections except prices, which are
+    // injected by loadPricesTab so they can be re-rendered on filter change).
+    function renderExperienceDetailBody(experience, experienceName) {
+        const currency = document.getElementById('filterCurrency').value;
+        const paymentType = document.getElementById('filterPayment').value;
+
+        // Accept arrays OR newline-delimited strings for list-type fields.
+        const toArr = (v) => {
+            if (!v) return [];
+            if (Array.isArray(v)) return v.filter(x => x !== null && x !== undefined && String(x).trim() !== '');
+            return String(v).split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        };
+
+        const sections = [];
+
+        // 1. Description (serif italic)
+        if (experience.description) {
+            sections.push(`<div class="exp-lux__section"><p class="exp-lux__desc">${experience.description}</p></div>`);
+        }
+
+        // 2. Info tiles: Duración + Grupo máximo
+        const durVal = experience.duration ? formatDuration(experience.duration) : '';
+        const minP = experience.min_people;
+        const maxP = experience.max_people || experience.capacity;
+        let groupVal = '';
+        if (minP && maxP) groupVal = `${minP}–${maxP} personas`;
+        else if (maxP) groupVal = `Máximo ${maxP} personas`;
+        else if (minP) groupVal = `Mínimo ${minP} personas`;
+        sections.push(`
+            <div class="exp-lux__tiles">
+                <div class="exp-lux__tile">
+                    <span class="exp-lux__tile-label">DURACIÓN</span>
+                    <span class="exp-lux__tile-value">${durVal || '—'}</span>
+                </div>
+                <div class="exp-lux__tile">
+                    <span class="exp-lux__tile-label">GRUPO MÁXIMO</span>
+                    <span class="exp-lux__tile-value">${groupVal || '—'}</span>
+                </div>
+            </div>
+        `);
+
+        // 3. Incluye
+        const inc = toArr(experience.includes);
+        if (inc.length) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">INCLUYE</h4>
+                    <ul class="exp-lux__list">
+                        ${inc.map(i => `<li><span class="exp-lux__check">✓</span><span>${i}</span></li>`).join('')}
+                    </ul>
+                </div>
+            `);
+        }
+
+        // 4. No incluye
+        const ninc = toArr(experience.notincludes);
+        if (ninc.length) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">NO INCLUYE</h4>
+                    <ul class="exp-lux__list exp-lux__list--muted">
+                        ${ninc.map(i => `<li><span class="exp-lux__cross">×</span><span>${i}</span></li>`).join('')}
+                    </ul>
+                </div>
+            `);
+        }
+
+        // 5. Galería (up to 4 thumbnails → fullscreen gallery)
+        if (experience.photos && experience.photos.length > 0) {
+            const thumbs = experience.photos.slice(0, 4).map((photo, index) => {
+                const url = getOptimizedImageUrl(photo) || '/img/amexing_logo_horizontal.avif';
+                return `<button type="button" class="exp-lux__thumb" data-photo-index="${index}" style="background-image:url('${url}')" aria-label="Ver foto ${index + 1}"></button>`;
+            }).join('');
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">GALERÍA</h4>
+                    <div class="exp-lux__gallery">${thumbs}</div>
+                </div>
+            `);
+        }
+
+        // 6. Notas de reserva (highlighted box)
+        if (experience.client_booking_notes) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <div class="exp-lux__notebox">
+                        <h4 class="exp-lux__heading">NOTAS DE RESERVA</h4>
+                        <p class="exp-lux__prewrap">${experience.client_booking_notes}</p>
+                    </div>
+                </div>
+            `);
+        }
+
+        // 7. Key-value rows
+        const kv = [];
+        const currencyMap = { MXN: 'MXN — Peso Mexicano', USD: 'USD — US Dollar' };
+        kv.push(['MONEDA', currencyMap[currency] || currency]);
+        const payMap = { efectivo: 'Efectivo', transferencia: 'Transferencia bancaria', tarjeta: 'Tarjeta de crédito' };
+        if (payMap[paymentType]) kv.push(['MÉTODO DE PAGO', payMap[paymentType]]);
+        const tipo = experience.tipo || experience.experienceType;
+        if (tipo) kv.push(['TIPO', String(tipo).charAt(0).toUpperCase() + String(tipo).slice(1)]);
+        const advMin = experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime);
+        if (advMin) kv.push(['RESERVA ANTICIPADA', formatAdvanceBooking(advMin)]);
+        if (experience.cancellation_policy) kv.push(['CANCELACIÓN', `<span class="exp-lux__prewrap">${experience.cancellation_policy}</span>`]);
+        const langs = Array.isArray(experience.languages) ? experience.languages : (experience.languages ? [experience.languages] : []);
+        if (langs.length) kv.push(['IDIOMA', langs.join(' · ')]);
+        if (kv.length) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <div class="exp-lux__kv">
+                        ${kv.map(([k, v]) => `<div class="exp-lux__kv-row"><span class="exp-lux__kv-key">${k}</span><span class="exp-lux__kv-val">${v}</span></div>`).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        // 8. Términos y condiciones
+        const hasBuyout = experience.buyout !== null && experience.buyout !== undefined && experience.buyout !== '';
+        const hasPriv = experience.private_min_value !== null && experience.private_min_value !== undefined && experience.private_min_value !== '';
+        if (hasBuyout || hasPriv) {
+            const rows = [];
+            if (hasBuyout) rows.push(['Buy-out', '$' + Number(experience.buyout).toLocaleString('es-MX', { minimumFractionDigits: 2 })]);
+            if (hasPriv) rows.push(['Mínimo para hacerlo privado', experience.private_min_type === 'monto' ? '$' + Number(experience.private_min_value).toLocaleString('es-MX', { minimumFractionDigits: 2 }) : Number(experience.private_min_value) + ' personas']);
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">TÉRMINOS Y CONDICIONES</h4>
+                    <div class="exp-lux__kv">
+                        ${rows.map(([k, v]) => `<div class="exp-lux__kv-row"><span class="exp-lux__kv-key">${k}</span><span class="exp-lux__kv-val">${v}</span></div>`).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        // 9. Precios por persona (filled by loadPricesTab into #pricesContent)
+        sections.push(`
+            <div class="exp-lux__section">
+                <h4 class="exp-lux__heading">PRECIOS POR PERSONA</h4>
+                <div id="pricesContent" class="exp-lux__prices"></div>
+            </div>
+        `);
+
+        return sections.join('');
     }
     
     // Function to load Information tab
@@ -2825,106 +2937,41 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
 
-    // Function to load Prices tab (without vehicle pricing)
+    // Render the "Precios por persona" section into #pricesContent.
+    // Kept as a standalone function because it is re-invoked when the currency
+    // or payment-method filter changes (see the filter change handlers).
     function loadPricesTab(experience) {
         const pricesContent = document.getElementById('pricesContent');
-        
-        // Clear any existing content first
-        pricesContent.innerHTML = '';
-        
-        // Get current currency and payment type from dropdowns
+        if (!pricesContent) return;
+
+        // Read current currency & payment type from the page filters.
         const currency = document.getElementById('filterCurrency').value;
         const paymentType = document.getElementById('filterPayment').value;
-        
-        // Create selections info display for experiences
-        const currencyText = currency === 'USD' ? 'USD' : 'MXN';
-        const paymentText = paymentType === 'efectivo' ? 'Efectivo' : 
-                            paymentType === 'transferencia' ? 'Transferencia' : 'Tarjeta Débito/Crédito';
-        
-        let pricingHtml = `
-            <div class="alert alert-info d-flex align-items-center mb-4" style="background-color: rgba(var(--brand-primary-rgb), 0.10); border-color: rgba(var(--brand-primary-rgb), 0.25);">
-                <i class="ti ti-info-circle me-2" style="font-size: 1.2rem;"></i>
-                <div>
-                    <strong>Configuración actual de precios:</strong>
-                    <div class="mt-1">
-                        <span class="badge me-2" style="background-color: white; color: black; border: 1px solid #dee2e6;">
-                            <i class="ti ti-currency-dollar me-1"></i>${currencyText}
-                        </span>
-                        <span class="badge me-2" style="background-color: white; color: black; border: 1px solid #dee2e6;">
-                            <i class="ti ti-credit-card me-1"></i>${paymentText}
-                        </span>
+        const unit = `${currency} / PERSONA`;
+
+        const cards = [];
+        const addCard = (label, subtitle, price) => {
+            if (parseFloat(price || 0) > 0) {
+                cards.push(`
+                    <div class="exp-lux__price-card">
+                        <div class="exp-lux__price-left">
+                            <span class="exp-lux__price-name">${label}</span>
+                            <span class="exp-lux__price-sub">${subtitle}</span>
+                        </div>
+                        <div class="exp-lux__price-right">
+                            <span class="exp-lux__price-amount">${convertExperiencePrice(price, currency, paymentType)}</span>
+                            <span class="exp-lux__price-unit">${unit}</span>
+                        </div>
                     </div>
-                </div>
-            </div>
-        `;
-        
-        // Check for per-person pricing (support both original and display fields)
-        if (experience.displayPrice || experience.displayPriceChild || experience.displayPriceNoAlcohol || experience.cost || experience.price_child || experience.price_no_alcohol || experience.price) {
-            pricingHtml += `
-                <div class="additional-pricing-section">
-                    <h6 class="mb-3"><i class="ti ti-users me-2"></i>Precios por Persona</h6>
-                    <div class="row g-3">
-                        ${(experience.displayPrice || experience.cost || experience.price) ? `
-                            <div class="col-md-4">
-                                <div class="additional-price-card">
-                                    <div class="additional-price-icon bg-primary">
-                                        <i class="ti ti-user"></i>
-                                    </div>
-                                    <div class="additional-price-info">
-                                        <span class="additional-price-label">Adulto</span>
-                                        <span class="additional-price-value">${convertExperiencePrice(experience.displayPrice || experience.cost || experience.price, currency, paymentType)}</span>
-                                        <small class="text-muted">Precio general</small>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${(experience.displayPriceChild || experience.price_child) ? `
-                            <div class="col-md-4">
-                                <div class="additional-price-card">
-                                    <div class="additional-price-icon bg-info">
-                                        <i class="ti ti-mood-kid"></i>
-                                    </div>
-                                    <div class="additional-price-info">
-                                        <span class="additional-price-label">Niño</span>
-                                        <span class="additional-price-value">${convertExperiencePrice(experience.displayPriceChild || experience.price_child, currency, paymentType)}</span>
-                                        <small class="text-muted">Menor de edad</small>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${(experience.displayPriceNoAlcohol || experience.price_no_alcohol) ? `
-                            <div class="col-md-4">
-                                <div class="additional-price-card">
-                                    <div class="additional-price-icon bg-success">
-                                        <i class="ti ti-user-check"></i>
-                                    </div>
-                                    <div class="additional-price-info">
-                                        <span class="additional-price-label">Sin Alcohol</span>
-                                        <span class="additional-price-value">${convertExperiencePrice(experience.displayPriceNoAlcohol || experience.price_no_alcohol, currency, paymentType)}</span>
-                                        <small class="text-muted">Sin bebidas alcohólicas</small>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        }
-        
-        // If no pricing data found, show a clean message (but keep the info banner)
-        const hasNoPricingData = !experience.displayPrice && !experience.displayPriceChild && !experience.displayPriceNoAlcohol && !experience.cost && !experience.price_child && !experience.price_no_alcohol && !experience.price;
-        
-        if (hasNoPricingData) {
-            pricingHtml += `
-                <div class="text-center py-5">
-                    <i class="ti ti-currency-dollar" style="font-size: 3rem; color: #dee2e6;"></i>
-                    <p class="mt-3 text-muted">No hay información de precios disponible</p>
-                    <p class="small text-muted">Por favor, contacte con nosotros para obtener cotización personalizada.</p>
-                </div>
-            `;
-        }
-        
-        pricesContent.innerHTML = pricingHtml;
+                `);
+            }
+        };
+
+        addCard('ADULTO', 'Precio general', experience.displayPrice || experience.cost || experience.price);
+        addCard('NIÑO', 'Precio niño', experience.displayPriceChild || experience.price_child);
+        addCard('SIN ALCOHOL', 'Sin alcohol', experience.displayPriceNoAlcohol || experience.price_no_alcohol);
+
+        pricesContent.innerHTML = cards.length ? cards.join('') : `<p class="exp-lux__quote">Por cotizar</p>`;
     }
     
     // Function to load Itinerary tab
@@ -3290,15 +3337,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function showModalError(message) {
         const modalLoading = document.getElementById('experienceModalLoading');
-        const tabContent = document.getElementById('experienceTabContent');
-        
-        modalLoading.innerHTML = `
-            <div class="text-center py-5">
-                <i class="ti ti-alert-triangle text-warning" style="font-size: 3rem;"></i>
-                <h5 class="mt-3">Error</h5>
-                <p class="text-muted">${message}</p>
-            </div>
-        `;
+        const detailBody = document.getElementById('experienceDetailBody');
+
+        if (detailBody) detailBody.innerHTML = '';
+        if (modalLoading) {
+            modalLoading.style.display = 'block';
+            modalLoading.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="ti ti-alert-triangle text-warning" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3">Error</h5>
+                    <p class="text-muted">${message}</p>
+                </div>
+            `;
+        }
     }
     
     function openFullscreenGallery(index) {
@@ -4382,5 +4433,410 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .new-day-date-row {
     padding: 10px 0;
+}
+
+/* =====================================================================
+   Experience Detail Modal — Luxury redesign (namespaced .exp-lux__*)
+   ===================================================================== */
+.exp-lux-modal {
+    --exp-cream: #EAE7DF;
+    --exp-tile: #E4DFCF;
+    --exp-border: #d6d1c4;
+    --exp-olive: #6E7A50;
+    --exp-olive-light: #7C8A5A;
+    --exp-muted: #8a8f78;
+    --exp-gold: #b8894a;
+    --exp-dark: #2b2b2b;
+    --exp-serif: var(--font-arpona), 'Georgia', serif;
+}
+.exp-lux__dialog {
+    max-width: 1160px;
+    width: 96vw;
+    margin: 1.75rem auto;
+}
+.exp-lux__content {
+    border: none;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--exp-cream);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+.exp-lux__grid {
+    display: grid;
+    grid-template-columns: 42% 58%;
+    height: min(88vh, 820px);
+}
+
+/* ---- LEFT: media pane ---- */
+.exp-lux__media {
+    position: relative;
+    overflow: hidden;
+    background: #1c1c1c;
+}
+.exp-lux__media-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.exp-lux__media-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.15) 45%, rgba(0, 0, 0, 0) 70%);
+}
+.exp-lux__media-caption {
+    position: absolute;
+    left: 34px;
+    right: 34px;
+    bottom: 36px;
+    z-index: 2;
+}
+.exp-lux__category {
+    display: inline-block;
+    margin-bottom: 14px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(20, 20, 20, 0.55);
+    backdrop-filter: blur(4px);
+    color: #f3f0e8;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.exp-lux__title {
+    margin: 0;
+    font-family: var(--exp-serif);
+    font-weight: 500;
+    font-size: 2.15rem;
+    line-height: 1.12;
+    color: #f7f4ec;
+    letter-spacing: 0.01em;
+}
+.exp-lux__title-underline {
+    display: block;
+    width: 40px;
+    height: 2px;
+    margin-top: 16px;
+    background: var(--exp-gold);
+}
+
+/* ---- RIGHT: content pane ---- */
+.exp-lux__panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--exp-cream);
+    min-height: 0;
+}
+.exp-lux__header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 34px;
+    border-bottom: 1px solid var(--exp-border);
+}
+.exp-lux__eyebrow {
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--exp-muted);
+    font-weight: 600;
+}
+.exp-lux__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--exp-dark);
+    font-size: 1.05rem;
+    transition: background 0.2s, color 0.2s;
+}
+.exp-lux__close:hover {
+    background: var(--exp-olive);
+    border-color: var(--exp-olive);
+    color: #fff;
+}
+
+.exp-lux__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 30px 34px 34px;
+}
+.exp-lux__loading {
+    text-align: center;
+    padding: 60px 0;
+    color: var(--exp-olive);
+}
+.exp-lux__section {
+    margin-bottom: 30px;
+}
+.exp-lux__heading {
+    margin: 0 0 16px;
+    font-family: var(--exp-serif);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--exp-olive);
+    font-weight: 600;
+}
+.exp-lux__desc {
+    margin: 0;
+    font-family: var(--exp-serif);
+    font-style: italic;
+    font-size: 1.06rem;
+    line-height: 1.75;
+    color: var(--exp-dark);
+    white-space: pre-line;
+}
+
+/* Info tiles */
+.exp-lux__tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 30px;
+}
+.exp-lux__tile {
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 16px 18px;
+    background: rgba(255, 255, 255, 0.25);
+}
+.exp-lux__tile-label {
+    display: block;
+    font-size: 0.66rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--exp-muted);
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+.exp-lux__tile-value {
+    display: block;
+    font-family: var(--exp-serif);
+    font-size: 1.15rem;
+    color: var(--exp-dark);
+}
+
+/* Includes / excludes lists */
+.exp-lux__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.exp-lux__list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 7px 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--exp-dark);
+}
+.exp-lux__check {
+    color: var(--exp-olive);
+    font-weight: 700;
+    flex: 0 0 auto;
+    line-height: 1.5;
+}
+.exp-lux__cross {
+    color: var(--exp-muted);
+    font-weight: 700;
+    flex: 0 0 auto;
+    line-height: 1.5;
+}
+.exp-lux__list--muted li {
+    color: #6c6c66;
+}
+
+/* Gallery thumbnails */
+.exp-lux__gallery {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+.exp-lux__thumb {
+    aspect-ratio: 1 / 1;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.exp-lux__thumb:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* Booking notes box */
+.exp-lux__notebox {
+    background: var(--exp-tile);
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 20px 22px;
+}
+.exp-lux__notebox .exp-lux__heading {
+    margin-bottom: 10px;
+}
+.exp-lux__prewrap {
+    white-space: pre-line;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--exp-dark);
+}
+
+/* Key-value rows */
+.exp-lux__kv {
+    display: flex;
+    flex-direction: column;
+}
+.exp-lux__kv-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 13px 0;
+    border-bottom: 1px solid var(--exp-border);
+}
+.exp-lux__kv-row:last-child {
+    border-bottom: none;
+}
+.exp-lux__kv-key {
+    flex: 0 0 auto;
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--exp-olive);
+    font-weight: 600;
+}
+.exp-lux__kv-val {
+    text-align: right;
+    font-size: 0.95rem;
+    color: var(--exp-dark);
+}
+
+/* Price cards */
+.exp-lux__prices {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.exp-lux__price-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.3);
+}
+.exp-lux__price-name {
+    display: block;
+    font-family: var(--exp-serif);
+    font-size: 1.02rem;
+    letter-spacing: 0.06em;
+    color: var(--exp-dark);
+}
+.exp-lux__price-sub {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--exp-muted);
+    margin-top: 3px;
+}
+.exp-lux__price-right {
+    text-align: right;
+}
+.exp-lux__price-amount {
+    display: block;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--exp-dark);
+}
+.exp-lux__price-unit {
+    display: block;
+    font-size: 0.64rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--exp-muted);
+    margin-top: 2px;
+}
+.exp-lux__quote {
+    font-family: var(--exp-serif);
+    font-style: italic;
+    color: var(--exp-muted);
+    margin: 0;
+}
+
+/* Sticky footer CTA */
+.exp-lux__footer {
+    flex: 0 0 auto;
+    padding: 18px 34px;
+    border-top: 1px solid var(--exp-border);
+    background: var(--exp-cream);
+}
+.exp-lux__cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 15px 20px;
+    border: none;
+    border-radius: 4px;
+    background: var(--exp-olive);
+    color: #fff;
+    font-size: 0.82rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+.exp-lux__cta:hover {
+    background: #5c6743;
+}
+.exp-lux__cta-arrow {
+    font-size: 1rem;
+}
+
+/* Responsive: stack columns on small screens */
+@media (max-width: 767.98px) {
+    .exp-lux__grid {
+        grid-template-columns: 1fr;
+        height: min(92vh, 900px);
+    }
+    .exp-lux__media {
+        height: 220px;
+        min-height: 220px;
+    }
+    .exp-lux__title {
+        font-size: 1.6rem;
+    }
+    .exp-lux__media-caption {
+        left: 22px;
+        right: 22px;
+        bottom: 22px;
+    }
+    .exp-lux__header,
+    .exp-lux__body,
+    .exp-lux__footer {
+        padding-left: 22px;
+        padding-right: 22px;
+    }
+    .exp-lux__gallery {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+    }
 }
 </style>
