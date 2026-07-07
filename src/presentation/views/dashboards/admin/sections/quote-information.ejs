@@ -1374,21 +1374,42 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
     document.getElementById('leadGuestIsFinalClient')?.addEventListener('change', async function () {
         const cb = this;
         if (cb.checked) {
+            // Cliente Final: opción existente o texto tecleado (nuevo). En ambos casos, al marcar
+            // "el Lead Guest es el cliente final" se copia su Nombre/Apellido al Lead Guest.
             let opt = null;
             try {
                 opt = getFinalClientOptionByValue(getSelectedFinalClientValue());
             } catch (e) { /* dropdown no disponible (p.ej. modo directo) */ }
+            let cfFirst = '';
+            let cfLast = '';
             if (opt) {
+                cfFirst = opt.firstName || '';
+                cfLast = opt.lastName || '';
+            } else {
+                const cfInst = document.getElementById('clientFinalId')?.customSelect;
+                if (cfInst && cfInst.isTyped && cfInst.isTyped() && cfInst.getTypedText) cfFirst = (cfInst.getTypedText() || '').trim();
+                cfLast = (document.getElementById('finalClientLastName')?.value || '').trim();
+            }
+            if (cfFirst || cfLast) {
                 const norm = (s) => (s || '').trim().toLowerCase();
                 const lgFirst = document.getElementById('leadGuestFirstName')?.value.trim() || '';
                 const lgLast = document.getElementById('leadGuestLastName')?.value.trim() || '';
-                const hasLeadGuest = !!(lgFirst || lgLast);
-                const differs = norm(lgFirst) !== norm(opt.firstName) || norm(lgLast) !== norm(opt.lastName);
-                if (hasLeadGuest && differs) {
-                    const ok = window.confirm('Se reemplazará el Lead Guest actual por el cliente final seleccionado. ¿Continuar?');
+                const differs = norm(lgFirst) !== norm(cfFirst) || norm(lgLast) !== norm(cfLast);
+                if ((lgFirst || lgLast) && differs) {
+                    const ok = window.confirm('Se reemplazará el Lead Guest actual por el cliente final. ¿Continuar?');
                     if (!ok) { cb.checked = false; syncLeadGuestMode(); return; }
                 }
-                applyFinalClientToLeadGuest(opt);
+                if (opt) {
+                    applyFinalClientToLeadGuest(opt);
+                } else {
+                    const set = (id, v, clearEdited) => { const el = document.getElementById(id); if (el) { el.value = v; if (clearEdited) el.dataset.userEdited = ''; } };
+                    set('leadGuestFirstName', cfFirst);
+                    set('leadGuestLastName', cfLast);
+                    if (!document.getElementById('contactDifferentFromOwner')?.checked) {
+                        set('contactFirstName', cfFirst, true);
+                        set('contactLastName', cfLast, true);
+                    }
+                }
             }
         }
         syncLeadGuestMode();
