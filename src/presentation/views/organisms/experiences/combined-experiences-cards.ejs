@@ -2388,6 +2388,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 ` : ''}
 
+                <!-- Tipo de experiencia (categoría temática) -->
+                ${categoryLabel(experience.experience_category) ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-category me-2"></i>Tipo de experiencia</h5>
+                        <span class="type-badge" style="background: rgba(43, 182, 115, 0.12); color: #157347;">${categoryLabel(experience.experience_category)}</span>
+                    </div>
+                ` : ''}
+
                 <!-- Tipo de Experiencia Section -->
                 ${(experience.experienceType || experience.tipo) ? `
                     <div class="content-section">
