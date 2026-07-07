@@ -194,6 +194,18 @@ const e = __isRes ? 'reservación' : 'cotización';
                         selected: []
                     }) %>
                 </div>
+                <!-- Cliente Final nuevo (tecleado): Nombre/Apellido para darlo de alta correctamente
+                     (prellenados del texto; editables). Oculto salvo typed-new. -->
+                <div class="row g-2 mb-2 d-none" id="finalClientNameRow">
+                    <div class="col-6">
+                        <label for="finalClientFirstName" class="form-label small mb-1">Nombre</label>
+                        <input type="text" class="form-control form-control-sm" id="finalClientFirstName" placeholder="Nombre">
+                    </div>
+                    <div class="col-6">
+                        <label for="finalClientLastName" class="form-label small mb-1">Apellido</label>
+                        <input type="text" class="form-control form-control-sm" id="finalClientLastName" placeholder="Apellido">
+                    </div>
+                </div>
                 <!-- Cliente Final tecleado (nuevo): opción de guardarlo como cliente de la agencia.
                      Oculto salvo cuando el CF es "typed-new" (evento customselect:create). -->
                 <div class="form-check mb-2 d-none" id="saveFinalClientWrap">
@@ -1222,10 +1234,17 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         return !!finalRow && window.getComputedStyle(finalRow).display !== 'none';
     }
     // En agencia el Lead Guest usa el combobox; en directo, los inputs de nombre.
+    // Los inputs Nombre/Apellido se muestran en directo siempre, y en agencia SOLO cuando se
+    // escribió un nombre nuevo (typed-new) — para editar/confirmar el split antes del alta.
     function syncLeadGuestNameUi() {
         const agency = isAgencyModeVisible();
         document.getElementById('leadGuestComboRow')?.classList.toggle('d-none', !agency);
-        document.getElementById('leadGuestNameRow')?.classList.toggle('d-none', agency);
+        const nameRow = document.getElementById('leadGuestNameRow');
+        if (nameRow) {
+            const inst = document.getElementById('leadGuestClientId')?.customSelect;
+            const typedNew = agency && inst && inst.isTyped && inst.isTyped();
+            nameRow.classList.toggle('d-none', agency && !typedNew);
+        }
     }
     // Puebla el combobox de Lead Guest con los mismos clientes de la agencia que el Cliente Final.
     async function populateLeadGuestOptions(clients) {
@@ -1246,6 +1265,7 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         const inst = this.customSelect;
         if (inst && inst.isTyped && inst.isTyped()) return; // el typed lo maneja customselect:create
         document.getElementById('saveFinalClientWrap')?.classList.add('d-none');
+        document.getElementById('finalClientNameRow')?.classList.add('d-none');
         const saveCb = document.getElementById('saveFinalClientAsClient');
         if (saveCb) saveCb.checked = false;
     });
@@ -1257,6 +1277,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             const el = document.getElementById(id);
             if (el) { el.value = v; if (clearEdited) el.dataset.userEdited = ''; }
         };
+        // Nombre/Apellido editables (prellenados del split) para el alta correcta.
+        set('finalClientFirstName', firstName);
+        set('finalClientLastName', lastName);
+        document.getElementById('finalClientNameRow')?.classList.remove('d-none');
         if (!document.getElementById('contactDifferentFromOwner')?.checked) {
             set('contactFirstName', firstName, true);
             set('contactLastName', lastName, true);
@@ -1306,9 +1330,15 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         const typed = inst.isTyped && inst.isTyped();
         if (!typed) return { clientFinalId: inst.getValue() || '', clientFinalName: '' };
         const text = (inst.getTypedText && inst.getTypedText()) || '';
+        // Nombre/Apellido separados (editables) para el alta; fallback al split del texto.
+        const nrFirst = (document.getElementById('finalClientFirstName')?.value || '').trim();
+        const nrLast = (document.getElementById('finalClientLastName')?.value || '').trim();
+        const split = splitLeadName(text);
+        const firstName = nrFirst || split.firstName;
+        const lastName = nrLast || split.lastName;
+        const fullName = `${firstName} ${lastName}`.trim() || text;
         const saveCb = document.getElementById('saveFinalClientAsClient');
-        if (saveCb && saveCb.checked && text) {
-            const { firstName, lastName } = splitLeadName(text);
+        if (saveCb && saveCb.checked) {
             if (firstName && lastName) {
                 const asAgency = leadGuestSavesAsAgencyClient();
                 const endpoint = asAgency ? '/api/owned-clients/admin-create-subclient' : '/api/owned-clients/quick';
@@ -1335,7 +1365,7 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 } catch (err) { console.error('Error creando cliente final:', err); }
             }
         }
-        return { clientFinalId: '', clientFinalName: text };
+        return { clientFinalId: '', clientFinalName: fullName };
     }
     // Al marcar "El Lead Guest es el cliente final": el Lead Guest debe volverse el cliente final.
     // Si hay uno seleccionado y el Lead Guest actual DIFIERE, se confirma antes de reemplazar (si
