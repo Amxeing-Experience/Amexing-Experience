@@ -217,7 +217,7 @@ class QuoteController {
 
       // 2. Extract fields from request body
       const {
-        client, clientId, clientType, clientFinalId, contactPerson, contactEmail, contactPhone,
+        client, clientId, clientType, clientFinalId, clientFinalName, contactPerson, contactEmail, contactPhone,
         contactFirstName, contactLastName, notes, eventType,
         leadGuestFirstName, leadGuestLastName,
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
@@ -455,6 +455,9 @@ class QuoteController {
       quote.set('contactPhone', finalContactData.contactPhone);
       quote.set('leadGuestFirstName', leadGuestFirstName || '');
       quote.set('leadGuestLastName', leadGuestLastName || '');
+      // Cliente Final tecleado (no guardado como cliente): se persiste como texto libre.
+      // Mutuamente excluyente con clientFinalId (el frontend envía solo uno con valor).
+      quote.set('clientFinalName', clientFinalName || '');
       quote.set('notes', notes || '');
       quote.set('eventType', eventType || '');
 
@@ -886,6 +889,7 @@ class QuoteController {
             leadGuestLastName: quote.get('leadGuestLastName') || '',
             notes: quote.get('notes') || '',
             clientFinalId: quote.get('clientFinalId') || null,
+            clientFinalName: quote.get('clientFinalName') || '',
             validUntil: quote.get('validUntil'),
             active: quote.get('active'),
             hasPendingInvoiceRequest, // Add invoice status
@@ -1119,6 +1123,7 @@ class QuoteController {
         leadGuestLastName: quote.get('leadGuestLastName') || '',
         notes: quote.get('notes') || '',
         clientFinalId: quote.get('clientFinalId') || null,
+        clientFinalName: quote.get('clientFinalName') || '',
         status: quote.get('status') || 'quoted',
         validUntil: quote.get('validUntil'),
         serviceItems: quote.get('serviceItems') || {
