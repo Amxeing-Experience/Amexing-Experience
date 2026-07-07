@@ -13903,9 +13903,13 @@ class ItineraryBuilder {
     // Check if price override is enabled (admin only)
     const isPriceOverride = document.getElementById('experienceOverridePrices')?.checked || false;
 
+    // Precio ADULTO del catálogo: la experiencia lo guarda en `cost` (no `price`, que es null para
+    // experiencias propias). Fallback a `price` para experiencias de proveedor.
+    const adultCatalogPrice = experience.cost || experience.price;
+
     // Store calculated prices for potential restoration
-    if (experience.price) {
-      this.calculatedPrices.experience.adult = experience.price;
+    if (adultCatalogPrice) {
+      this.calculatedPrices.experience.adult = adultCatalogPrice;
     }
     if (experience.price_child) {
       this.calculatedPrices.experience.child = experience.price_child;
@@ -13916,8 +13920,8 @@ class ItineraryBuilder {
 
     // Only update prices if override is NOT enabled or if fields are empty
     if (!isPriceOverride || !this.canEditPrices) {
-      if (adultPriceField && experience.price) {
-        adultPriceField.value = experience.price;
+      if (adultPriceField && adultCatalogPrice) {
+        adultPriceField.value = adultCatalogPrice;
       }
 
       if (childPriceField && experience.price_child) {
@@ -13929,8 +13933,8 @@ class ItineraryBuilder {
       }
     } else {
       // If override is enabled and fields are empty, populate with calculated values as starting point
-      if (adultPriceField && !adultPriceField.value && experience.price) {
-        adultPriceField.value = experience.price;
+      if (adultPriceField && !adultPriceField.value && adultCatalogPrice) {
+        adultPriceField.value = adultCatalogPrice;
       }
       if (childPriceField && !childPriceField.value && experience.price_child) {
         childPriceField.value = experience.price_child;
@@ -13946,7 +13950,7 @@ class ItineraryBuilder {
       const el = document.getElementById(id);
       if (el) el.textContent = (val && Number(val) > 0) ? `Lista ${AMX_PRICE_YEAR}: ${this.formatCurrency(val)}` : '';
     };
-    setExpListPrice('adultPriceListPrice', experience.price);
+    setExpListPrice('adultPriceListPrice', adultCatalogPrice);
     setExpListPrice('childPriceListPrice', experience.price_child);
     setExpListPrice('noAlcoholPriceListPrice', experience.price_no_alcohol);
 
