@@ -159,6 +159,34 @@ const e = __isRes ? 'reservación' : 'cotización';
                             <span class="placeholder col-8 placeholder-xs"></span>
                         </div>
                     </small>
+
+                    <!-- Transferir propietario INLINE (sin abrir el modal). El botón "Cambiar" se
+                         muestra solo si el usuario puede transferir (quote-ownership.js lo togglea
+                         por this.canTransfer en updateCompactOwnerDisplay). -->
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none d-none" id="btnInlineChangeOwner">
+                            <i class="ti ti-switch-horizontal me-1"></i>Cambiar propietario
+                        </button>
+                    </div>
+                    <div class="d-none mt-2" id="inlineTransferRow">
+                        <div id="inlineTransferAlerts"></div>
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-6">
+                                <label for="inlineNewOwnerSelect" class="form-label small mb-1">Nuevo propietario</label>
+                                <select class="form-select form-select-sm" id="inlineNewOwnerSelect"></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="inlineTransferReason" class="form-label small mb-1">Razón <span class="text-muted">(opcional)</span></label>
+                                <input type="text" class="form-control form-control-sm" id="inlineTransferReason" placeholder="Motivo de la transferencia">
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 mt-2">
+                            <button type="button" class="btn btn-sm btn-primary" id="btnInlineTransfer">
+                                <i class="ti ti-check me-1"></i>Transferir
+                            </button>
+                            <button type="button" class="btn btn-sm btn-light" id="btnInlineTransferCancel">Cancelar</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
