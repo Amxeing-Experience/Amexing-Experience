@@ -893,7 +893,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (indexB === -1) return -1;
                         return indexA - indexB;
                     });
-                    
+
+                    // Si es un solo día, mostrar el nombre completo (p.ej. "Lunes") en vez de la abreviatura.
+                    const fullDayMap = { 'Lu': 'Lunes', 'Ma': 'Martes', 'Mi': 'Miércoles', 'Ju': 'Jueves', 'Vi': 'Viernes', 'Sa': 'Sábado', 'Do': 'Domingo' };
+                    if (sortedDays.length === 1) {
+                        return fullDayMap[sortedDays[0]] || sortedDays[0];
+                    }
+
                     return sortedDays.length > 0 ? sortedDays.join(', ') : null;
                 } else {
                     return availability;
@@ -1153,7 +1159,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         return indexA - indexB;
                     });
                     
-                    formattedAvailability = sortedDays.length > 0 ? sortedDays.join(', ') : null;
+                    // Si es un solo día, mostrar el nombre completo (p.ej. "Lunes") en vez de la abreviatura.
+                    const fullDayMap = { 'Lu': 'Lunes', 'Ma': 'Martes', 'Mi': 'Miércoles', 'Ju': 'Jueves', 'Vi': 'Viernes', 'Sa': 'Sábado', 'Do': 'Domingo' };
+                    if (sortedDays.length === 1) {
+                        formattedAvailability = fullDayMap[sortedDays[0]] || sortedDays[0];
+                    } else {
+                        formattedAvailability = sortedDays.length > 0 ? sortedDays.join(', ') : null;
+                    }
                 } else if (exp.availability) {
                     formattedAvailability = exp.availability;
                 }
