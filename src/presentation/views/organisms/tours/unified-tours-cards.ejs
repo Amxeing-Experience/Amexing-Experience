@@ -1533,6 +1533,26 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
 
 <script>
+// Reserva anticipada (minutos) → días si >=24h; si no, horas y minutos (sin decimales).
+// A nivel de script para que la use tanto el render del card (DOMContentLoaded) como el
+// del detalle (IIFE aparte).
+function formatAdvanceBooking(totalMinutes) {
+    const mins = parseInt(totalMinutes);
+    if (!mins || isNaN(mins) || mins <= 0) return 'Reserva inmediata';
+    if (mins >= 1440) {
+        const days = Math.floor(mins / 1440);
+        const remHours = Math.floor((mins % 1440) / 60);
+        let out = `${days} ${days === 1 ? 'día' : 'días'}`;
+        if (remHours > 0) out += ` ${remHours} ${remHours === 1 ? 'hora' : 'horas'}`;
+        return out;
+    }
+    const hours = Math.floor(mins / 60);
+    const minutes = mins % 60;
+    if (hours > 0 && minutes > 0) return `${hours}h ${minutes}min`;
+    if (hours > 0) return `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+    return `${minutes} min`;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Tour management functionality
     let allTours = [];
@@ -2018,31 +2038,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            // Format advance booking time (value is in minutes)
-            let bookingTimeText = 'Reserva inmediata';
-            if (advanceBookingTime && advanceBookingTime > 0) {
-                const totalMinutes = parseInt(advanceBookingTime);
-                const hours = Math.floor(totalMinutes / 60);
-                const minutes = totalMinutes % 60;
-                
-                // If 24 hours or more, show in days
-                if (hours >= 24) {
-                    const days = Math.floor(hours / 24);
-                    bookingTimeText = days === 1 ? '1 día' : `${days} días`;
-                }
-                // If both hours and minutes
-                else if (hours > 0 && minutes > 0) {
-                    bookingTimeText = `${hours}h ${minutes}min`;
-                }
-                // If only hours
-                else if (hours > 0) {
-                    bookingTimeText = hours === 1 ? '1 hora' : `${hours} hrs`;
-                }
-                // If only minutes
-                else {
-                    bookingTimeText = minutes === 1 ? '1 minuto' : `${minutes} min`;
-                }
-            }
+            // Reserva anticipada: días si >=24h; si no, horas y minutos (misma función que el detalle).
+            const bookingTimeText = formatAdvanceBooking(advanceBookingTime);
             
             // Get pricing information
             let priceSection = '';
@@ -3232,7 +3229,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${tour.advance_booking_time ? `
                     <div class="alert alert-warning">
                         <i class="ti ti-clock-hour-4 me-2"></i>
-                        <strong>Reservar con anticipación:</strong> Mínimo ${formatDuration(tour.advance_booking_time)} antes
+                        <strong>Reservar con anticipación:</strong> Mínimo ${formatAdvanceBooking(tour.advance_booking_time)} antes
                     </div>
                 ` : ''}
                 
@@ -3240,7 +3237,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${tour.client_booking_notes ? `
                     <div class="content-section">
                         <h5><i class="ti ti-note me-2"></i>Notas de Reserva</h5>
-                        <p>${tour.client_booking_notes}</p>
+                        <p style="white-space: pre-line;">${tour.client_booking_notes}</p>
                     </div>
                 ` : ''}
 
@@ -3248,7 +3245,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${tour.notes ? `
                     <div class="content-section">
                         <h5><i class="ti ti-notes me-2"></i>Notas Adicionales</h5>
-                        <p>${tour.notes}</p>
+                        <p style="white-space: pre-line;">${tour.notes}</p>
                     </div>
                 ` : ''}
 
