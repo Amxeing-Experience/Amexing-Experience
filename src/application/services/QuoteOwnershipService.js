@@ -1091,9 +1091,20 @@ class QuoteOwnershipService {
     if (clientType === 'direct') {
       return this.getAvailableOwnersForClient({ clientType: 'direct' });
     }
-    const Client = Parse.Object.extend('Client');
-    const companyClient = Client.createWithoutData(clientId);
-    return this.getAvailableOwnersForClient({ companyClient, clientType });
+    // El id de agencia puede ser un `Client` (companyClientPtr) o un `AmexingUser` (legacy). Se
+    // resuelve cuál es ANTES de delegar; si se pasa el tipo equivocado, el fetch del core lanza y
+    // cae al fallback que devuelve TODAS las agencias.
+    const companyClient = await new Parse.Query(Parse.Object.extend('Client'))
+      .get(clientId, { useMasterKey: true }).catch(() => null);
+    if (companyClient) {
+      return this.getAvailableOwnersForClient({ companyClient, clientType });
+    }
+    const legacyClient = await new Parse.Query(Parse.Object.extend('AmexingUser'))
+      .get(clientId, { useMasterKey: true }).catch(() => null);
+    if (legacyClient) {
+      return this.getAvailableOwnersForClient({ legacyClient, clientType });
+    }
+    return { requiresClient: true, users: [] };
   }
 
   /**
