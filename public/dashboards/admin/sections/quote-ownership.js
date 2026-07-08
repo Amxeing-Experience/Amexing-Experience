@@ -789,6 +789,16 @@ class QuoteOwnershipManager {
         document.getElementById('btnInlineChangeOwner')?.addEventListener('click', () => this.openInlineTransfer());
         document.getElementById('btnInlineTransfer')?.addEventListener('click', () => this.transferOwnershipInline());
         document.getElementById('btnInlineTransferCancel')?.addEventListener('click', () => this.closeInlineTransfer());
+        // Al elegir un propietario en el combobox → personalizar/habilitar el botón "Transferir a X".
+        document.getElementById('inlineNewOwnerSelect')?.addEventListener('change', () => this.onInlineOwnerSelected());
+        // Razón opcional colapsable.
+        document.getElementById('btnToggleTransferReason')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('inlineTransferReason');
+            if (input) input.classList.remove('d-none');
+            e.currentTarget.classList.add('d-none');
+            input?.focus();
+        });
 
         // Add agent button (legacy)
         const addCollabBtn = document.getElementById('btnAddCollaborator');
@@ -3182,25 +3192,98 @@ class QuoteOwnershipManager {
     }
 
     // ===== Transferencia de propietario INLINE (sección Propietario, sin modal) =====
+    // Instancia customSelect del combobox de propietario (polling hasta que el átomo inicialice).
+    async _getOwnerCombobox(timeoutMs = 5000) {
+        const el0 = document.getElementById('inlineNewOwnerSelect');
+        if (el0 && el0.customSelect) return el0.customSelect;
+        return new Promise((resolve) => {
+            const start = Date.now();
+            const iv = setInterval(() => {
+                const el = document.getElementById('inlineNewOwnerSelect');
+                if (el && el.customSelect) { clearInterval(iv); resolve(el.customSelect); }
+                else if (Date.now() - start > timeoutMs) { clearInterval(iv); resolve(null); }
+            }, 100);
+        });
+    }
+
+    _resetInlineTransferButton() {
+        const btn = document.getElementById('btnInlineTransfer');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-check me-1"></i>Transferir';
+        }
+    }
+
     async openInlineTransfer() {
         const row = document.getElementById('inlineTransferRow');
         if (row) row.classList.remove('d-none');
         this._inlineTransferAlert('');
+        this._resetInlineTransferButton();
         try {
-            // Carga perezosa: solo al abrir el selector (no en el load de la página).
-            await this.loadAvailableUsers('inlineNewOwnerSelect');
+            await this._populateOwnerCombobox();
         } catch (e) {
             this._inlineTransferAlert('No se pudo cargar la lista de usuarios', 'danger');
+        }
+    }
+
+    // Puebla el combobox buscable con los owners del quote, excluyendo SOLO al propietario actual
+    // (los agentes SÍ pueden recibir la transferencia — antes se excluían por error).
+    async _populateOwnerCombobox() {
+        const inst = await this._getOwnerCombobox();
+        if (!inst) return;
+        const clientId = document.getElementById('clientId')?.value || '';
+        const qs = clientId ? `?clientId=${encodeURIComponent(clientId)}` : '';
+        const resp = await fetch(`/api/quotes/${this.quoteId}/available-owners${qs}`, {
+            headers: { Authorization: `Bearer ${this.getAccessToken()}` },
+        });
+        if (!resp.ok) {
+            if (resp.status === 400) {
+                const err = await resp.json().catch(() => ({}));
+                if (err.requiresClient) { this._inlineTransferAlert('Selecciona un cliente antes de transferir'); return; }
+            }
+            this._inlineTransferAlert('Error al cargar usuarios disponibles', 'danger');
+            return;
+        }
+        const json = await resp.json();
+        const users = (json && json.data) || [];
+        if (inst.clearOptions) inst.clearOptions();
+        users.forEach((u) => {
+            if (this.owner && !this.owner.isPlaceholder && u.id === this.owner.id) return;
+            const tag = u.isAdmin ? ' · Admin' : (u.isDepartmentManager ? ' · Agencia' : (u.isClient ? ' · Agente' : ''));
+            inst.addOption({
+                value: u.id,
+                text: `${u.firstName || ''} ${u.lastName || ''}`.trim() + (u.email ? ` - ${u.email}` : '') + tag,
+                firstName: u.firstName || '',
+                lastName: u.lastName || '',
+            });
+        });
+    }
+
+    // Al elegir un usuario: habilitar y personalizar el botón "Transferir a <Nombre>".
+    onInlineOwnerSelected() {
+        const inst = document.getElementById('inlineNewOwnerSelect')?.customSelect;
+        const btn = document.getElementById('btnInlineTransfer');
+        if (!inst || !btn) return;
+        const val = inst.getValue ? inst.getValue() : '';
+        const opt = val && inst.getOption ? inst.getOption(val) : null;
+        if (val && opt) {
+            const name = `${opt.firstName || ''} ${opt.lastName || ''}`.trim() || 'usuario';
+            btn.disabled = false;
+            btn.innerHTML = `<i class="ti ti-check me-1"></i>Transferir a ${name}`;
+        } else {
+            this._resetInlineTransferButton();
         }
     }
 
     closeInlineTransfer() {
         const row = document.getElementById('inlineTransferRow');
         if (row) row.classList.add('d-none');
-        const sel = document.getElementById('inlineNewOwnerSelect');
-        if (sel) sel.value = '';
+        const inst = document.getElementById('inlineNewOwnerSelect')?.customSelect;
+        if (inst && inst.clearOptions) inst.clearOptions();
         const reason = document.getElementById('inlineTransferReason');
-        if (reason) reason.value = '';
+        if (reason) { reason.value = ''; reason.classList.add('d-none'); }
+        document.getElementById('btnToggleTransferReason')?.classList.remove('d-none');
+        this._resetInlineTransferButton();
         this._inlineTransferAlert('');
     }
 
@@ -3213,14 +3296,14 @@ class QuoteOwnershipManager {
     }
 
     async transferOwnershipInline() {
-        const sel = document.getElementById('inlineNewOwnerSelect');
-        const newOwnerId = sel ? sel.value : '';
+        const inst = document.getElementById('inlineNewOwnerSelect')?.customSelect;
+        const newOwnerId = inst && inst.getValue ? inst.getValue() : '';
         const reason = document.getElementById('inlineTransferReason')?.value || '';
         if (!newOwnerId) {
             this._inlineTransferAlert('Por favor selecciona un nuevo propietario');
             return;
         }
-        // Sin popup de confirmación: el botón "Transferir" ya es la acción explícita.
+        // Sin popup de confirmación: el botón "Transferir a <Nombre>" ya es la acción explícita.
         this.setButtonLoading('btnInlineTransfer', true, 'Transfiriendo...');
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/ownership/transfer`, {
