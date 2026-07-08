@@ -1705,16 +1705,10 @@
             // For a-disposición, return empty to avoid redundancy (vehicle shown below)
             if (service.type === 'a-disposicion') return '';
 
-            // Establishment experiences: append "- ProviderName" to match the dropdown format
-            const isEstablishmentExp = service.type === 'experience'
-                && (service.providerType || '').toLowerCase() === 'establishment'
-                && service.providerName;
-
-            let base = service.concept || service.experienceName || service.tourName || service.name;
+            // Experiencias: se muestra solo el nombre (sin el "- Proveedor" que se agregaba antes
+            // a las de establecimiento), igual que en la lista de servicios del administrador.
+            const base = service.concept || service.experienceName || service.tourName || service.name;
             if (base) {
-                if (isEstablishmentExp && !base.includes(` - ${service.providerName}`)) {
-                    base = `${base} - ${service.providerName}`;
-                }
                 return base;
             }
 
