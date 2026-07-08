@@ -617,91 +617,11 @@ class ServicesController {
         }
       }
 
-      // Get client-specific prices if clientId is provided
-      const clientPricesMap = {};
-      if (clientId && serviceIds.length > 0) {
-        try {
-          // Since Parse SDK queries fail with "Service Unavailable", use a direct HTTP approach
-          const http = require('http');
-          const options = {
-            hostname: 'localhost',
-            port: 1337,
-            path: '/parse/classes/ClientPrices',
-            method: 'GET',
-            headers: {
-              'X-Parse-Application-Id': process.env.PARSE_APP_ID,
-              'X-Parse-Master-Key': process.env.PARSE_MASTER_KEY,
-            },
-          };
-
-          const clientPricesData = await new Promise((resolve, reject) => {
-            const httpReq = http.request(options, (httpRes) => {
-              let data = '';
-              httpRes.on('data', (chunk) => {
-                data += chunk;
-              });
-              httpRes.on('end', () => {
-                try {
-                  const parsed = JSON.parse(data);
-                  resolve(parsed);
-                } catch (error) {
-                  reject(new Error(`JSON parse error: ${error.message}`));
-                }
-              });
-            });
-
-            httpReq.on('error', (error) => {
-              reject(new Error(`HTTP request error: ${error.message}`));
-            });
-
-            httpReq.end();
-          });
-
-          // Filter for our client and services (only current active prices)
-          const relevantClientPrices = (clientPricesData.results || []).filter((cp) => {
-            const isOurClient = cp.clientPtr && cp.clientPtr.objectId === clientId;
-            const isServices = cp.itemType === 'SERVICES';
-            const isActive = cp.active === true;
-            const exists = cp.exists === true;
-            const isCurrent = cp.valid_until === null || cp.valid_until === undefined;
-            return isOurClient && isServices && isActive && exists && isCurrent;
-          });
-
-          // Create the pricing map - FIXED: Use vehiclePtr ID instead of ratePtr ID for consistency
-          relevantClientPrices.forEach((cp) => {
-            const clientServiceId = cp.itemId;
-            const clientRateId = cp.ratePtr?.objectId;
-            const clientVehicleId = cp.vehiclePtr?.objectId;
-            if (clientServiceId) {
-              const price = cp.precio || 0;
-
-              // Store by both rate and vehicle for flexibility in lookups
-              if (clientRateId) {
-                const keyByRate = `${clientServiceId}_RATE_${clientRateId}`;
-                clientPricesMap[keyByRate] = price;
-              }
-
-              if (clientVehicleId) {
-                const keyByVehicle = `${clientServiceId}_${clientVehicleId}`;
-                clientPricesMap[keyByVehicle] = price;
-              }
-
-              // Store by rate+vehicle combo for precise matching
-              if (clientRateId && clientVehicleId) {
-                const keyByBoth = `${clientServiceId}_${clientRateId}_${clientVehicleId}`;
-                clientPricesMap[keyByBoth] = price;
-              }
-            }
-          });
-        } catch (error) {
-          logger.error('Error loading client prices for services', {
-            clientId,
-            error: error.message,
-            errorCode: error.code,
-            errorStack: error.stack,
-          });
-        }
-      }
+      // Client-specific prices are applied by the getServiceVehicleTypeAndPrice() helper below
+      // (correct Parse SDK query filtered by clientPtr / itemType='SERVICES' / itemId / active /
+      // exists / valid_until IS NULL). The previous direct-HTTP workaround (hardcoded localhost:1337
+      // and an unfiltered fetch capped at 100 rows) was redundant and fragile, so it was removed —
+      // the helper is the single source of truth for client prices.
 
       // Format data for DataTables (with async helper support)
       const data = await Promise.all(
@@ -734,46 +654,6 @@ class ServicesController {
               let pricingData = null;
               if (serviceId) {
                 pricingData = await this.getServiceVehicleTypeAndPrice(serviceId, clientId, rateId);
-
-                // DEBUG: Check if we have client price overrides available
-                if (clientId && clientPricesMap && Object.keys(clientPricesMap).length > 0) {
-                  // Check all possible key formats for this service
-                  const possibleKeys = [
-                    `${serviceId}_RATE_${rateId}`,
-                    `${serviceId}_${pricingData?.vehicleType?.id}`,
-                    `${serviceId}_${rateId}_${pricingData?.vehicleType?.id}`,
-                  ];
-
-                  // console.log(`🔍 Checking for client price overrides for service ${serviceId}:`, {
-                  //   serviceId,
-                  //   clientId,
-                  //   rateId,
-                  //   vehicleId: pricingData?.vehicleType?.id,
-                  //   possibleKeys,
-                  //   availableKeys: Object.keys(clientPricesMap).filter((k) => k.includes(serviceId)),
-                  //   originalPrice: pricingData?.finalPrice,
-                  // });
-
-                  for (const key of possibleKeys) {
-                    if (clientPricesMap[key]) {
-                      // console.log(
-                      //   `✅ Found client price override for service ${serviceId}: ${clientPricesMap[key]} MXN (key: ${key})`
-                      // );
-                      // Override the price from the helper with the client-specific price
-                      if (pricingData) {
-                        pricingData.finalPrice = clientPricesMap[key];
-                        pricingData.isClientPrice = true;
-                      }
-                      break;
-                    }
-                  }
-
-                  if (!pricingData?.isClientPrice) {
-                    // console.log(
-                    //   `⚠️ No client price override found for service ${serviceId}, using base price: ${pricingData?.finalPrice} MXN`
-                    // );
-                  }
-                }
               }
 
               // Simple pricing: Use the helper method for consistency
