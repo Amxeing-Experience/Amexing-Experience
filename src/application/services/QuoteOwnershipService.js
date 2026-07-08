@@ -42,11 +42,16 @@ class QuoteOwnershipService {
    * @returns {Promise<object>} Ownership record.
    * @example
    */
-  async initializeOwnership(quoteId, ownerId) {
+  async initializeOwnership(quoteId, ownerId, createdById = ownerId) {
     try {
       // Get quote and owner objects
       const quote = await this.getQuoteById(quoteId);
       const owner = await this.getUserById(ownerId);
+      // El creador puede diferir del propietario (p.ej. admin crea la cotización y asigna el
+      // propietario inicial a otro usuario). createdBy debe quedar como el creador real.
+      const createdByUser = (createdById && createdById !== ownerId)
+        ? (await this.getUserById(createdById)) || owner
+        : owner;
 
       if (!quote) {
         throw new Error('Quote not found');
@@ -59,9 +64,9 @@ class QuoteOwnershipService {
       // Create initial ownership record
       const ownership = await QuoteOwnership.createInitialOwnership(quote, owner);
 
-      // Update quote with owner reference
+      // Update quote with owner reference (createdBy = creador, owner = elegido)
       quote.setOwner(owner);
-      quote.setCreatedBy(owner);
+      quote.setCreatedBy(createdByUser);
       await quote.save(null, { useMasterKey: true });
 
       // Record edit for ownership initialization
@@ -863,18 +868,26 @@ class QuoteOwnershipService {
    * @example
    */
   async getAvailableOwners(quoteId) {
+    const quote = await this.getQuoteById(quoteId);
+    if (!quote) {
+      logger.warn('Quote not found in getAvailableOwners', { quoteId });
+      return [];
+    }
+    // Resolver el cliente del quote y delegar al core reutilizable.
+    const companyClient = quote.get('companyClientPtr');
+    const legacyClient = quote.getClient(); // AmexingUser for backward compatibility
+    const clientType = quote.get('clientType');
+    return this.getAvailableOwnersForClient({
+      companyClient, legacyClient, clientType, quoteId,
+    });
+  }
+
+  // Resuelve los owners disponibles a partir de objetos de cliente YA conocidos (Client /
+  // AmexingUser). Extraído de getAvailableOwners para poder reusarlo sin quote (cotización nueva).
+  async getAvailableOwnersForClient({
+    companyClient = null, legacyClient = null, clientType = null, quoteId = null,
+  }) {
     try {
-      const quote = await this.getQuoteById(quoteId);
-      if (!quote) {
-        logger.warn('Quote not found in getAvailableOwners', { quoteId });
-        return [];
-      }
-
-      // Get the quote's client company (Client table, not AmexingUser)
-      const companyClient = quote.get('companyClientPtr');
-      const legacyClient = quote.getClient(); // AmexingUser for backward compatibility
-      const clientType = quote.get('clientType'); // Check if this is a direct client quote
-
       // For direct client quotes (clientType = "direct"), only companyClientPtr is required
       // For agency quotes, either companyClient or legacyClient is required
       const isDirectClient = clientType === 'direct';
@@ -1069,6 +1082,29 @@ class QuoteOwnershipService {
       // Return safe fallback
       return this.getAllDepartmentManagersAndAdmins();
     }
+  }
+
+  // Variante por clientId (SIN quote): para asignar el propietario inicial en una cotización nueva.
+  // En agencia el clientId es un id de `Client` (se hidrata dentro del core); en directo solo admins.
+  async getAvailableOwnersForClientId({ clientId, clientType = null }) {
+    if (!clientId) return { requiresClient: true, users: [] };
+    if (clientType === 'direct') {
+      return this.getAvailableOwnersForClient({ clientType: 'direct' });
+    }
+    // El id de agencia puede ser un `Client` (companyClientPtr) o un `AmexingUser` (legacy). Se
+    // resuelve cuál es ANTES de delegar; si se pasa el tipo equivocado, el fetch del core lanza y
+    // cae al fallback que devuelve TODAS las agencias.
+    const companyClient = await new Parse.Query(Parse.Object.extend('Client'))
+      .get(clientId, { useMasterKey: true }).catch(() => null);
+    if (companyClient) {
+      return this.getAvailableOwnersForClient({ companyClient, clientType });
+    }
+    const legacyClient = await new Parse.Query(Parse.Object.extend('AmexingUser'))
+      .get(clientId, { useMasterKey: true }).catch(() => null);
+    if (legacyClient) {
+      return this.getAvailableOwnersForClient({ legacyClient, clientType });
+    }
+    return { requiresClient: true, users: [] };
   }
 
   /**

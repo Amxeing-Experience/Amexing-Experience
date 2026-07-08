@@ -111,6 +111,9 @@ class QuoteOwnershipManager {
                 // Setup event listeners even for new quotes
                 this.setupEventListeners();
                 this.dataLoaded = true; // Mark as loaded for new quotes
+                // Propietario inicial (solo admin/superadmin, cotización nueva): permitir elegir
+                // quién será el propietario al crear.
+                this._setupInitialOwnerSelector();
                 return;
             }
 
@@ -155,6 +158,12 @@ class QuoteOwnershipManager {
             await this.dataLoadingPromise;
             this.dataLoaded = true;
             console.log('Initial data loading complete, dataLoaded:', this.dataLoaded);
+
+            // Recalcular canTransfer y refrescar el display con userAccess YA cargado. En el
+            // Promise.all, loadOwnership llama displayOwner antes de que loadUserAccess termine,
+            // así que para un owner (no admin) canTransfer salía false y el botón "Cambiar" no
+            // aparecía hasta abrir el modal. Este segundo displayOwner lo corrige.
+            this.displayOwner();
 
             // Capture the originally saved client ID when page loads
             this.captureOriginalClient();
@@ -362,8 +371,10 @@ class QuoteOwnershipManager {
             if (ownerSinceEl) ownerSinceEl.textContent = 'Desde: ' + new Date(this.owner.ownershipStartDate).toLocaleDateString('es-MX');
         }
 
-        // Store transfer capability for use in consolidated modal
-        const userRole = window.currentUser?.role || '';
+        // Store transfer capability for use in consolidated modal.
+        // Fuentes múltiples del rol para evitar races de inicialización (window.currentUser puede
+        // no estar seteado todavía en la carga inicial).
+        const userRole = window.currentUser?.role || this.currentUserRole || window.userRole || document.body.dataset.userRole || '';
         const currentUserId = window.currentUser?.id || window.currentUserData?.id || '';
 
         // Check if current user is the creator (when isDefaultOwner is true)
@@ -386,6 +397,125 @@ class QuoteOwnershipManager {
 
         // Update compact owner display in quote information form
         this.updateCompactOwnerDisplay();
+    }
+
+    // Propietario inicial (cotización nueva): revela el selector y lo puebla. El markup
+    // #initialOwnerRow solo se renderiza para admin/superadmin (gate EJS), así que su existencia
+    // implica el permiso; no dependemos de window.currentUser (que puede no estar seteado aún).
+    _setupInitialOwnerSelector() {
+        const row = document.getElementById('initialOwnerRow');
+        if (!row) return;
+        row.classList.remove('d-none');
+        // Evitar repetición: en cotización nueva el selector ES el propietario, así que ocultamos
+        // el display compacto de "propietario actual" (mostraría el mismo usuario).
+        document.getElementById('ownerDisplayBlock')?.classList.add('d-none');
+        // Al elegir propietario inicial, notificar al form (mismo evento que la transferencia) para
+        // que "el contacto es el propietario" refleje al SELECCIONADO, no al creador. Se ata antes
+        // de poblar para captar también el setValue por defecto.
+        document.getElementById('initialOwnerSelect')?.addEventListener('change', () => this._onInitialOwnerChanged());
+        this.loadInitialOwnerOptions();
+        document.getElementById('clientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
+        document.getElementById('directClientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
+    }
+
+    // Propaga el propietario inicial seleccionado al formulario de contacto vía quoteOwnerChanged
+    // (el listener en quote-information.ejs actualiza window.__quoteOwner y el resumen del contacto).
+    _onInitialOwnerChanged() {
+        const id = document.getElementById('initialOwnerSelect')?.value || '';
+        const u = (this._initialOwnerUsers || []).find((x) => x.id === id);
+        if (!u) return;
+        document.dispatchEvent(new CustomEvent('quoteOwnerChanged', {
+            detail: {
+                firstName: u.firstName || '',
+                lastName: u.lastName || '',
+                email: u.email || '',
+                phone: u.phone || '',
+                fullName: `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+            },
+        }));
+    }
+
+    // Puebla el combobox buscable #initialOwnerSelect con los owners disponibles del cliente
+    // (endpoint sin quote), lista plana con tag de rol (mismo estilo que la transferencia).
+    // Loader/errores en #initialOwnerAlerts. Default: el usuario actual (creador).
+    async loadInitialOwnerOptions() {
+        const inst = await this._getOwnerCombobox('initialOwnerSelect');
+        if (!inst) return;
+        const alert = (msg, type = 'info') => this._inlineTransferAlert(msg, type, 'initialOwnerAlerts');
+
+        const directRow = document.getElementById('directClientRow');
+        const isDirect = !!directRow && window.getComputedStyle(directRow).display !== 'none';
+        const clientId = isDirect
+            ? (document.getElementById('directClientId')?.value || '')
+            : (document.getElementById('clientId')?.value || '');
+        const clientType = isDirect ? 'direct' : 'agency';
+        const meId = window.currentUser?.id || window.currentUserData?.id || '';
+        const meName = (window.currentUserData
+            ? `${window.currentUserData.firstName || ''} ${window.currentUserData.lastName || ''}`.trim()
+            : '') || (window.currentUser && window.currentUser.name) || 'Yo';
+        const meEmail = window.currentUserData?.email || window.currentUser?.email || '';
+        const meLabel = `${meName}${meEmail ? ` - ${meEmail}` : ''} (yo)`;
+        const meUser = {
+            id: meId,
+            firstName: window.currentUserData?.firstName || meName,
+            lastName: window.currentUserData?.lastName || '',
+            email: meEmail,
+            phone: window.currentUserData?.phone || '',
+        };
+
+        const setJustMe = () => {
+            alert('');
+            this._initialOwnerUsers = meId ? [meUser] : [];
+            if (inst.clearOptions) inst.clearOptions();
+            if (meId && inst.addOption) {
+                inst.addOption({ value: meId, text: meLabel, firstName: meUser.firstName, lastName: meUser.lastName });
+                inst.setValue(meId);
+            }
+        };
+        if (!clientId) { setJustMe(); return; }
+
+        alert('Cargando propietarios…', 'info');
+        if (inst.clearOptions) inst.clearOptions();
+        let resp;
+        try {
+            resp = await fetch(`/api/quotes/owners/available?clientId=${encodeURIComponent(clientId)}&clientType=${encodeURIComponent(clientType)}`, {
+                headers: { Authorization: `Bearer ${this.getAccessToken()}` },
+            });
+        } catch (e) { setJustMe(); return; }
+        if (!resp.ok) { setJustMe(); return; }
+        const json = await resp.json();
+        const users = (json && json.data) || [];
+        if (inst.clearOptions) inst.clearOptions();
+
+        // Guardar la lista (con email/phone) para que _onInitialOwnerChanged pueda propagar los
+        // datos del seleccionado al contacto. Incluir al creador como default aunque no venga.
+        this._initialOwnerUsers = users.map((u) => ({
+            id: u.id,
+            firstName: u.firstName || '',
+            lastName: u.lastName || '',
+            email: u.email || '',
+            phone: u.phone || '',
+        }));
+
+        // Asegurar al usuario actual como opción (default) aunque no venga en la lista.
+        if (meId && !users.some((u) => u.id === meId)) {
+            this._initialOwnerUsers.unshift(meUser);
+            inst.addOption({ value: meId, text: meLabel, firstName: meUser.firstName, lastName: meUser.lastName });
+        }
+        users.forEach((u) => {
+            const tag = u.isAdmin ? ' · Admin' : (u.isDepartmentManager ? ' · Agencia' : (u.isClient ? ' · Agente' : ''));
+            inst.addOption({
+                value: u.id,
+                text: `${u.firstName || ''} ${u.lastName || ''}`.trim()
+                    + (u.email ? ` - ${u.email}` : '')
+                    + (u.id === meId ? ' (yo)' : '') + tag,
+                firstName: u.firstName || '',
+                lastName: u.lastName || '',
+            });
+        });
+        alert('');
+        if (meId) inst.setValue(meId);
+        else if (users[0]) inst.setValue(users[0].id);
     }
 
     // Cotización nueva: el propietario es el usuario actual (creador). No hay owner en el backend
@@ -443,6 +573,15 @@ class QuoteOwnershipManager {
         // Show the content (in case it was hidden)
         compactNameEl.style.display = 'block';
         compactEmailEl.style.display = 'block';
+
+        // Con un propietario real cargado (cotización existente o recién guardada) el selector
+        // "Propietario inicial" (solo del alta) sobra: se oculta y se muestra el display + transferencia.
+        document.getElementById('initialOwnerRow')?.classList.add('d-none');
+        document.getElementById('ownerDisplayBlock')?.classList.remove('d-none');
+
+        // Botón "Cambiar propietario" (transferencia inline): solo si el usuario puede transferir.
+        const changeBtn = document.getElementById('btnInlineChangeOwner');
+        if (changeBtn) changeBtn.classList.toggle('d-none', !this.canTransfer);
     }
 
     displayUserAccessWithOwner() {
@@ -662,6 +801,21 @@ class QuoteOwnershipManager {
         if (confirmTransferBtn) {
             confirmTransferBtn.addEventListener('click', () => this.transferOwnership());
         }
+
+        // Transferencia INLINE (sección Propietario, sin modal)
+        document.getElementById('btnInlineChangeOwner')?.addEventListener('click', () => this.openInlineTransfer());
+        document.getElementById('btnInlineTransfer')?.addEventListener('click', () => this.transferOwnershipInline());
+        document.getElementById('btnInlineTransferCancel')?.addEventListener('click', () => this.closeInlineTransfer());
+        // Al elegir un propietario en el combobox → personalizar/habilitar el botón "Transferir a X".
+        document.getElementById('inlineNewOwnerSelect')?.addEventListener('change', () => this.onInlineOwnerSelected());
+        // Razón opcional colapsable.
+        document.getElementById('btnToggleTransferReason')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('inlineTransferReason');
+            if (input) input.classList.remove('d-none');
+            e.currentTarget.classList.add('d-none');
+            input?.focus();
+        });
 
         // Add agent button (legacy)
         const addCollabBtn = document.getElementById('btnAddCollaborator');
@@ -1003,8 +1157,11 @@ class QuoteOwnershipManager {
                 console.log('Client was just changed - forcing fresh user data load');
             }
 
-            await this.loadAvailableUsers('newOwnerSelectMain');
-            await this.loadUsersForDropdown();
+            // Ambos pegan a /available-owners; en paralelo en vez de secuencial (−1 round-trip).
+            await Promise.all([
+                this.loadAvailableUsers('newOwnerSelectMain'),
+                this.loadUsersForDropdown(),
+            ]);
 
             // Reset placeholder text after loading new users
             if (this.clientWasJustChanged) {
@@ -3051,6 +3208,179 @@ class QuoteOwnershipManager {
         console.log('=== END MODAL OWNERSHIP DISPLAY ===');
     }
 
+    // ===== Transferencia de propietario INLINE (sección Propietario, sin modal) =====
+    // Instancia customSelect del combobox de propietario (polling hasta que el átomo inicialice).
+    async _getOwnerCombobox(elId = 'inlineNewOwnerSelect', timeoutMs = 5000) {
+        const el0 = document.getElementById(elId);
+        if (el0 && el0.customSelect) return el0.customSelect;
+        return new Promise((resolve) => {
+            const start = Date.now();
+            const iv = setInterval(() => {
+                const el = document.getElementById(elId);
+                if (el && el.customSelect) { clearInterval(iv); resolve(el.customSelect); }
+                else if (Date.now() - start > timeoutMs) { clearInterval(iv); resolve(null); }
+            }, 100);
+        });
+    }
+
+    _resetInlineTransferButton() {
+        const btn = document.getElementById('btnInlineTransfer');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ti ti-check"></i>';
+            btn.title = 'Transferir';
+        }
+    }
+
+    async openInlineTransfer() {
+        // El editor OCUPA el lugar del display del propietario (se oculta para no repetir).
+        document.getElementById('ownerDisplayBlock')?.classList.add('d-none');
+        const row = document.getElementById('inlineTransferRow');
+        if (row) row.classList.remove('d-none');
+        this._inlineTransferAlert('');
+        this._resetInlineTransferButton();
+        try {
+            await this._populateOwnerCombobox();
+        } catch (e) {
+            this._inlineTransferAlert('No se pudo cargar la lista de usuarios', 'danger');
+        }
+    }
+
+    // Puebla el combobox buscable con los owners del quote, excluyendo SOLO al propietario actual
+    // (los agentes SÍ pueden recibir la transferencia — antes se excluían por error).
+    async _populateOwnerCombobox() {
+        // Estado de carga visible (cubre la inicialización del átomo + el fetch).
+        this._inlineTransferAlert('Cargando propietarios…', 'info');
+        const inst = await this._getOwnerCombobox();
+        if (!inst) { this._inlineTransferAlert('No se pudo inicializar el selector', 'danger'); return; }
+        if (inst.clearOptions) inst.clearOptions();
+
+        const clientId = document.getElementById('clientId')?.value || '';
+        const qs = clientId ? `?clientId=${encodeURIComponent(clientId)}` : '';
+        let resp;
+        try {
+            resp = await fetch(`/api/quotes/${this.quoteId}/available-owners${qs}`, {
+                headers: { Authorization: `Bearer ${this.getAccessToken()}` },
+            });
+        } catch (e) {
+            this._inlineTransferAlert('Error de red al cargar usuarios', 'danger');
+            return;
+        }
+        if (!resp.ok) {
+            if (resp.status === 400) {
+                const err = await resp.json().catch(() => ({}));
+                if (err.requiresClient) { this._inlineTransferAlert('Selecciona un cliente antes de transferir'); return; }
+            }
+            this._inlineTransferAlert('Error al cargar usuarios disponibles', 'danger');
+            return;
+        }
+        const json = await resp.json();
+        const users = ((json && json.data) || []).filter(
+            (u) => !(this.owner && !this.owner.isPlaceholder && u.id === this.owner.id),
+        );
+        if (inst.clearOptions) inst.clearOptions();
+        if (!users.length) {
+            this._inlineTransferAlert('No hay otros usuarios disponibles para transferir', 'warning');
+            return;
+        }
+        this._inlineTransferAlert(''); // limpiar el "Cargando…"
+        users.forEach((u) => {
+            const tag = u.isAdmin ? ' · Admin' : (u.isDepartmentManager ? ' · Agencia' : (u.isClient ? ' · Agente' : ''));
+            inst.addOption({
+                value: u.id,
+                text: `${u.firstName || ''} ${u.lastName || ''}`.trim() + (u.email ? ` - ${u.email}` : '') + tag,
+                firstName: u.firstName || '',
+                lastName: u.lastName || '',
+            });
+        });
+    }
+
+    // Al elegir un usuario: habilitar y personalizar el botón "Transferir a <Nombre>".
+    onInlineOwnerSelected() {
+        const inst = document.getElementById('inlineNewOwnerSelect')?.customSelect;
+        const btn = document.getElementById('btnInlineTransfer');
+        if (!inst || !btn) return;
+        const val = inst.getValue ? inst.getValue() : '';
+        const opt = val && inst.getOption ? inst.getOption(val) : null;
+        if (val && opt) {
+            const name = `${opt.firstName || ''} ${opt.lastName || ''}`.trim() || 'usuario';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ti ti-check"></i>';
+            btn.title = `Transferir a ${name}`;
+        } else {
+            this._resetInlineTransferButton();
+        }
+    }
+
+    closeInlineTransfer() {
+        // Restaurar el display del propietario y ocultar el editor.
+        document.getElementById('ownerDisplayBlock')?.classList.remove('d-none');
+        const row = document.getElementById('inlineTransferRow');
+        if (row) row.classList.add('d-none');
+        const inst = document.getElementById('inlineNewOwnerSelect')?.customSelect;
+        if (inst && inst.clearOptions) inst.clearOptions();
+        const reason = document.getElementById('inlineTransferReason');
+        if (reason) { reason.value = ''; reason.classList.add('d-none'); }
+        document.getElementById('btnToggleTransferReason')?.classList.remove('d-none');
+        this._resetInlineTransferButton();
+        this._inlineTransferAlert('');
+    }
+
+    _inlineTransferAlert(message, type = 'warning', containerId = 'inlineTransferAlerts') {
+        const c = document.getElementById(containerId);
+        if (!c) return;
+        c.innerHTML = message
+            ? `<div class="alert alert-${type} alert-dismissible fade show py-1 px-2 mb-2" role="alert"><small>${message}</small><button type="button" class="btn-close p-2" data-bs-dismiss="alert" aria-label="Close"></button></div>`
+            : '';
+    }
+
+    async transferOwnershipInline() {
+        const inst = document.getElementById('inlineNewOwnerSelect')?.customSelect;
+        const newOwnerId = inst && inst.getValue ? inst.getValue() : '';
+        const reason = document.getElementById('inlineTransferReason')?.value || '';
+        if (!newOwnerId) {
+            this._inlineTransferAlert('Por favor selecciona un nuevo propietario');
+            return;
+        }
+        // Sin popup de confirmación: el botón "Transferir a <Nombre>" ya es la acción explícita.
+        this.setButtonLoading('btnInlineTransfer', true, 'Transfiriendo...');
+        try {
+            const response = await fetch(`/api/quotes/${this.quoteId}/ownership/transfer`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.getAccessToken()}` },
+                body: JSON.stringify({ newOwnerId, reason }),
+            });
+            if (!response.ok) {
+                let msg = 'Error al transferir propiedad';
+                try { const e = await response.json(); msg = e.error || msg; } catch (_) { /* noop */ }
+                this._inlineTransferAlert(msg, 'danger');
+                return;
+            }
+            // Recarga ligera en paralelo, refresca el display del propietario y notifica al
+            // formulario para que el Contacto (si "es el propietario") se actualice en caliente.
+            await Promise.all([this.loadOwnership(), this.loadUserAccess()]);
+            this.displayOwner();
+            document.dispatchEvent(new CustomEvent('quoteOwnerChanged', {
+                detail: {
+                    firstName: this.owner?.firstName || '',
+                    lastName: this.owner?.lastName || '',
+                    email: this.owner?.email || '',
+                    phone: this.owner?.phone || '',
+                    fullName: this.owner?.fullName || `${this.owner?.firstName || ''} ${this.owner?.lastName || ''}`.trim(),
+                },
+            }));
+            this.showSuccess('Propiedad transferida exitosamente');
+            this.closeInlineTransfer();
+            // Permisos de página en segundo plano: no bloquea la respuesta visual.
+            this.checkAndUpdatePagePermissions();
+        } catch (error) {
+            console.error('Error transferring ownership (inline):', error);
+            this._inlineTransferAlert('Error al transferir propiedad', 'danger');
+        } finally {
+            this.setButtonLoading('btnInlineTransfer', false);
+        }
+    }
+
     async transferOwnership() {
         const newOwnerId = document.getElementById('newOwnerSelectMain').value;
         const reason = document.getElementById('transferReasonMain').value;
@@ -3118,11 +3448,9 @@ class QuoteOwnershipManager {
                 console.log('=== STARTING OWNERSHIP DATA RELOAD AFTER TRANSFER ===');
                 console.log('Current owner before reload:', this.owner);
 
-                await this.loadOwnership();
-                console.log('Owner after loadOwnership:', this.owner);
-
-                await this.loadUserAccess();
-                console.log('User access after reload:', this.userAccess);
+                // Recarga en paralelo (antes eran dos awaits secuenciales → doble latencia).
+                await Promise.all([this.loadOwnership(), this.loadUserAccess()]);
+                console.log('Owner/access after reload:', this.owner, this.userAccess);
 
                 console.log('=== OWNERSHIP DATA RELOAD COMPLETED ===');
 
