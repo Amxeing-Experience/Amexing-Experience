@@ -1,0 +1,529 @@
+<%
+/**
+ * Vehicles Catalog Page (shared markup for client / department_manager)
+ * View-only luxury card catalog of the Amexing fleet.
+ *
+ * Layout:
+ * - Filters: search + Segmento (tarifa) + Tipo
+ * - Responsive card grid (photo + segment/type badge, class/rate badge,
+ *   capacity, carry-on, amenities, "Ver imágenes" → gallery)
+ *
+ * Read-only for both roles. Admin keeps its own management table.
+ * Created by Denisse Maldonado.
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'client';
+const activeSection = typeof section !== 'undefined' ? section : 'vehicles';
+%>
+
+<!-- Serif not used — luxury palette, sans typography (consistency with Experiencias) -->
+
+<!-- Page Header with Breadcrumb -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="mb-1 fw-bold">Vehículos</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/<%= currentUserRole %>" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-car me-1"></i>Vehículos
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="vfleet">
+
+    <!-- Filtros -->
+    <div class="vfleet-filters">
+        <div class="field">
+            <i class="ti ti-search ic"></i>
+            <input type="text" id="searchVehicle" placeholder="Buscar por marca o modelo…">
+        </div>
+        <div class="field sel">
+            <select id="filterRate">
+                <option value="">Filtrar por Segmento</option>
+                <!-- Options loaded dynamically -->
+            </select>
+        </div>
+        <div class="field sel">
+            <select id="filterType">
+                <option value="">Filtrar por Tipo</option>
+                <!-- Options loaded dynamically -->
+            </select>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="vehiclesLoading" class="vfleet-state">
+        <div class="spinner-border" role="status"><span class="visually-hidden">Cargando vehículos...</span></div>
+        <p>Cargando vehículos…</p>
+    </div>
+
+    <!-- Grid -->
+    <div id="vehiclesGrid" class="vfleet-grid" style="display: none;">
+        <!-- Vehicle cards injected dynamically -->
+    </div>
+
+    <!-- No results -->
+    <div id="noVehiclesMessage" class="vfleet-state" style="display: none;">
+        <i class="ti ti-car-off"></i>
+        <p>No se encontraron vehículos con los filtros seleccionados</p>
+    </div>
+</div>
+
+<!-- ═══════════ Fullscreen Vehicle Images Gallery Modal (same UX as a-disposición) ═══════════ -->
+<div class="modal fade" id="vehGalleryModal" tabindex="-1" aria-labelledby="vehGalleryLabel" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content veh-gallery-modal">
+            <div class="modal-header border-0 position-absolute top-0 start-0 w-100" style="z-index: 1060;">
+                <div class="d-flex justify-content-between align-items-center w-100 p-3">
+                    <h5 class="modal-title text-white" id="vehGalleryLabel">Galería del vehículo</h5>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-white veh-gallery-counter" id="vehGalleryCounter"></span>
+                        <button type="button" class="veh-gallery-close" data-bs-dismiss="modal" aria-label="Cerrar galería" title="Cerrar galería">
+                            <i class="ti ti-x"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-body p-0 d-flex align-items-center justify-content-center position-relative">
+                <div id="vehGalleryLoading" class="veh-gallery-state">
+                    <div class="spinner-border text-light" role="status"><span class="visually-hidden">Cargando…</span></div>
+                </div>
+                <div id="vehGalleryEmpty" class="veh-gallery-state" style="display: none;">
+                    <i class="ti ti-photo-off"></i>
+                    <p>No hay imágenes para este vehículo</p>
+                </div>
+                <div class="veh-gallery-main">
+                    <img id="vehGalleryMainImage" src="" alt="" class="veh-gallery-image" style="display: none;">
+                </div>
+                <button class="veh-gallery-nav veh-gallery-nav--prev" id="vehGalleryPrev" aria-label="Anterior" style="display: none;">
+                    <i class="ti ti-chevron-left"></i>
+                </button>
+                <button class="veh-gallery-nav veh-gallery-nav--next" id="vehGalleryNext" aria-label="Siguiente" style="display: none;">
+                    <i class="ti ti-chevron-right"></i>
+                </button>
+            </div>
+            <div class="veh-gallery-thumbs position-absolute bottom-0 start-0 w-100">
+                <div class="veh-gallery-thumbs-inner" id="vehGalleryThumbs"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fleet catalog styles (luxury) -->
+<style>
+.vfleet {
+    --tile:#E7E3DA; --tile2:#DED9CB; --border:#e6e2d8;
+    --olive:#6E7A50; --olive-d:#5c6743; --olive-light:#7C8A5A; --muted:#8a8f78; --gold:#b8894a; --dark:#2b2b2b;
+    color: var(--dark);
+}
+
+/* Filtros */
+.vfleet-filters { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+.vfleet .field { position: relative; }
+.vfleet .field input, .vfleet .field select { width: 100%; font-size: .95rem; color: var(--dark); background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 14px 18px; appearance: none; }
+.vfleet .field input { padding-left: 44px; }
+.vfleet .field input::placeholder { color: var(--muted); }
+.vfleet .field .ic { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 1.05rem; }
+.vfleet .field.sel::after { content: '⌄'; position: absolute; right: 18px; top: 42%; transform: translateY(-50%); color: var(--muted); font-size: 1.2rem; pointer-events: none; }
+.vfleet .field input:focus, .vfleet .field select:focus { outline: none; border-color: var(--olive); }
+
+/* Estados (loading / vacío) */
+.vfleet-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+.vfleet-state .spinner-border { color: var(--olive); }
+.vfleet-state i { font-size: 3rem; color: var(--border); }
+.vfleet-state p { margin-top: 14px; }
+
+/* Grid — 3 por fila */
+.vfleet-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+@media (max-width: 1200px) { .vfleet-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 720px) { .vfleet-grid { grid-template-columns: 1fr; } }
+
+.vcard { background: #fff; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; transition: .18s; }
+.vcard:hover { box-shadow: 0 10px 26px rgba(43,43,43,.12); transform: translateY(-3px); }
+
+/* Media */
+.vcard__media { position: relative; aspect-ratio: 16/10; background: #1c1c1c; overflow: hidden; }
+.vcard__media img.vehicle-main-image { width: 100%; height: 100%; object-fit: cover; transition: .4s; }
+.vcard:hover .vcard__media img.vehicle-main-image { transform: scale(1.04); }
+.vcard__media::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.35), rgba(0,0,0,0) 40%); pointer-events: none; }
+.vcard__media .no-image { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: #f2efe6; }
+.vcard__media .no-image img { max-width: 58%; max-height: 46%; object-fit: contain; }
+.vcard__segment { position: absolute; top: 14px; right: 14px; z-index: 2; background: rgba(43,43,43,.5); backdrop-filter: blur(3px); color: #fff; font-size: .64rem; letter-spacing: .16em; text-transform: uppercase; font-weight: 600; padding: 6px 11px; border-radius: 3px; }
+
+/* Body */
+.vcard__body { padding: 18px 22px 22px; display: flex; flex-direction: column; flex: 1; }
+.vcard__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.vcard__title { font-size: 1.05rem; letter-spacing: .04em; text-transform: uppercase; font-weight: 600; color: var(--dark); line-height: 1.25; }
+.vcard__class { flex: 0 0 auto; font-size: .6rem; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; padding: 5px 9px; border-radius: 3px; white-space: nowrap; margin-top: 2px; color: #fff; }
+
+.vspec { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.vspec .k { font-size: .68rem; letter-spacing: .16em; text-transform: uppercase; color: var(--olive); font-weight: 600; }
+.vspec .v { font-size: .88rem; color: var(--muted); }
+
+.vamenities { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
+.vamenities span { font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; color: var(--olive-d); font-weight: 600; background: rgba(110,122,80,.1); border: 1px solid rgba(110,122,80,.32); border-radius: 4px; padding: 6px 12px; }
+
+.vactions { display: flex; gap: 10px; margin-top: auto; padding-top: 18px; }
+.vbtn { flex: 1; border: 1px solid var(--olive); background: transparent; color: var(--olive-d); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; padding: 13px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: .15s; }
+.vbtn:hover { background: var(--olive); color: #fff; }
+
+/* Fullscreen gallery (same UX as a-disposición) */
+.veh-gallery-modal { background: #000; border: none; }
+.veh-gallery-state { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: #cfd3c2; z-index: 6; }
+.veh-gallery-state i { font-size: 3rem; opacity: .7; }
+.veh-gallery-main { width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.veh-gallery-image { max-width: 90%; max-height: 82vh; object-fit: contain; }
+.veh-gallery-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255,255,255,.1); border: 2px solid rgba(255,255,255,.3); color: #fff; width: 60px; height: 60px; border-radius: 50%; align-items: center; justify-content: center; font-size: 1.5rem; cursor: pointer; transition: all .3s ease; backdrop-filter: blur(10px); z-index: 10; }
+.veh-gallery-nav:hover { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.6); transform: translateY(-50%) scale(1.1); }
+.veh-gallery-nav--prev { left: 2rem; }
+.veh-gallery-nav--next { right: 2rem; }
+.veh-gallery-counter { font-size: .9rem; letter-spacing: .04em; }
+.veh-gallery-close { width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(255,255,255,.9); color: #2b2b2b; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; transition: background .2s; }
+.veh-gallery-close:hover { background: #fff; }
+.veh-gallery-thumbs { background: linear-gradient(transparent, rgba(0,0,0,.8)); z-index: 10; }
+.veh-gallery-thumbs-inner { display: flex; gap: 10px; padding: 18px; overflow-x: auto; justify-content: center; scrollbar-width: none; }
+.veh-gallery-thumbs-inner::-webkit-scrollbar { display: none; }
+.veh-gthumb { flex: 0 0 auto; width: 80px; height: 56px; border-radius: 4px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: all .3s ease; }
+.veh-gthumb img { width: 100%; height: 100%; object-fit: cover; }
+.veh-gthumb.active { border-color: #7C8A5A; box-shadow: 0 0 10px rgba(110,122,80,.6); }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Vehicle management functionality
+    let allVehicles = [];
+    let filteredVehicles = [];
+
+    // Get JWT token for API calls
+    async function getAccessToken() {
+        let token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        if (token) {
+            return token;
+        }
+        const cookieToken = getCookie('accessToken');
+        if (cookieToken) {
+            localStorage.setItem('accessToken', cookieToken);
+            return cookieToken;
+        }
+        return '';
+    }
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+            return parts.pop().split(';').shift();
+        }
+        return null;
+    }
+
+    // Filter vehicles to only include those with at least one image
+    async function filterVehiclesWithImages(vehicles, token) {
+        const vehiclesWithImages = [];
+        for (const vehicle of vehicles) {
+            try {
+                if (vehicle.image) {
+                    vehiclesWithImages.push(vehicle);
+                    continue;
+                }
+                const vehicleId = vehicle.id || vehicle.objectId;
+                if (!vehicleId) continue;
+
+                const response = await fetch(`/api/vehicles/${vehicleId}/images`, {
+                    method: 'GET',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    const imagesData = await response.json();
+                    if (imagesData.success && imagesData.data && imagesData.data.length > 0) {
+                        vehiclesWithImages.push(vehicle);
+                    }
+                }
+            } catch (error) {
+                if (vehicle.image) {
+                    vehiclesWithImages.push(vehicle);
+                }
+            }
+        }
+        return vehiclesWithImages;
+    }
+
+    // Load vehicles from API
+    async function loadVehicles() {
+        try {
+            const token = await getAccessToken();
+
+            const response = await fetch('/api/vehicles', {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            const data = await response.json();
+            const rawVehicles = data.data || [];
+
+            allVehicles = await filterVehiclesWithImages(rawVehicles, token);
+            filteredVehicles = [...allVehicles];
+
+            populateFilters();
+            displayVehicles();
+
+            document.getElementById('vehiclesLoading').style.display = 'none';
+            document.getElementById('vehiclesGrid').style.display = 'grid';
+        } catch (error) {
+            console.error('Error loading vehicles:', error);
+            document.getElementById('vehiclesLoading').innerHTML = `
+                <i class="ti ti-alert-circle" style="color:#e2445c;"></i>
+                <p style="color:#e2445c;">Error al cargar vehículos</p>
+                <p class="text-muted">${error.message}</p>
+            `;
+        }
+    }
+
+    // Populate filter dropdowns
+    function populateFilters() {
+        const rates = [...new Set(allVehicles.map(v => v.rateId?.name).filter(Boolean))].sort();
+        const rateSelect = document.getElementById('filterRate');
+        rateSelect.innerHTML = '<option value="">Filtrar por Segmento</option>';
+        rates.forEach(rate => {
+            rateSelect.innerHTML += `<option value="${rate}">${rate}</option>`;
+        });
+
+        const types = [...new Set(allVehicles.map(v => v.vehicleTypeId?.name).filter(Boolean))].sort();
+        const typeSelect = document.getElementById('filterType');
+        typeSelect.innerHTML = '<option value="">Filtrar por Tipo</option>';
+        types.forEach(type => {
+            typeSelect.innerHTML += `<option value="${type}">${type}</option>`;
+        });
+    }
+
+    // Display vehicles as luxury cards
+    function displayVehicles() {
+        const grid = document.getElementById('vehiclesGrid');
+        const noResults = document.getElementById('noVehiclesMessage');
+
+        if (filteredVehicles.length === 0) {
+            grid.style.display = 'none';
+            noResults.style.display = 'block';
+            return;
+        }
+
+        grid.style.display = 'grid';
+        noResults.style.display = 'none';
+
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        grid.innerHTML = filteredVehicles.map(vehicle => {
+            const typeName = esc(vehicle.vehicleTypeId?.name || 'Sin tipo');
+            const rateName = esc(vehicle.rateId?.name || 'Sin segmento');
+            const rateColor = vehicle.rateId?.color || '#6E7A50';
+            const imageUrl = vehicle.image || '';
+            const brandModel = esc(`${vehicle.brand || ''} ${vehicle.model || ''}`.trim());
+
+            const vehicleLuggage = vehicle.luggageCapacity || vehicle.luggage_quantity || vehicle.luggageQuantity || vehicle.luggage;
+            const luggageCount = (vehicleLuggage && vehicleLuggage > 0)
+                ? vehicleLuggage
+                : (vehicle.vehicleTypeId?.trunkCapacity || '-');
+
+            const mediaInner = imageUrl
+                ? `<img src="${imageUrl}" alt="${brandModel}" class="vehicle-main-image" data-has-fallback="true">
+                   <div class="no-image" style="display: none;"><img src="/img/amexing_logo_horizontal.avif" alt="Amexing"></div>`
+                : `<div class="no-image"><img src="/img/amexing_logo_horizontal.avif" alt="Amexing"></div>`;
+
+            const amenitiesHtml = (Array.isArray(vehicle.amenities) && vehicle.amenities.length)
+                ? `<div class="vamenities">${vehicle.amenities.map(a => `<span>${esc(a)}</span>`).join('')}</div>`
+                : '';
+
+            const viewBtnHtml = imageUrl
+                ? `<div class="vactions">
+                       <button class="vbtn view-images-btn" data-vehicle-id="${vehicle.id || vehicle.objectId}" data-vehicle-name="${brandModel}">
+                           <i class="ti ti-photo me-2"></i>Ver imágenes
+                       </button>
+                   </div>`
+                : '';
+
+            return `
+                <div class="vcard">
+                    <div class="vcard__media">
+                        ${mediaInner}
+                        <span class="vcard__segment">${typeName}</span>
+                    </div>
+                    <div class="vcard__body">
+                        <div class="vcard__head">
+                            <div class="vcard__title">${brandModel}</div>
+                            <span class="vcard__class" style="background: ${rateColor};">${rateName}</span>
+                        </div>
+                        <div class="vspec"><span class="k">Capacidad</span><span class="v">${vehicle.capacity || '-'} personas</span></div>
+                        <div class="vspec"><span class="k">Carry-on</span><span class="v">${luggageCount} carry-on</span></div>
+                        ${amenitiesHtml}
+                        ${viewBtnHtml}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Filter vehicles
+    function filterVehicles() {
+        const rateFilter = document.getElementById('filterRate').value;
+        const typeFilter = document.getElementById('filterType').value;
+        const searchFilter = document.getElementById('searchVehicle').value.toLowerCase();
+
+        filteredVehicles = allVehicles.filter(vehicle => {
+            const matchesRate = !rateFilter || vehicle.rateId?.name === rateFilter;
+            const matchesType = !typeFilter || vehicle.vehicleTypeId?.name === typeFilter;
+            const matchesSearch = !searchFilter ||
+                (vehicle.brand || '').toLowerCase().includes(searchFilter) ||
+                (vehicle.model || '').toLowerCase().includes(searchFilter);
+
+            return matchesRate && matchesType && matchesSearch;
+        });
+
+        displayVehicles();
+    }
+
+    document.getElementById('filterRate').addEventListener('change', filterVehicles);
+    document.getElementById('filterType').addEventListener('change', filterVehicles);
+    document.getElementById('searchVehicle').addEventListener('input', filterVehicles);
+
+    // View images buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.view-images-btn')) {
+            const button = e.target.closest('.view-images-btn');
+            openVehicleImagesGallery(button.dataset.vehicleId, button.dataset.vehicleName);
+        }
+    });
+
+    // ── Fullscreen vehicle gallery (same UX as a-disposición) ──
+    let vehGalleryImages = [];
+    let vehGalleryIndex = 0;
+
+    // Move modal to body to escape .dashboard-content overflow
+    const vehGalleryModalEl = document.getElementById('vehGalleryModal');
+    if (vehGalleryModalEl && vehGalleryModalEl.parentElement !== document.body) {
+        document.body.appendChild(vehGalleryModalEl);
+    }
+
+    async function openVehicleImagesGallery(vehicleId, vehicleName) {
+        document.getElementById('vehGalleryLabel').textContent = 'Galería · ' + (vehicleName || 'Vehículo');
+        vehGalleryImages = [];
+        vehGalleryIndex = 0;
+
+        // Reset to loading state
+        document.getElementById('vehGalleryLoading').style.display = 'flex';
+        document.getElementById('vehGalleryEmpty').style.display = 'none';
+        document.getElementById('vehGalleryMainImage').style.display = 'none';
+        document.getElementById('vehGalleryPrev').style.display = 'none';
+        document.getElementById('vehGalleryNext').style.display = 'none';
+        document.getElementById('vehGalleryThumbs').innerHTML = '';
+        document.getElementById('vehGalleryCounter').textContent = '';
+
+        new bootstrap.Modal(document.getElementById('vehGalleryModal')).show();
+
+        try {
+            const token = await getAccessToken();
+            const response = await fetch(`/api/vehicles/${vehicleId}/images`, {
+                method: 'GET',
+                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            vehGalleryImages = (data.success && Array.isArray(data.data)) ? data.data : [];
+        } catch (error) {
+            console.error('Error loading vehicle images:', error);
+            vehGalleryImages = [];
+        }
+
+        document.getElementById('vehGalleryLoading').style.display = 'none';
+
+        if (!vehGalleryImages.length) {
+            document.getElementById('vehGalleryEmpty').style.display = 'flex';
+            return;
+        }
+
+        document.getElementById('vehGalleryMainImage').style.display = 'block';
+        updateVehGallery();
+    }
+
+    function updateVehGallery() {
+        const imgs = vehGalleryImages;
+        if (!imgs.length) return;
+
+        const main = document.getElementById('vehGalleryMainImage');
+        main.src = imgs[vehGalleryIndex].url;
+        main.alt = imgs[vehGalleryIndex].fileName || `Imagen ${vehGalleryIndex + 1}`;
+        document.getElementById('vehGalleryCounter').textContent = `${vehGalleryIndex + 1} / ${imgs.length}`;
+
+        const prev = document.getElementById('vehGalleryPrev');
+        const next = document.getElementById('vehGalleryNext');
+        prev.style.display = vehGalleryIndex > 0 ? 'flex' : 'none';
+        next.style.display = vehGalleryIndex < imgs.length - 1 ? 'flex' : 'none';
+
+        generateVehGalleryThumbs();
+    }
+
+    function generateVehGalleryThumbs() {
+        const container = document.getElementById('vehGalleryThumbs');
+        if (!container) return;
+        if (vehGalleryImages.length <= 1) { container.style.display = 'none'; return; }
+
+        container.style.display = 'flex';
+        container.innerHTML = vehGalleryImages.map((im, i) =>
+            `<div class="veh-gthumb ${i === vehGalleryIndex ? 'active' : ''}" data-index="${i}">
+                <img src="${im.url}" alt="Miniatura ${i + 1}" loading="lazy">
+            </div>`
+        ).join('');
+
+        container.querySelectorAll('.veh-gthumb').forEach(t => {
+            t.addEventListener('click', function() {
+                vehGalleryIndex = parseInt(this.dataset.index, 10) || 0;
+                updateVehGallery();
+            });
+        });
+    }
+
+    // Gallery navigation (arrows + keyboard)
+    document.getElementById('vehGalleryPrev')?.addEventListener('click', function() {
+        if (vehGalleryIndex > 0) { vehGalleryIndex--; updateVehGallery(); }
+    });
+    document.getElementById('vehGalleryNext')?.addEventListener('click', function() {
+        if (vehGalleryIndex < vehGalleryImages.length - 1) { vehGalleryIndex++; updateVehGallery(); }
+    });
+    document.addEventListener('keydown', function(e) {
+        const modalEl = document.getElementById('vehGalleryModal');
+        if (!modalEl || !modalEl.classList.contains('show')) return;
+        if (e.key === 'ArrowLeft' && vehGalleryIndex > 0) { vehGalleryIndex--; updateVehGallery(); }
+        else if (e.key === 'ArrowRight' && vehGalleryIndex < vehGalleryImages.length - 1) { vehGalleryIndex++; updateVehGallery(); }
+    });
+
+    // Image error fallback (CSP-compliant)
+    document.addEventListener('error', function(e) {
+        if (e.target.classList.contains('vehicle-main-image') && e.target.dataset.hasFallback === 'true') {
+            e.target.style.display = 'none';
+            const fallback = e.target.nextElementSibling;
+            if (fallback && fallback.classList.contains('no-image')) {
+                fallback.style.display = 'flex';
+            }
+        }
+    }, true);
+
+    loadVehicles();
+});
+</script>
