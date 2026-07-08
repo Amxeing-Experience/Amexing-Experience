@@ -59,14 +59,8 @@
                     <div class="mb-3">
                         <label for="experienceCategory" class="form-label">Tipo de experiencia</label>
                         <select class="form-control" id="experienceCategory" name="experience_category">
+                            <%# Opciones cargadas dinámicamente desde la BD (ExperienceCategories.populateSelect). %>
                             <option value="">Seleccionar</option>
-                            <option value="catas">Catas</option>
-                            <option value="arte">Arte</option>
-                            <option value="historia_arquitectura">Historia y Arquitectura</option>
-                            <option value="gastronomicas">Gastronómicas</option>
-                            <option value="aventura">Aventura</option>
-                            <option value="naturaleza">Naturaleza</option>
-                            <option value="de_temporada">De Temporada</option>
                         </select>
                     </div>
                     <!-- Destino (Optional) -->
@@ -424,6 +418,8 @@
     </div>
 </template>
 
+<!-- Util para categorías de experiencias dinámicas (desde la BD) -->
+<script src="/dashboard/js/utils/experience-categories.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Note: accessToken is now fetched fresh in each function that needs it
@@ -556,7 +552,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (pois.length > 0) {
             populateDestinoSelect(pois);
         }
-        
+
+        // Carga dinámica de categorías de experiencia (desde la BD).
+        // Se puebla antes de loadExperienceData para que el valor guardado se preserve.
+        if (window.ExperienceCategories) {
+            try {
+                await window.ExperienceCategories.fetch();
+                const catSel = document.getElementById('experienceCategory');
+                window.ExperienceCategories.populateSelect(catSel, catSel ? catSel.value : '', { placeholder: 'Seleccionar' });
+            } catch (e) {
+                console.error('Error cargando categorías de experiencia:', e);
+            }
+        }
+
         if (!isNew) {
             await loadExperienceData();
         }
@@ -1315,7 +1323,17 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('experienceMaxPeople').value = data.max_people || '';
             document.getElementById('experienceCancellationPolicy').value = data.cancellation_policy || '';
             document.getElementById('experienceBuyout').value = (data.buyout !== null && data.buyout !== undefined) ? data.buyout : '';
-            document.getElementById('experienceCategory').value = data.experience_category || '';
+            // Categoría: usar populateSelect para preservar el valor guardado aunque
+            // ya no esté activo (conserva la opción). Fallback a asignación directa.
+            if (window.ExperienceCategories) {
+                window.ExperienceCategories.populateSelect(
+                    document.getElementById('experienceCategory'),
+                    data.experience_category || '',
+                    { placeholder: 'Seleccionar' }
+                );
+            } else {
+                document.getElementById('experienceCategory').value = data.experience_category || '';
+            }
             document.getElementById('experiencePrivateMinType').value = data.private_min_type || '';
             document.getElementById('experiencePrivateMinValue').value = (data.private_min_value !== null && data.private_min_value !== undefined) ? data.private_min_value : '';
             document.getElementById('experienceFixedSchedule').checked = !!data.fixed_schedule;
