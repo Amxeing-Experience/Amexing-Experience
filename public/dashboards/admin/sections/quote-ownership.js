@@ -409,9 +409,30 @@ class QuoteOwnershipManager {
         // Evitar repetición: en cotización nueva el selector ES el propietario, así que ocultamos
         // el display compacto de "propietario actual" (mostraría el mismo usuario).
         document.getElementById('ownerDisplayBlock')?.classList.add('d-none');
+        // Al elegir propietario inicial, notificar al form (mismo evento que la transferencia) para
+        // que "el contacto es el propietario" refleje al SELECCIONADO, no al creador. Se ata antes
+        // de poblar para captar también el setValue por defecto.
+        document.getElementById('initialOwnerSelect')?.addEventListener('change', () => this._onInitialOwnerChanged());
         this.loadInitialOwnerOptions();
         document.getElementById('clientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
         document.getElementById('directClientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
+    }
+
+    // Propaga el propietario inicial seleccionado al formulario de contacto vía quoteOwnerChanged
+    // (el listener en quote-information.ejs actualiza window.__quoteOwner y el resumen del contacto).
+    _onInitialOwnerChanged() {
+        const id = document.getElementById('initialOwnerSelect')?.value || '';
+        const u = (this._initialOwnerUsers || []).find((x) => x.id === id);
+        if (!u) return;
+        document.dispatchEvent(new CustomEvent('quoteOwnerChanged', {
+            detail: {
+                firstName: u.firstName || '',
+                lastName: u.lastName || '',
+                email: u.email || '',
+                phone: u.phone || '',
+                fullName: `${u.firstName || ''} ${u.lastName || ''}`.trim(),
+            },
+        }));
     }
 
     // Puebla el combobox buscable #initialOwnerSelect con los owners disponibles del cliente
@@ -434,12 +455,20 @@ class QuoteOwnershipManager {
             : '') || (window.currentUser && window.currentUser.name) || 'Yo';
         const meEmail = window.currentUserData?.email || window.currentUser?.email || '';
         const meLabel = `${meName}${meEmail ? ` - ${meEmail}` : ''} (yo)`;
+        const meUser = {
+            id: meId,
+            firstName: window.currentUserData?.firstName || meName,
+            lastName: window.currentUserData?.lastName || '',
+            email: meEmail,
+            phone: window.currentUserData?.phone || '',
+        };
 
         const setJustMe = () => {
             alert('');
+            this._initialOwnerUsers = meId ? [meUser] : [];
             if (inst.clearOptions) inst.clearOptions();
             if (meId && inst.addOption) {
-                inst.addOption({ value: meId, text: meLabel, firstName: meName, lastName: '' });
+                inst.addOption({ value: meId, text: meLabel, firstName: meUser.firstName, lastName: meUser.lastName });
                 inst.setValue(meId);
             }
         };
@@ -458,9 +487,20 @@ class QuoteOwnershipManager {
         const users = (json && json.data) || [];
         if (inst.clearOptions) inst.clearOptions();
 
+        // Guardar la lista (con email/phone) para que _onInitialOwnerChanged pueda propagar los
+        // datos del seleccionado al contacto. Incluir al creador como default aunque no venga.
+        this._initialOwnerUsers = users.map((u) => ({
+            id: u.id,
+            firstName: u.firstName || '',
+            lastName: u.lastName || '',
+            email: u.email || '',
+            phone: u.phone || '',
+        }));
+
         // Asegurar al usuario actual como opción (default) aunque no venga en la lista.
         if (meId && !users.some((u) => u.id === meId)) {
-            inst.addOption({ value: meId, text: meLabel, firstName: meName, lastName: '' });
+            this._initialOwnerUsers.unshift(meUser);
+            inst.addOption({ value: meId, text: meLabel, firstName: meUser.firstName, lastName: meUser.lastName });
         }
         users.forEach((u) => {
             const tag = u.isAdmin ? ' · Admin' : (u.isDepartmentManager ? ' · Agencia' : (u.isClient ? ' · Agente' : ''));
