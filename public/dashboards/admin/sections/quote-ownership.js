@@ -558,6 +558,10 @@ class QuoteOwnershipManager {
         compactNameEl.style.display = 'block';
         compactEmailEl.style.display = 'block';
 
+        // Con un propietario real cargado (cotización existente o recién guardada) el selector
+        // "Propietario inicial" (solo del alta) sobra: se oculta y se deja el display + transferencia.
+        document.getElementById('initialOwnerRow')?.classList.add('d-none');
+
         // Botón "Cambiar propietario" (transferencia inline): solo si el usuario puede transferir.
         const changeBtn = document.getElementById('btnInlineChangeOwner');
         if (changeBtn) changeBtn.classList.toggle('d-none', !this.canTransfer);
