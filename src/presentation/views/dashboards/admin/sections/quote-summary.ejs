@@ -140,7 +140,10 @@ const e = __isRes ? 'reservación' : 'cotización';
     }
     .sm-quote-info-row {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        /* auto-fit reparte los ítems VISIBLES en una sola fila y los estira parejo (evita que
+           "Fechas de servicios" u otro campo opcional quede huérfano solo en un renglón). La 1ra
+           fila no se afecta: define su propio grid-template-columns inline. */
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
         gap: 1rem;
     }
     .sm-quote-info-divider {
