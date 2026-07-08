@@ -3108,10 +3108,7 @@ class QuoteOwnershipManager {
             this._inlineTransferAlert('Por favor selecciona un nuevo propietario');
             return;
         }
-        const optText = (sel.options[sel.selectedIndex] || {}).text || '';
-        if (!confirm(`¿Confirmar transferencia de propiedad a:\n\n${optText}\n\nRazón: ${reason || 'Sin razón especificada'}`)) {
-            return;
-        }
+        // Sin popup de confirmación: el botón "Transferir" ya es la acción explícita.
         this.setButtonLoading('btnInlineTransfer', true, 'Transfiriendo...');
         try {
             const response = await fetch(`/api/quotes/${this.quoteId}/ownership/transfer`, {
@@ -3138,9 +3135,10 @@ class QuoteOwnershipManager {
                     fullName: this.owner?.fullName || `${this.owner?.firstName || ''} ${this.owner?.lastName || ''}`.trim(),
                 },
             }));
-            await this.checkAndUpdatePagePermissions();
             this.showSuccess('Propiedad transferida exitosamente');
             this.closeInlineTransfer();
+            // Permisos de página en segundo plano: no bloquea la respuesta visual.
+            this.checkAndUpdatePagePermissions();
         } catch (error) {
             console.error('Error transferring ownership (inline):', error);
             this._inlineTransferAlert('Error al transferir propiedad', 'danger');
