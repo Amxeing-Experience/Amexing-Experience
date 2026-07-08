@@ -3230,13 +3230,23 @@ class QuoteOwnershipManager {
     // Puebla el combobox buscable con los owners del quote, excluyendo SOLO al propietario actual
     // (los agentes SÍ pueden recibir la transferencia — antes se excluían por error).
     async _populateOwnerCombobox() {
+        // Estado de carga visible (cubre la inicialización del átomo + el fetch).
+        this._inlineTransferAlert('Cargando propietarios…', 'info');
         const inst = await this._getOwnerCombobox();
-        if (!inst) return;
+        if (!inst) { this._inlineTransferAlert('No se pudo inicializar el selector', 'danger'); return; }
+        if (inst.clearOptions) inst.clearOptions();
+
         const clientId = document.getElementById('clientId')?.value || '';
         const qs = clientId ? `?clientId=${encodeURIComponent(clientId)}` : '';
-        const resp = await fetch(`/api/quotes/${this.quoteId}/available-owners${qs}`, {
-            headers: { Authorization: `Bearer ${this.getAccessToken()}` },
-        });
+        let resp;
+        try {
+            resp = await fetch(`/api/quotes/${this.quoteId}/available-owners${qs}`, {
+                headers: { Authorization: `Bearer ${this.getAccessToken()}` },
+            });
+        } catch (e) {
+            this._inlineTransferAlert('Error de red al cargar usuarios', 'danger');
+            return;
+        }
         if (!resp.ok) {
             if (resp.status === 400) {
                 const err = await resp.json().catch(() => ({}));
@@ -3246,10 +3256,16 @@ class QuoteOwnershipManager {
             return;
         }
         const json = await resp.json();
-        const users = (json && json.data) || [];
+        const users = ((json && json.data) || []).filter(
+            (u) => !(this.owner && !this.owner.isPlaceholder && u.id === this.owner.id),
+        );
         if (inst.clearOptions) inst.clearOptions();
+        if (!users.length) {
+            this._inlineTransferAlert('No hay otros usuarios disponibles para transferir', 'warning');
+            return;
+        }
+        this._inlineTransferAlert(''); // limpiar el "Cargando…"
         users.forEach((u) => {
-            if (this.owner && !this.owner.isPlaceholder && u.id === this.owner.id) return;
             const tag = u.isAdmin ? ' · Admin' : (u.isDepartmentManager ? ' · Agencia' : (u.isClient ? ' · Agente' : ''));
             inst.addOption({
                 value: u.id,
