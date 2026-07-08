@@ -414,11 +414,14 @@ class QuoteOwnershipManager {
         document.getElementById('directClientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
     }
 
-    // Puebla #initialOwnerSelect con los owners disponibles del cliente (endpoint sin quote),
-    // agrupados igual que el modal "Compartir". Loader mientras carga. Default: el usuario actual.
+    // Puebla el combobox buscable #initialOwnerSelect con los owners disponibles del cliente
+    // (endpoint sin quote), lista plana con tag de rol (mismo estilo que la transferencia).
+    // Loader/errores en #initialOwnerAlerts. Default: el usuario actual (creador).
     async loadInitialOwnerOptions() {
-        const select = document.getElementById('initialOwnerSelect');
-        if (!select) return;
+        const inst = await this._getOwnerCombobox('initialOwnerSelect');
+        if (!inst) return;
+        const alert = (msg, type = 'info') => this._inlineTransferAlert(msg, type, 'initialOwnerAlerts');
+
         const directRow = document.getElementById('directClientRow');
         const isDirect = !!directRow && window.getComputedStyle(directRow).display !== 'none';
         const clientId = isDirect
@@ -433,70 +436,46 @@ class QuoteOwnershipManager {
         const meLabel = `${meName}${meEmail ? ` - ${meEmail}` : ''} (yo)`;
 
         const setJustMe = () => {
-            select.disabled = false;
-            select.innerHTML = '';
-            const o = document.createElement('option');
-            o.value = meId;
-            o.textContent = meLabel;
-            select.appendChild(o);
-            select.value = meId;
+            alert('');
+            if (inst.clearOptions) inst.clearOptions();
+            if (meId && inst.addOption) {
+                inst.addOption({ value: meId, text: meLabel, firstName: meName, lastName: '' });
+                inst.setValue(meId);
+            }
         };
         if (!clientId) { setJustMe(); return; }
 
-        // Loader
-        select.disabled = true;
-        select.innerHTML = '<option>Cargando propietarios…</option>';
+        alert('Cargando propietarios…', 'info');
+        if (inst.clearOptions) inst.clearOptions();
+        let resp;
         try {
-            const resp = await fetch(`/api/quotes/owners/available?clientId=${encodeURIComponent(clientId)}&clientType=${encodeURIComponent(clientType)}`, {
+            resp = await fetch(`/api/quotes/owners/available?clientId=${encodeURIComponent(clientId)}&clientType=${encodeURIComponent(clientType)}`, {
                 headers: { Authorization: `Bearer ${this.getAccessToken()}` },
             });
-            if (!resp.ok) { setJustMe(); return; }
-            const json = await resp.json();
-            const users = (json && json.data) || [];
+        } catch (e) { setJustMe(); return; }
+        if (!resp.ok) { setJustMe(); return; }
+        const json = await resp.json();
+        const users = (json && json.data) || [];
+        if (inst.clearOptions) inst.clearOptions();
 
-            // Agrupar igual que el modal: Gerentes de Departamento / Agentes / Administradores.
-            const departmentManagers = [];
-            const clients = [];
-            const admins = [];
-            const others = [];
-            users.forEach((u) => {
-                if (u.isDepartmentManager) departmentManagers.push(u);
-                else if (u.isClient) clients.push(u);
-                else if (u.isAdmin) admins.push(u);
-                else others.push(u);
-            });
-
-            select.disabled = false;
-            select.innerHTML = '';
-            const addGroup = (label, list) => {
-                if (!list.length) return;
-                const og = document.createElement('optgroup');
-                og.label = label;
-                list.forEach((u) => {
-                    const opt = document.createElement('option');
-                    opt.value = u.id;
-                    opt.textContent = `${u.firstName || ''} ${u.lastName || ''}`.trim()
-                        + (u.email ? ` - ${u.email}` : '')
-                        + (u.id === meId ? ' (yo)' : '');
-                    og.appendChild(opt);
-                });
-                select.appendChild(og);
-            };
-            addGroup('Gerentes de Departamento', departmentManagers);
-            addGroup('Agentes', clients);
-            addGroup('Administradores', [...admins, ...others]);
-
-            // Asegurar al usuario actual como opción (default) si no vino en la lista.
-            if (!users.some((u) => u.id === meId) && meId) {
-                const opt = document.createElement('option');
-                opt.value = meId;
-                opt.textContent = meLabel;
-                select.insertBefore(opt, select.firstChild);
-            }
-            select.value = meId || (users[0] && users[0].id) || '';
-        } catch (e) {
-            setJustMe();
+        // Asegurar al usuario actual como opción (default) aunque no venga en la lista.
+        if (meId && !users.some((u) => u.id === meId)) {
+            inst.addOption({ value: meId, text: meLabel, firstName: meName, lastName: '' });
         }
+        users.forEach((u) => {
+            const tag = u.isAdmin ? ' · Admin' : (u.isDepartmentManager ? ' · Agencia' : (u.isClient ? ' · Agente' : ''));
+            inst.addOption({
+                value: u.id,
+                text: `${u.firstName || ''} ${u.lastName || ''}`.trim()
+                    + (u.email ? ` - ${u.email}` : '')
+                    + (u.id === meId ? ' (yo)' : '') + tag,
+                firstName: u.firstName || '',
+                lastName: u.lastName || '',
+            });
+        });
+        alert('');
+        if (meId) inst.setValue(meId);
+        else if (users[0]) inst.setValue(users[0].id);
     }
 
     // Cotización nueva: el propietario es el usuario actual (creador). No hay owner en el backend
@@ -3191,13 +3170,13 @@ class QuoteOwnershipManager {
 
     // ===== Transferencia de propietario INLINE (sección Propietario, sin modal) =====
     // Instancia customSelect del combobox de propietario (polling hasta que el átomo inicialice).
-    async _getOwnerCombobox(timeoutMs = 5000) {
-        const el0 = document.getElementById('inlineNewOwnerSelect');
+    async _getOwnerCombobox(elId = 'inlineNewOwnerSelect', timeoutMs = 5000) {
+        const el0 = document.getElementById(elId);
         if (el0 && el0.customSelect) return el0.customSelect;
         return new Promise((resolve) => {
             const start = Date.now();
             const iv = setInterval(() => {
-                const el = document.getElementById('inlineNewOwnerSelect');
+                const el = document.getElementById(elId);
                 if (el && el.customSelect) { clearInterval(iv); resolve(el.customSelect); }
                 else if (Date.now() - start > timeoutMs) { clearInterval(iv); resolve(null); }
             }, 100);
@@ -3307,8 +3286,8 @@ class QuoteOwnershipManager {
         this._inlineTransferAlert('');
     }
 
-    _inlineTransferAlert(message, type = 'warning') {
-        const c = document.getElementById('inlineTransferAlerts');
+    _inlineTransferAlert(message, type = 'warning', containerId = 'inlineTransferAlerts') {
+        const c = document.getElementById(containerId);
         if (!c) return;
         c.innerHTML = message
             ? `<div class="alert alert-${type} alert-dismissible fade show py-1 px-2 mb-2" role="alert"><small>${message}</small><button type="button" class="btn-close p-2" data-bs-dismiss="alert" aria-label="Close"></button></div>`

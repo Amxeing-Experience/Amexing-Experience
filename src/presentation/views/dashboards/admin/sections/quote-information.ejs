@@ -175,7 +175,19 @@ const e = __isRes ? 'reservación' : 'cotización';
                     <% if (typeof userRole !== 'undefined' && (userRole === 'admin' || userRole === 'superadmin')) { %>
                     <div class="d-none mt-2" id="initialOwnerRow">
                         <label for="initialOwnerSelect" class="form-label small mb-1">Propietario inicial</label>
-                        <select class="form-select form-select-sm" id="initialOwnerSelect"></select>
+                        <div id="initialOwnerAlerts"></div>
+                        <!-- Mismo combobox buscable que la transferencia (consistencia de diseño). -->
+                        <%- include('../../../atoms/common/tom-select', {
+                            id: 'initialOwnerSelect',
+                            name: 'initialOwnerSelect',
+                            multiple: false,
+                            placeholder: 'Seleccionar propietario…',
+                            label: '',
+                            required: false,
+                            helpText: '',
+                            options: [],
+                            selected: []
+                        }) %>
                         <div class="form-text">Se asignará al guardar la cotización.</div>
                     </div>
                     <% } %>
