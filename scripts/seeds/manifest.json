@@ -460,6 +460,21 @@
       ],
       "idempotent": true,
       "order": 24
+    },
+    {
+      "name": "025-seed-experience-categories",
+      "file": "025-seed-experience-categories.js",
+      "description": "Seed initial experience categories (catas, arte, historia_arquitectura, gastronomicas, aventura, naturaleza, de_temporada)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": [
+        "development",
+        "staging",
+        "production"
+      ],
+      "dependencies": [],
+      "idempotent": true,
+      "order": 25
     }
   ],
   "notes": [

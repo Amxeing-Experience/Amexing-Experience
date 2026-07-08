@@ -574,14 +574,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <div class="mb-2">
                 <label class="form-label form-label-sm fw-medium text-success">Tipo de experiencia</label>
                 <select class="form-select experiencia-category-input">
+                    <%# Opciones cargadas dinámicamente desde la BD (ExperienceCategories.populateSelect). %>
                     <option value="">Seleccionar</option>
-                    <option value="catas">Catas</option>
-                    <option value="arte">Arte</option>
-                    <option value="historia_arquitectura">Historia y Arquitectura</option>
-                    <option value="gastronomicas">Gastronómicas</option>
-                    <option value="aventura">Aventura</option>
-                    <option value="naturaleza">Naturaleza</option>
-                    <option value="de_temporada">De Temporada</option>
                 </select>
             </div>
 
@@ -955,8 +949,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     </div>
 </div>
 
+<!-- Util para categorías de experiencias dinámicas (desde la BD) -->
+<script src="/dashboard/js/utils/experience-categories.js"></script>
 <script>
 (function() {
+    // Precarga las categorías de experiencia (desde la BD) para que estén listas al renderizar cards.
+    if (window.ExperienceCategories) window.ExperienceCategories.fetch();
+
     function initWhenReady() {
         if (typeof jQuery === 'undefined') {
             setTimeout(initWhenReady, 100);
@@ -1581,7 +1580,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-name-input').value = experiencia.name || '';
             card.querySelector('.experiencia-description-input').value = experiencia.description || '';
             card.querySelector('.experiencia-tipo-input').value = experiencia.tipo || '';
-            card.querySelector('.experiencia-category-input').value = experiencia.experience_category || '';
+            // Categoría de experiencia: poblada dinámicamente desde la BD.
+            // populateSelect conserva el valor guardado aunque ya no esté activo.
+            const experienciaCategorySel = card.querySelector('.experiencia-category-input');
+            if (window.ExperienceCategories) {
+                const applyExperienciaCategory = () => window.ExperienceCategories.populateSelect(
+                    experienciaCategorySel,
+                    experiencia.experience_category || '',
+                    { placeholder: 'Seleccionar' }
+                );
+                // Aplica de inmediato (conserva el valor) y re-aplica al resolver el fetch.
+                applyExperienciaCategory();
+                window.ExperienceCategories.fetch().then(applyExperienciaCategory);
+            } else {
+                experienciaCategorySel.value = experiencia.experience_category || '';
+            }
             card.querySelector('.experiencia-price-input').value = experiencia.price || '';
             card.querySelector('.experiencia-price-no-alcohol-input').value = experiencia.price_no_alcohol || '';
             card.querySelector('.experiencia-price-child-input').value = experiencia.price_child || '';

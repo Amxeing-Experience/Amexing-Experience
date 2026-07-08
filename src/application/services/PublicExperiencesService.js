@@ -397,6 +397,64 @@ class PublicExperiencesService {
       return byCategory;
     }
   }
+
+  /**
+   * Resuelve la URL de la imagen única de una categoría (o fallback).
+   * @param {object|null} image - Objeto imagen `{ s3Key, optimizedVariants }`.
+   * @returns {Promise<string>} URL servible o respaldo.
+   * @example
+   */
+  async resolveCategoryImageUrl(image) {
+    if (!image) return FALLBACK_IMG;
+    try {
+      const variants = image.optimizedVariants;
+      const keyFrom = (v) => (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
+      let s3Key = null;
+      if (variants && typeof variants === 'object') {
+        s3Key = ['webp', 'jpeg', 'avif'].map((fmt) => keyFrom(variants[fmt])).find(Boolean) || null;
+      }
+      if (!s3Key) {
+        s3Key = image.s3Key || null;
+      }
+      if (s3Key) {
+        const url = await this.imageService.getPresignedUrl(s3Key);
+        return url || FALLBACK_IMG;
+      }
+    } catch (error) {
+      logger.warn('Error resolving category image', { error: error.message });
+    }
+    return FALLBACK_IMG;
+  }
+
+  /**
+   * Categorías de experiencias activas para la web pública (label por idioma + imagen).
+   * @param {string} lang - Idioma ('es' | 'en').
+   * @returns {Promise<Array<object>>} Array `[{ value, label, img }]` ordenado por sortOrder.
+   * @example
+   * const cats = await service.getActiveCategories('en');
+   */
+  async getActiveCategories(lang = 'es') {
+    try {
+      const query = new Parse.Query('ExperienceCategory');
+      query.equalTo('exists', true);
+      query.equalTo('active', true);
+      query.ascending('sortOrder');
+      query.addAscending('name');
+      query.limit(500);
+
+      const cats = await query.find({ useMasterKey: true });
+      return Promise.all(
+        cats.map(async (c) => ({
+          value: c.get('code'),
+          label: lang === 'en' ? c.get('name_en') || c.get('name') : c.get('name'),
+          img: await this.resolveCategoryImageUrl(c.get('image')),
+        }))
+      );
+    } catch (error) {
+      logger.error('Error building active categories', { lang, error: error.message });
+      return [];
+    }
+  }
 }
 
 module.exports = PublicExperiencesService;

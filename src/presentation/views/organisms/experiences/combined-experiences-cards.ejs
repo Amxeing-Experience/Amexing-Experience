@@ -24,14 +24,8 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
                 </div>
                 <div class="exp-field exp-field--select">
                     <select id="filterCategory">
+                        <%# Opciones cargadas dinámicamente desde la BD (ExperienceCategories.populateSelect). %>
                         <option value="">Tipo de experiencia</option>
-                        <option value="catas">Catas</option>
-                        <option value="arte">Arte</option>
-                        <option value="historia_arquitectura">Historia y Arquitectura</option>
-                        <option value="gastronomicas">Gastronómicas</option>
-                        <option value="aventura">Aventura</option>
-                        <option value="naturaleza">Naturaleza</option>
-                        <option value="de_temporada">De Temporada</option>
                     </select>
                     <i class="ti ti-chevron-down exp-field__caret"></i>
                 </div>
@@ -247,6 +241,8 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
 <!-- Load centralized pricing utilities -->
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
+<!-- Util para categorías de experiencias dinámicas (desde la BD) -->
+<script src="/dashboard/js/utils/experience-categories.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -255,6 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let filteredExperiences = [];
 
     // Etiquetas legibles del "Tipo de experiencia" (experience_category) para las cards/filtro.
+    // Fallback estático por si el fetch dinámico de categorías (desde la BD) falla.
     const EXPERIENCE_CATEGORY_LABELS = {
         catas: 'Catas',
         arte: 'Arte',
@@ -264,7 +261,8 @@ document.addEventListener('DOMContentLoaded', function() {
         naturaleza: 'Naturaleza',
         de_temporada: 'De Temporada'
     };
-    const categoryLabel = (v) => EXPERIENCE_CATEGORY_LABELS[v] || '';
+    // Prefiere el nombre dinámico (BD); si no está, cae al mapa estático.
+    const categoryLabel = (v) => (window.ExperienceCategories && window.ExperienceCategories.labelFor(v)) || EXPERIENCE_CATEGORY_LABELS[v] || '';
     let currentExchangeRate = 20; // Default exchange rate MXN to USD
     let currentTransferRate = 0; // Transfer payment surcharge percentage
     let currentAgencyRate = 0; // Credit card payment surcharge percentage
@@ -1051,7 +1049,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <p class="expcard__desc">${experience.displayDescription || 'Sin descripción disponible'}</p>
                             <div class="expcard__rows">
                                 <div class="expcard__row"><span class="expcard__k">Duración</span><span class="expcard__v">${experience.displayDuration ? formatDuration(experience.displayDuration) : 'Por definir'}</span></div>
-                                <div class="expcard__row"><span class="expcard__k">Reserva anticipada</span><span class="expcard__v">${formatAdvanceBooking(experience.displayAdvanceBooking)}</span></div>
+                                <div class="expcard__row"><span class="expcard__k">Reserva anticipada</span><span class="expcard__v">${formatAdvanceBooking(experience.displayAdvanceBooking || 1440)}</span></div>
                                 <div class="expcard__row"><span class="expcard__k">Días disponibles</span><span class="expcard__v">${experience.displayAvailability || 'Todos los días'}</span></div>
                                 <hr class="expcard__sep">
                                 ${pricesRows}
@@ -1759,7 +1757,26 @@ document.addEventListener('DOMContentLoaded', function() {
     loadExchangeRate();
     loadTransferRate();
     loadAgencyRate();
-    loadExperiences();
+
+    // Categorías de experiencia dinámicas (desde la BD): pobla el filtro y calienta la
+    // cache ANTES de renderizar las cards, para que categoryLabel() devuelva los nombres.
+    (async function initExperienceCategoriesFilter() {
+        if (window.ExperienceCategories) {
+            try {
+                await window.ExperienceCategories.fetch();
+                const filterSel = document.getElementById('filterCategory');
+                window.ExperienceCategories.populateSelect(
+                    filterSel,
+                    filterSel ? (filterSel.value || '') : '',
+                    { placeholder: 'Tipo de experiencia' }
+                );
+            } catch (e) {
+                console.error('Error cargando categorías de experiencia:', e);
+            }
+        }
+        // Carga las experiencias después de tener las categorías listas.
+        loadExperiences();
+    })();
     
     // Modal functionality for experiences
     let storeGalleryPhotos = [];
@@ -2239,7 +2256,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // 6. Reserva: tiempo de anticipación + notas de reserva, juntos en una sola sección.
         // Fall back to booking_notes/notas/notes so content isn't lost (old modal behavior).
         const bookingNotes = experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes;
-        const advMinResv = experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime);
+        // Si la experiencia no tiene reserva anticipada configurada, se asume 24h (1 día) por default.
+        const advMinResv = experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime) || 1440;
         if (advMinResv || bookingNotes) {
             let reservaInner = '';
             if (advMinResv) {
