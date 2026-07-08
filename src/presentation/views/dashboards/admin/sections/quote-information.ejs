@@ -160,6 +160,18 @@ const e = __isRes ? 'reservación' : 'cotización';
                         </div>
                     </small>
 
+                    <!-- Propietario inicial (solo cotización NUEVA + admin): elegir quién será el
+                         propietario al CREAR. quote-ownership.js revela #initialOwnerRow en new-quote
+                         y puebla #initialOwnerSelect por cliente. En existente NO se usa (ahí hay
+                         transferencia). -->
+                    <% if (typeof userRole !== 'undefined' && (userRole === 'admin' || userRole === 'superadmin')) { %>
+                    <div class="d-none mt-2" id="initialOwnerRow">
+                        <label for="initialOwnerSelect" class="form-label small mb-1">Propietario inicial</label>
+                        <select class="form-select form-select-sm" id="initialOwnerSelect"></select>
+                        <div class="form-text">Se asignará al guardar la cotización.</div>
+                    </div>
+                    <% } %>
+
                     <!-- Transferir propietario INLINE (sin abrir el modal). El botón "Cambiar" se
                          muestra solo si el usuario puede transferir (quote-ownership.js lo togglea
                          por this.canTransfer en updateCompactOwnerDisplay). -->
@@ -3477,6 +3489,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 formData.clientType = 'direct';
             }
         }
+
+        // Propietario inicial elegido (solo admin/superadmin, cotización nueva). El server valida
+        // contra los owners del cliente y, si no aplica o es inválido, usa al creador.
+        formData.ownerId = document.getElementById('initialOwnerSelect')?.value || undefined;
 
         // Debug: Log the form data being sent
         console.log('🚀 Creating quote with form data:', {

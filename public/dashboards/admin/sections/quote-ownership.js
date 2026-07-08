@@ -111,6 +111,9 @@ class QuoteOwnershipManager {
                 // Setup event listeners even for new quotes
                 this.setupEventListeners();
                 this.dataLoaded = true; // Mark as loaded for new quotes
+                // Propietario inicial (solo admin/superadmin, cotización nueva): permitir elegir
+                // quién será el propietario al crear.
+                this._setupInitialOwnerSelector();
                 return;
             }
 
@@ -394,6 +397,71 @@ class QuoteOwnershipManager {
 
         // Update compact owner display in quote information form
         this.updateCompactOwnerDisplay();
+    }
+
+    // Propietario inicial (cotización nueva): revela el selector y lo puebla. El markup
+    // #initialOwnerRow solo se renderiza para admin/superadmin (gate EJS), así que su existencia
+    // implica el permiso; no dependemos de window.currentUser (que puede no estar seteado aún).
+    _setupInitialOwnerSelector() {
+        const row = document.getElementById('initialOwnerRow');
+        if (!row) return;
+        row.classList.remove('d-none');
+        this.loadInitialOwnerOptions();
+        document.getElementById('clientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
+        document.getElementById('directClientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
+    }
+
+    // Puebla #initialOwnerSelect con los owners disponibles del cliente seleccionado (endpoint sin
+    // quote). Default: el usuario actual. Si no hay cliente aún, deja solo al usuario actual.
+    async loadInitialOwnerOptions() {
+        const select = document.getElementById('initialOwnerSelect');
+        if (!select) return;
+        const directRow = document.getElementById('directClientRow');
+        const isDirect = !!directRow && window.getComputedStyle(directRow).display !== 'none';
+        const clientId = isDirect
+            ? (document.getElementById('directClientId')?.value || '')
+            : (document.getElementById('clientId')?.value || '');
+        const clientType = isDirect ? 'direct' : 'agency';
+        const meId = window.currentUser?.id || window.currentUserData?.id || '';
+        const meName = (window.currentUserData
+            ? `${window.currentUserData.firstName || ''} ${window.currentUserData.lastName || ''}`.trim()
+            : '') || (window.currentUser && window.currentUser.name) || 'Yo';
+        const setJustMe = () => {
+            select.innerHTML = '';
+            const o = document.createElement('option');
+            o.value = meId;
+            o.textContent = `${meName} (yo)`;
+            select.appendChild(o);
+            select.value = meId;
+        };
+        if (!clientId) { setJustMe(); return; }
+        try {
+            const resp = await fetch(`/api/quotes/owners/available?clientId=${encodeURIComponent(clientId)}&clientType=${encodeURIComponent(clientType)}`, {
+                headers: { Authorization: `Bearer ${this.getAccessToken()}` },
+            });
+            if (!resp.ok) { setJustMe(); return; }
+            const json = await resp.json();
+            const users = (json && json.data) || [];
+            select.innerHTML = '';
+            let hasMe = false;
+            users.forEach((u) => {
+                const opt = document.createElement('option');
+                opt.value = u.id;
+                const tag = u.isAdmin ? ' · Admin' : (u.isDepartmentManager ? ' · Agencia' : (u.isClient ? ' · Agente' : ''));
+                opt.textContent = `${u.firstName || ''} ${u.lastName || ''}`.trim() + tag + (u.id === meId ? ' (yo)' : '');
+                if (u.id === meId) hasMe = true;
+                select.appendChild(opt);
+            });
+            if (!hasMe && meId) {
+                const opt = document.createElement('option');
+                opt.value = meId;
+                opt.textContent = `${meName} (yo)`;
+                select.insertBefore(opt, select.firstChild);
+            }
+            select.value = meId || (users[0] && users[0].id) || '';
+        } catch (e) {
+            setJustMe();
+        }
     }
 
     // Cotización nueva: el propietario es el usuario actual (creador). No hay owner en el backend
