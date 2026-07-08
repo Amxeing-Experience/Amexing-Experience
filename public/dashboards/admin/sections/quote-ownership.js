@@ -406,13 +406,19 @@ class QuoteOwnershipManager {
         const row = document.getElementById('initialOwnerRow');
         if (!row) return;
         row.classList.remove('d-none');
+        // Evitar repetición: en cotización nueva el selector ES el propietario, así que ocultamos
+        // el display compacto de "propietario actual" (mostraría el mismo usuario).
+        const nameEl = document.getElementById('compactOwnerName');
+        const emailEl = document.getElementById('compactOwnerEmail');
+        if (nameEl) nameEl.style.display = 'none';
+        if (emailEl) emailEl.style.display = 'none';
         this.loadInitialOwnerOptions();
         document.getElementById('clientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
         document.getElementById('directClientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
     }
 
-    // Puebla #initialOwnerSelect con los owners disponibles del cliente seleccionado (endpoint sin
-    // quote). Default: el usuario actual. Si no hay cliente aún, deja solo al usuario actual.
+    // Puebla #initialOwnerSelect con los owners disponibles del cliente (endpoint sin quote),
+    // agrupados igual que el modal "Compartir". Loader mientras carga. Default: el usuario actual.
     async loadInitialOwnerOptions() {
         const select = document.getElementById('initialOwnerSelect');
         if (!select) return;
@@ -426,15 +432,23 @@ class QuoteOwnershipManager {
         const meName = (window.currentUserData
             ? `${window.currentUserData.firstName || ''} ${window.currentUserData.lastName || ''}`.trim()
             : '') || (window.currentUser && window.currentUser.name) || 'Yo';
+        const meEmail = window.currentUserData?.email || window.currentUser?.email || '';
+        const meLabel = `${meName}${meEmail ? ` - ${meEmail}` : ''} (yo)`;
+
         const setJustMe = () => {
+            select.disabled = false;
             select.innerHTML = '';
             const o = document.createElement('option');
             o.value = meId;
-            o.textContent = `${meName} (yo)`;
+            o.textContent = meLabel;
             select.appendChild(o);
             select.value = meId;
         };
         if (!clientId) { setJustMe(); return; }
+
+        // Loader
+        select.disabled = true;
+        select.innerHTML = '<option>Cargando propietarios…</option>';
         try {
             const resp = await fetch(`/api/quotes/owners/available?clientId=${encodeURIComponent(clientId)}&clientType=${encodeURIComponent(clientType)}`, {
                 headers: { Authorization: `Bearer ${this.getAccessToken()}` },
@@ -442,20 +456,44 @@ class QuoteOwnershipManager {
             if (!resp.ok) { setJustMe(); return; }
             const json = await resp.json();
             const users = (json && json.data) || [];
-            select.innerHTML = '';
-            let hasMe = false;
+
+            // Agrupar igual que el modal: Gerentes de Departamento / Agentes / Administradores.
+            const departmentManagers = [];
+            const clients = [];
+            const admins = [];
+            const others = [];
             users.forEach((u) => {
-                const opt = document.createElement('option');
-                opt.value = u.id;
-                const tag = u.isAdmin ? ' · Admin' : (u.isDepartmentManager ? ' · Agencia' : (u.isClient ? ' · Agente' : ''));
-                opt.textContent = `${u.firstName || ''} ${u.lastName || ''}`.trim() + tag + (u.id === meId ? ' (yo)' : '');
-                if (u.id === meId) hasMe = true;
-                select.appendChild(opt);
+                if (u.isDepartmentManager) departmentManagers.push(u);
+                else if (u.isClient) clients.push(u);
+                else if (u.isAdmin) admins.push(u);
+                else others.push(u);
             });
-            if (!hasMe && meId) {
+
+            select.disabled = false;
+            select.innerHTML = '';
+            const addGroup = (label, list) => {
+                if (!list.length) return;
+                const og = document.createElement('optgroup');
+                og.label = label;
+                list.forEach((u) => {
+                    const opt = document.createElement('option');
+                    opt.value = u.id;
+                    opt.textContent = `${u.firstName || ''} ${u.lastName || ''}`.trim()
+                        + (u.email ? ` - ${u.email}` : '')
+                        + (u.id === meId ? ' (yo)' : '');
+                    og.appendChild(opt);
+                });
+                select.appendChild(og);
+            };
+            addGroup('Gerentes de Departamento', departmentManagers);
+            addGroup('Agentes', clients);
+            addGroup('Administradores', [...admins, ...others]);
+
+            // Asegurar al usuario actual como opción (default) si no vino en la lista.
+            if (!users.some((u) => u.id === meId) && meId) {
                 const opt = document.createElement('option');
                 opt.value = meId;
-                opt.textContent = `${meName} (yo)`;
+                opt.textContent = meLabel;
                 select.insertBefore(opt, select.firstChild);
             }
             select.value = meId || (users[0] && users[0].id) || '';
