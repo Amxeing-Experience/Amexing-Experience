@@ -408,10 +408,7 @@ class QuoteOwnershipManager {
         row.classList.remove('d-none');
         // Evitar repetición: en cotización nueva el selector ES el propietario, así que ocultamos
         // el display compacto de "propietario actual" (mostraría el mismo usuario).
-        const nameEl = document.getElementById('compactOwnerName');
-        const emailEl = document.getElementById('compactOwnerEmail');
-        if (nameEl) nameEl.style.display = 'none';
-        if (emailEl) emailEl.style.display = 'none';
+        document.getElementById('ownerDisplayBlock')?.classList.add('d-none');
         this.loadInitialOwnerOptions();
         document.getElementById('clientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
         document.getElementById('directClientId')?.addEventListener('change', () => this.loadInitialOwnerOptions());
@@ -559,8 +556,9 @@ class QuoteOwnershipManager {
         compactEmailEl.style.display = 'block';
 
         // Con un propietario real cargado (cotización existente o recién guardada) el selector
-        // "Propietario inicial" (solo del alta) sobra: se oculta y se deja el display + transferencia.
+        // "Propietario inicial" (solo del alta) sobra: se oculta y se muestra el display + transferencia.
         document.getElementById('initialOwnerRow')?.classList.add('d-none');
+        document.getElementById('ownerDisplayBlock')?.classList.remove('d-none');
 
         // Botón "Cambiar propietario" (transferencia inline): solo si el usuario puede transferir.
         const changeBtn = document.getElementById('btnInlineChangeOwner');
@@ -3210,11 +3208,14 @@ class QuoteOwnershipManager {
         const btn = document.getElementById('btnInlineTransfer');
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="ti ti-check me-1"></i>Transferir';
+            btn.innerHTML = '<i class="ti ti-check"></i>';
+            btn.title = 'Transferir';
         }
     }
 
     async openInlineTransfer() {
+        // El editor OCUPA el lugar del display del propietario (se oculta para no repetir).
+        document.getElementById('ownerDisplayBlock')?.classList.add('d-none');
         const row = document.getElementById('inlineTransferRow');
         if (row) row.classList.remove('d-none');
         this._inlineTransferAlert('');
@@ -3269,13 +3270,16 @@ class QuoteOwnershipManager {
         if (val && opt) {
             const name = `${opt.firstName || ''} ${opt.lastName || ''}`.trim() || 'usuario';
             btn.disabled = false;
-            btn.innerHTML = `<i class="ti ti-check me-1"></i>Transferir a ${name}`;
+            btn.innerHTML = '<i class="ti ti-check"></i>';
+            btn.title = `Transferir a ${name}`;
         } else {
             this._resetInlineTransferButton();
         }
     }
 
     closeInlineTransfer() {
+        // Restaurar el display del propietario y ocultar el editor.
+        document.getElementById('ownerDisplayBlock')?.classList.remove('d-none');
         const row = document.getElementById('inlineTransferRow');
         if (row) row.classList.add('d-none');
         const inst = document.getElementById('inlineNewOwnerSelect')?.customSelect;
