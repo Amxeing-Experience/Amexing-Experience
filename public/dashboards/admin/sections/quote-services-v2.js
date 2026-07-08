@@ -11182,13 +11182,9 @@ class ItineraryBuilder {
   getServiceTitle(service) {
     switch (service.type) {
       case 'experience': {
-        const base = this.getExperienceName(service.experienceId) || 'Experiencia';
-        // Establishment experiences include the provider name in the title (matches dropdown format)
-        const isEstablishment = (service.providerType || '').toLowerCase() === 'establishment';
-        if (isEstablishment && service.providerName && !base.includes(` - ${service.providerName}`)) {
-          return `${base} - ${service.providerName}`;
-        }
-        return base;
+        // En la lista de servicios mostramos SOLO el nombre de la experiencia (sin el
+        // "- Proveedor" que traía antes para las de establecimiento).
+        return this.getExperienceName(service.experienceId) || 'Experiencia';
       }
       case 'tour':
         return this.getTourName(service.tourId) || 'Tour';
