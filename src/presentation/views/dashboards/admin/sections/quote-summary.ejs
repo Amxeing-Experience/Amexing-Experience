@@ -704,7 +704,7 @@ const e = __isRes ? 'reservación' : 'cotización';
 
             <!-- Quote Info -->
             <div class="sm-quote-info">
-                <div class="sm-quote-info-row" id="summaryTopInfoRow" style="grid-template-columns: repeat(2, 1fr);">
+                <div class="sm-quote-info-row" id="summaryTopInfoRow">
                     <div class="sm-quote-info-item">
                         <span class="sm-quote-info-label">Folio</span>
                         <span class="sm-quote-info-value" id="summaryFolio">-</span>
@@ -716,6 +716,12 @@ const e = __isRes ? 'reservación' : 'cotización';
                     <div class="sm-quote-info-item">
                         <span class="sm-quote-info-label">Última actualización</span>
                         <span class="sm-quote-info-value" id="summaryLastUpdated">-</span>
+                    </div>
+                    <!-- Fechas de servicios va en esta fila "meta" (junto a Folio/Última actualización)
+                         en vez de sola abajo. Se muestra/oculta por JS (#summaryServiceDatesRow). -->
+                    <div class="sm-quote-info-item d-none" id="summaryServiceDatesRow">
+                        <span class="sm-quote-info-label">Fechas de servicios</span>
+                        <span class="sm-quote-info-value" id="summaryServiceDates">-</span>
                     </div>
                 </div>
                 <div class="sm-quote-info-divider"></div>
@@ -743,10 +749,6 @@ const e = __isRes ? 'reservación' : 'cotización';
                     <div class="sm-quote-info-item">
                         <span class="sm-quote-info-label">Personas</span>
                         <span class="sm-quote-info-value" id="summaryNumberOfPeople">-</span>
-                    </div>
-                    <div class="sm-quote-info-item d-none" id="summaryServiceDatesRow">
-                        <span class="sm-quote-info-label">Fechas de servicios</span>
-                        <span class="sm-quote-info-value" id="summaryServiceDates">-</span>
                     </div>
                 </div>
             </div>
@@ -1312,11 +1314,10 @@ const e = __isRes ? 'reservación' : 'cotización';
             })();
 
             // Idioma de preferencia — show only when set (maps the 2-letter code to a label).
-            // Sits between Folio and Última actualización; widen the row to 3 columns
-            // when present, otherwise keep 2.
+            // Sits between Folio y Última actualización. El número de columnas lo maneja el
+            // auto-fit del CSS (.sm-quote-info-row); solo togglear visibilidad.
             const summaryPreferredLanguageRow = document.getElementById('summaryPreferredLanguageRow');
             const summaryPreferredLanguageEl = document.getElementById('summaryPreferredLanguage');
-            const summaryTopInfoRow = document.getElementById('summaryTopInfoRow');
             const preferredLanguage = quote.preferredLanguage && String(quote.preferredLanguage).trim();
             if (preferredLanguage) {
                 const languageLabels = {
@@ -1325,11 +1326,9 @@ const e = __isRes ? 'reservación' : 'cotización';
                 };
                 summaryPreferredLanguageEl.textContent = languageLabels[preferredLanguage] || preferredLanguage;
                 summaryPreferredLanguageRow?.classList.remove('d-none');
-                if (summaryTopInfoRow) summaryTopInfoRow.style.gridTemplateColumns = 'repeat(3, 1fr)';
             } else {
                 summaryPreferredLanguageEl.textContent = '';
                 summaryPreferredLanguageRow?.classList.add('d-none');
-                if (summaryTopInfoRow) summaryTopInfoRow.style.gridTemplateColumns = 'repeat(2, 1fr)';
             }
 
             // Quote-level notes — show the callout above SERVICIOS only when set
