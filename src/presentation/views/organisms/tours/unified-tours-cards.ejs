@@ -21,325 +21,189 @@ const isClient = currentUserRole === 'client';
 const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 %>
 
-<!-- Tours Cards Section -->
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-        <div class="row align-items-center">
-            <div class="col">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-map me-2"></i>Tours
-                </h5>
+<!-- Tours Cards Section (rediseño sobrio "lujo") -->
+<div class="exp-catalog">
+    <!-- ===== Filtros (Desktop, lg y superior) ===== -->
+    <div class="d-none d-lg-block">
+        <!-- Controles segmentados: Recorrido + Servicio -->
+        <div class="segbar">
+            <div class="segwrap">
+                <span class="seglabel">Recorrido</span>
+                <div class="seg">
+                    <button type="button" class="tour-type-pill active" data-tour-type="all">Todos</button>
+                    <button type="button" class="tour-type-pill" data-tour-type="walking">A pie</button>
+                    <button type="button" class="tour-type-pill" data-tour-type="vehicle">Con vehículo</button>
+                </div>
+            </div>
+            <!-- Servicio (solo tours con vehículo) -->
+            <div class="segwrap" id="vehicleFiltersDesktop">
+                <span class="seglabel">Servicio</span>
+                <div class="seg">
+                    <button type="button" class="filter-pill active" data-filter="guide-only">Solo guía</button>
+                    <button type="button" class="filter-pill" data-filter="with-driver">Guía + chofer</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fila de filtros: búsqueda + Segmento + Moneda + Pago -->
+        <div class="exp-catalog__filters">
+            <div class="exp-field exp-field--search">
+                <i class="ti ti-search exp-field__icon"></i>
+                <input type="text" id="searchTour" placeholder="Buscar tour por destino...">
+            </div>
+            <!-- Segmento (solo tours con vehículo) -->
+            <div class="exp-field exp-field--select" id="rateFilterDesktopContainer">
+                <select id="rateFilter-<%= dtTableId %>">
+                    <option value="">Seleccionar segmento...</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
+            </div>
+            <div class="exp-field exp-field--select">
+                <select id="currencyFilter-<%= dtTableId %>">
+                    <option value="MXN" selected>MXN</option>
+                    <option value="USD">USD</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
+            </div>
+            <div class="exp-field exp-field--select">
+                <select id="paymentTypeFilter-<%= dtTableId %>">
+                    <% if (isDepartmentManager || isClient) { %>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia" selected>Transferencia</option>
+                    <% } else { %>
+                        <option value="efectivo" selected>Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                    <% } %>
+                    <option value="tarjeta">Tarjeta Debito/Credito</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
         </div>
     </div>
 
-    <!-- Filter Controls -->
-    <div class="card-body border-bottom bg-light">
-        <!-- Desktop Layout (lg and above) -->
-        <div class="d-none d-lg-block">
-            <!-- Row 1: Pills + Search -->
-            <div class="d-flex align-items-end gap-3 mb-3">
-                <!-- Tour Type Pills -->
-                <div>
-                    <label class="form-label fw-semibold mb-2">Tipo de Tour</label>
-                    <ul class="nav nav-pills" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active tour-type-pill" data-tour-type="all" type="button" role="tab">
-                                Todos
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link tour-type-pill" data-tour-type="walking" type="button" role="tab">
-                                <i class="ti ti-walk me-1"></i>A Pie
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link tour-type-pill" data-tour-type="vehicle" type="button" role="tab">
-                                <i class="ti ti-car me-1"></i>Con Vehiculos
-                            </button>
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- Service Type Pills (vehicle-only) -->
-                <div id="vehicleFiltersDesktop">
-                    <label class="form-label fw-semibold mb-2">Tipo de Servicio</label>
-                    <ul class="nav nav-pills" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active filter-pill" data-filter="guide-only" type="button" role="tab">
-                                Solo Guia
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link filter-pill" data-filter="with-driver" type="button" role="tab">
-                                Guia + Chofer
-                            </button>
-                        </li>
-                    </ul>
-                </div>
-
-                <!-- Search (fills remaining space) -->
-                <div class="flex-grow-1">
-                    <label for="searchTour" class="form-label fw-semibold mb-2">
-                        <i class="ti ti-search me-1"></i>Buscar
-                    </label>
-                    <input type="text" class="form-control" id="searchTour" placeholder="Buscar...">
+    <!-- ===== Filtros (Tablet / Móvil, md e inferior) ===== -->
+    <div class="d-lg-none">
+        <div class="segbar">
+            <div class="segwrap">
+                <span class="seglabel">Recorrido</span>
+                <div class="seg">
+                    <button type="button" class="tour-type-pill active" data-tour-type="all">Todos</button>
+                    <button type="button" class="tour-type-pill" data-tour-type="walking">A pie</button>
+                    <button type="button" class="tour-type-pill" data-tour-type="vehicle">Con vehículo</button>
                 </div>
             </div>
-
-            <!-- Row 2: Segmento left, Moneda+Pago right -->
-            <div class="d-flex align-items-center gap-2">
-                <!-- Rate Selection (vehicle-only) - pushed left -->
-                <div class="d-flex align-items-center gap-1" id="rateFilterDesktopContainer">
-                    <label for="rateFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Segmento:</label>
-                    <select class="form-select" id="rateFilter-<%= dtTableId %>" style="min-width: 150px;">
-                        <option value="">Seleccionar segmento...</option>
-                    </select>
-                </div>
-
-                <!-- Spacer pushes Moneda+Pago to the right -->
-                <div class="flex-grow-1"></div>
-
-                <!-- Currency -->
-                <div class="d-flex align-items-center gap-1">
-                    <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
-                    <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
-                        <option value="MXN" selected>MXN</option>
-                        <option value="USD">USD</option>
-                    </select>
-                </div>
-
-                <!-- Payment Type -->
-                <div class="d-flex align-items-center gap-1">
-                    <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
-                    <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
-                        <% if (isDepartmentManager || isClient) { %>
-                            <option value="efectivo">Efectivo</option>
-                            <option value="transferencia" selected>Transferencia</option>
-                        <% } else { %>
-                            <option value="efectivo" selected>Efectivo</option>
-                            <option value="transferencia">Transferencia</option>
-                        <% } %>
-                        <option value="tarjeta">Tarjeta Debito/Credito</option>
-                    </select>
+            <div class="segwrap" id="vehicleFiltersMobile">
+                <span class="seglabel">Servicio</span>
+                <div class="seg">
+                    <button type="button" class="filter-pill active" data-filter="guide-only">Solo guía</button>
+                    <button type="button" class="filter-pill" data-filter="with-driver">Guía + chofer</button>
                 </div>
             </div>
         </div>
 
-        <!-- Tablet and Mobile Layout (md and below) -->
-        <div class="d-lg-none">
-            <!-- Tour Type Filter Row -->
-            <div class="row g-3 mb-3">
-                <div class="col-12">
-                    <label class="form-label fw-semibold mb-2">Tipo de Tour</label>
-                    <ul class="nav nav-pills" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active tour-type-pill" data-tour-type="all" type="button" role="tab">
-                                Todos
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link tour-type-pill" data-tour-type="walking" type="button" role="tab">
-                                <i class="ti ti-walk me-1"></i>A Pie
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link tour-type-pill" data-tour-type="vehicle" type="button" role="tab">
-                                <i class="ti ti-car me-1"></i>Con Vehiculos
-                            </button>
-                        </li>
-                    </ul>
-                </div>
+        <div class="exp-catalog__filters">
+            <div class="exp-field exp-field--search">
+                <i class="ti ti-search exp-field__icon"></i>
+                <input type="text" id="searchTourMobile" placeholder="Buscar tour por destino...">
             </div>
-            <!-- First Row: Search and Service Type Pills -->
-            <div class="row g-3 mb-3">
-                <!-- Search -->
-                <div class="col-md-6 col-12">
-                    <label for="searchTourMobile" class="form-label fw-semibold">
-                        <i class="ti ti-search me-1"></i>Buscar Tour
-                    </label>
-                    <input type="text" class="form-control search-input" id="searchTourMobile" placeholder="Buscar...">
-                </div>
-
-                <!-- Service Type Pills (vehicle-only) -->
-                <div class="col-md-6 col-12" id="vehicleFiltersMobile">
-                    <label class="form-label fw-semibold mb-2">Tipo de Servicio</label>
-                    <ul class="nav nav-pills" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active filter-pill" data-filter="guide-only" type="button" role="tab">
-                                Solo Guia
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link filter-pill" data-filter="with-driver" type="button" role="tab">
-                                Guia + Chofer
-                            </button>
-                        </li>
-                    </ul>
-                </div>
+            <div class="exp-field exp-field--select" id="rateFilterMobileContainer">
+                <select id="rateFilterMobile-<%= dtTableId %>">
+                    <option value="">Seleccionar segmento...</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
-
-            <!-- Second Row: Filter Dropdowns -->
-            <div class="row g-3">
-                <!-- Rate Selection (vehicle-only) -->
-                <div class="col-md-4 col-12" id="rateFilterMobileContainer">
-                    <label for="rateFilterMobile-<%= dtTableId %>" class="form-label fw-semibold">
-                        <i class="ti ti-tag me-1"></i>Segmento
-                    </label>
-                    <select class="form-select rate-filter" id="rateFilterMobile-<%= dtTableId %>">
-                        <option value="">Seleccionar segmento...</option>
-                    </select>
-                </div>
-
-                <!-- Currency -->
-                <div class="col-md-4 col-6">
-                    <label for="currencyFilterMobile-<%= dtTableId %>" class="form-label fw-semibold">
-                        <i class="ti ti-currency-dollar me-1"></i>Moneda
-                    </label>
-                    <select class="form-select currency-filter" id="currencyFilterMobile-<%= dtTableId %>">
-                        <option value="MXN" selected>MXN</option>
-                        <option value="USD">USD</option>
-                    </select>
-                </div>
-
-                <!-- Payment Type -->
-                <div class="col-md-4 col-6">
-                    <label for="paymentTypeFilterMobile-<%= dtTableId %>" class="form-label fw-semibold">
-                        <i class="ti ti-credit-card me-1"></i>Pago
-                    </label>
-                    <select class="form-select payment-filter" id="paymentTypeFilterMobile-<%= dtTableId %>">
-                        <% if (isDepartmentManager || isClient) { %>
-                            <option value="efectivo">Efectivo</option>
-                            <option value="transferencia" selected>Transferencia</option>
-                        <% } else { %>
-                            <option value="efectivo" selected>Efectivo</option>
-                            <option value="transferencia">Transferencia</option>
-                        <% } %>
-                        <option value="tarjeta">Tarjeta Debito/Credito</option>
-                    </select>
-                </div>
+            <div class="exp-field exp-field--select">
+                <select id="currencyFilterMobile-<%= dtTableId %>">
+                    <option value="MXN" selected>MXN</option>
+                    <option value="USD">USD</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
+            </div>
+            <div class="exp-field exp-field--select">
+                <select id="paymentTypeFilterMobile-<%= dtTableId %>">
+                    <% if (isDepartmentManager || isClient) { %>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia" selected>Transferencia</option>
+                    <% } else { %>
+                        <option value="efectivo" selected>Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                    <% } %>
+                    <option value="tarjeta">Tarjeta Debito/Credito</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
         </div>
     </div>
 
-    <!-- Content Area -->
-    <div class="card-body">
-        <!-- Loading state -->
-        <div id="toursLoading" class="text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando tours...</span>
-            </div>
-            <p class="mt-2 text-muted">Cargando tours...</p>
-        </div>
+    <!-- Contador de resultados -->
+    <div id="tourResultCount" class="exp-catalog__count"></div>
 
-        <!-- Tours Grid -->
-        <div id="toursGrid" class="d-flex flex-wrap gap-3" style="display: none;">
-            <!-- Tour cards will be dynamically inserted here -->
+    <!-- Loading state -->
+    <div id="toursLoading" class="exp-catalog__loading">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Cargando tours...</span>
         </div>
+        <p>Cargando tours...</p>
+    </div>
 
-        <!-- No results message -->
-        <div id="noToursMessage" class="text-center py-5" style="display: none;">
-            <i class="ti ti-mood-sad" style="font-size: 3rem; color: #dee2e6;"></i>
-            <p class="mt-3 text-muted">No se encontraron tours con los filtros seleccionados</p>
-        </div>
+    <!-- Tours Grid -->
+    <div id="toursGrid" class="row g-4" style="display: none;">
+        <!-- Tour cards will be dynamically inserted here -->
+    </div>
+
+    <!-- No results message -->
+    <div id="noToursMessage" class="exp-catalog__empty" style="display: none;">
+        <i class="ti ti-mood-sad"></i>
+        <p>No se encontraron tours con los filtros seleccionados</p>
     </div>
 </div>
 
 <!-- Tour Details Modal -->
-<div class="modal fade" id="tourDetailsModal" tabindex="-1" aria-labelledby="tourDetailsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content tour-modal">
-            <!-- Hero Section with Image -->
-            <div class="tour-hero-section">
-                <div class="tour-hero-image-container">
-                    <img id="tourHeroImage" src="" alt="" class="tour-hero-image">
-                    <div class="tour-hero-overlay">
-                        <h2 id="tourHeroTitle" class="tour-hero-title"></h2>
-                    </div>
-                </div>
-                <button type="button" class="tour-modal-close" data-bs-dismiss="modal" aria-label="Cerrar" title="Cerrar">
-                    <i class="ti ti-x"></i>
-                </button>
-            </div>
-
-            <!-- Tab Navigation -->
-            <div class="tour-tabs-container">
-                <ul class="nav nav-pills tour-nav-tabs" id="tourTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="info-tab" data-bs-toggle="pill" data-bs-target="#info" type="button" role="tab">
-                            <i class="ti ti-info-circle me-1"></i>
-                            Información
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="gallery-tab" data-bs-toggle="pill" data-bs-target="#gallery" type="button" role="tab">
-                            <i class="ti ti-photo me-1"></i>
-                            Galería
-                            <span class="badge bg-primary ms-1" id="photoCountBadge">0</span>
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="details-tab" data-bs-toggle="pill" data-bs-target="#details" type="button" role="tab">
-                            <i class="ti ti-list-details me-1"></i>
-                            Detalles
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="prices-tab" data-bs-toggle="pill" data-bs-target="#prices" type="button" role="tab">
-                            <i class="ti ti-currency-dollar me-1"></i>
-                            Precios
-                        </button>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- Modal Body with Tab Content -->
-            <div class="modal-body tour-modal-body">
-                <div class="tab-content" id="tourTabContent">
-                    <!-- Information Tab -->
-                    <div class="tab-pane fade show active" id="info" role="tabpanel">
-                        <div id="infoContent">
-                            <!-- Content will be loaded here -->
+<div class="modal fade exp-lux-modal" id="tourDetailsModal" tabindex="-1" aria-labelledby="tourDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered exp-lux__dialog">
+        <div class="modal-content exp-lux__content">
+            <div class="exp-lux__grid">
+                <!-- LEFT: media pane -->
+                <div class="exp-lux__media">
+                    <img id="tourHeroImage" src="" alt="" class="exp-lux__media-img">
+                    <div class="exp-lux__media-overlay"></div>
+                    <button type="button" class="exp-lux__expand" id="tourHeroExpand" aria-label="Ampliar galería" style="display:none;"><i class="ti ti-arrows-maximize"></i></button>
+                    <div class="exp-lux__media-caption">
+                        <div class="exp-lux__tags">
+                            <span class="exp-lux__category" id="tourHeroCategory" style="display:none;"></span>
+                            <span class="exp-lux__type-pill" id="tourHeroType" style="display:none;"></span>
                         </div>
-                    </div>
-
-                    <!-- Gallery Tab -->
-                    <div class="tab-pane fade" id="gallery" role="tabpanel">
-                        <div id="galleryContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Details Tab -->
-                    <div class="tab-pane fade" id="details" role="tabpanel">
-                        <div id="detailsContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Prices Tab -->
-                    <div class="tab-pane fade" id="prices" role="tabpanel">
-                        <div id="pricesContent">
-                            <!-- Content will be loaded here -->
-                        </div>
+                        <h3 id="tourHeroTitle" class="exp-lux__title"></h3>
+                        <span class="exp-lux__title-underline"></span>
                     </div>
                 </div>
 
-                <!-- Loading State -->
-                <div id="tourModalLoading" class="text-center py-5" style="display: none;">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando detalles del tour...</span>
+                <!-- RIGHT: content pane -->
+                <div class="exp-lux__panel">
+                    <div class="exp-lux__header">
+                        <button type="button" class="exp-lux__close" data-bs-dismiss="modal" aria-label="Cerrar">
+                            <i class="ti ti-x"></i>
+                        </button>
                     </div>
-                    <p class="mt-3 text-muted">Cargando información...</p>
+
+                    <div class="exp-lux__body">
+                        <div id="tourModalLoading" class="exp-lux__loading" style="display: none;">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Cargando detalles del tour...</span>
+                            </div>
+                        </div>
+                        <div id="tourDetailBody"></div>
+                    </div>
+
+                    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+                    <div class="exp-lux__footer">
+                        <button type="button" class="exp-lux__cta add-tour-to-quote-from-modal-btn">
+                            Agregar a cotización <i class="ti ti-arrow-right"></i>
+                        </button>
+                    </div>
+                    <% } %>
                 </div>
             </div>
-                <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-                <div class="modal-footer border-top" id="tourModalFooter">
-                    <button type="button" class="btn btn-primary add-tour-to-quote-from-modal-btn">
-                        <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
-                    </button>
-                </div>
-                <% } %>
         </div>
     </div>
 </div>
@@ -1529,6 +1393,138 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 .new-day-date-row { padding: 10px 0; }
 </style>
 
+<style>
+/* =====================================================================
+   Catálogo de Tours — rediseño (paleta lujo, sans)
+   Bloque copiado de combined-experiences-cards.ejs para reutilizar las
+   clases .exp-catalog / .expcard en esta página.
+   ===================================================================== */
+.exp-catalog {
+    --exp-cream: #EAE7DF; --exp-tile: #E4DFCF; --exp-border: #d6d1c4;
+    --exp-olive: #6E7A50; --exp-olive-light: #7C8A5A; --exp-muted: #8a8f78;
+    --exp-gold: #b8894a; --exp-dark: #2b2b2b;
+}
+/* Filtros */
+.exp-catalog__filters {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 8px 0 4px;
+}
+.exp-field { position: relative; }
+.exp-field input,
+.exp-field select {
+    width: 100%;
+    font-size: 0.92rem;
+    color: var(--exp-dark);
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid var(--exp-border);
+    border-radius: 6px;
+    padding: 13px 16px;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+}
+.exp-field input:focus,
+.exp-field select:focus { border-color: var(--exp-olive); background: #fff; }
+.exp-field--search input { padding-left: 42px; }
+.exp-field--select select { padding-right: 38px; }
+.exp-field__icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--exp-muted); pointer-events: none; }
+.exp-field__caret { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--exp-muted); pointer-events: none; font-size: 0.9rem; }
+.exp-catalog__count { font-size: 0.85rem; color: var(--exp-muted); text-align: right; margin: 8px 0 18px; }
+
+/* Loading / vacío */
+.exp-catalog__loading { text-align: center; padding: 60px 0; color: var(--exp-muted); }
+.exp-catalog__loading .spinner-border { color: var(--exp-olive); }
+.exp-catalog__loading p { margin-top: 12px; }
+.exp-catalog__empty { text-align: center; padding: 60px 0; color: var(--exp-muted); }
+.exp-catalog__empty i { font-size: 3rem; color: var(--exp-border); }
+.exp-catalog__empty p { margin-top: 12px; }
+
+/* Card */
+.expcard {
+    background: rgba(255, 255, 255, 0.30);
+    border: 1px solid var(--exp-border);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    transition: transform 0.25s, box-shadow 0.25s;
+}
+.expcard:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12); }
+.expcard__media { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #1c1c1c; }
+.expcard__media .image-loading-container,
+.expcard__media .experience-picture,
+.expcard__media .no-image { position: absolute; inset: 0; width: 100%; height: 100%; }
+.expcard__media .experience-img,
+.expcard__media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s, opacity 0.3s; }
+.expcard:hover .experience-img { transform: scale(1.05); }
+.expcard__media .no-image { display: flex; align-items: center; justify-content: center; background: var(--exp-tile); }
+.expcard__media .no-image img { width: 60%; height: auto; object-fit: contain; }
+.expcard__media .experience-img.loading { opacity: 0; }
+.expcard__media .progressive-loader { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 1; }
+
+/* Tags (categoría + tipo) apilados arriba-izquierda */
+.expcard__tags { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 82%; z-index: 2; }
+.expcard__badge { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; padding: 5px 11px; border-radius: 3px; line-height: 1.3; }
+.expcard__badge--cat { background: rgba(20, 20, 20, 0.62); color: #f3f0e8; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.expcard__badge--tipo { border: 1px solid rgba(243, 240, 232, 0.7); color: #f3f0e8; background: rgba(20, 20, 20, 0.28); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); font-weight: 600; }
+
+/* Body */
+.expcard__body { padding: 20px 20px 18px; display: flex; flex-direction: column; flex: 1; }
+.expcard__title { font-weight: 600; font-size: 1.15rem; line-height: 1.2; margin: 0 0 10px; color: var(--exp-dark); }
+.expcard__desc { font-size: 0.88rem; line-height: 1.6; color: #3e4137; margin: 0 0 16px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.expcard__rows { display: flex; flex-direction: column; margin-bottom: 18px; }
+.expcard__row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 6px 0; }
+.expcard__k { font-size: 0.66rem; letter-spacing: 0.13em; text-transform: uppercase; color: var(--exp-olive); font-weight: 600; white-space: nowrap; }
+.expcard__v { font-size: 0.9rem; color: var(--exp-dark); text-align: right; }
+.expcard__sep { border: none; border-top: 1px solid var(--exp-border); margin: 8px 0; }
+
+/* Acciones */
+.expcard__actions { margin-top: auto; display: flex; gap: 8px; }
+.expcard__btn { flex: 1; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; padding: 11px 10px; border-radius: 4px; cursor: pointer; transition: 0.2s; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; }
+.expcard__btn--primary { border: 1px solid var(--exp-olive); background: var(--exp-olive); color: #fff; }
+.expcard__btn--primary:hover { background: var(--exp-olive-light); border-color: var(--exp-olive-light); color: #fff; }
+.expcard__btn--ghost { border: 1px solid var(--exp-olive); background: transparent; color: var(--exp-olive); }
+.expcard__btn--ghost:hover { background: var(--exp-olive); color: #fff; }
+
+@media (max-width: 767px) {
+    .exp-catalog__filters { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+    .exp-catalog__filters { grid-template-columns: 1fr; }
+}
+
+/* ---------------------------------------------------------------------
+   Extras específicos de Tours: controles segmentados + lista de precios
+   (adaptado del mockup, usando la paleta --exp-*)
+   --------------------------------------------------------------------- */
+/* Controles segmentados (Recorrido / Servicio) */
+.exp-catalog .segbar { display: flex; gap: 30px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.exp-catalog .segwrap { display: flex; align-items: center; gap: 10px; }
+.exp-catalog .seglabel { font-size: 0.64rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--exp-muted); font-weight: 600; }
+.exp-catalog .seg { display: inline-flex; border: 1px solid var(--exp-border); border-radius: 6px; overflow: hidden; background: rgba(255, 255, 255, 0.4); }
+.exp-catalog .seg button { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; border: none; background: transparent; color: var(--exp-dark); padding: 9px 16px; cursor: pointer; transition: 0.15s; }
+.exp-catalog .seg button + button { border-left: 1px solid var(--exp-border); }
+.exp-catalog .seg button.active { background: var(--exp-olive); color: #fff; }
+
+/* La descripción se limita a 2 líneas (como el mockup) */
+.exp-catalog .expcard__desc { -webkit-line-clamp: 2; }
+/* La imagen de tour (picture/img o fallback) rellena el media */
+.exp-catalog .expcard__media .tour-card-image { width: 100%; height: 100%; }
+
+/* Lista de precios (vehículos / grupos) */
+.exp-catalog .tour-plabel { font-size: 0.66rem; letter-spacing: 0.13em; text-transform: uppercase; color: var(--exp-olive); font-weight: 600; display: block; margin-bottom: 6px; }
+.exp-catalog .tour-prate { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--exp-muted); font-weight: 600; margin: 8px 0 2px; padding-left: 8px; border-left: 2px solid var(--exp-olive); }
+.exp-catalog .tour-pline { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 5px 0; }
+.exp-catalog .tour-pname { font-size: 0.86rem; color: var(--exp-dark); }
+.exp-catalog .tour-psub { font-size: 0.72rem; color: var(--exp-muted); }
+.exp-catalog .tour-pamt { font-size: 0.9rem; font-weight: 700; color: var(--exp-dark); white-space: nowrap; }
+.exp-catalog .tour-punit { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--exp-muted); }
+.exp-catalog .tour-pnote { font-size: 0.8rem; color: var(--exp-muted); font-style: italic; }
+</style>
+
 <!-- Load centralized pricing utilities -->
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
 
@@ -1747,9 +1743,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const usdPrice = adjustedPrice / currentExchangeRate;
             // Apply USD rounding rules and format without decimals
             const roundedPrice = PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
-            return `$${roundedPrice} USD`;
+            return `$${Number(roundedPrice).toLocaleString('en-US')} USD`;
         } else {
-            return `$${adjustedPrice.toFixed(2)}`;
+            return `$${adjustedPrice.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }
     }
 
@@ -1837,9 +1833,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (currency === 'USD') {
             const usdPrice = adjustedPrice / currentExchangeRate;
             const roundedPrice = PricingUtils ? PricingUtils.applyUSDRoundingRules(usdPrice) : Math.round(usdPrice);
-            return '$' + roundedPrice + ' USD';
+            return '$' + Number(roundedPrice).toLocaleString('en-US') + ' USD';
         } else {
-            return '$' + adjustedPrice.toFixed(2);
+            return '$' + adjustedPrice.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
     }
 
@@ -1932,7 +1928,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Display tours in card layout
     function displayTours() {
         hideLoading();
-        
+
+        // Contador de resultados (mismo formato que Experiencias: "X de Y tours")
+        const countEl = document.getElementById('tourResultCount');
+        if (countEl) {
+            const total = Array.isArray(allTours) ? allTours.length : filteredTours.length;
+            countEl.textContent = `${filteredTours.length} de ${total} tours`;
+        }
+
         if (filteredTours.length === 0) {
             showNoResults();
             return;
@@ -2047,102 +2050,65 @@ document.addEventListener('DOMContentLoaded', function() {
             let typeSection = '';
 
             if (tour.isWalkingTour) {
-                // Walking tour pricing: group-based tiers
+                // Precios por grupo (tours a pie): 3 rangos, precio por hora
                 const pricing = getWalkingTourPricing(tour);
+                const ranges = getWalkingTourRanges(tour);
                 const smallPrice = convertWalkingPrice(pricing.smallNumber, currency, paymentType);
                 const mediumPrice = convertWalkingPrice(pricing.mediumNumber, currency, paymentType);
                 const largePrice = convertWalkingPrice(pricing.largeNumber, currency, paymentType);
 
                 priceSection = `
-                    <div class="vehicle-pricing">
-                        <div class="vehicle-option mb-2 p-2 border rounded" style="background: #f0fdf4;">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong style="color: #16a34a;"><i class="ti ti-users me-1"></i>${pricing.smallRange || '1-5 personas'}</strong>
-                                    <div class="small text-muted">por hora</div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="fw-bold text-success" style="font-size: 1.1rem;">${smallPrice}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="vehicle-option mb-2 p-2 border rounded" style="background: #fefce8;">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong style="color: #ca8a04;"><i class="ti ti-users me-1"></i>${pricing.mediumRange || '6-10 personas'}</strong>
-                                    <div class="small text-muted">por hora</div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="fw-bold text-success" style="font-size: 1.1rem;">${mediumPrice}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="vehicle-option mb-2 p-2 border rounded" style="background: #eff6ff;">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong style="color: #2563eb;"><i class="ti ti-users me-1"></i>${pricing.largeRange || '11-15 personas'}</strong>
-                                    <div class="small text-muted">por hora</div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="fw-bold text-success" style="font-size: 1.1rem;">${largePrice}</div>
-                                </div>
-                            </div>
-                        </div>
+                    <span class="tour-plabel">Precios por grupo · por hora</span>
+                    <div class="tour-pline">
+                        <span><span class="tour-pname">Grupo pequeño</span> · <span class="tour-psub">${pricing.smallRange || ranges.small}</span></span>
+                        <span><span class="tour-pamt">${smallPrice}</span> <span class="tour-punit">/ h</span></span>
+                    </div>
+                    <div class="tour-pline">
+                        <span><span class="tour-pname">Grupo mediano</span> · <span class="tour-psub">${pricing.mediumRange || ranges.medium}</span></span>
+                        <span><span class="tour-pamt">${mediumPrice}</span> <span class="tour-punit">/ h</span></span>
+                    </div>
+                    <div class="tour-pline">
+                        <span><span class="tour-pname">Grupo grande</span> · <span class="tour-psub">${pricing.largeRange || ranges.large}</span></span>
+                        <span><span class="tour-pamt">${largePrice}</span> <span class="tour-punit">/ h</span></span>
                     </div>
                 `;
             } else if (selectedRateId && tour.priceData && tour.priceData.length > 0) {
-                // Show detailed vehicles and pricing when rate is selected
-                const vehicleCards = tour.priceData.map(priceData => {
+                // Precios por vehículo (tours con vehículo): solo cuando hay segmento seleccionado
+                const rateName = (rateFilterDesktop?.selectedOptions[0]?.textContent
+                    || rateFilterMobile?.selectedOptions[0]?.textContent || '').trim();
+
+                const vehicleLines = tour.priceData.map(priceData => {
                     const vehicleName = priceData.vehicleType?.name || 'Vehículo';
                     const baseCapacity = priceData.vehicleType?.defaultCapacity || 0;
-                    let finalPrice = priceData.price || 0;
+                    const finalPrice = priceData.price || 0;
 
-                    // Adjust capacity based on guide filter
+                    // Ajustar capacidad según el filtro de servicio (con chofer → -1 asiento)
                     let adjustedCapacity = baseCapacity;
                     if (currentGuideFilter === 'with-driver' && baseCapacity > 0) {
-                        adjustedCapacity = baseCapacity - 1; // Driver takes a seat
+                        adjustedCapacity = baseCapacity - 1; // El chofer ocupa un asiento
                     }
 
-                    // Check if there's a client-specific price
-                    const isClientSpecific = priceData.isClientPrice;
-
-                    // Apply driver rate if "with-driver" is selected
+                    // Precio con chofer si "Guía + chofer" está seleccionado
                     const formattedPrice = convertTourPrice(finalPrice, currency, paymentType, true);
-                    const clientBadge = isClientSpecific ?
-                        '<span class="badge bg-primary text-white ms-1" style="font-size: 0.6rem;">Cliente</span>' : '';
+                    const clientBadge = priceData.isClientPrice
+                        ? ' <span class="tour-psub">(Cliente)</span>' : '';
 
                     return `
-                        <div class="vehicle-option mb-2 p-2 border rounded" style="background: #f8f9fa;">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong style="color: var(--brand-primary-active);">${vehicleName}</strong>${clientBadge}
-                                    <div class="small text-muted">
-                                        <i class="ti ti-users me-1"></i>${adjustedCapacity} personas
-                                    </div>
-                                </div>
-                                <div class="text-end">
-                                    <div class="fw-bold text-success" style="font-size: 1.1rem;">${formattedPrice}</div>
-                                </div>
-                            </div>
+                        <div class="tour-pline">
+                            <span><span class="tour-pname">${vehicleName}</span>${clientBadge} · <span class="tour-psub">${adjustedCapacity} pers.</span></span>
+                            <span><span class="tour-pamt">${formattedPrice}</span> <span class="tour-punit">/ h</span></span>
                         </div>
                     `;
                 }).join('');
 
                 priceSection = `
-                    <div class="vehicle-pricing">
-                        ${vehicleCards}
-                    </div>
+                    <span class="tour-plabel">Precios por vehículo · por hora</span>
+                    ${rateName ? `<div class="tour-prate">${rateName}</div>` : ''}
+                    ${vehicleLines}
                 `;
-
-                vehicleInfo = ``;
-
-                // Don't show type section - removed as requested
-                typeSection = '';
             } else {
-                // No pricing when no rate is selected or no vehicles available
-                priceSection = '';
-                vehicleInfo = '';
-                typeSection = '';
+                // Tours con vehículo sin segmento seleccionado: nota sutil
+                priceSection = '<div class="tour-pnote">Selecciona un segmento para ver precios</div>';
             }
             
             // Build picture element with optimized formats
@@ -2200,69 +2166,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
+            // Badge de tipo de recorrido: "A pie" o "Con vehículo"
+            const tipoBadge = tour.isWalkingTour ? 'A pie' : 'Con vehículo';
+
             return `
-                <div class="tour-card-wrapper">
-                    <div class="tour-card">
-                        ${pictureElement}
-                        <!-- Tour Type Badge -->
-                        ${tour.type ? `
-                            <div class="experience-type-badge">
-                                <span class="type-badge tour">${tour.type}</span>
+                <div class="col-md-6 col-lg-4">
+                    <div class="expcard">
+                        <div class="expcard__media" data-image-container>
+                            ${pictureElement}
+                            <div class="expcard__tags">
+                                <span class="expcard__badge expcard__badge--tipo">${tipoBadge}</span>
                             </div>
-                        ` : ''}
-                        <div class="tour-card-body">
-                            <h6 class="tour-card-title">${destination}</h6>
-                            ${tour.isWalkingTour ? '<span class="badge bg-success mb-1"><i class="ti ti-walk me-1"></i>Tour a Pie</span>' : ''}
-                            <p class="tour-card-description">${description.substring(0, 120)}${description.length > 120 ? '...' : ''}</p>
-                            
-                            ${vehicleInfo}
-                            
-                            <div class="tour-card-info">
-                                <div class="tour-card-details">
-                                    <div class="tour-info-row">
-                                        <span class="tour-info-label">
-                                            <i class="ti ti-clock me-1"></i>Mínimo de horas
-                                        </span>
-                                        <span class="tour-info-value tour-duration">${duration}</span>
-                                    </div>
-                                    <div class="tour-info-row">
-                                        <span class="tour-info-label">
-                                            <i class="ti ti-calendar-time me-1"></i>Reserva anticipada
-                                        </span>
-                                        <span class="tour-info-value">
-                                            ${bookingTimeText}
-                                        </span>
-                                    </div>
-                                    <div class="tour-info-row">
-                                        <span class="tour-info-label">
-                                            <i class="ti ti-calendar-event me-1"></i>Días sugeridos
-                                        </span>
-                                        <span class="tour-info-value" style="font-size: 0.8rem;">
-                                            ${availabilityText}
-                                        </span>
-                                    </div>
-                                    ${typeSection}
-                                    <div class="tour-info-pricing">
-                                        ${priceSection}
-                                    </div>
-                                </div>
-                                <div class="tour-card-button-wrapper d-flex gap-2">
-                                    <button class="btn btn-outline-primary btn-sm flex-grow-1 view-more-btn"
-                                            data-tour-id="${tour.id || tour.objectId}"
-                                            data-tour-name="${destination}"
-                                            data-tour-type="vehicle">
-                                        <i class="ti ti-eye me-1"></i>Ver más
-                                    </button>
-                                    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-                                    <button class="btn btn-primary btn-sm add-tour-to-quote-btn"
-                                            data-tour-id="${tour.id || tour.objectId}"
-                                            data-tour-name="${destination}"
-                                            data-tour-price="${tour.price || 0}"
-                                            title="Agregar a Cotización">
-                                        <i class="ti ti-file-plus"></i>
-                                    </button>
-                                    <% } %>
-                                </div>
+                        </div>
+                        <div class="expcard__body">
+                            <h5 class="expcard__title" title="${destination}">${destination}</h5>
+                            <p class="expcard__desc">${description}</p>
+                            <div class="expcard__rows">
+                                <div class="expcard__row"><span class="expcard__k">Mínimo de horas</span><span class="expcard__v">${duration}</span></div>
+                                <div class="expcard__row"><span class="expcard__k">Reserva anticipada</span><span class="expcard__v">${bookingTimeText}</span></div>
+                                <div class="expcard__row"><span class="expcard__k">Días sugeridos</span><span class="expcard__v">${availabilityText}</span></div>
+                                <hr class="expcard__sep">
+                                ${priceSection}
+                            </div>
+                            <div class="expcard__actions">
+                                <button class="expcard__btn expcard__btn--primary view-more-btn"
+                                        data-tour-id="${tour.id || tour.objectId}"
+                                        data-tour-name="${destination}"
+                                        data-tour-type="vehicle">
+                                    Ver más
+                                </button>
+                                <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+                                <button class="expcard__btn expcard__btn--ghost add-tour-to-quote-btn"
+                                        data-tour-id="${tour.id || tour.objectId}"
+                                        data-tour-name="${destination}"
+                                        data-tour-price="${tour.price || 0}"
+                                        title="Agregar a Cotización">
+                                    ＋ Agregar
+                                </button>
+                                <% } %>
                             </div>
                         </div>
                     </div>
@@ -2286,7 +2227,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function showResults() {
-        toursGrid.style.display = 'block';
+        // Grid Bootstrap (.row) → debe mostrarse como flex, no como block
+        toursGrid.style.display = 'flex';
         noToursMessage.style.display = 'none';
     }
     
@@ -2335,10 +2277,10 @@ document.addEventListener('DOMContentLoaded', function() {
             syncDropdowns(currencyFilterDesktop, currencyFilterMobile);
             applyFilters();
             
-            // If modal is open, refresh the pricing tab
-            const modal = document.getElementById('tourModal');
-            if (modal && modal.classList.contains('show') && window._selectedTour) {
-                loadPricesTab(window._selectedTour);
+            // Si el modal de detalle está abierto, refrescar los precios.
+            const modal = document.getElementById('tourDetailsModal');
+            if (modal && modal.classList.contains('show') && window._currentModalTourData) {
+                loadPricesTab(window._currentModalTourData);
             }
         });
     }
@@ -2348,10 +2290,10 @@ document.addEventListener('DOMContentLoaded', function() {
             syncDropdowns(currencyFilterMobile, currencyFilterDesktop);
             applyFilters();
             
-            // If modal is open, refresh the pricing tab
-            const modal = document.getElementById('tourModal');
-            if (modal && modal.classList.contains('show') && window._selectedTour) {
-                loadPricesTab(window._selectedTour);
+            // Si el modal de detalle está abierto, refrescar los precios.
+            const modal = document.getElementById('tourDetailsModal');
+            if (modal && modal.classList.contains('show') && window._currentModalTourData) {
+                loadPricesTab(window._currentModalTourData);
             }
         });
     }
@@ -2362,10 +2304,10 @@ document.addEventListener('DOMContentLoaded', function() {
             syncDropdowns(paymentFilterDesktop, paymentFilterMobile);
             applyFilters();
             
-            // If modal is open, refresh the pricing tab
-            const modal = document.getElementById('tourModal');
-            if (modal && modal.classList.contains('show') && window._selectedTour) {
-                loadPricesTab(window._selectedTour);
+            // Si el modal de detalle está abierto, refrescar los precios.
+            const modal = document.getElementById('tourDetailsModal');
+            if (modal && modal.classList.contains('show') && window._currentModalTourData) {
+                loadPricesTab(window._currentModalTourData);
             }
         });
     }
@@ -2375,10 +2317,10 @@ document.addEventListener('DOMContentLoaded', function() {
             syncDropdowns(paymentFilterMobile, paymentFilterDesktop);
             applyFilters();
             
-            // If modal is open, refresh the pricing tab
-            const modal = document.getElementById('tourModal');
-            if (modal && modal.classList.contains('show') && window._selectedTour) {
-                loadPricesTab(window._selectedTour);
+            // Si el modal de detalle está abierto, refrescar los precios.
+            const modal = document.getElementById('tourDetailsModal');
+            if (modal && modal.classList.contains('show') && window._currentModalTourData) {
+                loadPricesTab(window._currentModalTourData);
             }
         });
     }
@@ -2417,6 +2359,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Refresh display to recalculate capacity and pricing
             displayTours();
+
+            // Si el modal de detalle está abierto, refrescar los precios (afecta chofer/capacidad).
+            const gModal = document.getElementById('tourDetailsModal');
+            if (gModal && gModal.classList.contains('show') && window._currentModalTourData) {
+                loadPricesTab(window._currentModalTourData);
+            }
         });
     });
 
@@ -2956,8 +2904,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const heroTitle = document.getElementById('tourHeroTitle');
         const heroImage = document.getElementById('tourHeroImage');
         const modalLoading = document.getElementById('tourModalLoading');
-        const tabContent = document.getElementById('tourTabContent');
-        
+        const detailBody = document.getElementById('tourDetailBody');
+
         // Set initial data and show loading
         heroTitle.textContent = tourName;
         heroImage.src = '/img/amexing_logo_horizontal.avif'; // Default placeholder
@@ -2965,8 +2913,8 @@ document.addEventListener('DOMContentLoaded', function() {
         heroImage.style.background = '#ffffff';
         heroImage.style.padding = '20px';
         modalLoading.style.display = 'block';
-        tabContent.style.display = 'none';
-        
+        if (detailBody) detailBody.innerHTML = '';
+
         // Show modal
         modal.show();
         
@@ -3015,87 +2963,443 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Function to load tour data into modal
+    // Carga los detalles del tour en el modal de lujo (diseño de dos columnas).
+    // Réplica de loadExperienceDetailsIntoModal: hero + pills, galería, cuerpo y precios.
     async function loadTourDetailsIntoModal(tour, tourName) {
         const modalLoading = document.getElementById('tourModalLoading');
-        const tabContent = document.getElementById('tourTabContent');
         const heroImage = document.getElementById('tourHeroImage');
-        const photoCountBadge = document.getElementById('photoCountBadge');
-        
+        const heroTitle = document.getElementById('tourHeroTitle');
+        const heroCategory = document.getElementById('tourHeroCategory');
+        const heroType = document.getElementById('tourHeroType');
+        const detailBody = document.getElementById('tourDetailBody');
+
         try {
-            // Set optimized hero image with progressive loading
+            // Guardar el tour completo para recalcular precios al cambiar los filtros.
+            window._currentModalTourData = tour;
+
+            // ---- Imagen principal (hero) con carga progresiva ----
             const heroImageContainer = heroImage.parentElement;
-            heroImageContainer.classList.add('loading');
-            
+            heroImageContainer.classList.remove('loading', 'loaded', 'error');
+            heroImage.onload = null;
+            heroImage.onerror = null;
+
+            let imageUrl = '';
             if (tour.photos && tour.photos.length > 0) {
-                const firstPhoto = tour.photos[0];
-                heroImage.src = getOptimizedImageUrl(firstPhoto);
-                heroImage.style.objectFit = 'cover';
-                heroImage.style.background = '';
-                heroImage.style.padding = '';
-                photoCountBadge.textContent = tour.photos.length;
+                imageUrl = getOptimizedImageUrl(tour.photos[0]);
             } else if (tour.primaryPhoto) {
-                heroImage.src = getOptimizedImageUrl(tour.primaryPhoto);
+                imageUrl = getOptimizedImageUrl(tour.primaryPhoto);
+            }
+            if (imageUrl) {
                 heroImage.style.objectFit = 'cover';
                 heroImage.style.background = '';
                 heroImage.style.padding = '';
-                photoCountBadge.textContent = '1';
             } else {
-                heroImage.src = '/img/amexing_logo_horizontal.avif';
+                imageUrl = '/img/amexing_logo_horizontal.avif';
                 heroImage.style.objectFit = 'contain';
                 heroImage.style.background = '#ffffff';
                 heroImage.style.padding = '20px';
-                photoCountBadge.textContent = '0';
             }
-            
-            // Add progressive loading event listeners for hero image
-            heroImage.onload = () => {
-                heroImageContainer.classList.remove('loading');
-                heroImageContainer.classList.add('loaded');
-            };
-            
-            heroImage.onerror = () => {
-                heroImageContainer.classList.remove('loading');
-                heroImageContainer.classList.add('error');
-                heroImage.src = '/img/amexing_logo_horizontal.avif';
-                heroImage.style.objectFit = 'contain';
-                heroImage.style.background = '#ffffff';
-                heroImage.style.padding = '20px';
-            };
-            
-            // If image is already loaded (from cache), trigger load event
-            if (heroImage.complete && heroImage.naturalHeight !== 0) {
+
+            if (imageUrl && !imageUrl.startsWith('data:')) {
+                heroImageContainer.classList.add('loading');
+                heroImage.onload = () => {
+                    heroImageContainer.classList.remove('loading');
+                    heroImageContainer.classList.add('loaded');
+                };
+                heroImage.onerror = () => {
+                    heroImageContainer.classList.remove('loading');
+                    heroImage.src = '/img/amexing_logo_horizontal.avif';
+                    heroImage.style.objectFit = 'contain';
+                    heroImage.style.background = '#ffffff';
+                    heroImage.style.padding = '20px';
+                };
+            }
+            heroImage.src = imageUrl;
+            if (imageUrl && !imageUrl.startsWith('data:') && heroImage.complete && heroImage.naturalHeight !== 0) {
                 heroImage.dispatchEvent(new Event('load'));
             }
-            
-            // Load content into each tab
-            loadInformationTab(tour, tourName);
-            loadGalleryTab(tour, tourName);
-            loadDetailsTab(tour);
+
+            // ---- Título + pills de categoría/tipo del panel izquierdo ----
+            if (heroTitle) heroTitle.textContent = tour.destinationPOI?.name || tourName || '';
+            if (heroCategory) {
+                const catVal = tour.type;
+                if (catVal) {
+                    heroCategory.textContent = String(catVal).toUpperCase();
+                    heroCategory.style.display = '';
+                } else {
+                    heroCategory.style.display = 'none';
+                }
+            }
+            if (heroType) {
+                heroType.textContent = tour.isWalkingTour ? 'Tour a pie' : 'Con vehículo';
+                heroType.style.display = '';
+            }
+
+            // ---- Guardar fotos para el visor a pantalla completa (mecanismo reutilizado) ----
+            if (tour.photos && tour.photos.length > 0) {
+                storeGalleryPhotos(tour.photos, tourName);
+            } else {
+                currentGalleryPhotos = [];
+            }
+
+            // ---- Render del cuerpo (todo excepto precios, que inyecta loadPricesTab) ----
+            detailBody.innerHTML = renderTourDetailBody(tour);
+
+            // Galería: clic en miniatura → cambia el hero; clic en hero → visor a pantalla completa.
+            const thumbEls = detailBody.querySelectorAll('.exp-lux__thumb');
+            thumbEls.forEach((el) => {
+                el.addEventListener('click', () => {
+                    const idx = parseInt(el.dataset.photoIndex, 10) || 0;
+                    if (el.dataset.photoUrl) {
+                        heroImage.src = el.dataset.photoUrl;
+                        heroImage.style.objectFit = 'cover';
+                        heroImage.style.background = '';
+                        heroImage.style.padding = '';
+                    }
+                    heroImage.dataset.currentIndex = idx;
+                    thumbEls.forEach((t) => t.classList.toggle('is-active', t === el));
+                });
+            });
+            heroImage.dataset.currentIndex = 0;
+
+            const mediaPane = heroImage.closest('.exp-lux__media');
+            const expandBtn = document.getElementById('tourHeroExpand');
+            const hasGallery = currentGalleryPhotos.length > 0;
+            if (mediaPane) {
+                mediaPane.style.cursor = hasGallery ? 'zoom-in' : '';
+                mediaPane.onclick = () => {
+                    if (hasGallery) openFullscreenGallery(parseInt(heroImage.dataset.currentIndex, 10) || 0);
+                };
+            }
+            if (expandBtn) expandBtn.style.display = hasGallery ? '' : 'none';
+
+            // Navegación de la tira: flechas ‹ › y rueda del mouse (vertical → horizontal).
+            const galStrip = detailBody.querySelector('.exp-lux__gallery');
+            const galPrev = detailBody.querySelector('.exp-lux__gallery-nav--prev');
+            const galNext = detailBody.querySelector('.exp-lux__gallery-nav--next');
+            if (galStrip && galPrev && galNext) {
+                const galStep = () => Math.max(galStrip.clientWidth * 0.75, 200);
+                const galUpdateNav = () => {
+                    const maxScroll = galStrip.scrollWidth - galStrip.clientWidth - 2;
+                    galPrev.classList.toggle('is-hidden', galStrip.scrollLeft <= 0);
+                    galNext.classList.toggle('is-hidden', maxScroll <= 0 || galStrip.scrollLeft >= maxScroll);
+                };
+                galPrev.addEventListener('click', () => galStrip.scrollBy({ left: -galStep(), behavior: 'smooth' }));
+                galNext.addEventListener('click', () => galStrip.scrollBy({ left: galStep(), behavior: 'smooth' }));
+                galStrip.addEventListener('scroll', galUpdateNav);
+                galStrip.addEventListener('wheel', (e) => {
+                    if (galStrip.scrollWidth <= galStrip.clientWidth) return;
+                    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                        galStrip.scrollLeft += e.deltaY;
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+                galUpdateNav();
+                setTimeout(galUpdateNav, 300);
+            }
+
+            // Render de la sección de precios (separada para refrescar al cambiar filtros).
             loadPricesTab(tour);
-            
-            // Hide loading and show content
+
+            // Ocultar el loading.
             modalLoading.style.display = 'none';
-            tabContent.style.display = 'block';
-            
+
         } catch (error) {
             console.error('Error processing tour data:', error);
             showModalError('Error al procesar los datos del tour');
         }
     }
-    
-    // Function to show error in modal
+
+    // Construye el cuerpo de detalle de lujo (todas las secciones excepto precios,
+    // que inyecta loadPricesTab en #pricesContent para poder re-renderizarlas al
+    // cambiar moneda/pago/servicio). Réplica de renderExperienceDetailBody.
+    function renderTourDetailBody(tour) {
+        // Acepta arrays O strings delimitados por saltos de línea para campos de lista.
+        const toArr = (v) => {
+            if (!v) return [];
+            if (Array.isArray(v)) return v.filter(x => x !== null && x !== undefined && String(x).trim() !== '');
+            return String(v).split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        };
+
+        const sections = [];
+
+        // 1. Descripción (serif, sin itálica).
+        if (tour.description) {
+            sections.push(`<div class="exp-lux__section"><p class="exp-lux__desc">${tour.description}</p></div>`);
+        }
+
+        // 2. Tiles: Duración, Tipo de recorrido y Capacidad.
+        let durVal = '';
+        if (tour.time) {
+            const totalMinutes = parseInt(tour.time);
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            if (hours > 0 && minutes > 0) durVal = `${hours}h ${minutes}min`;
+            else if (hours > 0) durVal = `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+            else durVal = `${minutes} min`;
+        }
+        const tiles = [
+            ['MÍNIMO DE HORAS', durVal || '—'],
+        ];
+        const minP = tour.min_people;
+        const maxP = tour.max_people;
+        let capVal = '';
+        if (minP && maxP) capVal = `${minP}–${maxP} personas`;
+        else if (maxP) capVal = `Máximo ${maxP} personas`;
+        else if (minP) capVal = `Mínimo ${minP} personas`;
+        if (capVal) tiles.push(['CAPACIDAD', capVal]);
+        sections.push(`
+            <div class="exp-lux__tiles">
+                ${tiles.map(([label, val]) => `
+                <div class="exp-lux__tile">
+                    <span class="exp-lux__tile-label">${label}</span>
+                    <span class="exp-lux__tile-value">${val}</span>
+                </div>`).join('')}
+            </div>
+        `);
+
+        // 3. Disponibilidad: desglose por día con horarios si existe; si no, fila DÍAS DISPONIBLES.
+        const to12h = (hhmm) => {
+            const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/);
+            if (!m) return '';
+            let h = parseInt(m[1], 10);
+            const min = m[2];
+            const ampm = h >= 12 ? 'pm' : 'am';
+            h = h % 12; if (h === 0) h = 12;
+            return h + ':' + min + ' ' + ampm;
+        };
+        const schedDayAbbr = {
+            '0': 'Do', '7': 'Do', 'sunday': 'Do', 'domingo': 'Do',
+            '1': 'Lu', 'monday': 'Lu', 'lunes': 'Lu',
+            '2': 'Ma', 'tuesday': 'Ma', 'martes': 'Ma',
+            '3': 'Mi', 'wednesday': 'Mi', 'miércoles': 'Mi', 'miercoles': 'Mi',
+            '4': 'Ju', 'thursday': 'Ju', 'jueves': 'Ju',
+            '5': 'Vi', 'friday': 'Vi', 'viernes': 'Vi',
+            '6': 'Sa', 'saturday': 'Sa', 'sábado': 'Sa', 'sabado': 'Sa'
+        };
+        const schedShort = { 'Lu': 'Lun', 'Ma': 'Mar', 'Mi': 'Mié', 'Ju': 'Jue', 'Vi': 'Vie', 'Sa': 'Sáb', 'Do': 'Dom' };
+        const schedFull = { 'Lu': 'Lunes', 'Ma': 'Martes', 'Mi': 'Miércoles', 'Ju': 'Jueves', 'Vi': 'Viernes', 'Sa': 'Sábado', 'Do': 'Domingo' };
+        const schedOrder = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+        const kv = [];
+        let scheduleRendered = false;
+        if (Array.isArray(tour.availability) && tour.availability.length) {
+            const perDay = {};
+            tour.availability.forEach(entry => {
+                if (!entry || typeof entry !== 'object') return;
+                let dv = entry.day !== undefined ? entry.day : (entry.Day !== undefined ? entry.Day : (entry.name !== undefined ? entry.name : entry.value));
+                if (dv === null || dv === undefined) return;
+                const abbr = schedDayAbbr[String(dv).toLowerCase().trim()];
+                if (!abbr) return;
+                const times = [];
+                if (Array.isArray(entry.times)) {
+                    entry.times.forEach(t => {
+                        if (!t) return;
+                        const s = to12h(t.start || t.startTime || t.start_time);
+                        const e = to12h(t.end || t.endTime || t.end_time);
+                        if (s) times.push(e ? `${s} – ${e}` : s);
+                    });
+                } else if (entry.startTime || entry.start_time) {
+                    const s = to12h(entry.startTime || entry.start_time);
+                    const e = to12h(entry.endTime || entry.end_time);
+                    if (s) times.push(e ? `${s} – ${e}` : s);
+                }
+                if (!perDay[abbr]) perDay[abbr] = [];
+                times.forEach(t => { if (!perDay[abbr].includes(t)) perDay[abbr].push(t); });
+            });
+            const activeDays = Object.keys(perDay).sort((a, b) => schedOrder.indexOf(a) - schedOrder.indexOf(b));
+            const anyTimes = activeDays.some(d => perDay[d].length);
+            if (activeDays.length && anyTimes) {
+                const groups = [];
+                activeDays.forEach(d => {
+                    const key = perDay[d].join('|');
+                    const g = groups.find(gr => gr.key === key);
+                    if (g) g.days.push(d); else groups.push({ key, days: [d], times: perDay[d] });
+                });
+                const rowsHtml = groups.map(g => {
+                    let label;
+                    if (g.days.length === 7) label = 'Todos los días';
+                    else if (g.days.length === 1) label = schedFull[g.days[0]];
+                    else label = g.days.map(d => schedShort[d]).join(', ');
+                    const timesHtml = g.times.length
+                        ? g.times.map(t => `<span class="exp-lux__sched-time">${t}</span>`).join('')
+                        : '<span class="exp-lux__sched-time exp-lux__sched-time--muted">Horario por confirmar</span>';
+                    return `<div class="exp-lux__sched-row"><span class="exp-lux__sched-days">${label}</span><span class="exp-lux__sched-times">${timesHtml}</span></div>`;
+                }).join('');
+                sections.push(`
+                    <div class="exp-lux__section">
+                        <h4 class="exp-lux__heading">${tour.fixed_schedule ? 'HORARIOS' : 'HORARIOS SUGERIDOS'}</h4>
+                        <div class="exp-lux__sched">${rowsHtml}</div>
+                    </div>
+                `);
+                scheduleRendered = true;
+            }
+        }
+        // Fallback: días disponibles como texto (misma lógica que el card).
+        if (!scheduleRendered) {
+            kv.push(['DÍAS DISPONIBLES', getTourAvailabilityText(tour)]);
+        }
+
+        // 4. Incluye / No incluye en 2 columnas.
+        const inc = toArr(tour.includes);
+        const ninc = toArr(tour.notincludes);
+        if (inc.length || ninc.length) {
+            const incCol = inc.length ? `
+                    <div class="exp-lux__inc-col">
+                        <h4 class="exp-lux__heading">INCLUYE</h4>
+                        <ul class="exp-lux__list">
+                            ${inc.map(i => `<li><span class="exp-lux__check">✓</span><span>${i}</span></li>`).join('')}
+                        </ul>
+                    </div>` : '';
+            const nincCol = ninc.length ? `
+                    <div class="exp-lux__inc-col">
+                        <h4 class="exp-lux__heading">NO INCLUYE</h4>
+                        <ul class="exp-lux__list exp-lux__list--muted">
+                            ${ninc.map(i => `<li><span class="exp-lux__cross">×</span><span>${i}</span></li>`).join('')}
+                        </ul>
+                    </div>` : '';
+            sections.push(`
+                <div class="exp-lux__section">
+                    <div class="exp-lux__inc-grid">${incCol}${nincCol}</div>
+                </div>
+            `);
+        }
+
+        // 5. Galería: tira horizontal con TODAS las fotos.
+        if (tour.photos && tour.photos.length > 0) {
+            const thumbs = tour.photos.map((photo, index) => {
+                const url = getOptimizedImageUrl(photo) || '/img/amexing_logo_horizontal.avif';
+                return `<button type="button" class="exp-lux__thumb${index === 0 ? ' is-active' : ''}" data-photo-index="${index}" data-photo-url="${url}" style="background-image:url('${url}')" aria-label="Ver foto ${index + 1}"></button>`;
+            }).join('');
+            sections.push(`
+                <div class="exp-lux__section">
+                    <div class="exp-lux__gallery-head">
+                        <h4 class="exp-lux__heading">GALERÍA</h4>
+                        <div class="exp-lux__gallery-navs">
+                            <button type="button" class="exp-lux__gallery-nav exp-lux__gallery-nav--prev is-hidden" aria-label="Anterior"><i class="ti ti-chevron-left"></i></button>
+                            <button type="button" class="exp-lux__gallery-nav exp-lux__gallery-nav--next" aria-label="Siguiente"><i class="ti ti-chevron-right"></i></button>
+                        </div>
+                    </div>
+                    <div class="exp-lux__gallery">${thumbs}</div>
+                </div>
+            `);
+        }
+
+        // 6. Reserva: anticipación + notas de reserva.
+        const advMin = tour.advance_booking_time || tour.advanceBookingTime || tour.advanceBooking;
+        const bookingNotes = tour.client_booking_notes || tour.notes;
+        if (advMin || bookingNotes) {
+            let reservaInner = '';
+            if (advMin) {
+                reservaInner += `<p class="exp-lux__resv-adv">Reservar con al menos <span class="exp-lux__resv-adv-value">${formatAdvanceBooking(advMin)}</span> de anticipación.</p>`;
+            }
+            if (bookingNotes) {
+                reservaInner += `<p class="exp-lux__prewrap exp-lux__resv-notes">${bookingNotes}</p>`;
+            }
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">RESERVA</h4>
+                    ${reservaInner}
+                </div>
+            `);
+        }
+
+        // 7. Key-value (días disponibles fallback, idioma, etc.). La ubicación no se
+        //    incluye porque el destino ya es el título del hero.
+        if (kv.length) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <div class="exp-lux__kv">
+                        ${kv.map(([k, v]) => `<div class="exp-lux__kv-row"><span class="exp-lux__kv-key">${k}</span><span class="exp-lux__kv-val">${v}</span></div>`).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        // Idioma como chips.
+        const langs = Array.isArray(tour.languages) ? tour.languages : (tour.languages ? [tour.languages] : []);
+        if (langs.length) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">IDIOMA</h4>
+                    <div class="exp-lux__chips">
+                        ${langs.map(l => `<span class="exp-lux__chip">${l}</span>`).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        // 8. Placeholder de precios (lo llena loadPricesTab).
+        sections.push(`
+            <div class="exp-lux__section">
+                <h4 class="exp-lux__heading">PRECIOS</h4>
+                <div id="pricesContent" class="exp-lux__prices"></div>
+            </div>
+        `);
+
+        return sections.join('');
+    }
+
+    // Texto de días disponibles para el detalle (misma lógica que el card).
+    function getTourAvailabilityText(tour) {
+        let availabilityText = 'Todos los días';
+        let availableDays = null;
+        const dayNameToShort = {
+            'domingo': 'Do', 'lunes': 'Lu', 'martes': 'Ma',
+            'miércoles': 'Mi', 'miercoles': 'Mi', 'jueves': 'Ju',
+            'viernes': 'Vi', 'sábado': 'Sa', 'sabado': 'Sa'
+        };
+        if (tour.availability && Array.isArray(tour.availability) && tour.availability.length > 0) {
+            if (typeof tour.availability[0] === 'object' && 'day' in tour.availability[0]) {
+                availableDays = tour.availability.map(schedule => schedule.day);
+            } else {
+                availableDays = tour.availability;
+            }
+        } else if (tour.availableDays && Array.isArray(tour.availableDays) && tour.availableDays.length > 0) {
+            if (typeof tour.availableDays[0] === 'string') {
+                const shortDays = tour.availableDays.map(name => dayNameToShort[name.toLowerCase()]).filter(Boolean);
+                if (shortDays.length > 0 && shortDays.length < 7) {
+                    shortDays.sort((a, b) => {
+                        const order = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
+                        return order.indexOf(a) - order.indexOf(b);
+                    });
+                    availabilityText = shortDays.join(', ');
+                } else if (shortDays.length >= 7) {
+                    availabilityText = 'Todos los días';
+                }
+                availableDays = null;
+            } else {
+                availableDays = tour.availableDays;
+            }
+        } else if (tour.availability && typeof tour.availability === 'object' && tour.availability.availableDays) {
+            availableDays = tour.availability.availableDays;
+        }
+        if (availableDays && Array.isArray(availableDays) && availableDays.length > 0) {
+            const dayNames = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa'];
+            const validDays = availableDays.filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
+            if (validDays.length === 7) {
+                availabilityText = 'Todos los días';
+            } else if (validDays.length > 0) {
+                const weekOrder = d => (d + 6) % 7;
+                const days = validDays.sort((a, b) => weekOrder(a) - weekOrder(b)).map(day => dayNames[day]).filter(Boolean);
+                availabilityText = days.join(', ');
+            }
+        }
+        return availabilityText;
+    }
+
+    // Función para mostrar error en el modal
     function showModalError(message) {
         const modalLoading = document.getElementById('tourModalLoading');
-        const tabContent = document.getElementById('tourTabContent');
-        
+        const detailBody = document.getElementById('tourDetailBody');
+
+        modalLoading.style.display = 'block';
         modalLoading.innerHTML = `
             <div class="alert alert-danger">
                 <i class="ti ti-alert-circle me-2"></i>
                 ${message}
             </div>
         `;
-        tabContent.style.display = 'none';
+        if (detailBody) detailBody.innerHTML = '';
     }
     
     // Helper function to format currency
@@ -3475,476 +3779,102 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to load Prices tab
     function loadPricesTab(tour) {
         const pricesContent = document.getElementById('pricesContent');
-        
-        // Get current currency and payment type from dropdowns
+        if (!pricesContent) return;
+
+        // Moneda y tipo de pago actuales (de los filtros de la página).
         const currencyFilter = document.getElementById('currencyFilter-<%= dtTableId %>') || document.getElementById('currencyFilterMobile-<%= dtTableId %>');
         const paymentFilter = document.getElementById('paymentTypeFilter-<%= dtTableId %>') || document.getElementById('paymentTypeFilterMobile-<%= dtTableId %>');
         const currency = currencyFilter ? currencyFilter.value : 'MXN';
         const paymentType = paymentFilter ? paymentFilter.value : 'efectivo';
-        
-        // Debug tour pricing data to console
-        console.log('Complete tour pricing data:', {
-            tourId: tour.id,
-            tourName: tour.destinationPOI?.name,
-            priceData: tour.priceData,
-            priceDataLength: tour.priceData?.length || 0,
-            priceDataType: typeof tour.priceData,
-            isWalkingTour: tour.isWalkingTour,
-            walkingPriceSmall: tour.walkingPriceSmall,
-            walkingPriceMedium: tour.walkingPriceMedium,
-            walkingPriceLarge: tour.walkingPriceLarge,
-            price: tour.price,
-            price_child: tour.price_child,
-            price_no_alcohol: tour.price_no_alcohol,
-            base_price: tour.base_price,
-            discount_price: tour.discount_price,
-            seasonal_price: tour.seasonal_price,
-            private_price: tour.private_price,
-            group_price: tour.group_price,
-            weekend_price: tour.weekend_price,
-            holiday_price: tour.holiday_price,
-            allTourKeys: Object.keys(tour),
-            allPricingFields: Object.keys(tour).filter(key => 
-                key.toLowerCase().includes('price') || 
-                key.toLowerCase().includes('cost') || 
-                key.toLowerCase().includes('tarifa') ||
-                key.toLowerCase().includes('rate')
-            )
-        });
-        
-        // Additional debug for priceData structure
-        if (tour.priceData && Array.isArray(tour.priceData)) {
-            console.log('Vehicle pricing details:');
-            tour.priceData.forEach((price, index) => {
-                console.log(`  Vehicle ${index + 1}:`, {
-                    vehicleType: price.vehicleType,
-                    price: price.price,
-                    formattedPrice: price.formattedPrice,
-                    rate: price.rate
-                });
-            });
-        }
-        
-        // Create selections info display
-        const serviceTypeText = currentGuideFilter === 'with-driver' ? 'Guía + Chofer' : 'Solo Guía';
-        const currencyText = currency === 'USD' ? 'USD' : 'MXN';
-        const paymentText = paymentType === 'efectivo' ? 'Efectivo' : 
-                            paymentType === 'transferencia' ? 'Transferencia' : 'Tarjeta Débito/Crédito';
-        
-        // Get selected rate name if any
-        const rateFilterElement = document.getElementById('rateFilter-<%= dtTableId %>') || document.getElementById('rateFilterMobile-<%= dtTableId %>');
-        const selectedRateName = rateFilterElement && rateFilterElement.selectedOptions[0] && rateFilterElement.value 
-            ? rateFilterElement.selectedOptions[0].textContent 
-            : 'Sin segmento seleccionado';
-        
-        // Determine if this is a walking tour
+        const unit = `${currency} / HORA`;
+        const perUnit = `${currency} / PERSONA`;
+
         const isWalkingTour = tour.isWalkingTour || (tour.walkingPriceSmall || tour.walkingPriceMedium || tour.walkingPriceLarge);
-        
-        let pricingHtml = `
-            <div class="alert alert-info d-flex align-items-center mb-4" style="background-color: #f0f7ff; border-color: #b3d9ff;">
-                <i class="ti ti-info-circle me-2" style="font-size: 1.2rem;"></i>
-                <div>
-                    <strong>Configuración actual de precios:</strong>
-                    <div class="mt-1">
-                        ${!isWalkingTour ? `
-                            <span class="badge me-2" style="background-color: white; color: black; border: 1px solid #dee2e6;">
-                                <i class="ti ti-user-check me-1"></i>${serviceTypeText}
-                            </span>
-                        ` : ''}
-                        <span class="badge me-2" style="background-color: white; color: black; border: 1px solid #dee2e6;">
-                            <i class="ti ti-currency-dollar me-1"></i>${currencyText}
-                        </span>
-                        <span class="badge me-2" style="background-color: white; color: black; border: 1px solid #dee2e6;">
-                            <i class="ti ti-credit-card me-1"></i>${paymentText}
-                        </span>
-                        ${!isWalkingTour && selectedRateId ? `
-                            <span class="badge" style="background-color: white; color: black; border: 1px solid #dee2e6;">
-                                <i class="ti ti-tag me-1"></i>${selectedRateName}
-                            </span>
-                        ` : ''}
-                    </div>
+
+        // Tarjeta de precio de lujo (misma estructura que experiencias).
+        const priceCard = (name, sub, amountHtml, unitLabel) => `
+            <div class="exp-lux__price-card">
+                <div class="exp-lux__price-left">
+                    <span class="exp-lux__price-name">${name}</span>
+                    ${sub ? `<span class="exp-lux__price-sub">${sub}</span>` : ''}
                 </div>
-            </div>
-        `;
-        
-        // Check for vehicle pricing
+                <div class="exp-lux__price-right">
+                    <span class="exp-lux__price-amount">${amountHtml}</span>
+                    ${unitLabel ? `<span class="exp-lux__price-unit">${unitLabel}</span>` : ''}
+                </div>
+            </div>`;
+
+        let html = '';
+
+        // --- Tours con vehículo: TODAS las tarifas/segmentos ---
         if (tour.priceData && tour.priceData.length > 0) {
-            // Group prices by rate
             const pricesByRate = {};
-            tour.priceData.forEach(priceData => {
-                const rateKey = priceData.rate?.id || 'no-rate';
-                const rateName = priceData.rate?.name || 'Tarifa General';
-                const rateColor = priceData.rate?.color || '#6c757d';
-                
+            tour.priceData.forEach((pd) => {
+                const rateKey = pd.rate?.id || 'no-rate';
                 if (!pricesByRate[rateKey]) {
-                    pricesByRate[rateKey] = {
-                        name: rateName,
-                        color: rateColor,
-                        prices: []
-                    };
+                    pricesByRate[rateKey] = { name: pd.rate?.name || 'Tarifa general', color: pd.rate?.color || '#6E7A50', prices: [] };
                 }
-                pricesByRate[rateKey].prices.push(priceData);
+                pricesByRate[rateKey].prices.push(pd);
             });
-            
-            // Sort vehicles within each rate by capacity
-            Object.values(pricesByRate).forEach(rateGroup => {
-                rateGroup.prices.sort((a, b) => {
-                    const capacityA = a.vehicleType?.defaultCapacity || 0;
-                    const capacityB = b.vehicleType?.defaultCapacity || 0;
-                    return capacityA - capacityB; // Sort ascending by capacity
-                });
-            });
-            
-            // Sort rates to ensure consistent ordering
+            Object.values(pricesByRate).forEach((g) => g.prices.sort((a, b) => (a.vehicleType?.defaultCapacity || 0) - (b.vehicleType?.defaultCapacity || 0)));
             const sortedRates = Object.entries(pricesByRate).sort((a, b) => {
-                // Put "no-rate" at the end
                 if (a[0] === 'no-rate') return 1;
                 if (b[0] === 'no-rate') return -1;
-                // Otherwise sort by name
                 return a[1].name.localeCompare(b[1].name);
             });
-            
-            pricingHtml += `
-                <div class="pricing-section">
-                    <h5 class="mb-4"><i class="ti ti-car me-2"></i>Precios por Vehículo (Por hora)</h5>
-                    ${sortedRates.map(([rateKey, rateGroup]) => `
-                        <div class="rate-group mb-4">
-                            <div class="rate-header d-flex align-items-center mb-3">
-                                <span class="rate-badge" style="background-color: ${rateGroup.color}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.875rem; font-weight: 500;">
-                                    <i class="ti ti-tag me-1"></i>${rateGroup.name}
-                                </span>
-                            </div>
-                            <div class="row g-3">
-                                ${rateGroup.prices.map(priceData => {
-                                    // Adjust capacity based on guide filter (driver takes a seat)
-                                    const baseCapacity = priceData.vehicleType?.defaultCapacity || 0;
-                                    const adjustedCapacity = currentGuideFilter === 'with-driver' && baseCapacity > 0 
-                                        ? baseCapacity - 1 
-                                        : baseCapacity;
-                                    
-                                    // Determine if this is a vehicle tour (has driver option)
-                                    const hasDriver = true; // Vehicle tours can have drivers
-                                    
-                                    return `
-                                    <div class="col-md-6">
-                                        <div class="price-card" style="border-left: 3px solid ${rateGroup.color};">
-                                            <div class="price-icon" style="background-color: ${rateGroup.color};">
-                                                <i class="ti ti-car"></i>
-                                            </div>
-                                            <div class="price-info">
-                                                <h6>${priceData.vehicleType?.name || 'Vehículo'}</h6>
-                                                <p class="text-muted mb-1">
-                                                    <i class="ti ti-users me-1"></i>${adjustedCapacity} personas
-                                                </p>
-                                                <p class="price-amount">${convertTourPrice(priceData.price, currency, paymentType, hasDriver)}</p>
-                                                ${priceData.originalPrice && priceData.originalPrice !== priceData.price ? 
-                                                    `<p class="text-decoration-line-through text-muted small">Original: ${convertTourPrice(priceData.originalPrice, currency, paymentType, hasDriver)}</p>` : ''
-                                                }
-                                            </div>
-                                        </div>
-                                    </div>
-                                `}).join('')}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            `;
-            
-            // Add additional pricing options if they exist
+
+            html += sortedRates.map(([, g]) => {
+                const cards = g.prices.map((pd) => {
+                    const baseCapacity = pd.vehicleType?.defaultCapacity || 0;
+                    const capacity = (currentGuideFilter === 'with-driver' && baseCapacity > 0) ? baseCapacity - 1 : baseCapacity;
+                    const sub = capacity > 0 ? `Hasta ${capacity} personas` : '';
+                    return priceCard(pd.vehicleType?.name || 'Vehículo', sub, convertTourPrice(pd.price, currency, paymentType, true), unit);
+                }).join('');
+                return `
+                    <div class="tour-rate-group">
+                        <span class="tour-rate-label" style="border-color:${g.color};">${g.name}</span>
+                        ${cards}
+                    </div>`;
+            }).join('');
+
+            // Precios por persona (opcional, además de los de vehículo)
             if (tour.price || tour.price_child || tour.price_no_alcohol) {
-                pricingHtml += `
-                    <div class="additional-pricing-section mt-4">
-                        <h6 class="mb-3"><i class="ti ti-users me-2"></i>Precios por Persona</h6>
-                        <div class="row g-3">
-                            ${tour.price ? `
-                                <div class="col-md-4">
-                                    <div class="additional-price-card">
-                                        <div class="additional-price-icon bg-primary">
-                                            <i class="ti ti-user"></i>
-                                        </div>
-                                        <div class="additional-price-info">
-                                            <span class="additional-price-label">Adulto</span>
-                                            <span class="additional-price-value">${convertTourPrice(tour.price, currency, paymentType, true)}</span>
-                                            <small class="text-muted">Con alcohol incluido</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            ${tour.price_child ? `
-                                <div class="col-md-4">
-                                    <div class="additional-price-card">
-                                        <div class="additional-price-icon bg-info">
-                                            <i class="ti ti-mood-kid"></i>
-                                        </div>
-                                        <div class="additional-price-info">
-                                            <span class="additional-price-label">Niño</span>
-                                            <span class="additional-price-value">${convertTourPrice(tour.price_child, currency, paymentType, true)}</span>
-                                            <small class="text-muted">Menor de edad</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            ${tour.price_no_alcohol ? `
-                                <div class="col-md-4">
-                                    <div class="additional-price-card">
-                                        <div class="additional-price-icon bg-success">
-                                            <i class="ti ti-user-check"></i>
-                                        </div>
-                                        <div class="additional-price-info">
-                                            <span class="additional-price-label">Adulto Sin Alcohol</span>
-                                            <span class="additional-price-value">${convertTourPrice(tour.price_no_alcohol, currency, paymentType, true)}</span>
-                                            <small class="text-muted">Sin bebidas alcohólicas</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
+                let pp = '';
+                if (tour.price) pp += priceCard('Adulto', 'Con alcohol', convertTourPrice(tour.price, currency, paymentType, true), perUnit);
+                if (tour.price_child) pp += priceCard('Niño', 'Menor de edad', convertTourPrice(tour.price_child, currency, paymentType, true), perUnit);
+                if (tour.price_no_alcohol) pp += priceCard('Sin alcohol', 'Sin bebidas alcohólicas', convertTourPrice(tour.price_no_alcohol, currency, paymentType, true), perUnit);
+                if (pp) html += `<div class="tour-rate-group"><span class="tour-rate-label" style="border-color:var(--exp-olive);">Por persona</span>${pp}</div>`;
             }
         }
-        // Check for walking tour pricing
-        else if (tour.isWalkingTour && (tour.walkingPriceSmall || tour.walkingPriceMedium || tour.walkingPriceLarge)) {
+        // --- Tours a pie: tramos por tamaño de grupo ---
+        else if (isWalkingTour && (tour.walkingPriceSmall || tour.walkingPriceMedium || tour.walkingPriceLarge)) {
             const ranges = getWalkingTourRanges(tour);
-            pricingHtml += `
-                <div class="pricing-section">
-                    <h5><i class="ti ti-walk me-2"></i>Precios Walking Tour (Por hora)</h5>
-                    <div class="row g-3">
-                        ${tour.walkingPriceSmall ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-warning">
-                                        <i class="ti ti-users"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Grupo Pequeño</h6>
-                                        <p class="text-muted mb-1">${ranges.small}</p>
-                                        <p class="price-amount">${convertTourPrice(tour.walkingPriceSmall, currency, paymentType, false)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.walkingPriceMedium ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-warning">
-                                        <i class="ti ti-users"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Grupo Mediano</h6>
-                                        <p class="text-muted mb-1">${ranges.medium}</p>
-                                        <p class="price-amount">${convertTourPrice(tour.walkingPriceMedium, currency, paymentType, false)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.walkingPriceLarge ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-warning">
-                                        <i class="ti ti-users"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Grupo Grande</h6>
-                                        <p class="text-muted mb-1">${ranges.large}</p>
-                                        <p class="price-amount">${convertTourPrice(tour.walkingPriceLarge, currency, paymentType, false)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
+            if (tour.walkingPriceSmall) html += priceCard('Grupo pequeño', ranges.small, convertTourPrice(tour.walkingPriceSmall, currency, paymentType, false), unit);
+            if (tour.walkingPriceMedium) html += priceCard('Grupo mediano', ranges.medium, convertTourPrice(tour.walkingPriceMedium, currency, paymentType, false), unit);
+            if (tour.walkingPriceLarge) html += priceCard('Grupo grande', ranges.large, convertTourPrice(tour.walkingPriceLarge, currency, paymentType, false), unit);
         }
-        // Check for general pricing
-        else if (tour.price || tour.price_child || tour.price_no_alcohol || tour.base_price || tour.private_price || tour.group_price) {
-            pricingHtml += `
-                <div class="pricing-section">
-                    <h5><i class="ti ti-currency-dollar me-2"></i>Precios</h5>
-                    <div class="row g-3">
-                        ${tour.price || tour.base_price ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-success">
-                                        <i class="ti ti-user"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Adulto</h6>
-                                        <p class="text-muted mb-1">${tour.price ? 'Con alcohol' : 'Precio base'}</p>
-                                        <p class="price-amount">${convertTourPrice(tour.price || tour.base_price, currency, paymentType)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.price_child ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-success">
-                                        <i class="ti ti-mood-kid"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Niño</h6>
-                                        <p class="text-muted mb-1">Menor de edad</p>
-                                        <p class="price-amount">${convertTourPrice(tour.price_child, currency, paymentType)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.price_no_alcohol ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-success">
-                                        <i class="ti ti-glass-off"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Sin Alcohol</h6>
-                                        <p class="text-muted mb-1">Bebidas no alcohólicas</p>
-                                        <p class="price-amount">${convertTourPrice(tour.price_no_alcohol, currency, paymentType)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.private_price ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-primary">
-                                        <i class="ti ti-crown"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Tour Privado</h6>
-                                        <p class="text-muted mb-1">Exclusivo</p>
-                                        <p class="price-amount">${convertTourPrice(tour.private_price, currency, paymentType)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.group_price ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-info">
-                                        <i class="ti ti-users"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Grupo</h6>
-                                        <p class="text-muted mb-1">Precio grupal</p>
-                                        <p class="price-amount">${convertTourPrice(tour.group_price, currency, paymentType)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.weekend_price ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-warning">
-                                        <i class="ti ti-calendar-weekend"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Fin de Semana</h6>
-                                        <p class="text-muted mb-1">Precio especial</p>
-                                        <p class="price-amount">${convertTourPrice(tour.weekend_price, currency, paymentType)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.holiday_price ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-danger">
-                                        <i class="ti ti-calendar-event"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Días Festivos</h6>
-                                        <p class="text-muted mb-1">Precio especial</p>
-                                        <p class="price-amount">${convertTourPrice(tour.holiday_price, currency, paymentType)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.seasonal_price ? `
-                            <div class="col-md-4">
-                                <div class="price-card">
-                                    <div class="price-icon bg-secondary">
-                                        <i class="ti ti-calendar-time"></i>
-                                    </div>
-                                    <div class="price-info">
-                                        <h6>Temporada</h6>
-                                        <p class="text-muted mb-1">Precio estacional</p>
-                                        <p class="price-amount">${convertTourPrice(tour.seasonal_price, currency, paymentType)}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        } 
-        // If no pricing found, show simple message
-        else {
-            pricingHtml += `
-                <div class="text-center py-5">
-                    <i class="ti ti-currency-dollar" style="font-size: 3rem; color: #dee2e6;"></i>
-                    <p class="mt-3 text-muted">No hay información de precios disponible</p>
-                    <p class="small text-muted">Por favor, contacte con nosotros para obtener cotización personalizada.</p>
-                </div>
-            `;
+        // --- Precios generales (fallback) ---
+        else if (tour.price || tour.price_child || tour.price_no_alcohol || tour.base_price) {
+            if (tour.price || tour.base_price) html += priceCard('Adulto', tour.price ? 'Con alcohol' : 'Precio base', convertTourPrice(tour.price || tour.base_price, currency, paymentType, true), perUnit);
+            if (tour.price_child) html += priceCard('Niño', 'Menor de edad', convertTourPrice(tour.price_child, currency, paymentType, true), perUnit);
+            if (tour.price_no_alcohol) html += priceCard('Sin alcohol', 'Sin bebidas alcohólicas', convertTourPrice(tour.price_no_alcohol, currency, paymentType, true), perUnit);
         }
-        
-        // Add payment methods and additional pricing info if available
-        if (tour.payment_methods || tour.currency || tour.tax_included) {
-            pricingHtml += `
-                <div class="pricing-section mt-4">
-                    <h5><i class="ti ti-info-circle me-2"></i>Información Adicional</h5>
-                    <div class="row g-3">
-                        ${tour.payment_methods ? `
-                            <div class="col-md-6">
-                                <div class="info-card">
-                                    <h6><i class="ti ti-credit-card me-2"></i>Métodos de Pago</h6>
-                                    <p class="text-muted">${Array.isArray(tour.payment_methods) ? tour.payment_methods.join(', ') : tour.payment_methods}</p>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.currency ? `
-                            <div class="col-md-6">
-                                <div class="info-card">
-                                    <h6><i class="ti ti-currency-dollar me-2"></i>Moneda</h6>
-                                    <p class="text-muted">${tour.currency}</p>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.tax_included !== undefined ? `
-                            <div class="col-md-6">
-                                <div class="info-card">
-                                    <h6><i class="ti ti-receipt me-2"></i>Impuestos</h6>
-                                    <p class="text-muted">${tour.tax_included ? 'Incluidos' : 'No incluidos'}</p>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${tour.cancellation_policy ? `
-                            <div class="col-md-6">
-                                <div class="info-card">
-                                    <h6><i class="ti ti-ban me-2"></i>Política de Cancelación</h6>
-                                    <p class="text-muted">${tour.cancellation_policy}</p>
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
+
+        if (!html) {
+            html = `<p class="exp-lux__quote">Precios por confirmar</p>`;
         }
-        
-        // If no pricing data found, show a message
-        if (!pricingHtml) {
-            pricingHtml = `
-                <div class="alert alert-info" role="alert">
-                    <i class="ti ti-info-circle me-2"></i>
-                    <strong>Información de Precios</strong>
-                    <p class="mb-0 mt-2">No hay información de precios disponible para este tour en este momento.</p>
-                    <p class="mb-0 mt-1 small text-muted">Por favor, contacte con nosotros para obtener cotización personalizada.</p>
-                </div>
-            `;
+
+        // Pie: moneda / método de pago / servicio (solo vehículo). Se actualiza con los filtros.
+        const payMap = { efectivo: 'Efectivo', transferencia: 'Transferencia bancaria', tarjeta: 'Tarjeta de crédito' };
+        const currencyMap = { MXN: 'MXN — Peso Mexicano', USD: 'USD — US Dollar' };
+        const metaRows = [['Moneda', currencyMap[currency] || currency]];
+        if (payMap[paymentType]) metaRows.push(['Método de pago', payMap[paymentType]]);
+        if (!isWalkingTour && tour.priceData && tour.priceData.length > 0) {
+            metaRows.push(['Servicio', currentGuideFilter === 'with-driver' ? 'Guía + Chofer' : 'Solo Guía']);
         }
-        
-        pricesContent.innerHTML = pricingHtml;
+        html += `<div class="exp-lux__price-meta">${metaRows.map(([k, v]) => `<div class="exp-lux__price-meta-row"><span>${k}</span><span>${v}</span></div>`).join('')}</div>`;
+
+        pricesContent.innerHTML = html;
     }
     
     // Helper function to format availability
@@ -4326,3 +4256,672 @@ document.addEventListener('DOMContentLoaded', function() {
     init();
 });
 </script>
+<style>
+/* Copiado de experiencias: sistema visual de lujo del modal (.exp-lux__*) */
+/* =====================================================================
+   Experience Detail Modal — Luxury redesign (namespaced .exp-lux__*)
+   ===================================================================== */
+.exp-lux-modal {
+    --exp-cream: #EAE7DF;
+    --exp-tile: #E4DFCF;
+    --exp-border: #d6d1c4;
+    --exp-olive: #6E7A50;
+    --exp-olive-light: #7C8A5A;
+    --exp-muted: #8a8f78;
+    --exp-gold: #b8894a;
+    --exp-dark: #2b2b2b;
+    --exp-serif: var(--font-arpona), 'Georgia', serif;
+}
+.exp-lux__dialog {
+    max-width: 1160px;
+    width: 96vw;
+    margin: 1.75rem auto;
+}
+.exp-lux__content {
+    border: none;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--exp-cream);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+.exp-lux__grid {
+    display: grid;
+    grid-template-columns: 42% 58%;
+    height: min(88vh, 820px);
+}
+
+/* ---- LEFT: media pane ---- */
+.exp-lux__media {
+    position: relative;
+    overflow: hidden;
+    background: #1c1c1c;
+}
+.exp-lux__media-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.exp-lux__media-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.15) 45%, rgba(0, 0, 0, 0) 70%);
+    pointer-events: none;
+}
+.exp-lux__media-caption {
+    position: absolute;
+    left: 34px;
+    right: 34px;
+    bottom: 36px;
+    z-index: 2;
+    pointer-events: none;
+}
+.exp-lux__expand {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    z-index: 3;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.28);
+    color: #fff;
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    transition: background 0.2s, border-color 0.2s;
+}
+.exp-lux__expand:hover {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: #fff;
+}
+.exp-lux__expand i {
+    font-size: 1.15rem;
+}
+.exp-lux__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.exp-lux__category {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(20, 20, 20, 0.55);
+    backdrop-filter: blur(4px);
+    color: #f3f0e8;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.exp-lux__type-pill {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(243, 240, 232, 0.65);
+    background: rgba(20, 20, 20, 0.28);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: #f3f0e8;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.exp-lux__title {
+    margin: 0;
+    font-family: var(--exp-serif);
+    font-weight: 500;
+    font-size: 2.15rem;
+    line-height: 1.12;
+    color: #f7f4ec;
+    letter-spacing: 0.01em;
+}
+.exp-lux__title-underline {
+    display: block;
+    width: 40px;
+    height: 2px;
+    margin-top: 16px;
+    background: var(--exp-gold);
+}
+
+/* ---- RIGHT: content pane ---- */
+.exp-lux__panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--exp-cream);
+    min-height: 0;
+}
+.exp-lux__header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 22px 34px;
+    border-bottom: 1px solid var(--exp-border);
+}
+.exp-lux__eyebrow {
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--exp-muted);
+    font-weight: 600;
+}
+.exp-lux__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--exp-dark);
+    font-size: 1.05rem;
+    transition: background 0.2s, color 0.2s;
+}
+.exp-lux__close:hover {
+    background: var(--exp-olive);
+    border-color: var(--exp-olive);
+    color: #fff;
+}
+
+.exp-lux__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 30px 34px 34px;
+}
+.exp-lux__loading {
+    text-align: center;
+    padding: 60px 0;
+    color: var(--exp-olive);
+}
+.exp-lux__section {
+    margin-bottom: 30px;
+}
+.exp-lux__heading {
+    margin: 0 0 16px;
+    font-family: var(--exp-serif);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--exp-olive);
+    font-weight: 600;
+}
+.exp-lux__desc {
+    margin: 0;
+    font-family: var(--exp-serif);
+    font-size: 1.06rem;
+    line-height: 1.75;
+    color: var(--exp-dark);
+    white-space: pre-line;
+}
+
+/* Info tiles */
+.exp-lux__tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 30px;
+}
+.exp-lux__tile {
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 16px 18px;
+    background: rgba(255, 255, 255, 0.25);
+}
+.exp-lux__tile-label {
+    display: block;
+    font-size: 0.66rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--exp-muted);
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+.exp-lux__tile-value {
+    display: block;
+    font-family: var(--exp-serif);
+    font-size: 1.15rem;
+    color: var(--exp-dark);
+}
+
+/* Reserva */
+.exp-lux__resv-adv {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--exp-dark);
+}
+.exp-lux__resv-adv-value {
+    font-weight: 700;
+    color: var(--exp-olive);
+}
+.exp-lux__resv-notes {
+    margin: 16px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--exp-border);
+    color: var(--exp-muted);
+}
+
+/* Meta de precios (moneda / método de pago) */
+.exp-lux__price-meta {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--exp-border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.exp-lux__price-meta-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 0.8rem;
+    color: var(--exp-muted);
+}
+.exp-lux__price-meta-row span:last-child {
+    color: var(--exp-dark);
+    font-weight: 600;
+}
+
+/* Includes / excludes — 2 columnas lado a lado */
+.exp-lux__inc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 20px 32px;
+}
+.exp-lux__inc-col .exp-lux__heading {
+    margin-top: 0;
+}
+
+/* Includes / excludes lists */
+.exp-lux__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.exp-lux__list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 7px 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--exp-dark);
+}
+.exp-lux__check {
+    color: var(--exp-olive);
+    font-weight: 700;
+    flex: 0 0 auto;
+    line-height: 1.5;
+}
+.exp-lux__cross {
+    color: var(--exp-muted);
+    font-weight: 700;
+    flex: 0 0 auto;
+    line-height: 1.5;
+}
+.exp-lux__list--muted li {
+    color: #6c6c66;
+}
+
+/* Gallery thumbnails */
+.exp-lux__gallery-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.exp-lux__gallery-head .exp-lux__heading {
+    margin: 0;
+}
+.exp-lux__gallery-navs {
+    display: inline-flex;
+    gap: 4px;
+}
+.exp-lux__gallery {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.exp-lux__gallery::-webkit-scrollbar {
+    display: none;
+}
+.exp-lux__gallery-nav {
+    background: transparent;
+    border: none;
+    padding: 2px;
+    color: var(--exp-muted);
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s, opacity 0.2s;
+}
+.exp-lux__gallery-nav:hover {
+    color: var(--exp-olive);
+}
+.exp-lux__gallery-nav.is-hidden {
+    opacity: 0.25;
+    pointer-events: none;
+}
+.exp-lux__gallery-nav i {
+    font-size: 1.2rem;
+    display: block;
+}
+.exp-lux__thumb {
+    flex: 0 0 auto;
+    width: 96px;
+    height: 96px;
+    scroll-snap-align: start;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.exp-lux__thumb:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+.exp-lux__thumb.is-active {
+    border-color: var(--exp-olive);
+    box-shadow: 0 0 0 2px var(--exp-olive);
+}
+
+/* Itinerary timeline */
+.exp-lux__itinerary {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.exp-lux__itinerary-item {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 16px 12px 14px;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    background: var(--exp-tile);
+    margin-bottom: 10px;
+}
+.exp-lux__itinerary-item:last-child {
+    margin-bottom: 0;
+}
+.exp-lux__itinerary-dot {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    margin-top: 7px;
+    border-radius: 50%;
+    background: var(--exp-olive);
+}
+.exp-lux__itinerary-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.exp-lux__itinerary-name {
+    display: block;
+    font-family: var(--exp-serif);
+    font-size: 1.05rem;
+    color: var(--exp-dark);
+    line-height: 1.4;
+}
+.exp-lux__itinerary-time {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--exp-olive);
+    font-weight: 600;
+}
+.exp-lux__itinerary-notes {
+    margin: 6px 0 0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--exp-muted);
+    white-space: pre-line;
+}
+
+/* Booking notes box */
+.exp-lux__notebox {
+    background: var(--exp-tile);
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 20px 22px;
+}
+.exp-lux__notebox .exp-lux__heading {
+    margin-bottom: 10px;
+}
+.exp-lux__prewrap {
+    white-space: pre-line;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--exp-dark);
+}
+
+/* Key-value rows */
+.exp-lux__kv {
+    display: flex;
+    flex-direction: column;
+}
+.exp-lux__kv-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 7px 0;
+}
+.exp-lux__kv-row:last-child {
+    border-bottom: none;
+}
+.exp-lux__kv-key {
+    flex: 0 0 auto;
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--exp-olive);
+    font-weight: 600;
+}
+.exp-lux__kv-val {
+    text-align: right;
+    font-size: 0.95rem;
+    color: var(--exp-dark);
+}
+
+/* Schedule breakdown (día → horarios) */
+.exp-lux__sched {
+    display: flex;
+    flex-direction: column;
+}
+.exp-lux__sched-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 7px 0;
+}
+.exp-lux__sched-row:last-child {
+    border-bottom: none;
+}
+.exp-lux__sched-days {
+    flex: 0 0 auto;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--exp-dark);
+    white-space: nowrap;
+    padding-top: 3px;
+}
+.exp-lux__sched-times {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+}
+.exp-lux__sched-time {
+    background: var(--exp-tile);
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 0.82rem;
+    color: var(--exp-dark);
+    white-space: nowrap;
+}
+.exp-lux__sched-time--muted {
+    background: transparent;
+    color: var(--exp-muted);
+    font-style: italic;
+}
+
+/* Chips (idioma, etc.) */
+.exp-lux__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.exp-lux__chip {
+    display: inline-flex;
+    align-items: center;
+    background: var(--exp-tile);
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 0.82rem;
+    color: var(--exp-dark);
+}
+
+/* Price cards */
+.exp-lux__prices {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.exp-lux__price-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.3);
+}
+.exp-lux__price-name {
+    display: block;
+    font-family: var(--exp-serif);
+    font-size: 1.02rem;
+    letter-spacing: 0.06em;
+    color: var(--exp-dark);
+}
+.exp-lux__price-sub {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--exp-muted);
+    margin-top: 3px;
+}
+.exp-lux__price-right {
+    text-align: right;
+}
+.exp-lux__price-amount {
+    display: block;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--exp-dark);
+}
+.exp-lux__price-unit {
+    display: block;
+    font-size: 0.64rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--exp-muted);
+    margin-top: 2px;
+}
+.exp-lux__quote {
+    font-family: var(--exp-serif);
+    font-style: italic;
+    color: var(--exp-muted);
+    margin: 0;
+}
+
+/* Sticky footer CTA */
+.exp-lux__footer {
+    flex: 0 0 auto;
+    padding: 18px 34px;
+    border-top: 1px solid var(--exp-border);
+    background: var(--exp-cream);
+}
+.exp-lux__cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 15px 20px;
+    border: none;
+    border-radius: 4px;
+    background: var(--exp-olive);
+    color: #fff;
+    font-size: 0.82rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+.exp-lux__cta:hover {
+    background: #5c6743;
+}
+.exp-lux__cta-arrow {
+    font-size: 1rem;
+}
+
+/* Responsive: stack columns on small screens */
+@media (max-width: 767.98px) {
+    .exp-lux__grid {
+        grid-template-columns: 1fr;
+        height: min(92vh, 900px);
+    }
+    .exp-lux__media {
+        height: 220px;
+        min-height: 220px;
+    }
+    .exp-lux__title {
+        font-size: 1.6rem;
+    }
+    .exp-lux__media-caption {
+        left: 22px;
+        right: 22px;
+        bottom: 22px;
+    }
+    .exp-lux__header,
+    .exp-lux__body,
+    .exp-lux__footer {
+        padding-left: 22px;
+        padding-right: 22px;
+    }
+    .exp-lux__gallery {
+        gap: 8px;
+    }
+}
+
+.tour-rate-group{display:flex;flex-direction:column;gap:12px;}
+.tour-rate-group + .tour-rate-group{margin-top:20px;}
+.tour-rate-label{align-self:flex-start;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--exp-olive);padding:2px 0 2px 10px;border-left:3px solid var(--exp-olive);}
+</style>

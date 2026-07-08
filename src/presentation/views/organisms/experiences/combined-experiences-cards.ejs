@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Format price with currency
     function formatExperiencePrice(price, currency) {
         if (currency === 'USD') {
-            return `$${price.toFixed(2)} USD`;
+            return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
         } else {
             return `$${price.toLocaleString('es-MX', {
                 minimumFractionDigits: 2,
@@ -1010,6 +1010,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Get current filter values
         const currency = document.getElementById('filterCurrency').value;
         const paymentType = document.getElementById('filterPayment').value;
+        // Filtro de categoría activo: si hay una categoría específica seleccionada, el tag de
+        // categoría se oculta en las cards (sería redundante mostrar "Catas" en todas).
+        const categoryFilter = document.getElementById('filterCategory')?.value || '';
 
         grid.innerHTML = filteredExperiences.map((experience, index) => {
             const tipoBadge = experience.displayType && experience.displayType !== 'experiencia'
@@ -1039,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 `<div class="no-image"><img src="/img/amexing_logo_horizontal.avif" alt="Amexing"></div>`
                             }
                             <div class="expcard__tags">
-                                ${categoryLabel(experience.experience_category) ? `<span class="expcard__badge expcard__badge--cat">${categoryLabel(experience.experience_category)}</span>` : ''}
+                                ${(!categoryFilter && categoryLabel(experience.experience_category)) ? `<span class="expcard__badge expcard__badge--cat">${categoryLabel(experience.experience_category)}</span>` : ''}
                                 ${tipoBadge ? `<span class="expcard__badge expcard__badge--tipo">${tipoBadge}</span>` : ''}
                             </div>
                         </div>
@@ -2373,18 +2376,15 @@ document.addEventListener('DOMContentLoaded', function() {
         `);
 
         // 9. Términos y condiciones (buy-out / mínimo privado) — junto a precios y cancelación al final.
+        //    El contenido lo inyecta loadPricesTab en #termsContent para que los montos se
+        //    conviertan por moneda/recargo y se actualicen en vivo (igual que los precios).
         const hasBuyout = experience.buyout !== null && experience.buyout !== undefined && experience.buyout !== '';
         const hasPriv = experience.private_min_value !== null && experience.private_min_value !== undefined && experience.private_min_value !== '';
         if (hasBuyout || hasPriv) {
-            const rows = [];
-            if (hasBuyout) rows.push(['Buy-out', '$' + Number(experience.buyout).toLocaleString('es-MX', { minimumFractionDigits: 2 })]);
-            if (hasPriv) rows.push(['Mínimo para hacerlo privado', experience.private_min_type === 'monto' ? '$' + Number(experience.private_min_value).toLocaleString('es-MX', { minimumFractionDigits: 2 }) : Number(experience.private_min_value) + ' personas']);
             sections.push(`
                 <div class="exp-lux__section">
                     <h4 class="exp-lux__heading">TÉRMINOS Y CONDICIONES</h4>
-                    <div class="exp-lux__kv">
-                        ${rows.map(([k, v]) => `<div class="exp-lux__kv-row"><span class="exp-lux__kv-key">${k}</span><span class="exp-lux__kv-val">${v}</span></div>`).join('')}
-                    </div>
+                    <div id="termsContent" class="exp-lux__kv"></div>
                 </div>
             `);
         }
@@ -2953,6 +2953,21 @@ document.addEventListener('DOMContentLoaded', function() {
         const metaHtml = `<div class="exp-lux__price-meta">${metaRows.map(([k, v]) => `<div class="exp-lux__price-meta-row"><span>${k}</span><span>${v}</span></div>`).join('')}</div>`;
 
         pricesContent.innerHTML = (cards.length ? cards.join('') : `<p class="exp-lux__quote">Por cotizar</p>`) + metaHtml;
+
+        // Términos y condiciones (buy-out / mínimo privado): los montos usan el MISMO cálculo
+        // que los precios por persona (convertExperiencePrice → recargo por pago + conversión a
+        // USD + comas) y se refrescan aquí en cada cambio de moneda/pago.
+        const termsContent = document.getElementById('termsContent');
+        if (termsContent) {
+            const trows = [];
+            const hasBuyout = experience.buyout !== null && experience.buyout !== undefined && experience.buyout !== '';
+            const hasPriv = experience.private_min_value !== null && experience.private_min_value !== undefined && experience.private_min_value !== '';
+            if (hasBuyout) trows.push(['Buy-out', convertExperiencePrice(experience.buyout, currency, paymentType)]);
+            if (hasPriv) trows.push(['Mínimo para hacerlo privado', experience.private_min_type === 'monto'
+                ? convertExperiencePrice(experience.private_min_value, currency, paymentType)
+                : Number(experience.private_min_value) + ' personas']);
+            termsContent.innerHTML = trows.map(([k, v]) => `<div class="exp-lux__kv-row"><span class="exp-lux__kv-key">${k}</span><span class="exp-lux__kv-val">${v}</span></div>`).join('');
+        }
     }
     
     // Function to load Itinerary tab
