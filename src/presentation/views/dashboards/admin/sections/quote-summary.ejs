@@ -1277,19 +1277,34 @@ const e = __isRes ? 'reservación' : 'cotización';
                     datesRow.classList.add('d-none');
                     return;
                 }
-                const fmtServiceDate = (s) => {
-                    let d;
+                const parseServiceDate = (s) => {
                     if (typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
                         const [y, m, dd] = s.split('-').map(Number);
-                        d = new Date(y, m - 1, dd);
-                    } else {
-                        d = new Date(s);
+                        return new Date(y, m - 1, dd);
                     }
-                    return d.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+                    return new Date(s);
                 };
-                const first = fmtServiceDate(dayDates[0]);
-                const last = fmtServiceDate(dayDates[dayDates.length - 1]);
-                datesEl.textContent = first === last ? first : `${first} – ${last}`;
+                // Formatea el rango colapsando lo redundante:
+                //  - mismo día → "31 de octubre de 2026"
+                //  - mismo mes y año → "5 al 12 de julio de 2026"
+                //  - mismo año, distinto mes → "31 de octubre – 2 de noviembre de 2026"
+                //  - distinto año → "31 de diciembre de 2026 – 2 de enero de 2027"
+                const d1 = parseServiceDate(dayDates[0]);
+                const d2 = parseServiceDate(dayDates[dayDates.length - 1]);
+                const full = (d) => d.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+                const dayMonth = (d) => d.toLocaleDateString('es-MX', { month: 'long', day: 'numeric' });
+                const dayNum = (d) => d.toLocaleDateString('es-MX', { day: 'numeric' });
+                let rangeText;
+                if (d1.getTime() === d2.getTime()) {
+                    rangeText = full(d1);
+                } else if (d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth()) {
+                    rangeText = `${dayNum(d1)} al ${full(d2)}`;
+                } else if (d1.getFullYear() === d2.getFullYear()) {
+                    rangeText = `${dayMonth(d1)} – ${full(d2)}`;
+                } else {
+                    rangeText = `${full(d1)} – ${full(d2)}`;
+                }
+                datesEl.textContent = rangeText;
                 datesRow.classList.remove('d-none');
             })();
 
