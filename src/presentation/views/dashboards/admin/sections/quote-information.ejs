@@ -1491,6 +1491,15 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
         };
     }
 
+    // El ownership manager calcula this.canTransfer con window.currentUser.role. Por un race de
+    // inicialización, su displayOwner corría antes de que window.currentUser estuviera seteado, así
+    // que canTransfer salía false y el botón "Cambiar propietario" aparecía solo tras abrir el modal
+    // "Compartir". Ahora que window.currentUser ya está, forzamos un displayOwner para recalcular y
+    // (re)mostrar el botón en la carga inicial. Si el owner aún no cargó, no-op y el load lo corre luego.
+    if (window.quoteOwnership && typeof window.quoteOwnership.displayOwner === 'function') {
+        try { window.quoteOwnership.displayOwner(); } catch (e) { /* owner aún no cargado */ }
+    }
+
     // Get JWT token from cookies
     function getAccessToken() {
         const cookies = document.cookie.split(';');

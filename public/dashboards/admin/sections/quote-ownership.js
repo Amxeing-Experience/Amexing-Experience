@@ -368,8 +368,10 @@ class QuoteOwnershipManager {
             if (ownerSinceEl) ownerSinceEl.textContent = 'Desde: ' + new Date(this.owner.ownershipStartDate).toLocaleDateString('es-MX');
         }
 
-        // Store transfer capability for use in consolidated modal
-        const userRole = window.currentUser?.role || '';
+        // Store transfer capability for use in consolidated modal.
+        // Fuentes múltiples del rol para evitar races de inicialización (window.currentUser puede
+        // no estar seteado todavía en la carga inicial).
+        const userRole = window.currentUser?.role || this.currentUserRole || window.userRole || document.body.dataset.userRole || '';
         const currentUserId = window.currentUser?.id || window.currentUserData?.id || '';
 
         // Check if current user is the creator (when isDefaultOwner is true)
