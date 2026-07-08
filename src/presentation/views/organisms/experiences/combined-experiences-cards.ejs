@@ -15,82 +15,62 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 <div class="row mt-4">
     <div class="col-12">
         <!-- Combined Experiences Section with Card View -->
-        <div class="card border-0 shadow-sm">
-            <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-                <div class="row align-items-center">
-                    <div class="col">
-                        <h5 class="card-title mb-0 text-white">
-                            <i class="ti ti-star me-2"></i>Catálogo de Experiencias
-                        </h5>
-                    </div>
+        <div class="exp-catalog">
+            <!-- Filtros -->
+            <div class="exp-catalog__filters">
+                <div class="exp-field exp-field--search">
+                    <i class="ti ti-search exp-field__icon"></i>
+                    <input type="text" id="searchExperience" placeholder="Buscar experiencia...">
+                </div>
+                <div class="exp-field exp-field--select">
+                    <select id="filterCategory">
+                        <option value="">Tipo de experiencia</option>
+                        <option value="catas">Catas</option>
+                        <option value="arte">Arte</option>
+                        <option value="historia_arquitectura">Historia y Arquitectura</option>
+                        <option value="gastronomicas">Gastronómicas</option>
+                        <option value="aventura">Aventura</option>
+                        <option value="naturaleza">Naturaleza</option>
+                        <option value="de_temporada">De Temporada</option>
+                    </select>
+                    <i class="ti ti-chevron-down exp-field__caret"></i>
+                </div>
+                <div class="exp-field exp-field--select">
+                    <select id="filterCurrency">
+                        <option value="MXN">MXN</option>
+                        <option value="USD">USD</option>
+                    </select>
+                    <i class="ti ti-chevron-down exp-field__caret"></i>
+                </div>
+                <div class="exp-field exp-field--select">
+                    <select id="filterPayment">
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia" selected>Transferencia</option>
+                        <option value="tarjeta">Tarjeta Crédito/Débito</option>
+                    </select>
+                    <i class="ti ti-chevron-down exp-field__caret"></i>
                 </div>
             </div>
 
-            <!-- Search and Filters -->
-            <div class="card-body border-bottom bg-light">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label for="searchExperience" class="form-label fw-semibold">
-                            <i class="ti ti-search me-1"></i>Buscar Experiencia
-                        </label>
-                        <input type="text" class="form-control" id="searchExperience" placeholder="Buscar por nombre...">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="filterCategory" class="form-label fw-semibold">
-                            <i class="ti ti-category me-1"></i>Tipo de experiencia
-                        </label>
-                        <select class="form-select" id="filterCategory">
-                            <option value="">Todas</option>
-                            <option value="catas">Catas</option>
-                            <option value="arte">Arte</option>
-                            <option value="historia_arquitectura">Historia y Arquitectura</option>
-                            <option value="gastronomicas">Gastronómicas</option>
-                            <option value="aventura">Aventura</option>
-                            <option value="naturaleza">Naturaleza</option>
-                            <option value="de_temporada">De Temporada</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="filterCurrency" class="form-label fw-semibold">
-                            <i class="ti ti-currency-dollar me-1"></i>Moneda
-                        </label>
-                        <select class="form-select" id="filterCurrency">
-                            <option value="MXN">MXN</option>
-                            <option value="USD">USD</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="filterPayment" class="form-label fw-semibold">
-                            <i class="ti ti-credit-card me-1"></i>Pago
-                        </label>
-                        <select class="form-select" id="filterPayment">
-                            <option value="efectivo">Efectivo</option>
-                            <option value="transferencia" selected>Transferencia</option>
-                            <option value="tarjeta">Tarjeta Crédito/Débito</option>
-                        </select>
-                    </div>
+            <div id="expResultCount" class="exp-catalog__count"></div>
+
+            <!-- Loading state -->
+            <div id="experiencesLoading" class="exp-catalog__loading">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Cargando experiencias...</span>
                 </div>
+                <p>Cargando experiencias...</p>
             </div>
 
-            <div class="card-body">
-                <!-- Loading state -->
-                <div id="experiencesLoading" class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando experiencias...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Cargando experiencias...</p>
-                </div>
+            <!-- Experiences Grid -->
+            <div id="experiencesGrid" class="row g-4" style="display: none;">
+                <!-- Experience cards will be dynamically inserted here -->
+            </div>
 
-                <!-- Experiences Grid -->
-                <div id="experiencesGrid" class="row g-4" style="display: none;">
-                    <!-- Experience cards will be dynamically inserted here -->
-                </div>
-
-                <!-- No results message -->
-                <div id="noExperiencesMessage" class="text-center py-5" style="display: none;">
-                    <i class="ti ti-mood-sad" style="font-size: 3rem; color: #dee2e6;"></i>
-                    <p class="mt-3 text-muted">No se encontraron experiencias con los filtros seleccionados</p>
-                </div>
+            <!-- No results message -->
+            <div id="noExperiencesMessage" class="exp-catalog__empty" style="display: none;">
+                <i class="ti ti-mood-sad"></i>
+                <p>No se encontraron experiencias con los filtros seleccionados</p>
             </div>
         </div>
     </div>
@@ -236,180 +216,6 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
 <style>
 /* Experience Card Styles */
-.experience-card {
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.experience-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-}
-
-.experience-card-image {
-    height: 200px;
-    position: relative;
-    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
-
-.experience-card-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.experience-card-image .no-image {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    background: #ffffff;
-}
-
-.experience-source-badge {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.experience-source-badge.amexing {
-    color: #059669;
-    border: 1px solid #059669;
-}
-
-.experience-source-badge.provider {
-    color: #8b5cf6;
-    border: 1px solid #8b5cf6;
-}
-
-.experience-type-badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-/* Badge de "Tipo de experiencia" (categoría temática) sobre la imagen, esquina
-   inferior-izquierda: pastilla blanca con verde de marca. No ocupa espacio del cuerpo
-   y queda distinto del badge de Tipo (esquina superior-derecha). */
-.experience-category-badge {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    max-width: calc(100% - 20px);
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    background: rgba(255, 255, 255, 0.95);
-    color: #157347;
-    border: 1px solid rgba(43, 182, 115, 0.35);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.experience-card-body {
-    padding: 1.25rem;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.experience-card-title {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    color: #111827;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.experience-provider-name {
-    font-size: 0.875rem;
-    color: #6b7280;
-    margin-bottom: 0.75rem;
-}
-
-.experience-card-description {
-    font-size: 0.875rem;
-    color: #6b7280;
-    margin-bottom: 1rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    flex: 1;
-}
-
-.experience-card-info {
-    border-top: 1px solid #e5e7eb;
-    padding-top: 0.75rem;
-    margin-top: auto;
-}
-
-.experience-info-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.375rem 0;
-    font-size: 0.875rem;
-}
-
-.experience-info-label {
-    color: #6b7280;
-    font-weight: 500;
-}
-
-.experience-info-value {
-    color: #111827;
-    font-weight: 600;
-    text-align: right;
-}
-
-.experience-prices-list {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 6px 12px;
-    font-size: 0.8rem;
-}
-
-.experience-price-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.experience-price {
-    font-size: 1.25rem;
-    color: #059669;
-    font-weight: 700;
-}
-
 .type-badge {
     padding: 2px 8px;
     border-radius: 4px;
@@ -1185,6 +991,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const grid = document.getElementById('experiencesGrid');
         const noResults = document.getElementById('noExperiencesMessage');
 
+        // Contador de resultados
+        const countEl = document.getElementById('expResultCount');
+        if (countEl) {
+            const total = (typeof allExperiences !== 'undefined' && Array.isArray(allExperiences)) ? allExperiences.length : filteredExperiences.length;
+            countEl.textContent = `${filteredExperiences.length} de ${total} experiencias`;
+        }
+
         if (filteredExperiences.length === 0) {
             grid.style.display = 'none';
             noResults.style.display = 'block';
@@ -1199,123 +1012,64 @@ document.addEventListener('DOMContentLoaded', function() {
         const paymentType = document.getElementById('filterPayment').value;
 
         grid.innerHTML = filteredExperiences.map((experience, index) => {
-            const typeClass = experience.displayType ? experience.displayType.toLowerCase() : 'otro';
-            const typeName = experience.displayType || 'Experiencia';
-            
-            // Debug image URLs being used
-            if (index < 3) { // Only log first 3 for brevity
-                console.log(`🎯 Experience "${experience.displayName}" image debug:`, {
-                    hasDisplayImage: !!experience.displayImage,
-                    displayImageStructure: experience.displayImage,
-                    source: experience.source
-                });
-            }
-            
+            const tipoBadge = experience.displayType && experience.displayType !== 'experiencia'
+                ? experience.displayType.charAt(0).toUpperCase() + experience.displayType.slice(1)
+                : '';
+
+            // Precios (lista completa; convertidos según moneda/pago)
+            const priceItems = [];
+            if (experience.displayPrice > 0) priceItems.push(`<div class="expcard__row"><span class="expcard__k">Adulto</span><span class="expcard__v">${convertExperiencePrice(experience.displayPrice, currency, paymentType)}</span></div>`);
+            if (experience.displayPriceChild > 0) priceItems.push(`<div class="expcard__row"><span class="expcard__k">Niños</span><span class="expcard__v">${convertExperiencePrice(experience.displayPriceChild, currency, paymentType)}</span></div>`);
+            if (experience.displayPriceNoAlcohol > 0) priceItems.push(`<div class="expcard__row"><span class="expcard__k">Sin alcohol</span><span class="expcard__v">${convertExperiencePrice(experience.displayPriceNoAlcohol, currency, paymentType)}</span></div>`);
+            const pricesRows = priceItems.length ? priceItems.join('') : `<div class="expcard__row"><span class="expcard__k">Precios</span><span class="expcard__v">Por cotizar</span></div>`;
+
             return `
                 <div class="col-md-6 col-lg-4">
-                    <div class="experience-card">
-                        <div class="experience-card-image" data-image-container>
-                            ${experience.displayImage && experience.displayImage.fallback ? 
+                    <div class="expcard">
+                        <div class="expcard__media" data-image-container>
+                            ${experience.displayImage && experience.displayImage.fallback ?
                                 `<div class="image-loading-container">
                                     <picture class="experience-picture">
                                         ${experience.displayImage.avif ? `<source srcset="${experience.displayImage.avif}" type="image/avif">` : ''}
                                         ${experience.displayImage.webp ? `<source srcset="${experience.displayImage.webp}" type="image/webp">` : ''}
-                                        <img src="${experience.displayImage.fallback}" 
-                                             alt="${experience.displayName}" 
-                                             class="experience-img ${!experience.displayImage.avif && !experience.displayImage.webp ? 'loading' : ''}" 
-                                             loading="lazy"
->
+                                        <img src="${experience.displayImage.fallback}" alt="${experience.displayName}" class="experience-img ${!experience.displayImage.avif && !experience.displayImage.webp ? 'loading' : ''}" loading="lazy">
                                     </picture>
-                                    ${!experience.displayImage.avif && !experience.displayImage.webp ? 
-                                        '<div class="progressive-loader"><div class="loading-pulse"></div></div>' : ''}
+                                    ${!experience.displayImage.avif && !experience.displayImage.webp ? '<div class="progressive-loader"><div class="loading-pulse"></div></div>' : ''}
                                 </div>` :
-                                `<div class="no-image">
-                                    <img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;">
-                                </div>`
+                                `<div class="no-image"><img src="/img/amexing_logo_horizontal.avif" alt="Amexing"></div>`
                             }
-                            <!-- Experience Type Badge -->
-                            ${experience.displayType && experience.displayType !== 'experiencia' ?
-                                `<div class="experience-type-badge">
-                                    <span class="type-badge ${typeClass}">${typeName}</span>
-                                </div>` : ''}
-                            <!-- Tipo de experiencia (categoría) -->
-                            ${categoryLabel(experience.experience_category) ?
-                                `<span class="experience-category-badge" title="Tipo de experiencia">${categoryLabel(experience.experience_category)}</span>` : ''}
-                        </div>
-                        <div class="experience-card-body">
-                            <h5 class="experience-card-title" title="${experience.displayName}">
-                                ${experience.displayName}
-                            </h5>
-                            <div class="experience-card-description">
-                                ${experience.displayDescription || 'Sin descripción disponible'}
+                            <div class="expcard__tags">
+                                ${categoryLabel(experience.experience_category) ? `<span class="expcard__badge expcard__badge--cat">${categoryLabel(experience.experience_category)}</span>` : ''}
+                                ${tipoBadge ? `<span class="expcard__badge expcard__badge--tipo">${tipoBadge}</span>` : ''}
                             </div>
-                            <div class="experience-card-info">
-                                <div class="experience-info-row">
-                                    <span class="experience-info-label">
-                                        <i class="ti ti-clock me-1"></i>Duración
-                                    </span>
-                                    <span class="experience-info-value">
-                                        ${experience.displayDuration ? formatDuration(experience.displayDuration) : 'Por definir'}
-                                    </span>
-                                </div>
-                                <div class="experience-info-row">
-                                    <span class="experience-info-label">
-                                        <i class="ti ti-calendar-time me-1"></i>Reserva anticipada
-                                    </span>
-                                    <span class="experience-info-value">
-                                        ${formatAdvanceBooking(experience.displayAdvanceBooking)}
-                                    </span>
-                                </div>
-                                <div class="experience-info-row">
-                                    <span class="experience-info-label">
-                                        <i class="ti ti-calendar-event me-1"></i>Días disponibles
-                                    </span>
-                                    <span class="experience-info-value" style="font-size: 0.8rem;">
-                                        ${experience.displayAvailability || 'Todos los días'}
-                                    </span>
-                                </div>
-                                <div class="experience-info-row">
-                                    <span class="experience-info-label">
-                                        <i class="ti ti-currency-dollar me-1"></i>Precios
-                                    </span>
-                                    <div class="experience-prices-list">
-                                        ${experience.displayPrice > 0 ?
-                                            `<div class="experience-price-item">
-                                                <small class="text-muted">Adulto:</small>
-                                                <strong>${convertExperiencePrice(experience.displayPrice, currency, paymentType)}</strong>
-                                            </div>` : ''}
-                                        ${experience.displayPriceChild > 0 ?
-                                            `<div class="experience-price-item">
-                                                <small class="text-muted">Niños:</small>
-                                                <strong>${convertExperiencePrice(experience.displayPriceChild, currency, paymentType)}</strong>
-                                            </div>` : ''}
-                                        ${experience.displayPriceNoAlcohol > 0 ?
-                                            `<div class="experience-price-item">
-                                                <small class="text-muted">Sin alcohol:</small>
-                                                <strong>${convertExperiencePrice(experience.displayPriceNoAlcohol, currency, paymentType)}</strong>
-                                            </div>` : ''}
-                                        ${(!experience.displayPrice && !experience.displayPriceChild && !experience.displayPriceNoAlcohol) ?
-                                            '<div>Por cotizar</div>' : ''}
-                                    </div>
-                                </div>
-                                <div class="experience-info-row border-0 pt-3 d-flex gap-2">
-                                    <button class="btn btn-outline-primary btn-sm flex-grow-1 view-more-btn"
-                                            data-experience-id="${experience.id || experience.objectId}"
-                                            data-experience-name="${experience.displayName}"
-                                            data-experience-type="${experience.source}">
-                                        <i class="ti ti-eye me-1"></i>Ver más
-                                    </button>
-                                    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-                                    <button class="btn btn-primary btn-sm add-to-quote-btn"
-                                            data-experience-id="${experience.id || experience.objectId}"
-                                            data-experience-name="${experience.displayName}"
-                                            data-experience-type="${experience.source}"
-                                            data-experience-price="${experience.displayPrice || 0}"
-                                            title="Agregar a Cotización">
-                                        <i class="ti ti-file-plus"></i>
-                                    </button>
-                                    <% } %>
-                                </div>
+                        </div>
+                        <div class="expcard__body">
+                            <h5 class="expcard__title" title="${experience.displayName}">${experience.displayName}</h5>
+                            <p class="expcard__desc">${experience.displayDescription || 'Sin descripción disponible'}</p>
+                            <div class="expcard__rows">
+                                <div class="expcard__row"><span class="expcard__k">Duración</span><span class="expcard__v">${experience.displayDuration ? formatDuration(experience.displayDuration) : 'Por definir'}</span></div>
+                                <div class="expcard__row"><span class="expcard__k">Reserva anticipada</span><span class="expcard__v">${formatAdvanceBooking(experience.displayAdvanceBooking)}</span></div>
+                                <div class="expcard__row"><span class="expcard__k">Días disponibles</span><span class="expcard__v">${experience.displayAvailability || 'Todos los días'}</span></div>
+                                <hr class="expcard__sep">
+                                ${pricesRows}
+                            </div>
+                            <div class="expcard__actions">
+                                <button class="expcard__btn expcard__btn--primary view-more-btn"
+                                        data-experience-id="${experience.id || experience.objectId}"
+                                        data-experience-name="${experience.displayName}"
+                                        data-experience-type="${experience.source}">
+                                    Ver más
+                                </button>
+                                <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+                                <button class="expcard__btn expcard__btn--ghost add-to-quote-btn"
+                                        data-experience-id="${experience.id || experience.objectId}"
+                                        data-experience-name="${experience.displayName}"
+                                        data-experience-type="${experience.source}"
+                                        data-experience-price="${experience.displayPrice || 0}"
+                                        title="Agregar a cotización">
+                                    <i class="ti ti-file-plus me-1"></i>Agregar
+                                </button>
+                                <% } %>
                             </div>
                         </div>
                     </div>
@@ -1362,7 +1116,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // If all formats fail, show no-image fallback
-                    const container = this.closest('.experience-card-image');
+                    const container = this.closest('.expcard__media');
                     if (container) {
                         container.innerHTML = `
                             <div class="no-image" style="display: flex; align-items: center; justify-content: center; height: 200px; background: #ffffff;">
@@ -5323,5 +5077,107 @@ document.addEventListener('DOMContentLoaded', function() {
     .exp-lux__gallery {
         gap: 8px;
     }
+}
+</style>
+
+<style>
+/* =====================================================================
+   Catálogo de Experiencias — rediseño (paleta lujo, sans)
+   ===================================================================== */
+.exp-catalog {
+    --exp-cream: #EAE7DF; --exp-tile: #E4DFCF; --exp-border: #d6d1c4;
+    --exp-olive: #6E7A50; --exp-olive-light: #7C8A5A; --exp-muted: #8a8f78;
+    --exp-gold: #b8894a; --exp-dark: #2b2b2b;
+}
+/* Filtros */
+.exp-catalog__filters {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 8px 0 4px;
+}
+.exp-field { position: relative; }
+.exp-field input,
+.exp-field select {
+    width: 100%;
+    font-size: 0.92rem;
+    color: var(--exp-dark);
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid var(--exp-border);
+    border-radius: 6px;
+    padding: 13px 16px;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+}
+.exp-field input:focus,
+.exp-field select:focus { border-color: var(--exp-olive); background: #fff; }
+.exp-field--search input { padding-left: 42px; }
+.exp-field--select select { padding-right: 38px; }
+.exp-field__icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--exp-muted); pointer-events: none; }
+.exp-field__caret { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--exp-muted); pointer-events: none; font-size: 0.9rem; }
+.exp-catalog__count { font-size: 0.85rem; color: var(--exp-muted); text-align: right; margin: 8px 0 18px; }
+
+/* Loading / vacío */
+.exp-catalog__loading { text-align: center; padding: 60px 0; color: var(--exp-muted); }
+.exp-catalog__loading .spinner-border { color: var(--exp-olive); }
+.exp-catalog__loading p { margin-top: 12px; }
+.exp-catalog__empty { text-align: center; padding: 60px 0; color: var(--exp-muted); }
+.exp-catalog__empty i { font-size: 3rem; color: var(--exp-border); }
+.exp-catalog__empty p { margin-top: 12px; }
+
+/* Card */
+.expcard {
+    background: rgba(255, 255, 255, 0.30);
+    border: 1px solid var(--exp-border);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    transition: transform 0.25s, box-shadow 0.25s;
+}
+.expcard:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12); }
+.expcard__media { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #1c1c1c; }
+.expcard__media .image-loading-container,
+.expcard__media .experience-picture,
+.expcard__media .no-image { position: absolute; inset: 0; width: 100%; height: 100%; }
+.expcard__media .experience-img,
+.expcard__media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s, opacity 0.3s; }
+.expcard:hover .experience-img { transform: scale(1.05); }
+.expcard__media .no-image { display: flex; align-items: center; justify-content: center; background: var(--exp-tile); }
+.expcard__media .no-image img { width: 60%; height: auto; object-fit: contain; }
+.expcard__media .experience-img.loading { opacity: 0; }
+.expcard__media .progressive-loader { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 1; }
+
+/* Tags (categoría + tipo) apilados arriba-izquierda */
+.expcard__tags { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 82%; z-index: 2; }
+.expcard__badge { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; padding: 5px 11px; border-radius: 3px; line-height: 1.3; }
+.expcard__badge--cat { background: rgba(20, 20, 20, 0.62); color: #f3f0e8; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.expcard__badge--tipo { border: 1px solid rgba(243, 240, 232, 0.7); color: #f3f0e8; background: rgba(20, 20, 20, 0.28); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); font-weight: 600; }
+
+/* Body */
+.expcard__body { padding: 20px 20px 18px; display: flex; flex-direction: column; flex: 1; }
+.expcard__title { font-weight: 600; font-size: 1.15rem; line-height: 1.2; margin: 0 0 10px; color: var(--exp-dark); }
+.expcard__desc { font-size: 0.88rem; line-height: 1.6; color: #3e4137; margin: 0 0 16px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.expcard__rows { display: flex; flex-direction: column; margin-bottom: 18px; }
+.expcard__row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 6px 0; }
+.expcard__k { font-size: 0.66rem; letter-spacing: 0.13em; text-transform: uppercase; color: var(--exp-olive); font-weight: 600; white-space: nowrap; }
+.expcard__v { font-size: 0.9rem; color: var(--exp-dark); text-align: right; }
+.expcard__sep { border: none; border-top: 1px solid var(--exp-border); margin: 8px 0; }
+
+/* Acciones */
+.expcard__actions { margin-top: auto; display: flex; gap: 8px; }
+.expcard__btn { flex: 1; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; padding: 11px 10px; border-radius: 4px; cursor: pointer; transition: 0.2s; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; }
+.expcard__btn--primary { border: 1px solid var(--exp-olive); background: var(--exp-olive); color: #fff; }
+.expcard__btn--primary:hover { background: var(--exp-olive-light); border-color: var(--exp-olive-light); color: #fff; }
+.expcard__btn--ghost { border: 1px solid var(--exp-olive); background: transparent; color: var(--exp-olive); }
+.expcard__btn--ghost:hover { background: var(--exp-olive); color: #fff; }
+
+@media (max-width: 767px) {
+    .exp-catalog__filters { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+    .exp-catalog__filters { grid-template-columns: 1fr; }
 }
 </style>
