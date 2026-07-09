@@ -770,6 +770,17 @@
                 </div>`;
             }
 
+            // Notas del cliente (agencyNotes) — mismo estilo callout, icono de persona.
+            if (service.agencyNotes) {
+                html += `<div class="mt-2 p-2" style="border-left: 3px solid #adb5bd; width: 100%;">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="ti ti-user me-1 text-secondary"></i>
+                        <strong class="text-secondary" style="font-size: 0.85rem;">Notas del cliente</strong>
+                    </div>
+                    <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.agencyNotes}</div>
+                </div>`;
+            }
+
             // Asistentes — same vehicle-style block (header + indented names per row).
             if (Array.isArray(service.attendees) && service.attendees.filter((n) => String(n).trim()).length > 0) {
                 html += `<div class="mt-1 text-muted small">
@@ -1189,6 +1200,17 @@
                         <strong class="text-secondary" style="font-size: 0.85rem;">Notas</strong>
                     </div>
                     <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.notes}</div>
+                </div>`;
+            }
+
+            // Notas del cliente (agencyNotes) — mismo estilo callout, icono de persona.
+            if (service.agencyNotes) {
+                html += `<div class="mt-2 p-2" style="border-left: 3px solid #adb5bd;">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="ti ti-user me-1 text-secondary"></i>
+                        <strong class="text-secondary" style="font-size: 0.85rem;">Notas del cliente</strong>
+                    </div>
+                    <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.agencyNotes}</div>
                 </div>`;
             }
 
