@@ -1170,13 +1170,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function openExperienceAddToQuote(exp) {
             if (!exp) return;
-            const price = Number(exp.price) || 0;
-            const priceFormatted = price.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            // Las experiencias tienen 3 tipos de persona (adulto/niño/sin alcohol), así que
+            // no mostramos un "precio por persona" único: solo el nombre de la experiencia.
             AddToQuote.open({
                 userRole: '<%= currentUserRole %>',
                 serviceLabel: 'Experiencia',
-                itemLabel: '<strong>' + (exp.name || 'Experiencia') + '</strong>' +
-                    (price > 0 ? '<br><span class="small">$' + priceFormatted + ' MXN por persona</span>' : ''),
+                itemLabel: '<strong>' + (exp.name || 'Experiencia') + '</strong>',
                 buildSubconcept: function() { return buildExperienceSubconcept(exp); }
             });
         }
