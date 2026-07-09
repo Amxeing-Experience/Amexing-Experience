@@ -2113,7 +2113,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <button class="expcard__btn expcard__btn--ghost add-tour-to-quote-btn"
                                         data-tour-id="${tour.id || tour.objectId}"
                                         data-tour-name="${destination}"
-                                        data-tour-price="${tour.price || 0}"
+                                        data-walking-price-small="${tour.walkingPriceSmall || 0}"
+                                        data-walking-currency="${tour.walkingPriceCurrency || 'MXN'}"
+                                        data-min-hours="${tour.time ? (parseInt(tour.time) / 60) : 1}"
                                         title="Agregar a Cotización">
                                     ＋ Agregar
                                 </button>` : ''}
@@ -2344,36 +2346,69 @@ document.addEventListener('DOMContentLoaded', function() {
     <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
     // ========== Add Tour to Quote (módulo genérico compartido: /dashboard/js/utils/add-to-quote.js) ==========
     (function() {
-        // Payload específico de Tours (lo único propio de esta superficie)
-        function buildTourSubconcept(tour) {
+        // ── Tours A PIE (walking): un solo botón por tour ──
+        // El precio real depende del nº de personas (tramo chico/mediano/grande × horas),
+        // y eso lo calcula la cotización. Aquí guardamos el subconcepto walking con
+        // default de 1 persona (tramo chico) para que no quede en $0, y el builder
+        // recalcula el tramo/precio al ajustar el nº de personas en la cotización.
+        function buildWalkingTourSubconcept(t) {
+            const minHours = parseFloat(t.minHours) || 1;
+            let smallPrice = parseFloat(t.walkingPriceSmall) || 0;
+            const origCurrency = (t.walkingCurrency || 'MXN').toUpperCase();
+            // El builder guarda walkingTourPrice en MXN: convertir si el tour está en USD.
+            if (origCurrency === 'USD' && currentExchangeRate) {
+                smallPrice = Math.round(smallPrice * currentExchangeRate);
+            }
+            const total = Math.round(smallPrice * minHours * 100) / 100; // 1 persona → tramo chico
             return {
-                type: 'tour', tourId: tour.id, title: tour.name,
-                time: '', hours: 0, unitPrice: tour.price, total: tour.price,
-                isPerPerson: true, numberOfPeople: 1
+                type: 'tour',
+                tourId: t.id,
+                title: t.name,
+                isWalkingTour: true,
+                walkingPriceMode: 'calculated',
+                walkingTourCurrency: origCurrency,
+                walkingTourPeopleCount: 1,
+                adultsQuantity: 1,
+                childrenQuantity: 0,
+                infantsQuantity: 0,
+                persons: 1,
+                duration: minHours,
+                hours: minHours,
+                walkingTourPrice: total,
+                unitPrice: total,
+                total: total,
+                includeGuide: false,
+                includeGreeter: false,
+                time: '',
+                selectedSchedule: '',
+                notes: ''
             };
         }
 
         function openTourAddToQuote(tour) {
             if (!tour) return;
-            const price = Number(tour.price) || 0;
-            const priceFormatted = price.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            const sub = buildWalkingTourSubconcept(tour);
+            const totalFmt = (sub.total || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            const minHours = parseFloat(tour.minHours) || 1;
             AddToQuote.open({
                 userRole: '<%= currentUserRole %>',
-                serviceLabel: 'Tour',
+                serviceLabel: 'Tour a pie',
                 itemLabel: '<strong>' + (tour.name || 'Tour') + '</strong>' +
-                    (price > 0 ? '<br><span class="small">$' + priceFormatted + ' MXN por persona</span>' : ''),
-                buildSubconcept: function() { return buildTourSubconcept(tour); }
+                    '<br><span class="small">$' + totalFmt + ' MXN · 1 persona · mín ' + minHours + 'h · ajusta el nº de personas en la cotización</span>',
+                buildSubconcept: function() { return buildWalkingTourSubconcept(tour); }
             });
         }
 
-        // Add to Quote desde la card
+        // Add to Quote desde la card (solo tours a pie)
         document.addEventListener('click', function(e) {
             const btn = e.target.closest('.add-tour-to-quote-btn');
             if (!btn) return;
             openTourAddToQuote({
                 id: btn.dataset.tourId,
                 name: btn.dataset.tourName,
-                price: parseFloat(btn.dataset.tourPrice) || 0
+                walkingPriceSmall: btn.dataset.walkingPriceSmall,
+                walkingCurrency: btn.dataset.walkingCurrency,
+                minHours: btn.dataset.minHours
             });
         });
 
@@ -2500,7 +2535,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 name: tourDetail.destinationPOI?.name || tourName,
                 type: 'tour',
                 price: tourDetail.price || 0,
-                isWalkingTour: !!tourDetail.isWalkingTour
+                isWalkingTour: !!tourDetail.isWalkingTour,
+                walkingPriceSmall: tourDetail.walkingPriceSmall || 0,
+                walkingCurrency: tourDetail.walkingPriceCurrency || 'MXN',
+                minHours: tourDetail.time ? (parseInt(tourDetail.time) / 60) : 1
             };
             // El footer "Agregar a cotización" (global, por persona) solo aplica a tours a pie;
             // los tours con vehículo se agregan por vehículo desde la pestaña de precios.
