@@ -2006,6 +2006,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     data-with-driver="${currentGuideFilter === 'with-driver' ? '1' : '0'}"
                                     data-rate-id="${priceData.rate?.id || selectedRateId || ''}"
                                     data-rate-name="${(priceData.rate?.name || rateName || '').replace(/"/g, '&quot;')}"
+                                    data-min-hours="${tour.time ? (parseInt(tour.time) / 60) : 1}"
                                     title="Agregar a Cotización">＋</button>
                                 <% } %>
                             </span>
@@ -2390,10 +2391,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Precio guardado = base por hora + recargo de chofer (solo si "Guía + Chofer").
         // Sin % de método de pago ni conversión de moneda: eso lo aplica la cotización.
         function buildTourVehicleSubconcept(d) {
-            const base = parseFloat(d.basePrice) || 0;
-            const withDriver = d.withDriver === '1';
-            const driverRate = parseFloat(d.driverRate) || 0;
+            const base = parseFloat(d.basePrice) || 0;        // base por hora del vehículo (sin chofer)
+            const withDriver = d.withDriver === '1';           // "Guía + Chofer"
+            const driverRate = parseFloat(d.driverRate) || 0;  // recargo de chofer (por hora, pesos)
             const hourly = base + (withDriver ? driverRate : 0);
+            const hours = parseFloat(d.minHours) || 1;         // mínimo de horas del tour
+            const total = Math.round(hourly * hours * 100) / 100;
             return {
                 type: 'tour',
                 tourId: d.tourId,
@@ -2404,14 +2407,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 vehicleType: d.vehicleName || '',       // el builder guarda el nombre en vehicleType (compat)
                 vehicleTypeName: d.vehicleName || '',
                 vehicleCapacity: parseInt(d.vehicleCapacity) || 0,
-                includeGuide: true,
-                includeGreeter: withDriver,
+                includeGuide: withDriver,                // en tours el guía siempre va; este flag agrega el CHOFER (Guía+Chofer)
                 rateId: d.rateId || '',
                 rateName: d.rateName || '',
                 hourlyPrice: hourly,
-                hours: 1,
+                baseVehiclePrice: base,                  // base sin chofer, para recomputar bien al editar
+                hours: hours,
+                duration: hours,
                 unitPrice: hourly,
-                total: hourly,
+                total: total,
                 numberOfPeople: 1,
                 time: '',
                 selectedSchedule: '',
@@ -2428,6 +2432,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const base = parseFloat(d.basePrice) || 0;
             const withDriver = d.withDriver === '1';
             const hourly = base + (withDriver ? (parseFloat(d.driverRate) || 0) : 0);
+            const minHours = parseFloat(d.minHours) || 1;
             const priceFmt = hourly.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
             // Cerrar el modal de detalle si el botón vino de ahí
             const detailModal = bootstrap.Modal.getInstance(document.getElementById('tourDetailsModal'));
@@ -2436,7 +2441,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     userRole: '<%= currentUserRole %>',
                     serviceLabel: 'Tour con vehículo',
                     itemLabel: '<strong>' + (d.tourName || 'Tour') + ' — ' + (d.vehicleName || '') + '</strong>' +
-                        '<br><span class="small">$' + priceFmt + ' MXN/h · ' + (d.vehicleCapacity || '') + ' pers. · ' +
+                        '<br><span class="small">$' + priceFmt + ' MXN/h · mín ' + minHours + 'h · ' + (d.vehicleCapacity || '') + ' pers. · ' +
                         (withDriver ? 'Guía + Chofer' : 'Solo Guía') + '</span>',
                     buildSubconcept: function() { return buildTourVehicleSubconcept(d); }
                 });
@@ -3395,6 +3400,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         data-with-driver="${currentGuideFilter === 'with-driver' ? '1' : '0'}"
                         data-rate-id="${pd.rate?.id || ''}"
                         data-rate-name="${(pd.rate?.name || '').replace(/"/g, '&quot;')}"
+                        data-min-hours="${tour.time ? (parseInt(tour.time) / 60) : 1}"
                         title="Agregar a Cotización"><i class="ti ti-plus me-1"></i>Agregar a cotización</button>`;
                     <% } %>
                     return addBtn ? `<div class="exp-lux__price-vehicle">${card}${addBtn}</div>` : card;

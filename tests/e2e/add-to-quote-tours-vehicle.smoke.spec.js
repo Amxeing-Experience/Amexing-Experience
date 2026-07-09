@@ -53,8 +53,10 @@ test.describe('Agregar a cotización — Tour con vehículo (por vehículo)', ()
       basePrice: parseFloat(el.dataset.basePrice) || 0,
       driverRate: parseFloat(el.dataset.driverRate) || 0,
       withDriver: el.dataset.withDriver === '1',
+      minHours: parseFloat(el.dataset.minHours) || 1,
     }));
-    const expectedTotal = veh.basePrice + (veh.withDriver ? veh.driverRate : 0);
+    const hourly = veh.basePrice + (veh.withDriver ? veh.driverRate : 0);
+    const expectedTotal = Math.round(hourly * veh.minHours * 100) / 100;
     expect(veh.vehicleName, 'el botón debe tener data-vehicle-name').toBeTruthy();
 
     // Click → cierra el detalle y abre el modal genérico.
@@ -82,7 +84,9 @@ test.describe('Agregar a cotización — Tour con vehículo (por vehículo)', ()
     expect(s.requiresTransport, 'el tour con vehículo requiere transporte').toBe(true);
     expect(s.isWalkingTour, 'no es walking tour').toBe(false);
     expect(s.vehicleTypeName, 'lleva el nombre del vehículo').toBe(veh.vehicleName);
-    expect(Number(s.total), 'total = base (+ chofer si Guía+Chofer)').toBeCloseTo(expectedTotal, 2);
+    expect(Number(s.hours), 'hours = mínimo de horas del tour').toBeCloseTo(veh.minHours, 2);
+    expect(s.includeGuide, 'includeGuide refleja "Guía + Chofer"').toBe(veh.withDriver);
+    expect(Number(s.total), 'total = (base + chofer) × mín horas').toBeCloseTo(expectedTotal, 2);
 
     try { await page.request.delete(`/api/quotes/${quoteId}`); } catch (e) { /* best-effort */ }
   });
