@@ -4076,31 +4076,26 @@ class ItineraryBuilder {
 
           // Note: Removed walking tour final data log for console cleanup
 
-          // Check for price override on walking tours
-          const walkingTourOverride = document.getElementById('tourOverridePrices')?.checked;
+          // Precio del walking tour SIN depender de #tourOverridePrices (no existe en el modal):
+          //  - modo "group": los inputs por tier SON los precios (override implícito) → se guardan.
+          //  - modo "total": el precio manual si se capturó.
+          //  - si no, precio calculado del catálogo.
           const walkingPriceMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value || 'total';
+          const walkingManualPrice = document.getElementById('walkingTourManualPrice')?.value;
 
-          if (walkingTourOverride) {
-            if (walkingPriceMode === 'group') {
-              // Per-group pricing mode
-              const groupPrices = [];
-              const groupInputs = document.querySelectorAll('.walking-group-price');
-              groupInputs.forEach((input) => {
-                groupPrices.push(parseFloat(input.value) || 0);
-              });
-              data.walkingTourGroupPrices = groupPrices;
-              data.walkingTourPrice = groupPrices.reduce((sum, price) => sum + price, 0);
-              data.walkingTourPriceOverride = true;
-              data.walkingTourPriceMode = 'group';
-            } else {
-              // Total price override mode
-              const walkingTourManualPrice = document.getElementById('walkingTourManualPrice')?.value;
-              if (walkingTourManualPrice) {
-                data.walkingTourPrice = parseFloat(walkingTourManualPrice);
-                data.walkingTourPriceOverride = true;
-                data.walkingTourPriceMode = 'total';
-              }
-            }
+          if (walkingPriceMode === 'group') {
+            const groupPrices = [];
+            document.querySelectorAll('.walking-group-price').forEach((input) => {
+              groupPrices.push(parseFloat(input.value) || 0);
+            });
+            data.walkingTourGroupPrices = groupPrices;
+            data.walkingTourPrice = groupPrices.reduce((sum, price) => sum + price, 0);
+            data.walkingTourPriceOverride = true;
+            data.walkingTourPriceMode = 'group';
+          } else if (walkingManualPrice && parseFloat(walkingManualPrice) > 0) {
+            data.walkingTourPrice = parseFloat(walkingManualPrice);
+            data.walkingTourPriceOverride = true;
+            data.walkingTourPriceMode = 'total';
           } else {
             // Get duration for walking tour calculation
             const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
@@ -5544,18 +5539,16 @@ class ItineraryBuilder {
           // tour pricing section and the override UI is mounted.
           if (service.walkingTourPriceOverride) {
             setTimeout(() => {
+              // El checkbox #tourOverridePrices puede NO existir en este modal; si existe, marcarlo,
+              // pero NO depender de él para restaurar (el modo "group" honra los inputs por sí solo).
               const overrideCheckbox = document.getElementById('tourOverridePrices');
-              if (!overrideCheckbox) {
-                console.warn('⚠️ Override restore: checkbox not found in DOM');
-                return;
+              if (overrideCheckbox) {
+                overrideCheckbox.checked = true;
+                overrideCheckbox.setAttribute('checked', 'checked');
+                overrideCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+                this.handlePriceOverrideToggle('tour', true);
               }
-              overrideCheckbox.checked = true;
-              overrideCheckbox.setAttribute('checked', 'checked');
-              // Fire change event so any UI/listener picks up the new state.
-              overrideCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-              // Toggle handler also called explicitly in case the listener isn't attached yet.
-              this.handlePriceOverrideToggle('tour', true);
-              qsDevLog('✅ Walking tour override checkbox restored', { mode: service.walkingTourPriceMode });
+              qsDevLog('✅ Walking tour price restored', { mode: service.walkingTourPriceMode });
 
               if (service.walkingTourPriceMode === 'group') {
                 const groupRadio = document.getElementById('walkingPriceModeGroup');
@@ -9380,10 +9373,10 @@ class ItineraryBuilder {
 
         const priceCurrency = selectedTourData.walkingPriceCurrency || 'MXN';
 
-        // If user activated override + group mode, read edited per-tier prices.
-        const overrideCheckbox = document.getElementById('tourOverridePrices');
+        // Modo "group": los inputs por tier SON los precios (override implícito) — no depende de un
+        // checkbox #tourOverridePrices, que no existe en este modal. Se leen los precios editados.
         const walkingMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value;
-        const isPerGroupOverride = !!(overrideCheckbox?.checked && walkingMode === 'group');
+        const isPerGroupOverride = walkingMode === 'group';
         const overridePrices = {};
         if (isPerGroupOverride) {
           document.querySelectorAll('.walking-group-price').forEach((inp) => {
@@ -9411,9 +9404,10 @@ class ItineraryBuilder {
         // Override de TOTAL manual: el precio capturado es la BASE en efectivo; el recargo
         // por forma de pago se aplica después (decisión del cliente). En modo automático o
         // por-grupo, la base se calcula con los precios por tier (resolveTierPrice).
-        const isTotalOverride = !!(overrideCheckbox?.checked && walkingMode === 'total');
+        const manualWalkingPrice = parseFloat(document.getElementById('walkingTourManualPrice')?.value || 0);
+        const isTotalOverride = walkingMode === 'total' && manualWalkingPrice > 0;
         const baseTotal = isTotalOverride
-          ? (parseFloat(document.getElementById('walkingTourManualPrice')?.value || 0))
+          ? manualWalkingPrice
           : groups.reduce((sum, g) => sum + resolveTierPrice(g.tier) * duration, 0);
 
         // Recargo por forma de pago vía el motor único (un solo nodo: el total base; el
@@ -21356,12 +21350,8 @@ class ItineraryBuilder {
             inp.value = value;
           }
 
-          // Editar un precio por grupo implica override manual: activar #tourOverridePrices para que
-          // el precio editado se aplique al desglose (isPerGroupOverride) y se guarde (collectServiceData
-          // lo ignora si el override está apagado). Se marca en silencio (sin disparar change) para no
-          // regenerar los inputs ni perder el foco mientras se teclea.
-          const walkingOverrideCb = document.getElementById('tourOverridePrices');
-          if (walkingOverrideCb && !walkingOverrideCb.checked) walkingOverrideCb.checked = true;
+          // Editar un precio de grupo se refleja al instante: el modo "group" ya honra los inputs
+          // (override implícito). Marcar como modificado y recalcular.
           this.serviceModified = true;
 
           // Update total display (function lives in DOMContentLoaded scope; guard for class-method access).
