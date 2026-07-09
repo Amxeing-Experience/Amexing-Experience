@@ -210,44 +210,8 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 
 <!-- Add to Quote Picker Modal for Tours -->
 <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-<div class="modal fade" id="addTourToQuoteModal" tabindex="-1" aria-labelledby="addTourToQuoteLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-md">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addTourToQuoteLabel">
-                    <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted mb-3" id="addTourToQuoteName"></p>
-
-                <div class="create-new-quote-option mb-3" id="createNewQuoteBtnTour">
-                    <i class="ti ti-plus me-2"></i>Crear nueva cotización
-                </div>
-
-                <div class="text-muted small mb-2">o seleccionar cotización existente:</div>
-
-                <input type="text" class="form-control form-control-sm tour-quote-search-input mb-3"
-                       id="tourQuoteSearchInput" placeholder="Buscar por folio o cliente...">
-
-                <div id="tourQuotePickerLoading" class="text-center py-4" style="display: none;">
-                    <div class="spinner-border spinner-border-sm text-primary" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <div class="text-muted small mt-2">Cargando cotizaciones...</div>
-                </div>
-
-                <div id="tourQuotePickerList" class="quote-picker-list" style="display: none;"></div>
-
-                <div id="tourQuoteActionLoading" class="text-center py-4" style="display: none;">
-                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                    <div class="text-muted small mt-2">Agregando tour...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Add to Quote — modal genérico compartido -->
+<%- include('../quotes/add-to-quote-modal') %>
 <% } %>
 
 <!-- Full-Screen Gallery Modal -->
@@ -1280,117 +1244,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
     padding: 12px 24px;
 }
 
-.create-new-quote-option {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 14px 16px;
-    border: 2px dashed var(--brand-primary);
-    border-radius: 8px;
-    color: var(--brand-primary-active);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.create-new-quote-option:hover {
-    background: rgba(13, 110, 253, 0.05);
-    border-color: #0a58ca;
-    color: #0a58ca;
-}
-
-.quote-picker-list {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.quote-list-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.quote-list-item:hover {
-    background: #f8f9fa;
-    border-color: var(--brand-primary-active);
-    box-shadow: 0 1px 4px rgba(13, 110, 253, 0.12);
-}
-
-.quote-list-item .quote-folio {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: #344767;
-}
-
-.quote-list-item .quote-meta {
-    font-size: 0.75rem;
-    color: #adb5bd;
-}
-
-.quote-list-item .quote-status {
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 4px;
-    text-transform: capitalize;
-    white-space: nowrap;
-}
-
-.quote-status.status-requested { background: #fff3cd; color: #856404; }
-.quote-status.status-hold { background: #cce5ff; color: #004085; }
-
-.tour-quote-search-input { border-radius: 6px; }
-
-.quote-picker-empty {
-    text-align: center;
-    padding: 24px 16px;
-    color: #6c757d;
-}
-
-.day-selector-back {
-    font-size: 0.85rem;
-    color: var(--brand-primary-active);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-}
-
-.day-selector-back:hover {
-    color: #0a58ca;
-    text-decoration: underline;
-}
-
-.day-list-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.day-list-item:hover {
-    background: #f8f9fa;
-    border-color: var(--brand-primary-active);
-    box-shadow: 0 1px 4px rgba(13, 110, 253, 0.12);
-}
-
-.day-list-item .day-title {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: #344767;
-}
-
-.new-day-date-row { padding: 10px 0; }
+/* Picker de cotización → estilos en organisms/quotes/add-to-quote-modal.ejs (compartido) */
 </style>
 
 <style>
@@ -1527,6 +1381,10 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 
 <!-- Load centralized pricing utilities -->
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
+<% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+<!-- Add to Quote — módulo genérico compartido -->
+<script src="/dashboard/js/utils/add-to-quote.js"></script>
+<% } %>
 
 <script>
 // Reserva anticipada (minutos) → días si >=24h; si no, horas y minutos (sin decimales).
@@ -2428,474 +2286,51 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-    // ========== Add Tour to Quote functionality ==========
-
-    function getTourAccessToken() {
-        let token = localStorage.getItem('accessToken') ||
-                   localStorage.getItem('authToken') ||
-                   localStorage.getItem('token') ||
-                   sessionStorage.getItem('accessToken') ||
-                   sessionStorage.getItem('authToken');
-        if (!token || token === '') {
-            const serverToken = '<%= typeof accessToken !== "undefined" ? accessToken : "" %>';
-            if (serverToken && serverToken !== '') token = serverToken;
-        }
-        return (token && token !== 'undefined' && token !== 'null') ? token : null;
-    }
-
-    function tourTimeAgo(dateStr) {
-        if (!dateStr) return '';
-        const now = new Date();
-        const date = new Date(dateStr);
-        const diffMs = now - date;
-        const diffMin = Math.floor(diffMs / 60000);
-        const diffHrs = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-        if (diffMin < 1) return 'hace un momento';
-        if (diffMin < 60) return 'hace ' + diffMin + ' min';
-        if (diffHrs < 24) return 'hace ' + diffHrs + (diffHrs === 1 ? ' hora' : ' horas');
-        if (diffDays < 30) return 'hace ' + diffDays + (diffDays === 1 ? ' día' : ' días');
-        const diffMonths = Math.floor(diffDays / 30);
-        return 'hace ' + diffMonths + (diffMonths === 1 ? ' mes' : ' meses');
-    }
-
-    // Move modal to body to escape overflow containers
+    // ========== Add Tour to Quote (módulo genérico compartido: /dashboard/js/utils/add-to-quote.js) ==========
     (function() {
-        const m = document.getElementById('addTourToQuoteModal');
-        if (m && m.parentElement !== document.body) document.body.appendChild(m);
-    })();
+        // Payload específico de Tours (lo único propio de esta superficie)
+        function buildTourSubconcept(tour) {
+            return {
+                type: 'tour', tourId: tour.id, title: tour.name,
+                time: '', hours: 0, unitPrice: tour.price, total: tour.price,
+                isPerPerson: true, numberOfPeople: 1
+            };
+        }
 
-    // Event: Add to Quote from card
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.add-tour-to-quote-btn')) {
+        function openTourAddToQuote(tour) {
+            if (!tour) return;
+            const price = Number(tour.price) || 0;
+            const priceFormatted = price.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            AddToQuote.open({
+                userRole: '<%= currentUserRole %>',
+                serviceLabel: 'Tour',
+                itemLabel: '<strong>' + (tour.name || 'Tour') + '</strong>' +
+                    (price > 0 ? '<br><span class="small">$' + priceFormatted + ' MXN por persona</span>' : ''),
+                buildSubconcept: function() { return buildTourSubconcept(tour); }
+            });
+        }
+
+        // Add to Quote desde la card
+        document.addEventListener('click', function(e) {
             const btn = e.target.closest('.add-tour-to-quote-btn');
-            openTourQuoteDialog({
+            if (!btn) return;
+            openTourAddToQuote({
                 id: btn.dataset.tourId,
                 name: btn.dataset.tourName,
-                type: 'tour',
                 price: parseFloat(btn.dataset.tourPrice) || 0
             });
-        }
-    });
-
-    // Event: Add to Quote from modal
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.add-tour-to-quote-from-modal-btn')) {
-            const cur = window._currentModalTour;
-            if (cur) {
-                const detailModal = bootstrap.Modal.getInstance(document.getElementById('tourDetailsModal'));
-                if (detailModal) detailModal.hide();
-                setTimeout(() => openTourQuoteDialog(cur), 300);
-            }
-        }
-    });
-
-    // Event: Create new quote
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('#createNewQuoteBtnTour')) {
-            createNewQuoteWithTour();
-        }
-    });
-
-    // Event: Select existing quote → day selector
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('#tourQuotePickerList .quote-list-item')) {
-            const item = e.target.closest('.quote-list-item');
-            showTourDaySelector(item.dataset.quoteId);
-        }
-    });
-
-    // Event: Select a day
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('#tourDaySelector .day-list-item')) {
-            const item = e.target.closest('.day-list-item');
-            addTourToDay(item.dataset.quoteId, parseInt(item.dataset.dayIndex));
-        }
-    });
-
-    // Event: Add new day via date
-    document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('tour-new-day-date-input') && e.target.value) {
-            const quoteId = e.target.dataset.quoteId;
-            const d = new Date(e.target.value + 'T12:00:00');
-            const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-            const dayTitle = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
-            addTourToNewDay(quoteId, dayTitle);
-        }
-    });
-
-    // Event: Back to quote list
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('#tourDaySelector .day-selector-back')) {
-            document.getElementById('tourQuotePickerList').style.display = 'block';
-            document.querySelector('#createNewQuoteBtnTour').style.display = '';
-            document.querySelector('.tour-quote-search-input').style.display = '';
-            document.getElementById('tourDaySelector').style.display = 'none';
-        }
-    });
-
-    // Event: Search filter
-    document.getElementById('tourQuoteSearchInput').addEventListener('input', function() {
-        const query = this.value.toLowerCase().trim();
-        document.querySelectorAll('#tourQuotePickerList .quote-list-item').forEach(item => {
-            item.style.display = item.textContent.toLowerCase().includes(query) ? '' : 'none';
         });
-    });
 
-    async function openTourQuoteDialog(tour) {
-        window._selectedTour = tour;
-        document.getElementById('addTourToQuoteName').textContent = tour.name;
-        document.getElementById('tourQuoteSearchInput').value = '';
-        document.getElementById('tourQuotePickerLoading').style.display = 'block';
-        document.getElementById('tourQuotePickerList').style.display = 'none';
-        document.getElementById('tourQuoteActionLoading').style.display = 'none';
-
-        const modal = new bootstrap.Modal(document.getElementById('addTourToQuoteModal'));
-        modal.show();
-
-        try {
-            const token = getTourAccessToken();
-            const response = await fetch('/api/quotes?start=0&length=50&order[0][column]=7&order[0][dir]=desc', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            if (!response.ok) throw new Error('Error al cargar cotizaciones');
-            const result = await response.json();
-            const quotes = (result.data || [])
-                .filter(q => ['requested', 'hold'].includes(q.status))
-                .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-            renderTourQuoteList(quotes);
-        } catch (error) {
-            console.error('Error loading quotes:', error);
-            document.getElementById('tourQuotePickerList').innerHTML =
-                '<div class="quote-picker-empty"><i class="ti ti-alert-circle me-1"></i>Error al cargar cotizaciones</div>';
-        } finally {
-            document.getElementById('tourQuotePickerLoading').style.display = 'none';
-            document.getElementById('tourQuotePickerList').style.display = 'block';
-        }
-    }
-
-    function renderTourQuoteList(quotes) {
-        const container = document.getElementById('tourQuotePickerList');
-        if (quotes.length === 0) {
-            container.innerHTML = '<div class="quote-picker-empty"><i class="ti ti-file-off me-2"></i>No hay cotizaciones editables</div>';
-            return;
-        }
-        container.innerHTML = quotes.map(q => {
-            const creatorName = q.createdBy ? q.createdBy.fullName : 'Sin asignar';
-            const serviceCount = q.serviceCount || 0;
-            const updated = tourTimeAgo(q.updatedAt);
-            return '<div class="quote-list-item" data-quote-id="' + q.id + '">' +
-                '<div class="flex-grow-1">' +
-                    '<div class="quote-folio">' + q.folio + '</div>' +
-                    '<div class="quote-meta">' + serviceCount + ' servicios · ' + creatorName +
-                        (updated ? ' · ' + updated : '') + '</div>' +
-                '</div>' +
-                '<span class="quote-status status-' + q.status + '">' + q.status + '</span>' +
-            '</div>';
-        }).join('');
-    }
-
-    async function showTourDaySelector(quoteId) {
-        const token = getTourAccessToken();
-        document.getElementById('tourQuotePickerList').style.display = 'none';
-        document.querySelector('#createNewQuoteBtnTour').style.display = 'none';
-        document.querySelector('.tour-quote-search-input').style.display = 'none';
-        document.getElementById('tourQuotePickerLoading').style.display = 'block';
-
-        let daySelector = document.getElementById('tourDaySelector');
-        if (!daySelector) {
-            daySelector = document.createElement('div');
-            daySelector.id = 'tourDaySelector';
-            document.getElementById('tourQuotePickerList').parentNode.appendChild(daySelector);
-        }
-        daySelector.style.display = 'none';
-
-        try {
-            const quoteRes = await fetch('/api/quotes/' + quoteId, {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            if (!quoteRes.ok) throw new Error('Error al obtener cotización');
-            const quoteData = await quoteRes.json();
-            const quote = quoteData.data || quoteData;
-            window._selectedTourQuote = quote;
-            const days = (quote.serviceItems && quote.serviceItems.days) || [];
-
-            // 0 or 1 days → add directly
-            if (days.length <= 1) {
-                document.getElementById('tourQuotePickerLoading').style.display = 'none';
-                if (days.length === 0) {
-                    await addTourToNewDay(quoteId);
-                } else {
-                    await addTourToDay(quoteId, 0);
-                }
-                return;
-            }
-
-            // 2+ days → show picker
-            let html = '<div class="day-selector-back mb-3"><i class="ti ti-arrow-left me-1"></i>Volver a cotizaciones</div>';
-            html += '<div class="quote-folio mb-3">' + quote.folio + ' — Seleccionar día</div>';
-            html += days.map((day, idx) => {
-                const scCount = (day.subconcepts || []).length;
-                return '<div class="day-list-item" data-quote-id="' + quoteId + '" data-day-index="' + idx + '">' +
-                    '<div class="flex-grow-1">' +
-                        '<div class="day-title">Día ' + day.dayNumber + (day.dayTitle ? ' — ' + day.dayTitle : '') + '</div>' +
-                        '<div class="quote-meta">' + scCount + ' servicios</div>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
-            html += '<div class="new-day-date-row mt-2" data-quote-id="' + quoteId + '">' +
-                '<label class="form-label small text-muted mb-1">Agregar nuevo día:</label>' +
-                '<input type="date" class="form-control form-control-sm tour-new-day-date-input" data-quote-id="' + quoteId + '">' +
-            '</div>';
-
-            daySelector.innerHTML = html;
-            daySelector.style.display = 'block';
-        } catch (error) {
-            console.error('Error loading quote days:', error);
-            showTourQuoteError(error.message);
-            document.getElementById('tourQuotePickerList').style.display = 'block';
-            document.querySelector('#createNewQuoteBtnTour').style.display = '';
-            document.querySelector('.tour-quote-search-input').style.display = '';
-        } finally {
-            document.getElementById('tourQuotePickerLoading').style.display = 'none';
-        }
-    }
-
-    async function addTourToDay(quoteId, dayIndex) {
-        const tour = window._selectedTour;
-        const quote = window._selectedTourQuote;
-        const token = getTourAccessToken();
-
-        const daySel = document.getElementById('tourDaySelector');
-        if (daySel) daySel.style.display = 'none';
-        document.getElementById('tourQuoteActionLoading').style.display = 'block';
-
-        try {
-            const serviceItems = quote.serviceItems || { days: [], subtotal: 0, iva: 0, total: 0 };
-            serviceItems.days[dayIndex].subconcepts.push({
-                type: 'tour',
-                tourId: tour.id,
-                title: tour.name,
-                time: '',
-                hours: 0,
-                unitPrice: tour.price,
-                total: tour.price,
-                isPerPerson: true,
-                numberOfPeople: 1
-            });
-
-            let subtotal = 0;
-            serviceItems.days.forEach(day => {
-                let dayTotal = 0;
-                (day.subconcepts || []).forEach(sc => { dayTotal += (sc.total || 0); });
-                day.dayTotal = Math.round(dayTotal * 100) / 100;
-                subtotal += dayTotal;
-            });
-            serviceItems.subtotal = Math.round(subtotal * 100) / 100;
-            serviceItems.iva = Math.round(subtotal * 0.16 * 100) / 100;
-            serviceItems.total = Math.round((serviceItems.subtotal + serviceItems.iva) * 100) / 100;
-
-            const updateRes = await fetch('/api/quotes/' + quoteId + '/service-items', {
-                method: 'PUT',
-                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                body: JSON.stringify(serviceItems)
-            });
-            if (!updateRes.ok) {
-                const errData = await updateRes.json();
-                throw new Error(errData.error || 'Error al agregar tour');
-            }
-
-            bootstrap.Modal.getInstance(document.getElementById('addTourToQuoteModal'))?.hide();
-            showTourQuoteSuccess(quote.folio || quoteId, quoteId);
-        } catch (error) {
-            console.error('Error adding tour to day:', error);
-            showTourQuoteError(error.message);
-            if (daySel) daySel.style.display = 'block';
-            document.getElementById('tourQuoteActionLoading').style.display = 'none';
-        }
-    }
-
-    async function addTourToNewDay(quoteId, dayTitle) {
-        const tour = window._selectedTour;
-        const quote = window._selectedTourQuote;
-        const token = getTourAccessToken();
-
-        const daySel = document.getElementById('tourDaySelector');
-        if (daySel) daySel.style.display = 'none';
-        document.getElementById('tourQuoteActionLoading').style.display = 'block';
-
-        try {
-            const serviceItems = quote.serviceItems || { days: [], subtotal: 0, iva: 0, total: 0 };
-            if (!serviceItems.days) serviceItems.days = [];
-
-            serviceItems.days.push({
-                dayNumber: serviceItems.days.length + 1,
-                dayTitle: dayTitle || '',
-                subconcepts: [{
-                    type: 'tour',
-                    tourId: tour.id,
-                    title: tour.name,
-                    time: '',
-                    hours: 0,
-                    unitPrice: tour.price,
-                    total: tour.price,
-                    isPerPerson: true,
-                    numberOfPeople: 1
-                }],
-                dayTotal: tour.price
-            });
-
-            let subtotal = 0;
-            serviceItems.days.forEach(day => {
-                let dayTotal = 0;
-                (day.subconcepts || []).forEach(sc => { dayTotal += (sc.total || 0); });
-                day.dayTotal = Math.round(dayTotal * 100) / 100;
-                subtotal += dayTotal;
-            });
-            serviceItems.subtotal = Math.round(subtotal * 100) / 100;
-            serviceItems.iva = Math.round(subtotal * 0.16 * 100) / 100;
-            serviceItems.total = Math.round((serviceItems.subtotal + serviceItems.iva) * 100) / 100;
-
-            const updateRes = await fetch('/api/quotes/' + quoteId + '/service-items', {
-                method: 'PUT',
-                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                body: JSON.stringify(serviceItems)
-            });
-            if (!updateRes.ok) {
-                const errData = await updateRes.json();
-                throw new Error(errData.error || 'Error al agregar tour');
-            }
-
-            bootstrap.Modal.getInstance(document.getElementById('addTourToQuoteModal'))?.hide();
-            showTourQuoteSuccess(quote.folio || quoteId, quoteId);
-        } catch (error) {
-            console.error('Error adding tour to new day:', error);
-            showTourQuoteError(error.message);
-            if (daySel) daySel.style.display = 'block';
-            document.getElementById('tourQuoteActionLoading').style.display = 'none';
-        }
-    }
-
-    async function createNewQuoteWithTour() {
-        const tour = window._selectedTour;
-        const token = getTourAccessToken();
-
-        document.getElementById('tourQuotePickerList').style.display = 'none';
-        document.getElementById('tourQuoteActionLoading').style.display = 'block';
-        document.querySelector('#createNewQuoteBtnTour').style.display = 'none';
-        document.querySelector('.tour-quote-search-input').style.display = 'none';
-
-        try {
-            const createRes = await fetch('/api/quotes', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ notes: 'Tour: ' + tour.name })
-            });
-            if (!createRes.ok) throw new Error('Error al crear cotización');
-            const newQuote = await createRes.json();
-            const quoteId = newQuote.data.id;
-
-            // Store as selected quote for addTourToNewDay
-            window._selectedTourQuote = { serviceItems: { days: [], subtotal: 0, iva: 0, total: 0 } };
-
-            const serviceItems = {
-                days: [{
-                    dayNumber: 1,
-                    dayTitle: '',
-                    subconcepts: [{
-                        type: 'tour',
-                        tourId: tour.id,
-                        title: tour.name,
-                        time: '',
-                        hours: 0,
-                        unitPrice: tour.price,
-                        total: tour.price,
-                        isPerPerson: true,
-                        numberOfPeople: 1
-                    }],
-                    dayTotal: tour.price
-                }],
-                subtotal: Math.round(tour.price * 100) / 100,
-                iva: Math.round(tour.price * 0.16 * 100) / 100,
-                total: Math.round(tour.price * 1.16 * 100) / 100
-            };
-
-            const updateRes = await fetch('/api/quotes/' + quoteId + '/service-items', {
-                method: 'PUT',
-                headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-                body: JSON.stringify(serviceItems)
-            });
-            if (!updateRes.ok) {
-                const errData = await updateRes.json();
-                throw new Error(errData.error || 'Error al agregar tour');
-            }
-
-            bootstrap.Modal.getInstance(document.getElementById('addTourToQuoteModal'))?.hide();
-            window.location.href = '/dashboard/<%= currentUserRole %>/quotes/' + quoteId + '?section=services';
-        } catch (error) {
-            console.error('Error creating new quote:', error);
-            showTourQuoteError(error.message);
-            document.getElementById('tourQuotePickerList').style.display = 'block';
-            document.getElementById('tourQuoteActionLoading').style.display = 'none';
-            document.querySelector('#createNewQuoteBtnTour').style.display = '';
-            document.querySelector('.tour-quote-search-input').style.display = '';
-        }
-    }
-
-    function showTourQuoteSuccess(folio, quoteId) {
-        const alertHtml = '<div class="alert alert-success alert-dismissible fade show" role="alert">' +
-            '<i class="ti ti-check me-2"></i>' +
-            'Tour agregado a <strong>' + folio + '</strong> ' +
-            '<a href="/dashboard/<%= currentUserRole %>/quotes/' + quoteId + '?section=services" class="alert-link ms-2">' +
-                'Ver cotización <i class="ti ti-arrow-right"></i>' +
-            '</a>' +
-            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
-        '</div>';
-        document.querySelectorAll('.tour-quote-alert').forEach(el => el.remove());
-        const container = document.querySelector('.card.border-0.shadow-sm');
-        if (container) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'tour-quote-alert';
-            wrapper.innerHTML = alertHtml;
-            container.parentNode.insertBefore(wrapper, container);
-            setTimeout(() => {
-                wrapper.querySelector('.alert')?.classList.remove('show');
-                setTimeout(() => wrapper.remove(), 150);
-            }, 8000);
-        }
-    }
-
-    function showTourQuoteError(message) {
-        const alertHtml = '<div class="alert alert-danger alert-dismissible fade show" role="alert">' +
-            '<i class="ti ti-alert-circle me-2"></i>' + (message || 'Error al agregar tour') +
-            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
-        '</div>';
-        document.querySelectorAll('.tour-quote-alert').forEach(el => el.remove());
-        const container = document.querySelector('.card.border-0.shadow-sm');
-        if (container) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'tour-quote-alert';
-            wrapper.innerHTML = alertHtml;
-            container.parentNode.insertBefore(wrapper, container);
-            setTimeout(() => {
-                wrapper.querySelector('.alert')?.classList.remove('show');
-                setTimeout(() => wrapper.remove(), 150);
-            }, 8000);
-        }
-    }
-
-    // Reset picker on close
-    document.getElementById('addTourToQuoteModal').addEventListener('hidden.bs.modal', function() {
-        document.getElementById('tourQuotePickerList').innerHTML = '';
-        document.getElementById('tourQuotePickerLoading').style.display = 'none';
-        document.getElementById('tourQuoteActionLoading').style.display = 'none';
-        document.querySelector('#createNewQuoteBtnTour').style.display = '';
-        document.querySelector('.tour-quote-search-input').style.display = '';
-        const daySel = document.getElementById('tourDaySelector');
-        if (daySel) daySel.style.display = 'none';
-        window._selectedTourQuote = null;
-    });
-
+        // Add to Quote desde el modal de detalle
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.add-tour-to-quote-from-modal-btn')) return;
+            const cur = window._currentModalTour;
+            if (!cur) return;
+            const detailModal = bootstrap.Modal.getInstance(document.getElementById('tourDetailsModal'));
+            if (detailModal) detailModal.hide();
+            setTimeout(function() { openTourAddToQuote(cur); }, 300);
+        });
+    })();
     <% } %>
 
     // Function to show tour details modal
