@@ -1258,41 +1258,33 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
     color: #fff;
 }
 
-/* Tarjeta de precio por vehículo (modal de detalle): botón "Agregar" integrado como pie */
-.exp-lux__price-card--vehicle {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0;
-    padding: 0;
-    overflow: hidden;
-}
-.exp-lux__price-card--vehicle .exp-lux__price-main {
+/* Tarjeta de precio por vehículo (modal de detalle): botón "Agregar" compacto en la misma fila */
+.exp-lux__price-end {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    padding: 16px 20px;
+    gap: 16px;
+    flex-shrink: 0;
 }
 .exp-lux__price-add {
-    display: flex;
+    flex-shrink: 0;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 7px;
-    width: 100%;
-    border: none;
-    border-top: 1px solid var(--exp-border, #d6d1c4);
+    gap: 6px;
+    border: 1px solid var(--exp-olive, #6E7A50);
     background: transparent;
     color: var(--exp-olive, #6E7A50);
+    border-radius: 999px;
     font-family: inherit;
-    font-size: 0.68rem;
+    font-size: 0.64rem;
     font-weight: 600;
-    letter-spacing: 0.13em;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
-    padding: 11px 20px;
+    padding: 7px 14px;
     cursor: pointer;
-    transition: background 0.18s ease, color 0.18s ease;
+    white-space: nowrap;
+    transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
 }
-.exp-lux__price-add i { font-size: 0.95rem; }
+.exp-lux__price-add i { font-size: 0.85rem; }
 .exp-lux__price-add:hover {
     background: var(--exp-olive, #6E7A50);
     color: #fff;
@@ -3463,21 +3455,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         data-rate-id="${pd.rate?.id || ''}"
                         data-rate-name="${(pd.rate?.name || '').replace(/"/g, '&quot;')}"
                         data-min-hours="${tour.time ? (parseInt(tour.time) / 60) : 1}"
-                        title="Agregar a Cotización"><i class="ti ti-plus"></i><span>Agregar a cotización</span></button>`;
+                        title="Agregar a Cotización"><i class="ti ti-plus"></i><span>Agregar</span></button>`;
                     <% } %>
                     return `
-                        <div class="exp-lux__price-card${footer ? ' exp-lux__price-card--vehicle' : ''}">
-                            <div class="exp-lux__price-main">
-                                <div class="exp-lux__price-left">
-                                    <span class="exp-lux__price-name">${vName}</span>
-                                    ${sub ? `<span class="exp-lux__price-sub">${sub}</span>` : ''}
-                                </div>
+                        <div class="exp-lux__price-card">
+                            <div class="exp-lux__price-left">
+                                <span class="exp-lux__price-name">${vName}</span>
+                                ${sub ? `<span class="exp-lux__price-sub">${sub}</span>` : ''}
+                            </div>
+                            <div class="exp-lux__price-end">
                                 <div class="exp-lux__price-right">
                                     <span class="exp-lux__price-amount">${amount}</span>
                                     <span class="exp-lux__price-unit">${unit}</span>
                                 </div>
+                                ${footer}
                             </div>
-                            ${footer}
                         </div>`;
                 }).join('');
                 return `
