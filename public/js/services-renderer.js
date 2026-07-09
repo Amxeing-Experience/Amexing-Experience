@@ -916,9 +916,8 @@
                 ${destination}
             </div>`;
 
-            // Pickup / drop-off addresses (Punto a Punto + Local)
-            const isPapOrLocal = service.transportType === 'punto-a-punto' || service.transportType === 'local';
-            if (isPapOrLocal) {
+            // Pickup / drop-off addresses: se muestran siempre que existan (cualquier tipo de transporte).
+            {
                 if (service.tripType === 'round-trip') {
                     // Per-leg addresses
                     if (service.pickupAddressIda || service.dropoffAddressIda) {
