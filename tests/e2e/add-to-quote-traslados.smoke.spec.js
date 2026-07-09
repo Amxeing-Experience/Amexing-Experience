@@ -76,6 +76,13 @@ test.describe('Agregar a cotización — Traslados', () => {
     expect(Number(svcSub.total), 'el total del subconcepto debe coincidir con el precio del traslado')
       .toBeCloseTo(svc.price, 2);
 
+    // El módulo genérico debe inyectar pricesByType (efectivo/transferencia/tarjeta) para que
+    // la cotización cambie el precio según su método de pago. efectivo = base; transferencia/tarjeta > base.
+    expect(svcSub.pricesByType, 'el subconcepto debe traer pricesByType').toBeTruthy();
+    expect(Number(svcSub.pricesByType.efectivo), 'pricesByType.efectivo = precio base').toBeCloseTo(svc.price, 2);
+    expect(Number(svcSub.pricesByType.transferencia), 'transferencia >= efectivo').toBeGreaterThanOrEqual(Number(svcSub.pricesByType.efectivo));
+    expect(Number(svcSub.pricesByType.tarjeta), 'tarjeta >= transferencia').toBeGreaterThanOrEqual(Number(svcSub.pricesByType.transferencia));
+
     // --- Limpieza best-effort: borrar la cotización de prueba ---
     try {
       await page.request.delete(`/api/quotes/${quoteId}`);

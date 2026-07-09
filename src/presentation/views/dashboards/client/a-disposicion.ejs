@@ -1500,11 +1500,16 @@ const isAdminRole = (currentUserRole === 'admin' || currentUserRole === 'superad
         const capacity = d.vehicleCapacity || 4;
         const trunkCapacity = d.trunkCapacity || 2;
         const vehicleTypeName = d.vehicleName + ' - ' + capacity + ' pax, ' + trunkCapacity + ' maletas';
+        // Base EFECTIVO (MXN, sin recargo por método de pago): el módulo genérico deriva
+        // pricesByType (efectivo/transferencia/tarjeta) para que la cotización cambie el precio
+        // según SU método de pago. hourlyRate es la tarifa base (sin recargo).
+        const disc = (Number(d.discountPercent) || 0) / 100;
+        const baseEfectivo = Math.round((Number(d.hourlyRate) || 0) * (Number(d.hours) || 0) * (Number(d.vehicleCount) || 1) * (1 - disc) * 100) / 100;
         return {
             type: 'a-disposicion', concept: 'A Disposición', time: '', endTime: '',
             vehicleType: d.vehicleTypeId, vehicleTypeName: vehicleTypeName, rateId: d.rateId,
-            unitPrice: d.totalCost, quantity: 1, hours: d.hours, vehicleCount: d.vehicleCount,
-            hourlyPrice: d.hourlyRate, discountPercent: d.discountPercent, total: d.totalCost,
+            unitPrice: baseEfectivo, quantity: 1, hours: d.hours, vehicleCount: d.vehicleCount,
+            hourlyPrice: d.hourlyRate, discountPercent: d.discountPercent, total: baseEfectivo,
             persons: 0, transportAdults: 0, transportChildren: 0, transportInfants: 0,
             selectedSchedule: '', includeInTotal: true, notes: ''
         };

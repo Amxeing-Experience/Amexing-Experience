@@ -69,12 +69,26 @@ test.describe('Agregar a cotización — A Disposición', () => {
     const disp = subs.find((s) => s.type === 'a-disposicion');
 
     expect(disp, 'la cotización debe contener un subconcepto de a-disposición').toBeTruthy();
-    expect(disp.total, 'el total del subconcepto debe coincidir con el calculado')
-      .toBeCloseTo(calc.totalCost, 2);
     expect(Number(disp.hours), 'horas coinciden').toBe(Number(calc.hours));
     expect(Number(disp.vehicleCount), 'vehículos coinciden').toBe(Number(calc.vehicleCount));
     expect(disp.rateId, 'rateId presente').toBeTruthy();
     expect(disp.vehicleType, 'vehicleType presente').toBeTruthy();
+
+    // El total guardado es el BASE EFECTIVO (sin recargo por método de pago).
+    const disc = (Number(calc.discountPercent) || 0) / 100;
+    const baseEfectivo = Math.round((calc.hourlyRate * calc.hours * calc.vehicleCount) * (1 - disc) * 100) / 100;
+    expect(Number(disp.total), 'total = base efectivo (sin recargo)').toBeCloseTo(baseEfectivo, 1);
+
+    // pricesByType debe existir para que la cotización cambie el precio por método de pago.
+    expect(disp.pricesByType, 'el subconcepto debe traer pricesByType').toBeTruthy();
+    expect(Number(disp.pricesByType.efectivo), 'pricesByType.efectivo = base').toBeCloseTo(baseEfectivo, 1);
+    // El precio con el método de pago de la página (transferencia por defecto) debe coincidir
+    // con el total mostrado en el catálogo (calc.totalCost).
+    const payKey = calc.paymentMethod || 'transferencia';
+    if (disp.pricesByType[payKey] !== undefined) {
+      expect(Number(disp.pricesByType[payKey]), `pricesByType.${payKey} = total del catálogo`)
+        .toBeCloseTo(Number(calc.totalCost), 1);
+    }
 
     // --- Limpieza best-effort: borrar la cotización de prueba ---
     try {

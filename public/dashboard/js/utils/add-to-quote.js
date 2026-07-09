@@ -204,6 +204,48 @@
     }
   }
 
+  // ── pricesByType: recargo por método de pago (misma fuente que la cotización) ──
+  // La cotización cambia el precio con el método de pago vía subconcept.pricesByType
+  // (efectivo/transferencia/tarjeta). Aquí lo generamos con el mismo motor (PricingUtils),
+  // tomando sub.total como BASE EFECTIVO. Sin esto, cambiar el pago en la cotización no surte efecto.
+  let ratesCache = null;
+  async function getRates() {
+    if (ratesCache) return ratesCache;
+    try {
+      if (window.PricingUtils && typeof window.PricingUtils.loadCurrentRates === 'function') {
+        ratesCache = await window.PricingUtils.loadCurrentRates();
+        return ratesCache;
+      }
+    } catch (e) { /* fallback abajo */ }
+    ratesCache = { exchangeRate: 20, transferRate: 3, agencyRate: 5 };
+    return ratesCache;
+  }
+
+  // Envuelve el buildSubconcept de la superficie e inyecta pricesByType a partir de
+  // sub.total (base efectivo), salvo que la superficie ya lo traiga.
+  async function buildSub() {
+    const sub = opts.buildSubconcept();
+    if (sub && sub.pricesByType == null && sub.total != null) {
+      const base = Number(sub.total) || 0;
+      const rates = await getRates();
+      const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+      const pay = (type) => {
+        if (window.PricingUtils && typeof window.PricingUtils.applyPaymentRate === 'function') {
+          return window.PricingUtils.applyPaymentRate(base, type, rates.transferRate, rates.agencyRate);
+        }
+        if (type === 'transferencia') return base * (1 + rates.transferRate / 100);
+        if (type === 'tarjeta') return base * (1 + rates.agencyRate / 100);
+        return base;
+      };
+      sub.pricesByType = {
+        efectivo: round2(base),
+        transferencia: round2(pay('transferencia')),
+        tarjeta: round2(pay('tarjeta')),
+      };
+    }
+    return sub;
+  }
+
   async function addToDay(quoteId, dayIndex) {
     const ds = el('atqDaySelector');
     if (ds) ds.style.display = 'none';
@@ -211,7 +253,7 @@
     try {
       const quote = selectedQuote;
       const si = quote.serviceItems || { days: [], subtotal: 0, iva: 0, total: 0 };
-      si.days[dayIndex].subconcepts.push(opts.buildSubconcept());
+      si.days[dayIndex].subconcepts.push(await buildSub());
       recalc(si);
       const r = await fetch('/api/quotes/' + quoteId + '/service-items', { method: 'PUT', headers: headers(true), body: JSON.stringify(si) });
       if (!r.ok) throw new Error((await r.json()).error || 'Error');
@@ -232,7 +274,7 @@
       const quote = selectedQuote;
       const si = quote.serviceItems || { days: [], subtotal: 0, iva: 0, total: 0 };
       if (!si.days) si.days = [];
-      const sc = opts.buildSubconcept();
+      const sc = await buildSub();
       si.days.push({ dayNumber: si.days.length + 1, dayTitle: dayTitle || '', subconcepts: [sc], dayTotal: sc.total });
       recalc(si);
       const r = await fetch('/api/quotes/' + quoteId + '/service-items', { method: 'PUT', headers: headers(true), body: JSON.stringify(si) });
@@ -256,7 +298,7 @@
       if (!createRes.ok) throw new Error((await createRes.json()).error || 'Error al crear cotización');
       const createData = await createRes.json();
       const quoteId = createData.data?.objectId || createData.data?.id || createData.objectId;
-      const sc = opts.buildSubconcept();
+      const sc = await buildSub();
       const si = {
         days: [{ dayNumber: 1, dayTitle: '', subconcepts: [sc], dayTotal: sc.total }],
         subtotal: Math.round(sc.total * 100) / 100,
