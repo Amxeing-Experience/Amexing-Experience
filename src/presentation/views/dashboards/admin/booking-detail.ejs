@@ -332,23 +332,50 @@ document.addEventListener('DOMContentLoaded', async function() {
         return name.split(' ').map(w => w[0]).filter(Boolean).join('').substring(0, 2).toUpperCase();
     }
 
-    // Returns the per-service price respecting the reservation's payment type. The
-    // quote stored pricesByType per service ({ efectivo, transferencia, tarjeta }) — at
-    // conversion only the snapshot for the quote's payment type made it into
-    // svc.total. Using pricesByType when available makes the booking totals match the
-    // quote regardless of which payment type the reservation is currently on.
-    function getServicePriceByType(svc, paymentType) {
+    // Modelo de precio por método de pago (igual que PaymentService en el servidor):
+    // se parte del precio base en efectivo (pricesByType.efectivo, intacto de la cotización)
+    // y se aplica un factor — efectivo = base, transferencia = base × 1.16, tarjeta = base × 1.21
+    // (IVA 16% + comisión de tarjeta 5%, ambos sumados sobre el base).
+    function methodFactor(paymentType) {
+        if (paymentType === 'transferencia') return 1.16;
+        if (paymentType === 'tarjeta') return 1.21;
+        return 1;
+    }
+
+    // Redondeo a efectivo: múltiplo de 5 MXN (ley de redondeo del proyecto, applyCashRounding).
+    function cashRoundMXN(price) {
+        const integerPart = Math.floor(price);
+        const decimalPart = price - integerPart;
+        if (decimalPart <= 0.50) return Math.floor(integerPart / 5) * 5;
+        if (integerPart === 0) return 5;
+        return Math.ceil(integerPart / 5) * 5;
+    }
+
+    // Precio base en efectivo de un servicio (0 si está excluido del total).
+    function getServiceBase(svc) {
+        if (svc?.subconcept?.includeInTotal === false) return 0;
         const pbt = svc?.subconcept?.pricesByType;
-        if (pbt && typeof pbt === 'object' && pbt[paymentType] != null) {
-            const v = Number(pbt[paymentType]);
+        if (pbt && typeof pbt === 'object' && pbt.efectivo != null) {
+            const v = Number(pbt.efectivo);
             if (!Number.isNaN(v)) return v;
         }
         return Number(svc?.total) || 0;
     }
 
-    // Sum of per-service prices using the reservation's payment type.
+    // Precio por servicio ya con el factor del método (para el listado de servicios).
+    function getServicePriceByType(svc, paymentType) {
+        return getServiceBase(svc) * methodFactor(paymentType);
+    }
+
+    // Total de servicios por método: Σ base × factor; efectivo (MXN) redondeado a múltiplo de 5.
     function computeServicesSubtotalByType(services, paymentType) {
-        return (services || []).reduce((sum, svc) => sum + getServicePriceByType(svc, paymentType), 0);
+        const base = (services || []).reduce((sum, svc) => sum + getServiceBase(svc), 0);
+        let value = base * methodFactor(paymentType);
+        const currency = (reservationData && reservationData.currency) || 'MXN';
+        if (paymentType === 'efectivo' && String(currency).toUpperCase() === 'MXN') {
+            value = cashRoundMXN(value);
+        }
+        return Math.round(value * 100) / 100;
     }
 
     function buildPersonCard(person, roleLabel, roleIcon, colorClass) {
@@ -1638,7 +1665,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     ${getPaymentStatusBadge(pay.paymentStatus)}
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total con IVA</span>
+                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total a pagar</span>
                     <span class="fw-semibold">${formatCurrency(pay.total, curr)}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">

@@ -1,16 +1,20 @@
 /**
  * PaymentService - Business logic for reservation payments.
  *
- * Pure helpers (servicePrice/computeTotals/deriveStatus) compute the amount due
+ * Pure helpers (serviceBase/computeTotals/deriveStatus) compute the amount due
  * and payment status without touching Parse, so they are trivially unit-testable.
  * Recalculate() loads the reservation and its existing payments, then writes the
  * payment rollup (paidAmount/balance/paymentStatus) onto the Reservation. Payments
  * are plain money amounts applied against the grand total (balance = total − paid);
  * there is no per-service payment split.
  *
- * The IVA math mirrors PublicReservationController.preparePublicReservationData
- * (subtotal by paymentType -> 16% IVA -> total) so there is a single source of
- * truth for what the client owes.
+ * Modelo de precio por método de pago (solo reservación): se parte del precio base
+ * en efectivo (pricesByType.efectivo, intacto de la cotización) y se aplica un factor
+ * por método — efectivo = base, transferencia = base × (1 + IVA), tarjeta = base ×
+ * (1 + IVA + tarjeta). El IVA (16%) y la comisión de tarjeta (5%) se suman ambos sobre
+ * el base (no compuestos): tarjeta = base × 1.21. El efectivo en MXN se redondea a
+ * múltiplo de 5 (ley de redondeo, applyCashRounding). NO se usan agencyRate/transferRate
+ * ni se toca el motor de cotizaciones.
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0
@@ -19,8 +23,11 @@
 const Parse = require('parse/node');
 const BaseModel = require('../../domain/models/BaseModel');
 const logger = require('../../infrastructure/logger');
+// Solo se importa el redondeo a efectivo (múltiplo de 5). No se modifica el motor.
+const { applyCashRounding } = require('../../domain/pricing/pricingEngine');
 
 const IVA_RATE = 0.16;
+const CARD_RATE = 0.05;
 
 /**
  * Round to 2 decimals (currency precision).
@@ -38,61 +45,83 @@ function round2(n) {
  */
 class PaymentService {
   /**
-   * Resolve a single service's price (sin IVA) for a payment tier, mirroring the
-   * public reservation total logic: pricesByType[paymentType] with fallback to total.
+   * Resolve a single service's BASE price (efectivo, sin IVA ni comisión), reading
+   * pricesByType.efectivo (fallback to total). Es el cimiento sobre el que se aplica
+   * el factor por método de pago.
    * @param {object} item - Plain service item { includeInTotal, pricesByType, total }.
-   * @param {string} paymentType - Pricing tier (efectivo|transferencia|tarjeta).
-   * @returns {number} Service price without IVA (0 when excluded from total).
+   * @returns {number} Base (efectivo) price (0 when excluded from total).
    * @example
-   * PaymentService.servicePrice({ pricesByType: { efectivo: 100 } }, 'efectivo') // 100
+   * PaymentService.serviceBase({ pricesByType: { efectivo: 100 } }) // 100
    */
-  static servicePrice(item, paymentType) {
+  static serviceBase(item) {
     if (!item || item.includeInTotal === false) return 0;
     const prices = item.pricesByType;
     if (prices && typeof prices === 'object') {
-      const byType = Number(prices[paymentType]);
-      if (Number.isFinite(byType)) return byType;
+      const base = Number(prices.efectivo);
+      if (Number.isFinite(base)) return base;
     }
     const total = Number(item.total);
     return Number.isFinite(total) ? total : 0;
   }
 
   /**
-   * Compute reservation totals (con IVA) from plain service items + reservation tip.
-   * @param {Array<object>} serviceItems - Plain items { id, includeInTotal, pricesByType, total }.
-   * @param {string} paymentType - Pricing tier (efectivo|transferencia|tarjeta).
-   * @param {number} [reservationTip] - Reservation-level tip, added on top (no IVA).
-   * @param {number} [adjustmentsNet] - Net reservation adjustments (charges − discounts, pre-IVA).
-   * @returns {object} { subtotal, adjustments, adjustedSubtotal, iva, servicesTotal, tip, total, perService }.
+   * Factor por método de pago sobre el precio base: efectivo = 1, transferencia = 1 + IVA
+   * (1.16), tarjeta = 1 + IVA + comisión de tarjeta (1.21). IVA y comisión se suman ambos
+   * sobre el base (no compuestos).
+   * @param {string} paymentType - Método (efectivo|transferencia|tarjeta).
+   * @returns {number} Factor multiplicador (1 para métodos desconocidos).
    * @example
-   * PaymentService.computeTotals([{ id: 'a', pricesByType: { efectivo: 100 } }], 'efectivo')
+   * PaymentService.methodFactor('tarjeta') // 1.21
    */
-  static computeTotals(serviceItems, paymentType, reservationTip = 0, adjustmentsNet = 0) {
-    const items = Array.isArray(serviceItems) ? serviceItems : [];
-    const perService = {};
-    let subtotal = 0;
+  static methodFactor(paymentType) {
+    if (paymentType === 'transferencia') return 1 + IVA_RATE;
+    if (paymentType === 'tarjeta') return 1 + IVA_RATE + CARD_RATE;
+    return 1;
+  }
 
-    for (const item of items) {
-      const price = this.servicePrice(item, paymentType);
-      subtotal += price;
-      if (item && item.id) {
-        const serviceIva = round2(price * IVA_RATE);
-        perService[item.id] = round2(price + serviceIva);
-      }
+  /**
+   * Compute reservation totals from plain service items using the payment-method model:
+   * base (efectivo) × factor(paymentType), + net adjustments + tip. Efectivo en MXN se
+   * redondea a múltiplo de 5.
+   * @param {Array<object>} serviceItems - Plain items { id, includeInTotal, pricesByType, total }.
+   * @param {string} paymentType - Método (efectivo|transferencia|tarjeta).
+   * @param {number} [reservationTip] - Reservation-level tip, added on top (sin factor).
+   * @param {number} [adjustmentsNet] - Net reservation adjustments (charges − discounts), pesos finales.
+   * @param {string} [currency] - Moneda (MXN aplica redondeo a efectivo).
+   * @returns {object} { subtotal, adjustments, iva, surcharge, servicesTotal, tip, total, paymentType }.
+   * @example
+   * PaymentService.computeTotals([{ id: 'a', pricesByType: { efectivo: 100 } }], 'tarjeta')
+   */
+  static computeTotals(serviceItems, paymentType, reservationTip = 0, adjustmentsNet = 0, currency = 'MXN') {
+    const items = Array.isArray(serviceItems) ? serviceItems : [];
+    let base = 0;
+    for (const item of items) base += this.serviceBase(item);
+    base = round2(base);
+
+    const factor = this.methodFactor(paymentType);
+    let servicesTotal = round2(base * factor);
+    // Efectivo en MXN: redondeo a múltiplo de 5 sobre el total (ley de redondeo del proyecto).
+    if (paymentType === 'efectivo' && String(currency).toUpperCase() === 'MXN') {
+      servicesTotal = round2(applyCashRounding(servicesTotal));
     }
 
-    subtotal = round2(subtotal);
-    // Reservation-level adjustments (charges/discounts) apply to the pre-IVA subtotal, then IVA is
-    // computed on the adjusted subtotal — mirrors the "Total Final" the admin sees + IVA on top.
+    // Ajustes (cargos/descuentos) y propina se suman como pesos finales (sin factor).
     const adjustments = round2(Number(adjustmentsNet) || 0);
-    const adjustedSubtotal = round2(subtotal + adjustments);
-    const iva = round2(adjustedSubtotal * IVA_RATE);
-    const servicesTotal = round2(adjustedSubtotal + iva);
     const tip = round2(reservationTip);
-    const total = round2(servicesTotal + tip);
+    const total = round2(servicesTotal + adjustments + tip);
+    // Recargo agregado por el método (IVA, o IVA + tarjeta). Se expone también como `iva`
+    // por compatibilidad con los consumidores existentes del summary.
+    const surcharge = round2(servicesTotal - base);
 
     return {
-      subtotal, adjustments, adjustedSubtotal, iva, servicesTotal, tip, total, perService,
+      subtotal: base,
+      adjustments,
+      iva: surcharge,
+      surcharge,
+      servicesTotal,
+      tip,
+      total,
+      paymentType,
     };
   }
 
@@ -174,13 +203,16 @@ class PaymentService {
 
     const paymentType = reservation.get('paymentType') || 'efectivo';
     const reservationTip = reservation.get('tip') || 0;
+    const currency = reservation.get('currency') || 'MXN';
     // Net reservation adjustments (charges add, discounts subtract) flow into the amount due.
     const adjustmentsList = reservation.get('adjustments') || [];
     const adjustmentsNet = adjustmentsList.reduce((sum, a) => {
       const amt = Number(a && a.amount) || 0;
       return a && a.type === 'discount' ? sum - amt : sum + amt;
     }, 0);
-    const totals = this.computeTotals(this.toServiceItems(services), paymentType, reservationTip, adjustmentsNet);
+    const totals = this.computeTotals(
+      this.toServiceItems(services), paymentType, reservationTip, adjustmentsNet, currency,
+    );
 
     const paidGlobal = this.sumPayments(payments.map((payment) => ({ amount: payment.get('amount') })));
 
