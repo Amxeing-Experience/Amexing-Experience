@@ -1,0 +1,70 @@
+<%#
+  Modal genérico "Agregar a cotización" (compartido por a-disposición, traslados, tours, experiencias…).
+  Lo maneja el módulo public/dashboard/js/utils/add-to-quote.js (window.AddToQuote.open(...)).
+  Incluir este partial + ese script en cada superficie. Created by Denisse Maldonado.
+%>
+<div class="modal fade" id="atqModal" tabindex="-1" aria-labelledby="atqLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="atqLabel">
+                    <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3" id="atqItemName"></p>
+
+                <div class="create-new-quote-option mb-3" id="atqCreateNew">
+                    <i class="ti ti-plus me-2"></i>Crear nueva cotización
+                </div>
+
+                <div class="text-muted small mb-2">o seleccionar cotización existente:</div>
+
+                <div class="small mb-2" style="color: #6E7A50;">
+                    <i class="ti ti-info-circle me-1"></i>Solo se muestran cotizaciones actuales o futuras.
+                </div>
+
+                <input type="text" class="form-control form-control-sm quote-search-input mb-3"
+                       id="atqSearchInput" placeholder="Buscar por folio o creador...">
+
+                <div id="atqPickerLoading" class="text-center py-4" style="display: none;">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <div class="text-muted small mt-2">Cargando cotizaciones...</div>
+                </div>
+
+                <div id="atqPickerList" class="quote-picker-list" style="display: none;"></div>
+
+                <div id="atqDaySelector" style="display: none;"></div>
+
+                <div id="atqActionLoading" class="text-center py-4" style="display: none;">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    <div class="text-muted small mt-2">Agregando a la cotización...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Quote picker (add-to-quote) */
+.create-new-quote-option { display: flex; align-items: center; justify-content: center; padding: 14px 16px; border: 2px dashed #6E7A50; border-radius: 8px; color: #6E7A50; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.2s; }
+.create-new-quote-option:hover { background: rgba(110,122,80,0.05); border-color: #5c6743; color: #5c6743; }
+.quote-picker-list { max-height: 300px; overflow-y: auto; }
+.quote-list-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+.quote-list-item:hover { background: #f8f9fa; border-color: #6E7A50; box-shadow: 0 1px 4px rgba(110,122,80,0.12); }
+.quote-list-item .quote-folio { font-weight: 600; font-size: 0.85rem; color: #344767; }
+.quote-list-item .quote-meta { font-size: 0.75rem; color: #adb5bd; }
+.quote-list-item .quote-status { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; text-transform: capitalize; white-space: nowrap; }
+.quote-search-input { border-radius: 6px; }
+.quote-picker-empty { text-align: center; padding: 24px 16px; color: #6c757d; }
+.day-selector-back { font-size: 0.85rem; color: #6E7A50; cursor: pointer; display: inline-flex; align-items: center; }
+.day-selector-back:hover { color: #5c6743; text-decoration: underline; }
+.day-list-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+.day-list-item:hover { background: #f8f9fa; border-color: #6E7A50; box-shadow: 0 1px 4px rgba(110,122,80,0.12); }
+.day-list-item .day-title { font-weight: 600; font-size: 0.85rem; color: #344767; }
+.new-day-date-row { padding: 10px 0; }
+.atq-alert { position: fixed; top: 20px; right: 20px; z-index: 10600; min-width: 320px; max-width: 480px; }
+</style>

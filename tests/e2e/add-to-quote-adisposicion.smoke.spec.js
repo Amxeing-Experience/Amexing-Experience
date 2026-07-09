@@ -46,7 +46,7 @@ test.describe('Agregar a cotización — A Disposición', () => {
 
     // --- Abrir modal y crear nueva cotización ---
     await addBtn.click();
-    const createBtn = page.locator('#createNewQuoteBtnDisp');
+    const createBtn = page.locator('#atqCreateNew');
     await expect(createBtn).toBeVisible({ timeout: 15_000 });
 
     // Al crear, el front hace POST /api/quotes + PUT service-items y redirige a la cotización.
