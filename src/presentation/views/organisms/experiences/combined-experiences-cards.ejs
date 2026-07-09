@@ -122,49 +122,8 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
 <!-- Add to Quote Picker Modal -->
 <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-<div class="modal fade" id="addToQuoteModal" tabindex="-1" aria-labelledby="addToQuoteLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-md">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addToQuoteLabel">
-                    <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted mb-3" id="addToQuoteExperienceName"></p>
-
-                <!-- Create New Quote Option -->
-                <div class="create-new-quote-option mb-3" id="createNewQuoteBtn">
-                    <i class="ti ti-plus me-2"></i>Crear nueva cotización
-                </div>
-
-                <div class="text-muted small mb-2">o seleccionar cotización existente:</div>
-
-                <!-- Search -->
-                <input type="text" class="form-control form-control-sm quote-search-input mb-3"
-                       id="quoteSearchInput" placeholder="Buscar por folio o cliente...">
-
-                <!-- Loading -->
-                <div id="quotePickerLoading" class="text-center py-4" style="display: none;">
-                    <div class="spinner-border spinner-border-sm text-primary" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <div class="text-muted small mt-2">Cargando cotizaciones...</div>
-                </div>
-
-                <!-- Quote List -->
-                <div id="quotePickerList" class="quote-picker-list" style="display: none;"></div>
-
-                <!-- Action Loading -->
-                <div id="quoteActionLoading" class="text-center py-4" style="display: none;">
-                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                    <div class="text-muted small mt-2">Agregando experiencia...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Add to Quote — modal genérico compartido -->
+<%- include('../quotes/add-to-quote-modal') %>
 <% } %>
 
 <!-- Full-Screen Gallery Modal -->
@@ -243,6 +202,10 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
 <!-- Util para categorías de experiencias dinámicas (desde la BD) -->
 <script src="/dashboard/js/utils/experience-categories.js"></script>
+<% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+<!-- Add to Quote — módulo genérico compartido -->
+<script src="/dashboard/js/utils/add-to-quote.js"></script>
+<% } %>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -1194,519 +1157,51 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-    // ========== Add to Quote functionality ==========
-
-    // Event: Add to Quote from card
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.add-to-quote-btn')) {
-            const button = e.target.closest('.add-to-quote-btn');
-            openAddToQuoteDialog({
-                id: button.dataset.experienceId,
-                name: button.dataset.experienceName,
-                type: button.dataset.experienceType,
-                price: parseFloat(button.dataset.experiencePrice) || 0
-            });
-        }
-    });
-
-    // Event: Add to Quote from detail modal
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.add-to-quote-from-modal-btn')) {
-            const currentExp = window._currentModalExperience;
-            if (currentExp) {
-                const detailModal = bootstrap.Modal.getInstance(document.getElementById('experienceDetailsModal'));
-                if (detailModal) detailModal.hide();
-                setTimeout(() => openAddToQuoteDialog(currentExp), 300);
-            }
-        }
-    });
-
-    // Event: Create new quote
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('#createNewQuoteBtn')) {
-            createNewQuoteWithExperience();
-        }
-    });
-
-    // Event: Select existing quote → show day selector
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.quote-list-item')) {
-            const item = e.target.closest('.quote-list-item');
-            showDaySelector(item.dataset.quoteId);
-        }
-    });
-
-    // Event: Select a day
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.day-list-item')) {
-            const item = e.target.closest('.day-list-item');
-            addExperienceToDay(item.dataset.quoteId, parseInt(item.dataset.dayIndex));
-        }
-    });
-
-    // Event: Add new day via date picker
-    document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('new-day-date-input') && e.target.value) {
-            const quoteId = e.target.dataset.quoteId;
-            const dateVal = e.target.value;
-            // Format date as title: "8 Mar 2026"
-            const d = new Date(dateVal + 'T12:00:00');
-            const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-            const dayTitle = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
-            addExperienceToNewDay(quoteId, dayTitle);
-        }
-    });
-
-    // Event: Back to quote list
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.day-selector-back')) {
-            // Re-show quote list view
-            document.getElementById('quotePickerLoading').style.display = 'none';
-            document.getElementById('quotePickerList').style.display = 'block';
-            document.querySelector('#createNewQuoteBtn').style.display = '';
-            document.querySelector('.quote-search-input').style.display = '';
-            document.getElementById('daySelector').style.display = 'none';
-        }
-    });
-
-    // Event: Search filter
-    document.getElementById('quoteSearchInput').addEventListener('input', function() {
-        const query = this.value.toLowerCase().trim();
-        document.querySelectorAll('#quotePickerList .quote-list-item').forEach(item => {
-            const text = item.textContent.toLowerCase();
-            item.style.display = text.includes(query) ? '' : 'none';
-        });
-    });
-
-    // Move modal to body so it's not trapped by overflow containers
+    // ========== Add Experience to Quote (módulo genérico compartido: /dashboard/js/utils/add-to-quote.js) ==========
     (function() {
-        const quoteModal = document.getElementById('addToQuoteModal');
-        if (quoteModal && quoteModal.parentElement !== document.body) {
-            document.body.appendChild(quoteModal);
+        // Payload específico de Experiencias (lo único propio de esta superficie)
+        function buildExperienceSubconcept(exp) {
+            return {
+                type: 'experience', experienceId: exp.id, title: exp.name,
+                time: '', hours: 0, unitPrice: exp.price, total: exp.price,
+                isPerPerson: true, numberOfPeople: 1
+            };
         }
+
+        function openExperienceAddToQuote(exp) {
+            if (!exp) return;
+            const price = Number(exp.price) || 0;
+            const priceFormatted = price.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            AddToQuote.open({
+                userRole: '<%= currentUserRole %>',
+                serviceLabel: 'Experiencia',
+                itemLabel: '<strong>' + (exp.name || 'Experiencia') + '</strong>' +
+                    (price > 0 ? '<br><span class="small">$' + priceFormatted + ' MXN por persona</span>' : ''),
+                buildSubconcept: function() { return buildExperienceSubconcept(exp); }
+            });
+        }
+
+        // Add to Quote desde la card
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.add-to-quote-btn');
+            if (!btn) return;
+            openExperienceAddToQuote({
+                id: btn.dataset.experienceId,
+                name: btn.dataset.experienceName,
+                price: parseFloat(btn.dataset.experiencePrice) || 0
+            });
+        });
+
+        // Add to Quote desde el modal de detalle
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.add-to-quote-from-modal-btn')) return;
+            const cur = window._currentModalExperience;
+            if (!cur) return;
+            const detailModal = bootstrap.Modal.getInstance(document.getElementById('experienceDetailsModal'));
+            if (detailModal) detailModal.hide();
+            setTimeout(function() { openExperienceAddToQuote(cur); }, 300);
+        });
     })();
-
-    async function openAddToQuoteDialog(experience) {
-        window._selectedExperience = experience;
-
-        // Update UI
-        document.getElementById('addToQuoteExperienceName').textContent = experience.name;
-        document.getElementById('quoteSearchInput').value = '';
-        document.getElementById('quotePickerLoading').style.display = 'block';
-        document.getElementById('quotePickerList').style.display = 'none';
-        document.getElementById('quoteActionLoading').style.display = 'none';
-
-        const modal = new bootstrap.Modal(document.getElementById('addToQuoteModal'));
-        modal.show();
-
-        try {
-            const token = getAccessToken();
-            const response = await fetch('/api/quotes?start=0&length=50&order[0][column]=7&order[0][dir]=desc', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-
-            if (!response.ok) throw new Error('Error al cargar cotizaciones');
-            const result = await response.json();
-            const quotes = (result.data || [])
-                .filter(q => ['requested', 'hold'].includes(q.status))
-                .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-            renderQuotePickerList(quotes);
-        } catch (error) {
-            console.error('Error loading quotes:', error);
-            document.getElementById('quotePickerList').innerHTML =
-                '<div class="quote-picker-empty"><i class="ti ti-alert-circle me-1"></i>Error al cargar cotizaciones</div>';
-        } finally {
-            document.getElementById('quotePickerLoading').style.display = 'none';
-            document.getElementById('quotePickerList').style.display = 'block';
-        }
-    }
-
-    function timeAgo(dateStr) {
-        if (!dateStr) return '';
-        const now = new Date();
-        const date = new Date(dateStr);
-        const diffMs = now - date;
-        const diffMin = Math.floor(diffMs / 60000);
-        const diffHrs = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-
-        if (diffMin < 1) return 'hace un momento';
-        if (diffMin < 60) return 'hace ' + diffMin + ' min';
-        if (diffHrs < 24) return 'hace ' + diffHrs + (diffHrs === 1 ? ' hora' : ' horas');
-        if (diffDays < 30) return 'hace ' + diffDays + (diffDays === 1 ? ' día' : ' días');
-        const diffMonths = Math.floor(diffDays / 30);
-        return 'hace ' + diffMonths + (diffMonths === 1 ? ' mes' : ' meses');
-    }
-
-    function renderQuotePickerList(quotes) {
-        const container = document.getElementById('quotePickerList');
-
-        if (quotes.length === 0) {
-            container.innerHTML = '<div class="quote-picker-empty"><i class="ti ti-file-off me-2"></i>No hay cotizaciones editables</div>';
-            return;
-        }
-
-        container.innerHTML = quotes.map(q => {
-            const creatorName = q.createdBy ? q.createdBy.fullName : 'Sin asignar';
-            const serviceCount = q.serviceCount || 0;
-            const updated = timeAgo(q.updatedAt);
-
-            return '<div class="quote-list-item" data-quote-id="' + q.id + '">' +
-                '<div class="flex-grow-1">' +
-                    '<div class="quote-folio">' + q.folio + '</div>' +
-                    '<div class="quote-meta">' + serviceCount + ' servicios · ' + creatorName +
-                        (updated ? ' · ' + updated : '') + '</div>' +
-                '</div>' +
-                '<span class="quote-status status-' + q.status + '">' + q.status + '</span>' +
-            '</div>';
-        }).join('');
-    }
-
-    async function showDaySelector(quoteId) {
-        const token = getAccessToken();
-
-        // Hide quote list, show loading
-        document.getElementById('quotePickerList').style.display = 'none';
-        document.querySelector('#createNewQuoteBtn').style.display = 'none';
-        document.querySelector('.quote-search-input').style.display = 'none';
-        document.getElementById('quotePickerLoading').style.display = 'block';
-
-        // Ensure daySelector container exists
-        let daySelector = document.getElementById('daySelector');
-        if (!daySelector) {
-            daySelector = document.createElement('div');
-            daySelector.id = 'daySelector';
-            document.getElementById('quotePickerList').parentNode.appendChild(daySelector);
-        }
-        daySelector.style.display = 'none';
-
-        try {
-            const quoteRes = await fetch('/api/quotes/' + quoteId, {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            if (!quoteRes.ok) throw new Error('Error al obtener cotización');
-
-            const quoteData = await quoteRes.json();
-            const quote = quoteData.data || quoteData;
-            window._selectedQuote = quote;
-            const days = (quote.serviceItems && quote.serviceItems.days) || [];
-
-            // 0 or 1 days → add directly, no extra interaction
-            if (days.length <= 1) {
-                document.getElementById('quotePickerLoading').style.display = 'none';
-                if (days.length === 0) {
-                    await addExperienceToNewDay(quoteId);
-                } else {
-                    await addExperienceToDay(quoteId, 0);
-                }
-                return;
-            }
-
-            // 2+ days → show day picker
-            let html = '<div class="day-selector-back mb-3"><i class="ti ti-arrow-left me-1"></i>Volver a cotizaciones</div>';
-            html += '<div class="quote-folio mb-3">' + quote.folio + ' — Seleccionar día</div>';
-
-            html += days.map((day, idx) => {
-                const scCount = (day.subconcepts || []).length;
-                return '<div class="day-list-item" data-quote-id="' + quoteId + '" data-day-index="' + idx + '">' +
-                    '<div class="flex-grow-1">' +
-                        '<div class="day-title">Día ' + day.dayNumber + (day.dayTitle ? ' — ' + day.dayTitle : '') + '</div>' +
-                        '<div class="quote-meta">' + scCount + ' servicios</div>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
-
-            html += '<div class="new-day-date-row mt-2" data-quote-id="' + quoteId + '">' +
-                '<label class="form-label small text-muted mb-1">Agregar nuevo día:</label>' +
-                '<input type="date" class="form-control form-control-sm new-day-date-input" data-quote-id="' + quoteId + '">' +
-            '</div>';
-
-            daySelector.innerHTML = html;
-            daySelector.style.display = 'block';
-
-        } catch (error) {
-            console.error('Error loading quote days:', error);
-            showAddToQuoteError(error.message);
-            // Reset to quote list
-            document.getElementById('quotePickerList').style.display = 'block';
-            document.querySelector('#createNewQuoteBtn').style.display = '';
-            document.querySelector('.quote-search-input').style.display = '';
-        } finally {
-            document.getElementById('quotePickerLoading').style.display = 'none';
-        }
-    }
-
-    async function addExperienceToDay(quoteId, dayIndex) {
-        const experience = window._selectedExperience;
-        const quote = window._selectedQuote;
-        const token = getAccessToken();
-
-        // Show loading
-        document.getElementById('daySelector').style.display = 'none';
-        document.getElementById('quoteActionLoading').style.display = 'block';
-
-        try {
-            const serviceItems = quote.serviceItems || { days: [], subtotal: 0, iva: 0, total: 0 };
-
-            // Build subconcept
-            const newSubconcept = {
-                type: 'experience',
-                experienceId: experience.id,
-                title: experience.name,
-                time: '',
-                hours: 0,
-                unitPrice: experience.price,
-                total: experience.price,
-                isPerPerson: true,
-                numberOfPeople: 1
-            };
-
-            // Add to selected day
-            serviceItems.days[dayIndex].subconcepts.push(newSubconcept);
-
-            // Recalculate totals
-            let subtotal = 0;
-            serviceItems.days.forEach(day => {
-                let dayTotal = 0;
-                (day.subconcepts || []).forEach(sc => { dayTotal += (sc.total || 0); });
-                day.dayTotal = Math.round(dayTotal * 100) / 100;
-                subtotal += dayTotal;
-            });
-            serviceItems.subtotal = Math.round(subtotal * 100) / 100;
-            serviceItems.iva = Math.round(subtotal * 0.16 * 100) / 100;
-            serviceItems.total = Math.round((serviceItems.subtotal + serviceItems.iva) * 100) / 100;
-
-            // PUT
-            const updateRes = await fetch('/api/quotes/' + quoteId + '/service-items', {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(serviceItems)
-            });
-
-            if (!updateRes.ok) {
-                const errData = await updateRes.json();
-                throw new Error(errData.error || 'Error al agregar experiencia');
-            }
-
-            bootstrap.Modal.getInstance(document.getElementById('addToQuoteModal'))?.hide();
-            showAddToQuoteSuccess(quote.folio || quoteId, quoteId);
-
-        } catch (error) {
-            console.error('Error adding experience to day:', error);
-            showAddToQuoteError(error.message);
-            document.getElementById('daySelector').style.display = 'block';
-            document.getElementById('quoteActionLoading').style.display = 'none';
-        }
-    }
-
-    async function addExperienceToNewDay(quoteId, dayTitle) {
-        const experience = window._selectedExperience;
-        const quote = window._selectedQuote;
-        const token = getAccessToken();
-
-        const daySel = document.getElementById('daySelector');
-        if (daySel) daySel.style.display = 'none';
-        document.getElementById('quoteActionLoading').style.display = 'block';
-
-        try {
-            const serviceItems = quote.serviceItems || { days: [], subtotal: 0, iva: 0, total: 0 };
-            if (!serviceItems.days) serviceItems.days = [];
-
-            const newDayNumber = serviceItems.days.length + 1;
-            serviceItems.days.push({
-                dayNumber: newDayNumber,
-                dayTitle: dayTitle || '',
-                subconcepts: [{
-                    type: 'experience',
-                    experienceId: experience.id,
-                    title: experience.name,
-                    time: '',
-                    hours: 0,
-                    unitPrice: experience.price,
-                    total: experience.price,
-                    isPerPerson: true,
-                    numberOfPeople: 1
-                }],
-                dayTotal: experience.price
-            });
-
-            // Recalculate totals
-            let subtotal = 0;
-            serviceItems.days.forEach(day => {
-                let dayTotal = 0;
-                (day.subconcepts || []).forEach(sc => { dayTotal += (sc.total || 0); });
-                day.dayTotal = Math.round(dayTotal * 100) / 100;
-                subtotal += dayTotal;
-            });
-            serviceItems.subtotal = Math.round(subtotal * 100) / 100;
-            serviceItems.iva = Math.round(subtotal * 0.16 * 100) / 100;
-            serviceItems.total = Math.round((serviceItems.subtotal + serviceItems.iva) * 100) / 100;
-
-            const updateRes = await fetch('/api/quotes/' + quoteId + '/service-items', {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(serviceItems)
-            });
-
-            if (!updateRes.ok) {
-                const errData = await updateRes.json();
-                throw new Error(errData.error || 'Error al agregar experiencia');
-            }
-
-            bootstrap.Modal.getInstance(document.getElementById('addToQuoteModal'))?.hide();
-            showAddToQuoteSuccess(quote.folio || quoteId, quoteId);
-
-        } catch (error) {
-            console.error('Error adding experience to new day:', error);
-            showAddToQuoteError(error.message);
-            document.getElementById('daySelector').style.display = 'block';
-            document.getElementById('quoteActionLoading').style.display = 'none';
-        }
-    }
-
-    async function createNewQuoteWithExperience() {
-        const experience = window._selectedExperience;
-        const token = getAccessToken();
-
-        // Show action loading
-        document.getElementById('quotePickerList').style.display = 'none';
-        document.getElementById('quoteActionLoading').style.display = 'block';
-        document.querySelector('#createNewQuoteBtn').style.display = 'none';
-        document.querySelector('.quote-search-input').style.display = 'none';
-
-        try {
-            // 1. Create new quote
-            const createRes = await fetch('/api/quotes', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    notes: 'Experiencia: ' + experience.name
-                })
-            });
-
-            if (!createRes.ok) throw new Error('Error al crear cotización');
-            const newQuote = await createRes.json();
-            const quoteId = newQuote.data.id;
-
-            // 2. Add the experience
-            const serviceItems = {
-                days: [{
-                    dayNumber: 1,
-                    dayTitle: 'Día 1',
-                    subconcepts: [{
-                        type: 'experience',
-                        experienceId: experience.id,
-                        title: experience.name,
-                        time: '',
-                        hours: 0,
-                        unitPrice: experience.price,
-                        total: experience.price,
-                        isPerPerson: true,
-                        numberOfPeople: 1
-                    }],
-                    dayTotal: experience.price
-                }],
-                subtotal: Math.round(experience.price * 100) / 100,
-                iva: Math.round(experience.price * 0.16 * 100) / 100,
-                total: Math.round(experience.price * 1.16 * 100) / 100
-            };
-
-            const updateRes = await fetch('/api/quotes/' + quoteId + '/service-items', {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(serviceItems)
-            });
-
-            if (!updateRes.ok) {
-                const errData = await updateRes.json();
-                throw new Error(errData.error || 'Error al agregar experiencia');
-            }
-
-            // 3. Close modal & redirect to quote
-            bootstrap.Modal.getInstance(document.getElementById('addToQuoteModal'))?.hide();
-            window.location.href = '/dashboard/department_manager/quotes/' + quoteId + '?section=services';
-
-        } catch (error) {
-            console.error('Error creating new quote:', error);
-            showAddToQuoteError(error.message);
-            document.getElementById('quotePickerList').style.display = 'block';
-            document.getElementById('quoteActionLoading').style.display = 'none';
-            document.querySelector('#createNewQuoteBtn').style.display = '';
-            document.querySelector('.quote-search-input').style.display = '';
-        }
-    }
-
-    function showAddToQuoteSuccess(folio, quoteId) {
-        const alertHtml = '<div class="alert alert-success alert-dismissible fade show" role="alert">' +
-            '<i class="ti ti-check me-2"></i>' +
-            'Experiencia agregada a <strong>' + folio + '</strong> ' +
-            '<a href="/dashboard/department_manager/quotes/' + quoteId + '?section=services" class="alert-link ms-2">' +
-                'Ver cotización <i class="ti ti-arrow-right"></i>' +
-            '</a>' +
-            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
-        '</div>';
-
-        // Remove existing alerts
-        document.querySelectorAll('.add-to-quote-alert').forEach(el => el.remove());
-
-        const container = document.querySelector('.row.mt-4');
-        if (container) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'add-to-quote-alert';
-            wrapper.innerHTML = alertHtml;
-            container.parentNode.insertBefore(wrapper, container);
-            setTimeout(() => {
-                wrapper.querySelector('.alert')?.classList.remove('show');
-                setTimeout(() => wrapper.remove(), 150);
-            }, 8000);
-        }
-    }
-
-    function showAddToQuoteError(message) {
-        const alertHtml = '<div class="alert alert-danger alert-dismissible fade show" role="alert">' +
-            '<i class="ti ti-alert-circle me-2"></i>' + (message || 'Error al agregar experiencia') +
-            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
-        '</div>';
-
-        document.querySelectorAll('.add-to-quote-alert').forEach(el => el.remove());
-
-        const container = document.querySelector('.row.mt-4');
-        if (container) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'add-to-quote-alert';
-            wrapper.innerHTML = alertHtml;
-            container.parentNode.insertBefore(wrapper, container);
-            setTimeout(() => {
-                wrapper.querySelector('.alert')?.classList.remove('show');
-                setTimeout(() => wrapper.remove(), 150);
-            }, 8000);
-        }
-    }
-
-    // Reset picker modal on close
-    document.getElementById('addToQuoteModal').addEventListener('hidden.bs.modal', function() {
-        document.getElementById('quotePickerList').innerHTML = '';
-        document.getElementById('quotePickerLoading').style.display = 'none';
-        document.getElementById('quoteActionLoading').style.display = 'none';
-        document.querySelector('#createNewQuoteBtn').style.display = '';
-        document.querySelector('.quote-search-input').style.display = '';
-        const daySelector = document.getElementById('daySelector');
-        if (daySelector) daySelector.style.display = 'none';
-        window._selectedQuote = null;
-    });
-
     <% } %>
 
     // Function to refresh images for a specific experience
@@ -4317,86 +3812,7 @@ document.addEventListener('DOMContentLoaded', function() {
     border: 1px solid #dee2e6;
 }
 
-/* Add to Quote Picker Modal */
-.create-new-quote-option {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 14px 16px;
-    border: 2px dashed var(--brand-primary);
-    border-radius: 8px;
-    color: var(--brand-primary-active);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.create-new-quote-option:hover {
-    background: rgba(var(--brand-primary-rgb), 0.05);
-    border-color: var(--brand-primary-active);
-    color: var(--brand-primary-active);
-}
-
-.quote-picker-list {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.quote-list-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.quote-list-item:hover {
-    background: #f8f9fa;
-    border-color: var(--brand-primary);
-    box-shadow: 0 1px 4px rgba(var(--brand-primary-rgb), 0.12);
-}
-
-.quote-list-item .quote-folio {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--brand-secondary);
-}
-
-.quote-list-item .quote-client {
-    font-size: 0.8rem;
-    color: #6c757d;
-}
-
-.quote-list-item .quote-meta {
-    font-size: 0.75rem;
-    color: #adb5bd;
-}
-
-.quote-list-item .quote-status {
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 4px;
-    text-transform: capitalize;
-    white-space: nowrap;
-}
-
-.quote-status.status-requested { background: #fff3cd; color: #856404; }
-.quote-status.status-hold { background: rgba(var(--brand-primary-rgb), 0.10); color: var(--brand-primary-active); }
-
-.quote-search-input {
-    border-radius: 6px;
-}
-
-.quote-picker-empty {
-    text-align: center;
-    padding: 24px 16px;
-    color: #6c757d;
-}
+/* Picker de cotización → estilos en organisms/quotes/add-to-quote-modal.ejs (compartido) */
 
 .add-to-quote-btn {
     padding: 0.25rem 0.5rem;
@@ -4408,46 +3824,6 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 12px 24px;
 }
 
-.day-selector-back {
-    font-size: 0.85rem;
-    color: var(--brand-primary-active);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-}
-
-.day-selector-back:hover {
-    color: var(--brand-primary-active);
-    text-decoration: underline;
-}
-
-.day-list-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.day-list-item:hover {
-    background: #f8f9fa;
-    border-color: var(--brand-primary);
-    box-shadow: 0 1px 4px rgba(var(--brand-primary-rgb), 0.12);
-}
-
-.day-list-item .day-title {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--brand-secondary);
-}
-
-.new-day-date-row {
-    padding: 10px 0;
-}
 
 /* =====================================================================
    Experience Detail Modal — Luxury redesign (namespaced .exp-lux__*)
