@@ -717,6 +717,14 @@
             // It belongs only to the internal cotización (services edit) view; the summary /
             // public quote should never expose it to clients.
 
+            // Dirección de pickup (texto libre capturado en el modal de tour).
+            if (service.type === 'tour' && service.pickupAddress) {
+                html += `<div class="service-detail-item">
+                    <i class="ti ti-map-pin-up me-1 text-success"></i>
+                    <span class="text-muted me-1">Pick-up:</span>${service.pickupAddress}
+                </div>`;
+            }
+
             // "Incluye" / "No incluye" for tours and experiences, shown in two columns.
             // The backend enriches each subconcept with these fields (no client cache
             // needed). Line breaks are preserved via white-space: pre-wrap.

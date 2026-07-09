@@ -7671,6 +7671,14 @@ class ItineraryBuilder {
       }).join('')}
                                         </div>
                                     ` : ''}
+                                    ${service.type === 'tour' && service.pickupAddress ? `
+                                        <div class="row g-2 text-muted small mt-1">
+                                            <div class="col-auto">
+                                                <i class="ti ti-map-pin-up me-1 text-success"></i>
+                                                <span class="text-muted">Pick-up:</span> ${service.pickupAddress}
+                                            </div>
+                                        </div>
+                                    ` : ''}
                                     ${((((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide)
                                       || (service.type === 'experience' && service.experienceGuide))
                                       && !((service.type === 'tour' || service.type === 'experience') && this.serviceIncludesMentionGuide(service))) ? `
