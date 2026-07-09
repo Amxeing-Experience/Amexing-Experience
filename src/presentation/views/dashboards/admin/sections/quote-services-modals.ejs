@@ -1206,7 +1206,15 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                 </div>
                             </div>
                         </div>
-                        
+
+                        <!-- Dirección de pickup (texto libre) para experiencias. -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="experiencePickupAddress" class="form-label"><i class="ti ti-map-pin me-1"></i>Dirección de pickup</label>
+                                <input type="text" class="form-control" id="experiencePickupAddress" placeholder="Hotel, dirección o punto de encuentro" autocomplete="off">
+                            </div>
+                        </div>
+
                         <hr class="my-4">
                         
                         <!-- People limits display -->

@@ -3996,6 +3996,8 @@ class ItineraryBuilder {
     switch (type) {
       case 'experience': {
         data.experienceId = document.getElementById('experienceSelect')?.value;
+        // Dirección de pickup (texto libre).
+        data.pickupAddress = (document.getElementById('experiencePickupAddress')?.value || '').trim();
         // Duración editable de la experiencia (autollenada del catálogo, modificable). Se guarda en
         // data.duration (ya persistido) — informativa; no afecta el precio (que es por persona).
         data.duration = parseFloat(document.getElementById('experienceDuration')?.value) || null;
@@ -5325,6 +5327,9 @@ class ItineraryBuilder {
             if (expDurationField && service.duration !== undefined && service.duration !== null) {
               expDurationField.value = service.duration;
             }
+            // Dirección de pickup.
+            const expPickupField = document.getElementById('experiencePickupAddress');
+            if (expPickupField) expPickupField.value = service.pickupAddress || '';
           } else if (attempt < 5) {
             // Retry with longer delay
 
@@ -7671,7 +7676,7 @@ class ItineraryBuilder {
       }).join('')}
                                         </div>
                                     ` : ''}
-                                    ${service.type === 'tour' && service.pickupAddress ? `
+                                    ${(service.type === 'tour' || service.type === 'experience') && service.pickupAddress ? `
                                         <div class="row g-2 text-muted small mt-1">
                                             <div class="col-auto">
                                                 <i class="ti ti-map-pin-up me-1 text-success"></i>
