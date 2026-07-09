@@ -1258,22 +1258,43 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
     color: #fff;
 }
 
-/* Tarjeta de precio por vehículo (modal de detalle) con botón "Agregar" */
-.exp-lux__price-vehicle { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.exp-lux__price-add {
-    align-self: flex-end;
-    border: 1px solid var(--brand-primary, #6E7A50);
-    background: transparent;
-    color: var(--brand-primary-active, #5c6743);
-    border-radius: 8px;
-    font-size: 0.8rem;
-    font-weight: 600;
-    padding: 6px 12px;
-    cursor: pointer;
-    transition: all 0.15s;
+/* Tarjeta de precio por vehículo (modal de detalle): botón "Agregar" integrado como pie */
+.exp-lux__price-card--vehicle {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
 }
+.exp-lux__price-card--vehicle .exp-lux__price-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px 20px;
+}
+.exp-lux__price-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    border: none;
+    border-top: 1px solid var(--exp-border, #d6d1c4);
+    background: transparent;
+    color: var(--exp-olive, #6E7A50);
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    padding: 11px 20px;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease;
+}
+.exp-lux__price-add i { font-size: 0.95rem; }
 .exp-lux__price-add:hover {
-    background: var(--brand-primary, #6E7A50);
+    background: var(--exp-olive, #6E7A50);
     color: #fff;
 }
 
@@ -3426,14 +3447,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     const baseCapacity = pd.vehicleType?.defaultCapacity || 0;
                     const capacity = (currentGuideFilter === 'with-driver' && baseCapacity > 0) ? baseCapacity - 1 : baseCapacity;
                     const sub = capacity > 0 ? `Hasta ${capacity} personas` : '';
-                    const card = priceCard(pd.vehicleType?.name || 'Vehículo', sub, convertTourPrice(pd.price, currency, paymentType, true), unit);
-                    let addBtn = '';
+                    const amount = convertTourPrice(pd.price, currency, paymentType, true);
+                    const vName = pd.vehicleType?.name || 'Vehículo';
+                    let footer = '';
                     <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-                    addBtn = `<button type="button" class="exp-lux__price-add add-tour-vehicle-to-quote-btn"
+                    footer = `<button type="button" class="exp-lux__price-add add-tour-vehicle-to-quote-btn"
                         data-tour-id="${tour.id || tour.objectId || (window._currentModalTour && window._currentModalTour.id) || ''}"
                         data-tour-name="${(tour.destinationPOI?.name || tour.name || (window._currentModalTour && window._currentModalTour.name) || 'Tour').replace(/"/g, '&quot;')}"
                         data-vehicle-id="${pd.vehicleType?.id || ''}"
-                        data-vehicle-name="${(pd.vehicleType?.name || 'Vehículo').replace(/"/g, '&quot;')}"
+                        data-vehicle-name="${(vName).replace(/"/g, '&quot;')}"
                         data-vehicle-capacity="${capacity}"
                         data-base-price="${pd.price || 0}"
                         data-driver-rate="${currentDriverTourRate || 0}"
@@ -3441,9 +3463,22 @@ document.addEventListener('DOMContentLoaded', function() {
                         data-rate-id="${pd.rate?.id || ''}"
                         data-rate-name="${(pd.rate?.name || '').replace(/"/g, '&quot;')}"
                         data-min-hours="${tour.time ? (parseInt(tour.time) / 60) : 1}"
-                        title="Agregar a Cotización"><i class="ti ti-plus me-1"></i>Agregar a cotización</button>`;
+                        title="Agregar a Cotización"><i class="ti ti-plus"></i><span>Agregar a cotización</span></button>`;
                     <% } %>
-                    return addBtn ? `<div class="exp-lux__price-vehicle">${card}${addBtn}</div>` : card;
+                    return `
+                        <div class="exp-lux__price-card${footer ? ' exp-lux__price-card--vehicle' : ''}">
+                            <div class="exp-lux__price-main">
+                                <div class="exp-lux__price-left">
+                                    <span class="exp-lux__price-name">${vName}</span>
+                                    ${sub ? `<span class="exp-lux__price-sub">${sub}</span>` : ''}
+                                </div>
+                                <div class="exp-lux__price-right">
+                                    <span class="exp-lux__price-amount">${amount}</span>
+                                    <span class="exp-lux__price-unit">${unit}</span>
+                                </div>
+                            </div>
+                            ${footer}
+                        </div>`;
                 }).join('');
                 return `
                     <div class="tour-rate-group">
