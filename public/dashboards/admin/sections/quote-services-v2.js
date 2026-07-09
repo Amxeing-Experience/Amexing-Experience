@@ -13897,9 +13897,6 @@ class ItineraryBuilder {
     const childPriceField = document.getElementById('childPrice');
     const noAlcoholPriceField = document.getElementById('noAlcoholPrice');
 
-    // Check if price override is enabled (admin only)
-    const isPriceOverride = document.getElementById('experienceOverridePrices')?.checked || false;
-
     // Precio ADULTO del catálogo: la experiencia lo guarda en `cost` (no `price`, que es null para
     // experiencias propias). Fallback a `price` para experiencias de proveedor.
     const adultCatalogPrice = experience.cost || experience.price;
@@ -13915,21 +13912,11 @@ class ItineraryBuilder {
       this.calculatedPrices.experience.noAlcohol = experience.price_no_alcohol;
     }
 
-    // Only update prices if override is NOT enabled or if fields are empty
-    if (!isPriceOverride || !this.canEditPrices) {
-      if (adultPriceField && adultCatalogPrice) {
-        adultPriceField.value = adultCatalogPrice;
-      }
-
-      if (childPriceField && experience.price_child) {
-        childPriceField.value = experience.price_child;
-      }
-
-      if (noAlcoholPriceField && experience.price_no_alcohol) {
-        noAlcoholPriceField.value = experience.price_no_alcohol;
-      }
-    } else {
-      // If override is enabled and fields are empty, populate with calculated values as starting point
+    // Precios de experiencia: SIEMPRE editables. Autollenar SOLO campos vacíos con el precio de
+    // catálogo — nunca pisar un precio personalizado por el usuario. En la restauración de edición
+    // no se tocan: populateServiceForm rellena los precios guardados (el bug era que aquí se
+    // sobreescribía con el precio base y tapaba el personalizado).
+    if (!this._restoringExperienceData) {
       if (adultPriceField && !adultPriceField.value && adultCatalogPrice) {
         adultPriceField.value = adultCatalogPrice;
       }
