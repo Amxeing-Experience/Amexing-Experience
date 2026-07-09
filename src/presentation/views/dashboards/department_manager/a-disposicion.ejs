@@ -283,6 +283,10 @@ const isAdminRole = (currentUserRole === 'admin' || currentUserRole === 'superad
 
                 <div class="text-muted small mb-2">o seleccionar cotización existente:</div>
 
+                <div class="small mb-2" style="color: var(--olive, #6E7A50);">
+                    <i class="ti ti-info-circle me-1"></i>Solo se muestran cotizaciones actuales o futuras.
+                </div>
+
                 <!-- Search -->
                 <input type="text" class="form-control form-control-sm quote-search-input mb-3"
                        id="dispQuoteSearchInput" placeholder="Buscar por folio o creador...">
@@ -1650,6 +1654,9 @@ const isAdminRole = (currentUserRole === 'admin' || currentUserRole === 'superad
 
         // Fetch quotes
         const token = getDispAccessToken();
+        // Nota: /api/quotes usa su default dateFilter='future', por lo que el picker solo
+        // lista cotizaciones actuales o futuras (las de fechas pasadas no aparecen). Se avisa
+        // con un label en el modal para que quede claro.
         fetch('/api/quotes?start=0&length=100&order[0][column]=7&order[0][dir]=desc', {
             headers: { 'Authorization': 'Bearer ' + token }
         })
