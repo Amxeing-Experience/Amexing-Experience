@@ -1005,6 +1005,18 @@ ItineraryBuilder.prototype.updateExtraVehiclesHeaderVisibility = function () {
     if (!header || !list) return;
     const hasRows = list.querySelectorAll('.extra-additional-vehicle-row').length > 0;
     header.classList.toggle('d-none', !hasRows);
+    // El "Tiempo de espera" de los vehículos adicionales NO aplica a tours (no entra en su fórmula):
+    // se oculta esa columna (header + filas) y se ensancha "Precio" para ocupar el hueco. En
+    // transporte se mantiene visible.
+    const isTour = document.querySelector('input[name="serviceType"]:checked')?.value === 'tour';
+    const container = document.getElementById('extraAdditionalVehiclesContainer');
+    if (container) {
+      container.querySelectorAll('.extra-waiting-col').forEach((el) => el.classList.toggle('d-none', isTour));
+      container.querySelectorAll('.extra-price-col').forEach((el) => {
+        el.classList.toggle('col-md-6', isTour);
+        el.classList.toggle('col-md-2', !isTour);
+      });
+    }
 };
 
 ItineraryBuilder.prototype.syncExtraVehiclesButtonEnabled = function () {

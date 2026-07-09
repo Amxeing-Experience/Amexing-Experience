@@ -2085,6 +2085,7 @@ class ItineraryBuilder {
         document.getElementById('serviceQuantity').value = 1;
         document.getElementById('extraAdditionalVehiclesContainer')?.classList.remove('d-none');
         this.syncExtraVehiclesButtonEnabled();
+        this.updateExtraVehiclesHeaderVisibility(); // tour: oculta la columna "Tiempo de espera"
 
         // Only uncheck if not populating form during edit
         if (!this._populatingVehicleTourForm && !this._populatingTransportForm) {
@@ -2168,6 +2169,7 @@ class ItineraryBuilder {
       document.getElementById('serviceQuantity').value = 1;
       document.getElementById('extraAdditionalVehiclesContainer')?.classList.remove('d-none');
       this.syncExtraVehiclesButtonEnabled();
+      this.updateExtraVehiclesHeaderVisibility(); // transporte: muestra "Tiempo de espera"
 
       // Only uncheck if not populating form during edit
       if (!this._populatingVehicleTourForm && !this._populatingTransportForm) {
@@ -12322,14 +12324,14 @@ class ItineraryBuilder {
           <option value="">Primero selecciona un segmento</option>
         </select>
       </div>
-      <div class="col-md-2">
+      <div class="col-md-2 extra-price-col">
         <div class="input-group input-group-sm">
           <span class="input-group-text">$</span>
           <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-price-input" placeholder="0.00">
         </div>
         <small class="text-muted extra-list-price d-block"></small>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-4 extra-waiting-col">
         <div class="row g-1">
           <div class="col-5">
             <div class="input-group input-group-sm">
