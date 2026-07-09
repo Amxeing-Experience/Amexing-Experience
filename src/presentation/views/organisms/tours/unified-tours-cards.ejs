@@ -2479,7 +2479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     serviceLabel: 'Tour con vehículo',
                     itemLabel: '<strong>' + (d.tourName || 'Tour') + ' — ' + (d.vehicleName || '') + '</strong>' +
                         '<br><span class="small">$' + totalFmt + ' MXN · ' + priceFmt + '/h × mín ' + minHours + 'h · ' +
-                        (d.vehicleCapacity || '') + ' pers. · ' + (withDriver ? 'Guía + Chofer' : 'Solo Guía') + '</span>',
+                        (withDriver ? 'Guía + Chofer' : 'Solo Guía') + '</span>',
                     buildSubconcept: function() { return buildTourVehicleSubconcept(d); }
                 });
             };
