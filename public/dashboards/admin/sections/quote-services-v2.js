@@ -4054,6 +4054,8 @@ class ItineraryBuilder {
       }
       case 'tour': {
         data.tourId = document.getElementById('tourSelect')?.value;
+        // Dirección de pickup (texto libre) — aplica a tour con vehículo y walking tour.
+        data.pickupAddress = (document.getElementById('tourPickupAddress')?.value || '').trim();
 
         // Check if this is a walking tour
         const selectedTourData = this.toursCache.has('all')
@@ -5345,6 +5347,12 @@ class ItineraryBuilder {
             infantsQuantity: service.infantsQuantity,
           },
         });
+
+        // Restaurar la dirección de pickup (aplica a walking y vehicle tour).
+        {
+          const tourPickupField = document.getElementById('tourPickupAddress');
+          if (tourPickupField) tourPickupField.value = service.pickupAddress || '';
+        }
 
         // Use clean vehicle tour handler for non-walking tours
         if (!service.isWalkingTour) {
