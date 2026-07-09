@@ -83,4 +83,66 @@ test.describe('Agregar a cotización — Traslados', () => {
       // si no hay endpoint de borrado, se deja la cotización de prueba en dev
     }
   });
+
+  test('el botón de la fila expandida (vehicle-option) también agrega a cotización', async ({ page }) => {
+    // --- Login ---
+    await page.goto('/login');
+    await page.fill('#identifier', EMAIL);
+    await page.fill('#password', PASSWORD);
+    await Promise.all([
+      page.waitForURL(/\/dashboard\//, { timeout: 30_000 }),
+      page.click('button[type="submit"]'),
+    ]);
+
+    await page.goto(`/dashboard/${ROLE}/services`, { waitUntil: 'domcontentloaded' });
+
+    // Esperar la tabla y expandir la primera fila que tenga el control de "ver más precios".
+    const expandBtn = page.locator('.expand-services-prices-btn').first();
+    await expect(expandBtn, 'debe existir el botón para expandir precios de una fila')
+      .toBeVisible({ timeout: 45_000 });
+    await expandBtn.click();
+
+    // El botón de agregar vive dentro de una .vehicle-option (fila expandida).
+    const addBtn = page.locator('.vehicle-option .add-svc-to-quote-btn').first();
+    await expect(addBtn, 'la fila expandida debe mostrar botones "Agregar" por vehículo')
+      .toBeVisible({ timeout: 15_000 });
+
+    const svc = await addBtn.evaluate((el) => ({
+      serviceId: el.dataset.serviceId,
+      price: parseFloat(el.dataset.price) || 0,
+    }));
+    expect(svc.serviceId, 'el botón expandido debe tener data-service-id').toBeTruthy();
+
+    // --- Abrir modal genérico y crear nueva cotización ---
+    await addBtn.click();
+    const createBtn = page.locator('#atqCreateNew');
+    await expect(createBtn, 'el modal genérico #atqModal debe abrir desde la fila expandida')
+      .toBeVisible({ timeout: 15_000 });
+
+    await Promise.all([
+      page.waitForURL(/\/quotes\/[A-Za-z0-9]+/, { timeout: 30_000 }),
+      createBtn.click(),
+    ]);
+
+    const quoteId = page.url().match(/\/quotes\/([A-Za-z0-9]+)/)[1];
+    expect(quoteId, 'debe haberse creado una cotización con id').toBeTruthy();
+
+    // --- Verificar el subconcepto por API ---
+    const res = await page.request.get(`/api/quotes/${quoteId}`);
+    expect(res.ok(), `GET /api/quotes/${quoteId} -> ${res.status()}`).toBeTruthy();
+    const body = await res.json();
+    const quote = body.data || body;
+    const subs = (quote.serviceItems?.days || []).flatMap((d) => d.subconcepts || []);
+    const svcSub = subs.find((s) => s.type === 'transport');
+    expect(svcSub, 'la cotización debe contener un subconcepto de traslado (transport)').toBeTruthy();
+    expect(svcSub.transferId, 'el transferId debe coincidir con el traslado expandido').toBe(svc.serviceId);
+    expect(Number(svcSub.total), 'el total debe coincidir con el precio del vehículo expandido')
+      .toBeCloseTo(svc.price, 2);
+
+    try {
+      await page.request.delete(`/api/quotes/${quoteId}`);
+    } catch (e) {
+      // best-effort
+    }
+  });
 });
