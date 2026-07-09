@@ -7012,17 +7012,20 @@ class ItineraryBuilder {
       driverTourRateCache: this.driverTourRateCache,
     });
 
-    // Get main vehicle cost — when the user has activated the manual override
-    // (tourVehicleOverridePrices) for vehicle tours, replace the calculated
-    // rate with what's typed into servicePrice so the breakdown reflects it.
+    // Costo del vehículo principal. Se honra el precio EDITADO cuando el usuario lo modificó: por el
+    // checkbox de override (#tourVehicleOverridePrices — que puede NO existir en el modal) O porque el
+    // #servicePrice difiere del costo de catálogo (misma detección que collectServiceData). Antes solo
+    // se miraba el checkbox; como no existe, el desglose ignoraba el precio modificado (mostraba catálogo).
     let mainVehicleCost = this.getMainVehicleCost();
-    const vehicleOverrideCheckbox = document.getElementById('tourVehicleOverridePrices');
-    if (vehicleOverrideCheckbox?.checked) {
-      const overriddenPrice = parseFloat(document.getElementById('servicePrice')?.value || 0);
-      if (overriddenPrice >= 0) {
-        qsDevLog('🚗 Vehicle tour override active — using servicePrice as main vehicle cost:', overriddenPrice, '(was:', mainVehicleCost, ')');
-        mainVehicleCost = overriddenPrice;
-      }
+    const catalogVehicleCost = mainVehicleCost;
+    const editedVehiclePrice = parseFloat(document.getElementById('servicePrice')?.value);
+    const vehicleOverrideChecked = document.getElementById('tourVehicleOverridePrices')?.checked;
+    const vehiclePriceManuallyEdited = !Number.isNaN(editedVehiclePrice) && !Number.isNaN(catalogVehicleCost)
+      && Math.abs(editedVehiclePrice - catalogVehicleCost) > 0.01;
+    if ((vehicleOverrideChecked || vehiclePriceManuallyEdited)
+      && !Number.isNaN(editedVehiclePrice) && editedVehiclePrice >= 0) {
+      qsDevLog('🚗 Vehicle tour: usando #servicePrice editado como costo del vehículo:', editedVehiclePrice, '(catálogo:', catalogVehicleCost, ')');
+      mainVehicleCost = editedVehiclePrice;
     }
     qsDevLog('🚗 Main vehicle cost result:', mainVehicleCost);
 
@@ -8681,19 +8684,8 @@ class ItineraryBuilder {
           vehicleTypeName, // Add for consistency
           quantity: 1,
         };
-        // Costo de UN vehículo. Si el precio se editó manualmente (override activo, o el #servicePrice
-        // difiere del calculado — misma detección que collectServiceData), usar el precio editado.
-        // Antes SIEMPRE se usaba el costo de catálogo (getVehicleCost), así que el desglose no
-        // reflejaba el precio del vehículo modificado.
-        const editedVehiclePrice = parseFloat(document.getElementById('servicePrice')?.value);
-        const vehicleOverrideOn = document.getElementById('tourVehicleOverridePrices')?.checked;
-        const calcVehiclePrice = parseFloat(this.lastValidTourPrice);
-        const vehiclePriceManuallyEdited = !Number.isNaN(editedVehiclePrice) && !Number.isNaN(calcVehiclePrice)
-          && Math.abs(editedVehiclePrice - calcVehiclePrice) > 0.01;
-        const singleVehicleCost = ((vehicleOverrideOn || vehiclePriceManuallyEdited)
-          && !Number.isNaN(editedVehiclePrice) && editedVehiclePrice > 0)
-          ? editedVehiclePrice
-          : (this.getVehicleCost(tempService) || 0);
+        // Get cost for ONE vehicle
+        const singleVehicleCost = this.getVehicleCost(tempService) || 0;
         // Total vehicle cost = single vehicle cost × quantity
         vehicleBaseCost = singleVehicleCost * vehicleQuantity;
 
