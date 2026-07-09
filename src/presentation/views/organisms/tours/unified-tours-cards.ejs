@@ -196,7 +196,8 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
                     </div>
 
                     <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-                    <div class="exp-lux__footer">
+                    <!-- Solo walking: los tours con vehículo agregan por vehículo desde la pestaña de precios -->
+                    <div class="exp-lux__footer" id="tourDetailQuoteFooter" style="display: none;">
                         <button type="button" class="exp-lux__cta add-tour-to-quote-from-modal-btn">
                             Agregar a cotización <i class="ti ti-arrow-right"></i>
                         </button>
@@ -1239,6 +1240,43 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
     min-width: 34px;
 }
 
+/* Botón "＋" por vehículo en las líneas de precio de la card */
+.tour-pline-add {
+    border: 1px solid var(--brand-primary, #6E7A50);
+    background: transparent;
+    color: var(--brand-primary-active, #5c6743);
+    border-radius: 6px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 7px;
+    margin-left: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.tour-pline-add:hover {
+    background: var(--brand-primary, #6E7A50);
+    color: #fff;
+}
+
+/* Tarjeta de precio por vehículo (modal de detalle) con botón "Agregar" */
+.exp-lux__price-vehicle { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.exp-lux__price-add {
+    align-self: flex-end;
+    border: 1px solid var(--brand-primary, #6E7A50);
+    background: transparent;
+    color: var(--brand-primary-active, #5c6743);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.exp-lux__price-add:hover {
+    background: var(--brand-primary, #6E7A50);
+    color: #fff;
+}
+
 #tourModalFooter {
     justify-content: center;
     padding: 12px 24px;
@@ -1954,7 +1992,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     return `
                         <div class="tour-pline">
                             <span><span class="tour-pname">${vehicleName}</span>${clientBadge} · <span class="tour-psub">${adjustedCapacity} pers.</span></span>
-                            <span><span class="tour-pamt">${formattedPrice}</span> <span class="tour-punit">/ h</span></span>
+                            <span>
+                                <span><span class="tour-pamt">${formattedPrice}</span> <span class="tour-punit">/ h</span></span>
+                                <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+                                <button type="button" class="tour-pline-add add-tour-vehicle-to-quote-btn"
+                                    data-tour-id="${tour.id || tour.objectId}"
+                                    data-tour-name="${(destination || '').replace(/"/g, '&quot;')}"
+                                    data-vehicle-id="${priceData.vehicleType?.id || ''}"
+                                    data-vehicle-name="${(vehicleName || '').replace(/"/g, '&quot;')}"
+                                    data-vehicle-capacity="${adjustedCapacity}"
+                                    data-base-price="${finalPrice}"
+                                    data-driver-rate="${currentDriverTourRate || 0}"
+                                    data-with-driver="${currentGuideFilter === 'with-driver' ? '1' : '0'}"
+                                    data-rate-id="${priceData.rate?.id || selectedRateId || ''}"
+                                    data-rate-name="${(priceData.rate?.name || rateName || '').replace(/"/g, '&quot;')}"
+                                    title="Agregar a Cotización">＋</button>
+                                <% } %>
+                            </span>
                         </div>
                     `;
                 }).join('');
@@ -2054,13 +2108,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                     Ver más
                                 </button>
                                 <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+                                ${tour.isWalkingTour ? `
                                 <button class="expcard__btn expcard__btn--ghost add-tour-to-quote-btn"
                                         data-tour-id="${tour.id || tour.objectId}"
                                         data-tour-name="${destination}"
                                         data-tour-price="${tour.price || 0}"
                                         title="Agregar a Cotización">
                                     ＋ Agregar
-                                </button>
+                                </button>` : ''}
                                 <% } %>
                             </div>
                         </div>
@@ -2330,6 +2385,64 @@ document.addEventListener('DOMContentLoaded', function() {
             if (detailModal) detailModal.hide();
             setTimeout(function() { openTourAddToQuote(cur); }, 300);
         });
+
+        // ── Tours CON vehículo: se agrega POR vehículo (como traslados) ──
+        // Precio guardado = base por hora + recargo de chofer (solo si "Guía + Chofer").
+        // Sin % de método de pago ni conversión de moneda: eso lo aplica la cotización.
+        function buildTourVehicleSubconcept(d) {
+            const base = parseFloat(d.basePrice) || 0;
+            const withDriver = d.withDriver === '1';
+            const driverRate = parseFloat(d.driverRate) || 0;
+            const hourly = base + (withDriver ? driverRate : 0);
+            return {
+                type: 'tour',
+                tourId: d.tourId,
+                title: d.tourName,
+                isWalkingTour: false,
+                requiresTransport: true,
+                vehicleId: d.vehicleId || '',
+                vehicleType: d.vehicleName || '',       // el builder guarda el nombre en vehicleType (compat)
+                vehicleTypeName: d.vehicleName || '',
+                vehicleCapacity: parseInt(d.vehicleCapacity) || 0,
+                includeGuide: true,
+                includeGreeter: withDriver,
+                rateId: d.rateId || '',
+                rateName: d.rateName || '',
+                hourlyPrice: hourly,
+                hours: 1,
+                unitPrice: hourly,
+                total: hourly,
+                numberOfPeople: 1,
+                time: '',
+                selectedSchedule: '',
+                notes: ''
+            };
+        }
+
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.add-tour-vehicle-to-quote-btn');
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const d = Object.assign({}, btn.dataset);
+            const base = parseFloat(d.basePrice) || 0;
+            const withDriver = d.withDriver === '1';
+            const hourly = base + (withDriver ? (parseFloat(d.driverRate) || 0) : 0);
+            const priceFmt = hourly.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            // Cerrar el modal de detalle si el botón vino de ahí
+            const detailModal = bootstrap.Modal.getInstance(document.getElementById('tourDetailsModal'));
+            const openIt = function() {
+                AddToQuote.open({
+                    userRole: '<%= currentUserRole %>',
+                    serviceLabel: 'Tour con vehículo',
+                    itemLabel: '<strong>' + (d.tourName || 'Tour') + ' — ' + (d.vehicleName || '') + '</strong>' +
+                        '<br><span class="small">$' + priceFmt + ' MXN/h · ' + (d.vehicleCapacity || '') + ' pers. · ' +
+                        (withDriver ? 'Guía + Chofer' : 'Solo Guía') + '</span>',
+                    buildSubconcept: function() { return buildTourVehicleSubconcept(d); }
+                });
+            };
+            if (detailModal) { detailModal.hide(); setTimeout(openIt, 300); } else { openIt(); }
+        });
     })();
     <% } %>
 
@@ -2379,8 +2492,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 id: tourId,
                 name: tourDetail.destinationPOI?.name || tourName,
                 type: 'tour',
-                price: tourDetail.price || 0
+                price: tourDetail.price || 0,
+                isWalkingTour: !!tourDetail.isWalkingTour
             };
+            // El footer "Agregar a cotización" (global, por persona) solo aplica a tours a pie;
+            // los tours con vehículo se agregan por vehículo desde la pestaña de precios.
+            const _quoteFooter = document.getElementById('tourDetailQuoteFooter');
+            if (_quoteFooter) _quoteFooter.style.display = tourDetail.isWalkingTour ? '' : 'none';
             console.log('All tour data fields:', Object.keys(tourDetail));
             console.log('Tour data field categories:', {
                 basic: Object.keys(tourDetail).filter(key => !key.includes('_') && !key.includes('price') && !key.includes('Price')),
@@ -3263,7 +3381,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     const baseCapacity = pd.vehicleType?.defaultCapacity || 0;
                     const capacity = (currentGuideFilter === 'with-driver' && baseCapacity > 0) ? baseCapacity - 1 : baseCapacity;
                     const sub = capacity > 0 ? `Hasta ${capacity} personas` : '';
-                    return priceCard(pd.vehicleType?.name || 'Vehículo', sub, convertTourPrice(pd.price, currency, paymentType, true), unit);
+                    const card = priceCard(pd.vehicleType?.name || 'Vehículo', sub, convertTourPrice(pd.price, currency, paymentType, true), unit);
+                    let addBtn = '';
+                    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+                    addBtn = `<button type="button" class="exp-lux__price-add add-tour-vehicle-to-quote-btn"
+                        data-tour-id="${tour.id || tour.objectId || (window._currentModalTour && window._currentModalTour.id) || ''}"
+                        data-tour-name="${(tour.destinationPOI?.name || tour.name || (window._currentModalTour && window._currentModalTour.name) || 'Tour').replace(/"/g, '&quot;')}"
+                        data-vehicle-id="${pd.vehicleType?.id || ''}"
+                        data-vehicle-name="${(pd.vehicleType?.name || 'Vehículo').replace(/"/g, '&quot;')}"
+                        data-vehicle-capacity="${capacity}"
+                        data-base-price="${pd.price || 0}"
+                        data-driver-rate="${currentDriverTourRate || 0}"
+                        data-with-driver="${currentGuideFilter === 'with-driver' ? '1' : '0'}"
+                        data-rate-id="${pd.rate?.id || ''}"
+                        data-rate-name="${(pd.rate?.name || '').replace(/"/g, '&quot;')}"
+                        title="Agregar a Cotización"><i class="ti ti-plus me-1"></i>Agregar a cotización</button>`;
+                    <% } %>
+                    return addBtn ? `<div class="exp-lux__price-vehicle">${card}${addBtn}</div>` : card;
                 }).join('');
                 return `
                     <div class="tour-rate-group">
