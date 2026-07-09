@@ -212,12 +212,14 @@ const isAdminRole = (currentUserRole === 'admin' || currentUserRole === 'superad
                 </div>
                 <% } %>
 
-                <!-- Add to Quote (todos los roles) -->
+                <!-- Add to Quote — oculto para admin por coherencia (solo department_manager/client). Rehabilitar quitando el gate. -->
+                <% if (!isAdminRole) { %>
                 <div id="disposicion-add-to-quote-wrapper" style="display: none;">
                     <button type="button" class="adispo-cta" id="addDisposicionToQuoteBtn">
                         Agregar a cotización <i class="ti ti-arrow-right ms-1"></i>
                     </button>
                 </div>
+                <% } %>
             </div>
         </div>
     </div>
@@ -263,8 +265,10 @@ const isAdminRole = (currentUserRole === 'admin' || currentUserRole === 'superad
 
 </div>
 
-<!-- Add to Quote — modal genérico compartido -->
+<!-- Add to Quote — modal genérico compartido (oculto para admin) -->
+<% if (!isAdminRole) { %>
 <%- include('../../organisms/quotes/add-to-quote-modal') %>
+<% } %>
 
 <!-- ═══════════ Fullscreen Vehicle Gallery Modal ═══════════ -->
 <div class="modal fade" id="dispGalleryModal" tabindex="-1" aria-labelledby="dispGalleryLabel" aria-hidden="true">
@@ -1491,7 +1495,8 @@ const isAdminRole = (currentUserRole === 'admin' || currentUserRole === 'superad
 <% } %>
 </script>
 
-<!-- Add to Quote — módulo genérico compartido + payload de A Disposición -->
+<!-- Add to Quote — módulo genérico compartido + payload de A Disposición (oculto para admin) -->
+<% if (!isAdminRole) { %>
 <script src="/dashboard/js/utils/add-to-quote.js"></script>
 <script>
 (function() {
@@ -1528,6 +1533,7 @@ const isAdminRole = (currentUserRole === 'admin' || currentUserRole === 'superad
     });
 })();
 </script>
+<% } %>
 
 <!-- Page Styles: luxury 3-column layout -->
 <style>

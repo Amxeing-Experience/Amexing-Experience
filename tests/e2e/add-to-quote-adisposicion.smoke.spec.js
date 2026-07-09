@@ -17,10 +17,11 @@ const { test, expect } = require('@playwright/test');
 
 const EMAIL = process.env.E2E_EMAIL;
 const PASSWORD = process.env.E2E_PASSWORD;
-const ROLE = process.env.E2E_ROLE || 'admin';
+const ROLE = process.env.E2E_ROLE || 'department_manager';
 
 test.describe('Agregar a cotización — A Disposición', () => {
   test.skip(!EMAIL || !PASSWORD, 'Faltan E2E_EMAIL / E2E_PASSWORD');
+  test.skip(ROLE === 'admin', 'El add-to-quote de a-disposición se oculta para admin (solo department_manager/client)');
 
   test('calcula precio, crea cotización y guarda el subconcepto correcto', async ({ page }) => {
     // --- Login ---
