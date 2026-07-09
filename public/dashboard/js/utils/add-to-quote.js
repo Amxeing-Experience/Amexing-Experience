@@ -112,8 +112,9 @@
     fetch('/api/quotes?start=0&length=100&order[0][column]=7&order[0][dir]=desc', { headers: headers() })
       .then((r) => r.json())
       .then((res) => {
+        const ALLOWED_STATUSES = ['draft', 'quoted', 'requested'];
         const quotes = (res.data || [])
-          .filter((q) => q.status !== 'cancelled')
+          .filter((q) => ALLOWED_STATUSES.includes(q.status))
           .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
         el('atqPickerLoading').style.display = 'none';
         el('atqPickerList').style.display = 'block';
