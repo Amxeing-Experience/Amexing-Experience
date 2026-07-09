@@ -5570,7 +5570,9 @@ class ItineraryBuilder {
                   inputs.forEach((inp, i) => {
                     if (saved[i] !== undefined) inp.value = parseFloat(saved[i]).toFixed(2);
                   });
-                  // Dev breakdown FIRST so service breakdown reads fresh values.
+                  // Dev breakdown FIRST so service breakdown reads fresh values (el walking tour lee
+                  // de los campos devBreakdown*, que hay que repoblar con los precios restaurados).
+                  this.updateDevPaymentBreakdown();
                   this.updateServicePriceBreakdown();
                 }, 50);
               } else if (service.walkingTourPriceMode === 'total') {
@@ -21354,12 +21356,22 @@ class ItineraryBuilder {
             inp.value = value;
           }
 
+          // Editar un precio por grupo implica override manual: activar #tourOverridePrices para que
+          // el precio editado se aplique al desglose (isPerGroupOverride) y se guarde (collectServiceData
+          // lo ignora si el override está apagado). Se marca en silencio (sin disparar change) para no
+          // regenerar los inputs ni perder el foco mientras se teclea.
+          const walkingOverrideCb = document.getElementById('tourOverridePrices');
+          if (walkingOverrideCb && !walkingOverrideCb.checked) walkingOverrideCb.checked = true;
+          this.serviceModified = true;
+
           // Update total display (function lives in DOMContentLoaded scope; guard for class-method access).
           if (typeof updateWalkingGroupTotalDisplay === 'function') {
             updateWalkingGroupTotalDisplay();
           }
-          // Dev breakdown must run FIRST — it populates the devBreakdown* fields
-          // that updateServicePriceBreakdown reads from.
+          // Dev breakdown must run FIRST — it populates the devBreakdown* fields that
+          // updateServicePriceBreakdown reads for el walking tour (antes solo se llamaba al segundo,
+          // así el desglose no reflejaba el precio de grupo editado).
+          this.updateDevPaymentBreakdown();
           this.updateServicePriceBreakdown();
         });
 
