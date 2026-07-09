@@ -7807,7 +7807,7 @@ class ItineraryBuilder {
                                     ` : ''}
                                     ${service.agencyNotes ? `
                                         <div class="service-notes mt-1 text-muted small d-flex align-items-start">
-                                            <i class="ti ti-user me-1"></i>
+                                            <i class="ti ti-message-circle me-1"></i>
                                             <span style="white-space: pre-wrap;">${service.agencyNotes}</span>
                                         </div>
                                     ` : ''}

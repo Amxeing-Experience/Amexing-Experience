@@ -774,7 +774,7 @@
             if (service.agencyNotes) {
                 html += `<div class="mt-2 p-2" style="border-left: 3px solid #adb5bd; width: 100%;">
                     <div class="d-flex align-items-center mb-1">
-                        <i class="ti ti-user me-1 text-secondary"></i>
+                        <i class="ti ti-message-circle me-1 text-secondary"></i>
                         <strong class="text-secondary" style="font-size: 0.85rem;">Notas del cliente</strong>
                     </div>
                     <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.agencyNotes}</div>
@@ -1207,7 +1207,7 @@
             if (service.agencyNotes) {
                 html += `<div class="mt-2 p-2" style="border-left: 3px solid #adb5bd;">
                     <div class="d-flex align-items-center mb-1">
-                        <i class="ti ti-user me-1 text-secondary"></i>
+                        <i class="ti ti-message-circle me-1 text-secondary"></i>
                         <strong class="text-secondary" style="font-size: 0.85rem;">Notas del cliente</strong>
                     </div>
                     <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.agencyNotes}</div>
