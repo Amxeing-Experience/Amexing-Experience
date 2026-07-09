@@ -1198,6 +1198,8 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                 <label for="experienceDuration" class="form-label">Duración <small class="text-muted">(horas)</small></label>
                                 <input type="number" min="0" step="0.5" class="form-control" id="experienceDuration" placeholder="Ej: 2" autocomplete="off">
                                 <small class="text-muted d-block">Se autollena de la experiencia; puedes modificarla.</small>
+                                <!-- Duración real calculada del horario (inicio/fin): solo si difiere de la de catálogo. -->
+                                <small class="text-info d-block d-none" id="experienceRealDuration"></small>
                             </div>
                             <div class="col-md-2 d-flex align-items-center">
                                 <div class="form-check mt-2">

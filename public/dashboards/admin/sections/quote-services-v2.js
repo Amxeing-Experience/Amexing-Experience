@@ -1218,6 +1218,11 @@ class ItineraryBuilder {
       this.updateServicePriceBreakdown();
     });
 
+    // Horas de experiencia: al tener inicio y fin, derivar la duración real y sobrescribir el campo.
+    ['experienceStartTime', 'experienceEndTime'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => this.updateExperienceDurationFromSchedule());
+    });
+
     // Local transfers: recompute the estimated arrival when the pick-up time changes.
     document.getElementById('transportStartTime')?.addEventListener('input', () => {
       this.updateTransferArrivalEstimate();
@@ -2619,6 +2624,42 @@ class ItineraryBuilder {
     hoursInput.value = String(hours);
     this.serviceModified = true;
     this.calculateADisposicionPrice();
+  }
+
+  // Experiencia: cuando hay hora de inicio y fin, deriva la duración real (fin - inicio, cruzando
+  // medianoche si aplica) y la escribe en #experienceDuration (sobrescribe la de catálogo). Si la
+  // duración real difiere de la de catálogo, muestra un small con la duración real bajo el input.
+  updateExperienceDurationFromSchedule() {
+    const start = this.parseTimeToMinutes(document.getElementById('experienceStartTime')?.value);
+    const end = this.parseTimeToMinutes(document.getElementById('experienceEndTime')?.value);
+    const durationInput = document.getElementById('experienceDuration');
+    const hint = document.getElementById('experienceRealDuration');
+    if (start === null || end === null || !durationInput) {
+      // Sin ambas horas: se conserva la duración de catálogo/manual; se oculta el aviso.
+      if (hint) hint.classList.add('d-none');
+      return;
+    }
+    let diff = end - start;
+    if (diff <= 0) diff += 1440; // el horario cruza medianoche
+    const realHours = Math.round((diff / 60) * 100) / 100; // 2 decimales
+    durationInput.value = String(realHours);
+
+    // El small solo aparece cuando la duración real difiere de la de catálogo de la experiencia.
+    const catalog = parseFloat(this._experienceCatalogDuration);
+    const differs = Number.isNaN(catalog) || Math.abs(realHours - catalog) > 0.01;
+    if (hint) {
+      if (differs) {
+        hint.textContent = `Duración real según horario: ${realHours} ${realHours === 1 ? 'hora' : 'horas'}`;
+        hint.classList.remove('d-none');
+      } else {
+        hint.classList.add('d-none');
+      }
+    }
+
+    this.serviceModified = true;
+    // La duración afecta el costo del guía (tier×personas × duración): recalcular desgloses.
+    this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
   }
 
 
@@ -5330,6 +5371,8 @@ class ItineraryBuilder {
             // Dirección de pickup.
             const expPickupField = document.getElementById('experiencePickupAddress');
             if (expPickupField) expPickupField.value = service.pickupAddress || '';
+            // Con horario restaurado, reflejar la duración real y su aviso (si difiere del catálogo).
+            this.updateExperienceDurationFromSchedule();
           } else if (attempt < 5) {
             // Retry with longer delay
 
@@ -13869,6 +13912,13 @@ class ItineraryBuilder {
   }
 
   fillExperienceFields(experience) {
+    // Duración de catálogo de la experiencia — referencia para comparar contra la duración real
+    // derivada del horario (updateExperienceDurationFromSchedule).
+    this._experienceCatalogDuration = experience.duration;
+    // Al (re)seleccionar experiencia se limpia el aviso de duración real (el restore lo re-muestra
+    // si hay horario que difiere).
+    document.getElementById('experienceRealDuration')?.classList.add('d-none');
+
     // Only fill quantity fields if we're NOT in edit mode
     // In edit mode, the quantities should be restored by populateServiceForm
     if (!this.currentServiceId) {
