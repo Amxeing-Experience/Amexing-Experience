@@ -8681,8 +8681,19 @@ class ItineraryBuilder {
           vehicleTypeName, // Add for consistency
           quantity: 1,
         };
-        // Get cost for ONE vehicle
-        const singleVehicleCost = this.getVehicleCost(tempService) || 0;
+        // Costo de UN vehículo. Si el precio se editó manualmente (override activo, o el #servicePrice
+        // difiere del calculado — misma detección que collectServiceData), usar el precio editado.
+        // Antes SIEMPRE se usaba el costo de catálogo (getVehicleCost), así que el desglose no
+        // reflejaba el precio del vehículo modificado.
+        const editedVehiclePrice = parseFloat(document.getElementById('servicePrice')?.value);
+        const vehicleOverrideOn = document.getElementById('tourVehicleOverridePrices')?.checked;
+        const calcVehiclePrice = parseFloat(this.lastValidTourPrice);
+        const vehiclePriceManuallyEdited = !Number.isNaN(editedVehiclePrice) && !Number.isNaN(calcVehiclePrice)
+          && Math.abs(editedVehiclePrice - calcVehiclePrice) > 0.01;
+        const singleVehicleCost = ((vehicleOverrideOn || vehiclePriceManuallyEdited)
+          && !Number.isNaN(editedVehiclePrice) && editedVehiclePrice > 0)
+          ? editedVehiclePrice
+          : (this.getVehicleCost(tempService) || 0);
         // Total vehicle cost = single vehicle cost × quantity
         vehicleBaseCost = singleVehicleCost * vehicleQuantity;
 
