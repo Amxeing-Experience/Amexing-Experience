@@ -165,20 +165,6 @@ router.get(
 );
 
 /**
- * GET /api/services/debug-client-prices - Debug endpoint to examine ClientPrices data.
- *
- * Access: Authenticated users (department manager and above)
- * Query: clientId?, serviceId? (optional filters)
- * Returns: Detailed ClientPrices data comparing Parse SDK vs HTTP approaches.
- */
-router.get(
-  '/debug-client-prices',
-  jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => ServicesController.debugClientPrices(req, res)
-);
-
-/**
  * GET /api/services/:id/price-history - Get price history for a service.
  *
  * Access: Authenticated users (admin, superadmin)

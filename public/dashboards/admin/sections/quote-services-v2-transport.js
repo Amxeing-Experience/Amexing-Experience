@@ -345,10 +345,8 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                                 <span class="text-muted me-1">Hacia:</span>
                                 ${destination}
                             </div>
-                            <!-- Pickup / Drop-off (Punto a Punto + Local) -->
+                            <!-- Pickup / Drop-off: se muestran siempre que existan (cualquier tipo de transporte). -->
                             ${(() => {
-                                const isPapOrLocal = service.transportType === 'punto-a-punto' || service.transportType === 'local';
-                                if (!isPapOrLocal) return '';
                                 const lines = [];
                                 const row = (icon, color, label, value) => `
                                     <div class="d-flex align-items-center text-muted small mb-1">

@@ -180,6 +180,17 @@ router.post(
 );
 
 /**
+ * GET /api/quotes/owners/available - Available owners by clientId, SIN quote (para asignar el
+ * propietario inicial al crear una cotización nueva). Admin/superadmin. Va antes de /:quoteId/*.
+ */
+router.get(
+  '/owners/available',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  (req, res) => ownershipController.getAvailableOwnersForClient(req, res)
+);
+
+/**
  * GET /api/quotes/:quoteId/available-owners - Get available owners for a quote.
  * Private access (Admin and Department Manager only).
  */

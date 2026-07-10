@@ -542,6 +542,56 @@ class QuoteOwnershipController {
       });
     }
   }
+
+  // Owners disponibles por clientId (SIN quote): para asignar el propietario inicial al CREAR una
+  // cotización nueva. Solo admin/superadmin. Reusa el mismo shape de datos que getAvailableOwners.
+  async getAvailableOwnersForClient(req, res) {
+    const userId = req.user?.id;
+    const userRole = req.userRole || req.user?.role || '';
+    const { clientId, clientType } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+    if (!['admin', 'superadmin'].includes(userRole)) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions to view available owners' });
+    }
+
+    try {
+      const result = await this.ownershipService.getAvailableOwnersForClientId({ clientId, clientType });
+      if (result && result.requiresClient) {
+        return res.status(400).json({
+          success: false,
+          error: 'Cliente no seleccionado',
+          message: 'Por favor selecciona un cliente antes de asignar el propietario',
+          requiresClient: true,
+        });
+      }
+      const availableOwners = Array.isArray(result) ? result : (result.users || []);
+      res.status(200).json({
+        success: true,
+        data: availableOwners.map((user) => {
+          const roleId = user.get('roleId');
+          const roleName = (roleId && typeof roleId.get === 'function') ? roleId.get('name') : user.get('role');
+          return {
+            id: user.id,
+            firstName: user.get('firstName'),
+            lastName: user.get('lastName'),
+            email: user.get('email'),
+            role: roleName,
+            username: user.get('username'),
+            isDepartmentManager: roleName === 'department_manager',
+            isClient: roleName === 'client',
+            isAdmin: roleName === 'admin' || roleName === 'superadmin',
+          };
+        }),
+        total: availableOwners.length,
+      });
+    } catch (error) {
+      logger.error('Failed to get available owners by client', { error: error.message, clientId, userId });
+      res.status(500).json({ success: false, error: 'Failed to retrieve available owners' });
+    }
+  }
 }
 
 module.exports = QuoteOwnershipController;

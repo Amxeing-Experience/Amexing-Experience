@@ -15,245 +15,115 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 <div class="row mt-4">
     <div class="col-12">
         <!-- Combined Experiences Section with Card View -->
-        <div class="card border-0 shadow-sm">
-            <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-                <div class="row align-items-center">
-                    <div class="col">
-                        <h5 class="card-title mb-0 text-white">
-                            <i class="ti ti-star me-2"></i>Catálogo de Experiencias
-                        </h5>
-                    </div>
+        <div class="exp-catalog">
+            <!-- Filtros -->
+            <div class="exp-catalog__filters">
+                <div class="exp-field exp-field--search">
+                    <i class="ti ti-search exp-field__icon"></i>
+                    <input type="text" id="searchExperience" placeholder="Buscar experiencia...">
+                </div>
+                <div class="exp-field exp-field--select">
+                    <select id="filterCategory">
+                        <%# Opciones cargadas dinámicamente desde la BD (ExperienceCategories.populateSelect). %>
+                        <option value="">Tipo de experiencia</option>
+                    </select>
+                    <i class="ti ti-chevron-down exp-field__caret"></i>
+                </div>
+                <div class="exp-field exp-field--select">
+                    <select id="filterCurrency">
+                        <option value="MXN">MXN</option>
+                        <option value="USD">USD</option>
+                    </select>
+                    <i class="ti ti-chevron-down exp-field__caret"></i>
+                </div>
+                <div class="exp-field exp-field--select">
+                    <select id="filterPayment">
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia" selected>Transferencia</option>
+                        <option value="tarjeta">Tarjeta Crédito/Débito</option>
+                    </select>
+                    <i class="ti ti-chevron-down exp-field__caret"></i>
                 </div>
             </div>
 
-            <!-- Search and Filters -->
-            <div class="card-body border-bottom bg-light">
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <label for="searchExperience" class="form-label fw-semibold">
-                            <i class="ti ti-search me-1"></i>Buscar Experiencia
-                        </label>
-                        <input type="text" class="form-control" id="searchExperience" placeholder="Buscar por nombre...">
-                    </div>
-                    <div class="col-md-3">
-                        <label for="filterCategory" class="form-label fw-semibold">
-                            <i class="ti ti-category me-1"></i>Tipo de experiencia
-                        </label>
-                        <select class="form-select" id="filterCategory">
-                            <option value="">Todas</option>
-                            <option value="catas">Catas</option>
-                            <option value="arte">Arte</option>
-                            <option value="historia_arquitectura">Historia y Arquitectura</option>
-                            <option value="gastronomicas">Gastronómicas</option>
-                            <option value="aventura">Aventura</option>
-                            <option value="naturaleza">Naturaleza</option>
-                            <option value="de_temporada">De Temporada</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="filterCurrency" class="form-label fw-semibold">
-                            <i class="ti ti-currency-dollar me-1"></i>Moneda
-                        </label>
-                        <select class="form-select" id="filterCurrency">
-                            <option value="MXN">MXN</option>
-                            <option value="USD">USD</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label for="filterPayment" class="form-label fw-semibold">
-                            <i class="ti ti-credit-card me-1"></i>Pago
-                        </label>
-                        <select class="form-select" id="filterPayment">
-                            <option value="efectivo">Efectivo</option>
-                            <option value="transferencia" selected>Transferencia</option>
-                            <option value="tarjeta">Tarjeta Crédito/Débito</option>
-                        </select>
-                    </div>
+            <div id="expResultCount" class="exp-catalog__count"></div>
+
+            <!-- Loading state -->
+            <div id="experiencesLoading" class="exp-catalog__loading">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Cargando experiencias...</span>
                 </div>
+                <p>Cargando experiencias...</p>
             </div>
 
-            <div class="card-body">
-                <!-- Loading state -->
-                <div id="experiencesLoading" class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando experiencias...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Cargando experiencias...</p>
-                </div>
+            <!-- Experiences Grid -->
+            <div id="experiencesGrid" class="row g-4" style="display: none;">
+                <!-- Experience cards will be dynamically inserted here -->
+            </div>
 
-                <!-- Experiences Grid -->
-                <div id="experiencesGrid" class="row g-4" style="display: none;">
-                    <!-- Experience cards will be dynamically inserted here -->
-                </div>
-
-                <!-- No results message -->
-                <div id="noExperiencesMessage" class="text-center py-5" style="display: none;">
-                    <i class="ti ti-mood-sad" style="font-size: 3rem; color: #dee2e6;"></i>
-                    <p class="mt-3 text-muted">No se encontraron experiencias con los filtros seleccionados</p>
-                </div>
+            <!-- No results message -->
+            <div id="noExperiencesMessage" class="exp-catalog__empty" style="display: none;">
+                <i class="ti ti-mood-sad"></i>
+                <p>No se encontraron experiencias con los filtros seleccionados</p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Experience Details Modal -->
-<div class="modal fade" id="experienceDetailsModal" tabindex="-1" aria-labelledby="experienceDetailsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header p-0 border-0">
-                <div class="tour-hero w-100">
-                    <div class="experience-hero-image-container">
-                        <img id="experienceHeroImage" src="" alt="" class="experience-hero-image">
-                        <div class="tour-hero-overlay">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <h3 id="experienceHeroTitle" class="text-white mb-0"></h3>
+<!-- Experience Details Modal (Luxury redesign) -->
+<div class="modal fade exp-lux-modal" id="experienceDetailsModal" tabindex="-1" aria-labelledby="experienceDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered exp-lux__dialog">
+        <div class="modal-content exp-lux__content">
+            <div class="exp-lux__grid">
+                <!-- LEFT: media pane -->
+                <div class="exp-lux__media">
+                    <img id="experienceHeroImage" src="" alt="" class="exp-lux__media-img">
+                    <div class="exp-lux__media-overlay"></div>
+                    <button type="button" class="exp-lux__expand" id="experienceHeroExpand" aria-label="Ampliar galería" style="display:none;"><i class="ti ti-arrows-maximize"></i></button>
+                    <div class="exp-lux__media-caption">
+                        <div class="exp-lux__tags">
+                            <span class="exp-lux__category" id="experienceHeroCategory" style="display:none;"></span>
+                            <span class="exp-lux__type-pill" id="experienceHeroType" style="display:none;"></span>
+                        </div>
+                        <h3 id="experienceHeroTitle" class="exp-lux__title"></h3>
+                        <span class="exp-lux__title-underline"></span>
+                    </div>
+                </div>
+
+                <!-- RIGHT: content pane -->
+                <div class="exp-lux__panel">
+                    <div class="exp-lux__header">
+                        <button type="button" class="exp-lux__close" data-bs-dismiss="modal" aria-label="Close">
+                            <i class="ti ti-x"></i>
+                        </button>
+                    </div>
+
+                    <div class="exp-lux__body">
+                        <div id="experienceModalLoading" class="exp-lux__loading" style="display: none;">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Cargando detalles de la experiencia...</span>
                             </div>
                         </div>
+                        <div id="experienceDetailBody"></div>
                     </div>
+
+                    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+                    <div class="exp-lux__footer" id="experienceModalFooter">
+                        <button type="button" class="exp-lux__cta add-to-quote-from-modal-btn">
+                            AGREGAR A COTIZACIÓN <span class="exp-lux__cta-arrow">→</span>
+                        </button>
+                    </div>
+                    <% } %>
                 </div>
-                <button type="button" class="btn-close-custom" data-bs-dismiss="modal" aria-label="Close">
-                    <i class="ti ti-x"></i>
-                </button>
             </div>
-            <!-- Tab Navigation -->
-            <div class="tour-tabs-container">
-                <ul class="nav nav-pills tour-nav-tabs" id="experienceTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="info-tab" data-bs-toggle="pill" data-bs-target="#info" type="button" role="tab">
-                            <i class="ti ti-info-circle me-1"></i>
-                            Información
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation" id="itineraryTabItem" style="display: none;">
-                        <button class="nav-link" id="itinerary-tab" data-bs-toggle="pill" data-bs-target="#itinerary" type="button" role="tab">
-                            <i class="ti ti-list-numbers me-1"></i>
-                            Itinerario
-                            <span class="badge bg-primary ms-1" id="itineraryCountBadge">0</span>
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="gallery-tab" data-bs-toggle="pill" data-bs-target="#gallery" type="button" role="tab">
-                            <i class="ti ti-photo me-1"></i>
-                            Galería
-                            <span class="badge bg-primary ms-1" id="galleryPhotoBadge">0</span>
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="details-tab" data-bs-toggle="pill" data-bs-target="#details" type="button" role="tab">
-                            <i class="ti ti-list-details me-1"></i>
-                            Detalles
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="prices-tab" data-bs-toggle="pill" data-bs-target="#prices" type="button" role="tab">
-                            <i class="ti ti-currency-dollar me-1"></i>
-                            Precios
-                        </button>
-                    </li>
-                </ul>
-            </div>
-
-            <!-- Tab Content -->
-            <div class="modal-body p-0">
-                <div class="tab-content" id="experienceTabContent" style="display: none;">
-                    <!-- Information Tab -->
-                    <div class="tab-pane fade show active" id="info" role="tabpanel">
-                        <div id="infoContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Itinerary Tab -->
-                    <div class="tab-pane fade" id="itinerary" role="tabpanel">
-                        <div id="itineraryContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Gallery Tab -->
-                    <div class="tab-pane fade" id="gallery" role="tabpanel">
-                        <div id="galleryContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Details Tab -->
-                    <div class="tab-pane fade" id="details" role="tabpanel">
-                        <div id="detailsContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Prices Tab -->
-                    <div class="tab-pane fade" id="prices" role="tabpanel">
-                        <div id="pricesContent">
-                            <!-- Content will be loaded here -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Loading State -->
-                <div id="experienceModalLoading" class="text-center py-5" style="display: none;">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Cargando detalles de la experiencia...</span>
-                    </div>
-                </div>
-                <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-                <div class="modal-footer border-top" id="experienceModalFooter">
-                    <button type="button" class="btn btn-primary add-to-quote-from-modal-btn">
-                        <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
-                    </button>
-                </div>
-                <% } %>
         </div>
     </div>
 </div>
 
 <!-- Add to Quote Picker Modal -->
 <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-<div class="modal fade" id="addToQuoteModal" tabindex="-1" aria-labelledby="addToQuoteLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-md">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addToQuoteLabel">
-                    <i class="ti ti-file-plus me-2"></i>Agregar a Cotización
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted mb-3" id="addToQuoteExperienceName"></p>
-
-                <!-- Create New Quote Option -->
-                <div class="create-new-quote-option mb-3" id="createNewQuoteBtn">
-                    <i class="ti ti-plus me-2"></i>Crear nueva cotización
-                </div>
-
-                <div class="text-muted small mb-2">o seleccionar cotización existente:</div>
-
-                <!-- Search -->
-                <input type="text" class="form-control form-control-sm quote-search-input mb-3"
-                       id="quoteSearchInput" placeholder="Buscar por folio o cliente...">
-
-                <!-- Loading -->
-                <div id="quotePickerLoading" class="text-center py-4" style="display: none;">
-                    <div class="spinner-border spinner-border-sm text-primary" role="status">
-                        <span class="visually-hidden">Cargando...</span>
-                    </div>
-                    <div class="text-muted small mt-2">Cargando cotizaciones...</div>
-                </div>
-
-                <!-- Quote List -->
-                <div id="quotePickerList" class="quote-picker-list" style="display: none;"></div>
-
-                <!-- Action Loading -->
-                <div id="quoteActionLoading" class="text-center py-4" style="display: none;">
-                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                    <div class="text-muted small mt-2">Agregando experiencia...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Add to Quote — modal genérico compartido -->
+<%- include('../quotes/add-to-quote-modal') %>
 <% } %>
 
 <!-- Full-Screen Gallery Modal -->
@@ -299,180 +169,6 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
 <style>
 /* Experience Card Styles */
-.experience-card {
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
-    overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.experience-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-}
-
-.experience-card-image {
-    height: 200px;
-    position: relative;
-    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
-
-.experience-card-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.experience-card-image .no-image {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    background: #ffffff;
-}
-
-.experience-source-badge {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.experience-source-badge.amexing {
-    color: #059669;
-    border: 1px solid #059669;
-}
-
-.experience-source-badge.provider {
-    color: #8b5cf6;
-    border: 1px solid #8b5cf6;
-}
-
-.experience-type-badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-/* Badge de "Tipo de experiencia" (categoría temática) sobre la imagen, esquina
-   inferior-izquierda: pastilla blanca con verde de marca. No ocupa espacio del cuerpo
-   y queda distinto del badge de Tipo (esquina superior-derecha). */
-.experience-category-badge {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    max-width: calc(100% - 20px);
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    background: rgba(255, 255, 255, 0.95);
-    color: #157347;
-    border: 1px solid rgba(43, 182, 115, 0.35);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.experience-card-body {
-    padding: 1.25rem;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.experience-card-title {
-    font-size: 1.125rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-    color: #111827;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-.experience-provider-name {
-    font-size: 0.875rem;
-    color: #6b7280;
-    margin-bottom: 0.75rem;
-}
-
-.experience-card-description {
-    font-size: 0.875rem;
-    color: #6b7280;
-    margin-bottom: 1rem;
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    flex: 1;
-}
-
-.experience-card-info {
-    border-top: 1px solid #e5e7eb;
-    padding-top: 0.75rem;
-    margin-top: auto;
-}
-
-.experience-info-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.375rem 0;
-    font-size: 0.875rem;
-}
-
-.experience-info-label {
-    color: #6b7280;
-    font-weight: 500;
-}
-
-.experience-info-value {
-    color: #111827;
-    font-weight: 600;
-    text-align: right;
-}
-
-.experience-prices-list {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 6px 12px;
-    font-size: 0.8rem;
-}
-
-.experience-price-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.experience-price {
-    font-size: 1.25rem;
-    color: #059669;
-    font-weight: 700;
-}
-
 .type-badge {
     padding: 2px 8px;
     border-radius: 4px;
@@ -504,6 +200,12 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
 <!-- Load centralized pricing utilities -->
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
+<!-- Util para categorías de experiencias dinámicas (desde la BD) -->
+<script src="/dashboard/js/utils/experience-categories.js"></script>
+<% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+<!-- Add to Quote — módulo genérico compartido -->
+<script src="/dashboard/js/utils/add-to-quote.js"></script>
+<% } %>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -512,6 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let filteredExperiences = [];
 
     // Etiquetas legibles del "Tipo de experiencia" (experience_category) para las cards/filtro.
+    // Fallback estático por si el fetch dinámico de categorías (desde la BD) falla.
     const EXPERIENCE_CATEGORY_LABELS = {
         catas: 'Catas',
         arte: 'Arte',
@@ -521,7 +224,8 @@ document.addEventListener('DOMContentLoaded', function() {
         naturaleza: 'Naturaleza',
         de_temporada: 'De Temporada'
     };
-    const categoryLabel = (v) => EXPERIENCE_CATEGORY_LABELS[v] || '';
+    // Prefiere el nombre dinámico (BD); si no está, cae al mapa estático.
+    const categoryLabel = (v) => (window.ExperienceCategories && window.ExperienceCategories.labelFor(v)) || EXPERIENCE_CATEGORY_LABELS[v] || '';
     let currentExchangeRate = 20; // Default exchange rate MXN to USD
     let currentTransferRate = 0; // Transfer payment surcharge percentage
     let currentAgencyRate = 0; // Credit card payment surcharge percentage
@@ -551,6 +255,24 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             return `${mins}min`;
         }
+    }
+
+    // Reserva anticipada (minutos) → días si >=24h; si no, horas y minutos (sin decimales).
+    function formatAdvanceBooking(totalMinutes) {
+        const mins = parseInt(totalMinutes);
+        if (!mins || isNaN(mins) || mins <= 0) return 'Reserva inmediata';
+        if (mins >= 1440) {
+            const days = Math.floor(mins / 1440);
+            const remHours = Math.floor((mins % 1440) / 60);
+            let out = `${days} ${days === 1 ? 'día' : 'días'}`;
+            if (remHours > 0) out += ` ${remHours} ${remHours === 1 ? 'hora' : 'horas'}`;
+            return out;
+        }
+        const hours = Math.floor(mins / 60);
+        const minutes = mins % 60;
+        if (hours > 0 && minutes > 0) return `${hours}h ${minutes}min`;
+        if (hours > 0) return `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+        return `${minutes} min`;
     }
     
     // Load exchange rate
@@ -650,7 +372,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Format price with currency
     function formatExperiencePrice(price, currency) {
         if (currency === 'USD') {
-            return `$${price.toFixed(2)} USD`;
+            return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
         } else {
             return `$${price.toLocaleString('es-MX', {
                 minimumFractionDigits: 2,
@@ -893,7 +615,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (indexB === -1) return -1;
                         return indexA - indexB;
                     });
-                    
+
+                    // Si están los 7 días, mostrar "Todos los días" en vez de la lista completa.
+                    if (sortedDays.length === 7) {
+                        return 'Todos los días';
+                    }
+                    // Si es un solo día, mostrar el nombre completo (p.ej. "Lunes") en vez de la abreviatura.
+                    const fullDayMap = { 'Lu': 'Lunes', 'Ma': 'Martes', 'Mi': 'Miércoles', 'Ju': 'Jueves', 'Vi': 'Viernes', 'Sa': 'Sábado', 'Do': 'Domingo' };
+                    if (sortedDays.length === 1) {
+                        return fullDayMap[sortedDays[0]] || sortedDays[0];
+                    }
+
                     return sortedDays.length > 0 ? sortedDays.join(', ') : null;
                 } else {
                     return availability;
@@ -1153,7 +885,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         return indexA - indexB;
                     });
                     
-                    formattedAvailability = sortedDays.length > 0 ? sortedDays.join(', ') : null;
+                    // Si están los 7 días, "Todos los días"; si es un solo día, nombre completo.
+                    const fullDayMap = { 'Lu': 'Lunes', 'Ma': 'Martes', 'Mi': 'Miércoles', 'Ju': 'Jueves', 'Vi': 'Viernes', 'Sa': 'Sábado', 'Do': 'Domingo' };
+                    if (sortedDays.length === 7) {
+                        formattedAvailability = 'Todos los días';
+                    } else if (sortedDays.length === 1) {
+                        formattedAvailability = fullDayMap[sortedDays[0]] || sortedDays[0];
+                    } else {
+                        formattedAvailability = sortedDays.length > 0 ? sortedDays.join(', ') : null;
+                    }
                 } else if (exp.availability) {
                     formattedAvailability = exp.availability;
                 }
@@ -1212,6 +952,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const grid = document.getElementById('experiencesGrid');
         const noResults = document.getElementById('noExperiencesMessage');
 
+        // Contador de resultados
+        const countEl = document.getElementById('expResultCount');
+        if (countEl) {
+            const total = (typeof allExperiences !== 'undefined' && Array.isArray(allExperiences)) ? allExperiences.length : filteredExperiences.length;
+            countEl.textContent = `${filteredExperiences.length} de ${total} experiencias`;
+        }
+
         if (filteredExperiences.length === 0) {
             grid.style.display = 'none';
             noResults.style.display = 'block';
@@ -1224,140 +971,69 @@ document.addEventListener('DOMContentLoaded', function() {
         // Get current filter values
         const currency = document.getElementById('filterCurrency').value;
         const paymentType = document.getElementById('filterPayment').value;
+        // Filtro de categoría activo: si hay una categoría específica seleccionada, el tag de
+        // categoría se oculta en las cards (sería redundante mostrar "Catas" en todas).
+        const categoryFilter = document.getElementById('filterCategory')?.value || '';
 
         grid.innerHTML = filteredExperiences.map((experience, index) => {
-            const typeClass = experience.displayType ? experience.displayType.toLowerCase() : 'otro';
-            const typeName = experience.displayType || 'Experiencia';
-            
-            // Debug image URLs being used
-            if (index < 3) { // Only log first 3 for brevity
-                console.log(`🎯 Experience "${experience.displayName}" image debug:`, {
-                    hasDisplayImage: !!experience.displayImage,
-                    displayImageStructure: experience.displayImage,
-                    source: experience.source
-                });
-            }
-            
+            const tipoBadge = experience.displayType && experience.displayType !== 'experiencia'
+                ? experience.displayType.charAt(0).toUpperCase() + experience.displayType.slice(1)
+                : '';
+
+            // Precios (lista completa; convertidos según moneda/pago)
+            const priceItems = [];
+            if (experience.displayPrice > 0) priceItems.push(`<div class="expcard__row"><span class="expcard__k">Adulto</span><span class="expcard__v">${convertExperiencePrice(experience.displayPrice, currency, paymentType)}</span></div>`);
+            if (experience.displayPriceChild > 0) priceItems.push(`<div class="expcard__row"><span class="expcard__k">Niños</span><span class="expcard__v">${convertExperiencePrice(experience.displayPriceChild, currency, paymentType)}</span></div>`);
+            if (experience.displayPriceNoAlcohol > 0) priceItems.push(`<div class="expcard__row"><span class="expcard__k">Sin alcohol</span><span class="expcard__v">${convertExperiencePrice(experience.displayPriceNoAlcohol, currency, paymentType)}</span></div>`);
+            const pricesRows = priceItems.length ? priceItems.join('') : `<div class="expcard__row"><span class="expcard__k">Precios</span><span class="expcard__v">Por cotizar</span></div>`;
+
             return `
                 <div class="col-md-6 col-lg-4">
-                    <div class="experience-card">
-                        <div class="experience-card-image" data-image-container>
-                            ${experience.displayImage && experience.displayImage.fallback ? 
+                    <div class="expcard">
+                        <div class="expcard__media" data-image-container>
+                            ${experience.displayImage && experience.displayImage.fallback ?
                                 `<div class="image-loading-container">
                                     <picture class="experience-picture">
                                         ${experience.displayImage.avif ? `<source srcset="${experience.displayImage.avif}" type="image/avif">` : ''}
                                         ${experience.displayImage.webp ? `<source srcset="${experience.displayImage.webp}" type="image/webp">` : ''}
-                                        <img src="${experience.displayImage.fallback}" 
-                                             alt="${experience.displayName}" 
-                                             class="experience-img ${!experience.displayImage.avif && !experience.displayImage.webp ? 'loading' : ''}" 
-                                             loading="lazy"
->
+                                        <img src="${experience.displayImage.fallback}" alt="${experience.displayName}" class="experience-img ${!experience.displayImage.avif && !experience.displayImage.webp ? 'loading' : ''}" loading="lazy">
                                     </picture>
-                                    ${!experience.displayImage.avif && !experience.displayImage.webp ? 
-                                        '<div class="progressive-loader"><div class="loading-pulse"></div></div>' : ''}
+                                    ${!experience.displayImage.avif && !experience.displayImage.webp ? '<div class="progressive-loader"><div class="loading-pulse"></div></div>' : ''}
                                 </div>` :
-                                `<div class="no-image">
-                                    <img src="/img/amexing_logo_horizontal.avif" alt="Amexing" style="max-width: 60%; max-height: 50%; object-fit: contain;">
-                                </div>`
+                                `<div class="no-image"><img src="/img/amexing_logo_horizontal.avif" alt="Amexing"></div>`
                             }
-                            <!-- Experience Type Badge -->
-                            ${experience.displayType && experience.displayType !== 'experiencia' ?
-                                `<div class="experience-type-badge">
-                                    <span class="type-badge ${typeClass}">${typeName}</span>
-                                </div>` : ''}
-                            <!-- Tipo de experiencia (categoría) -->
-                            ${categoryLabel(experience.experience_category) ?
-                                `<span class="experience-category-badge" title="Tipo de experiencia">${categoryLabel(experience.experience_category)}</span>` : ''}
-                        </div>
-                        <div class="experience-card-body">
-                            <h5 class="experience-card-title" title="${experience.displayName}">
-                                ${experience.displayName}
-                            </h5>
-                            <div class="experience-card-description">
-                                ${experience.displayDescription || 'Sin descripción disponible'}
+                            <div class="expcard__tags">
+                                ${(!categoryFilter && categoryLabel(experience.experience_category)) ? `<span class="expcard__badge expcard__badge--cat">${categoryLabel(experience.experience_category)}</span>` : ''}
+                                ${tipoBadge ? `<span class="expcard__badge expcard__badge--tipo">${tipoBadge}</span>` : ''}
                             </div>
-                            <div class="experience-card-info">
-                                <div class="experience-info-row">
-                                    <span class="experience-info-label">
-                                        <i class="ti ti-clock me-1"></i>Duración
-                                    </span>
-                                    <span class="experience-info-value">
-                                        ${experience.displayDuration ? formatDuration(experience.displayDuration) : 'Por definir'}
-                                    </span>
-                                </div>
-                                <div class="experience-info-row">
-                                    <span class="experience-info-label">
-                                        <i class="ti ti-calendar-time me-1"></i>Reserva anticipada
-                                    </span>
-                                    <span class="experience-info-value">
-                                        ${(() => {
-                                            if (!experience.displayAdvanceBooking) return 'Reserva inmediata';
-                                            const totalMinutes = parseInt(experience.displayAdvanceBooking);
-                                            if (isNaN(totalMinutes)) return 'Reserva inmediata';
-                                            
-                                            const hours = Math.floor(totalMinutes / 60);
-                                            const minutes = totalMinutes % 60;
-                                            
-                                            if (hours > 0 && minutes > 0) {
-                                                return `${hours}h ${minutes}min`;
-                                            } else if (hours > 0) {
-                                                return `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
-                                            } else {
-                                                return `${minutes} min`;
-                                            }
-                                        })()}
-                                    </span>
-                                </div>
-                                <div class="experience-info-row">
-                                    <span class="experience-info-label">
-                                        <i class="ti ti-calendar-event me-1"></i>Días sugeridos
-                                    </span>
-                                    <span class="experience-info-value" style="font-size: 0.8rem;">
-                                        ${experience.displayAvailability || 'Todos los días'}
-                                    </span>
-                                </div>
-                                <div class="experience-info-row">
-                                    <span class="experience-info-label">
-                                        <i class="ti ti-currency-dollar me-1"></i>Precios
-                                    </span>
-                                    <div class="experience-prices-list">
-                                        ${experience.displayPrice > 0 ?
-                                            `<div class="experience-price-item">
-                                                <small class="text-muted">Adulto:</small>
-                                                <strong>${convertExperiencePrice(experience.displayPrice, currency, paymentType)}</strong>
-                                            </div>` : ''}
-                                        ${experience.displayPriceChild > 0 ?
-                                            `<div class="experience-price-item">
-                                                <small class="text-muted">Niños:</small>
-                                                <strong>${convertExperiencePrice(experience.displayPriceChild, currency, paymentType)}</strong>
-                                            </div>` : ''}
-                                        ${experience.displayPriceNoAlcohol > 0 ?
-                                            `<div class="experience-price-item">
-                                                <small class="text-muted">Sin alcohol:</small>
-                                                <strong>${convertExperiencePrice(experience.displayPriceNoAlcohol, currency, paymentType)}</strong>
-                                            </div>` : ''}
-                                        ${(!experience.displayPrice && !experience.displayPriceChild && !experience.displayPriceNoAlcohol) ?
-                                            '<div>Por cotizar</div>' : ''}
-                                    </div>
-                                </div>
-                                <div class="experience-info-row border-0 pt-3 d-flex gap-2">
-                                    <button class="btn btn-outline-primary btn-sm flex-grow-1 view-more-btn"
-                                            data-experience-id="${experience.id || experience.objectId}"
-                                            data-experience-name="${experience.displayName}"
-                                            data-experience-type="${experience.source}">
-                                        <i class="ti ti-eye me-1"></i>Ver más
-                                    </button>
-                                    <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-                                    <button class="btn btn-primary btn-sm add-to-quote-btn"
-                                            data-experience-id="${experience.id || experience.objectId}"
-                                            data-experience-name="${experience.displayName}"
-                                            data-experience-type="${experience.source}"
-                                            data-experience-price="${experience.displayPrice || 0}"
-                                            title="Agregar a Cotización">
-                                        <i class="ti ti-file-plus"></i>
-                                    </button>
-                                    <% } %>
-                                </div>
+                        </div>
+                        <div class="expcard__body">
+                            <h5 class="expcard__title" title="${experience.displayName}">${experience.displayName}</h5>
+                            <p class="expcard__desc">${experience.displayDescription || 'Sin descripción disponible'}</p>
+                            <div class="expcard__rows">
+                                <div class="expcard__row"><span class="expcard__k">Duración</span><span class="expcard__v">${experience.displayDuration ? formatDuration(experience.displayDuration) : 'Por definir'}</span></div>
+                                <div class="expcard__row"><span class="expcard__k">Reserva anticipada</span><span class="expcard__v">${formatAdvanceBooking(experience.displayAdvanceBooking || 1440)}</span></div>
+                                <div class="expcard__row"><span class="expcard__k">Días disponibles</span><span class="expcard__v">${experience.displayAvailability || 'Todos los días'}</span></div>
+                                <hr class="expcard__sep">
+                                ${pricesRows}
+                            </div>
+                            <div class="expcard__actions">
+                                <button class="expcard__btn expcard__btn--primary view-more-btn"
+                                        data-experience-id="${experience.id || experience.objectId}"
+                                        data-experience-name="${experience.displayName}"
+                                        data-experience-type="${experience.source}">
+                                    Ver más
+                                </button>
+                                <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
+                                <button class="expcard__btn expcard__btn--ghost add-to-quote-btn"
+                                        data-experience-id="${experience.id || experience.objectId}"
+                                        data-experience-name="${experience.displayName}"
+                                        data-experience-type="${experience.source}"
+                                        data-experience-price="${experience.displayPrice || 0}"
+                                        title="Agregar a cotización">
+                                    <i class="ti ti-file-plus me-1"></i>Agregar
+                                </button>
+                                <% } %>
                             </div>
                         </div>
                     </div>
@@ -1404,7 +1080,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // If all formats fail, show no-image fallback
-                    const container = this.closest('.experience-card-image');
+                    const container = this.closest('.expcard__media');
                     if (container) {
                         container.innerHTML = `
                             <div class="no-image" style="display: flex; align-items: center; justify-content: center; height: 200px; background: #ffffff;">
@@ -1450,9 +1126,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('filterCurrency').addEventListener('change', function() {
         // Only update display to recalculate prices, don't filter
         displayExperiences();
-        
-        // If modal is open, refresh the pricing tab
-        const modal = document.getElementById('experienceModal');
+
+        // If modal is open, refresh the pricing section
+        const modal = document.getElementById('experienceDetailsModal');
         if (modal && modal.classList.contains('show') && window._selectedExperience) {
             loadPricesTab(window._selectedExperience);
         }
@@ -1460,9 +1136,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('filterPayment').addEventListener('change', function() {
         // Only update display to recalculate prices, don't filter
         displayExperiences();
-        
-        // If modal is open, refresh the pricing tab
-        const modal = document.getElementById('experienceModal');
+
+        // If modal is open, refresh the pricing section
+        const modal = document.getElementById('experienceDetailsModal');
         if (modal && modal.classList.contains('show') && window._selectedExperience) {
             loadPricesTab(window._selectedExperience);
         }
@@ -1481,519 +1157,50 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
-    // ========== Add to Quote functionality ==========
-
-    // Event: Add to Quote from card
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.add-to-quote-btn')) {
-            const button = e.target.closest('.add-to-quote-btn');
-            openAddToQuoteDialog({
-                id: button.dataset.experienceId,
-                name: button.dataset.experienceName,
-                type: button.dataset.experienceType,
-                price: parseFloat(button.dataset.experiencePrice) || 0
-            });
-        }
-    });
-
-    // Event: Add to Quote from detail modal
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.add-to-quote-from-modal-btn')) {
-            const currentExp = window._currentModalExperience;
-            if (currentExp) {
-                const detailModal = bootstrap.Modal.getInstance(document.getElementById('experienceDetailsModal'));
-                if (detailModal) detailModal.hide();
-                setTimeout(() => openAddToQuoteDialog(currentExp), 300);
-            }
-        }
-    });
-
-    // Event: Create new quote
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('#createNewQuoteBtn')) {
-            createNewQuoteWithExperience();
-        }
-    });
-
-    // Event: Select existing quote → show day selector
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.quote-list-item')) {
-            const item = e.target.closest('.quote-list-item');
-            showDaySelector(item.dataset.quoteId);
-        }
-    });
-
-    // Event: Select a day
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.day-list-item')) {
-            const item = e.target.closest('.day-list-item');
-            addExperienceToDay(item.dataset.quoteId, parseInt(item.dataset.dayIndex));
-        }
-    });
-
-    // Event: Add new day via date picker
-    document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('new-day-date-input') && e.target.value) {
-            const quoteId = e.target.dataset.quoteId;
-            const dateVal = e.target.value;
-            // Format date as title: "8 Mar 2026"
-            const d = new Date(dateVal + 'T12:00:00');
-            const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-            const dayTitle = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
-            addExperienceToNewDay(quoteId, dayTitle);
-        }
-    });
-
-    // Event: Back to quote list
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.day-selector-back')) {
-            // Re-show quote list view
-            document.getElementById('quotePickerLoading').style.display = 'none';
-            document.getElementById('quotePickerList').style.display = 'block';
-            document.querySelector('#createNewQuoteBtn').style.display = '';
-            document.querySelector('.quote-search-input').style.display = '';
-            document.getElementById('daySelector').style.display = 'none';
-        }
-    });
-
-    // Event: Search filter
-    document.getElementById('quoteSearchInput').addEventListener('input', function() {
-        const query = this.value.toLowerCase().trim();
-        document.querySelectorAll('#quotePickerList .quote-list-item').forEach(item => {
-            const text = item.textContent.toLowerCase();
-            item.style.display = text.includes(query) ? '' : 'none';
-        });
-    });
-
-    // Move modal to body so it's not trapped by overflow containers
+    // ========== Add Experience to Quote (módulo genérico compartido: /dashboard/js/utils/add-to-quote.js) ==========
     (function() {
-        const quoteModal = document.getElementById('addToQuoteModal');
-        if (quoteModal && quoteModal.parentElement !== document.body) {
-            document.body.appendChild(quoteModal);
+        // Payload específico de Experiencias (lo único propio de esta superficie)
+        function buildExperienceSubconcept(exp) {
+            return {
+                type: 'experience', experienceId: exp.id, title: exp.name,
+                time: '', hours: 0, unitPrice: exp.price, total: exp.price,
+                isPerPerson: true, numberOfPeople: 1
+            };
         }
+
+        function openExperienceAddToQuote(exp) {
+            if (!exp) return;
+            // Las experiencias tienen 3 tipos de persona (adulto/niño/sin alcohol), así que
+            // no mostramos un "precio por persona" único: solo el nombre de la experiencia.
+            AddToQuote.open({
+                userRole: '<%= currentUserRole %>',
+                serviceLabel: 'Experiencia',
+                itemLabel: '<strong>' + (exp.name || 'Experiencia') + '</strong>',
+                buildSubconcept: function() { return buildExperienceSubconcept(exp); }
+            });
+        }
+
+        // Add to Quote desde la card
+        document.addEventListener('click', function(e) {
+            const btn = e.target.closest('.add-to-quote-btn');
+            if (!btn) return;
+            openExperienceAddToQuote({
+                id: btn.dataset.experienceId,
+                name: btn.dataset.experienceName,
+                price: parseFloat(btn.dataset.experiencePrice) || 0
+            });
+        });
+
+        // Add to Quote desde el modal de detalle
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.add-to-quote-from-modal-btn')) return;
+            const cur = window._currentModalExperience;
+            if (!cur) return;
+            const detailModal = bootstrap.Modal.getInstance(document.getElementById('experienceDetailsModal'));
+            if (detailModal) detailModal.hide();
+            setTimeout(function() { openExperienceAddToQuote(cur); }, 300);
+        });
     })();
-
-    async function openAddToQuoteDialog(experience) {
-        window._selectedExperience = experience;
-
-        // Update UI
-        document.getElementById('addToQuoteExperienceName').textContent = experience.name;
-        document.getElementById('quoteSearchInput').value = '';
-        document.getElementById('quotePickerLoading').style.display = 'block';
-        document.getElementById('quotePickerList').style.display = 'none';
-        document.getElementById('quoteActionLoading').style.display = 'none';
-
-        const modal = new bootstrap.Modal(document.getElementById('addToQuoteModal'));
-        modal.show();
-
-        try {
-            const token = getAccessToken();
-            const response = await fetch('/api/quotes?start=0&length=50&order[0][column]=7&order[0][dir]=desc', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-
-            if (!response.ok) throw new Error('Error al cargar cotizaciones');
-            const result = await response.json();
-            const quotes = (result.data || [])
-                .filter(q => ['requested', 'hold'].includes(q.status))
-                .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-            renderQuotePickerList(quotes);
-        } catch (error) {
-            console.error('Error loading quotes:', error);
-            document.getElementById('quotePickerList').innerHTML =
-                '<div class="quote-picker-empty"><i class="ti ti-alert-circle me-1"></i>Error al cargar cotizaciones</div>';
-        } finally {
-            document.getElementById('quotePickerLoading').style.display = 'none';
-            document.getElementById('quotePickerList').style.display = 'block';
-        }
-    }
-
-    function timeAgo(dateStr) {
-        if (!dateStr) return '';
-        const now = new Date();
-        const date = new Date(dateStr);
-        const diffMs = now - date;
-        const diffMin = Math.floor(diffMs / 60000);
-        const diffHrs = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-
-        if (diffMin < 1) return 'hace un momento';
-        if (diffMin < 60) return 'hace ' + diffMin + ' min';
-        if (diffHrs < 24) return 'hace ' + diffHrs + (diffHrs === 1 ? ' hora' : ' horas');
-        if (diffDays < 30) return 'hace ' + diffDays + (diffDays === 1 ? ' día' : ' días');
-        const diffMonths = Math.floor(diffDays / 30);
-        return 'hace ' + diffMonths + (diffMonths === 1 ? ' mes' : ' meses');
-    }
-
-    function renderQuotePickerList(quotes) {
-        const container = document.getElementById('quotePickerList');
-
-        if (quotes.length === 0) {
-            container.innerHTML = '<div class="quote-picker-empty"><i class="ti ti-file-off me-2"></i>No hay cotizaciones editables</div>';
-            return;
-        }
-
-        container.innerHTML = quotes.map(q => {
-            const creatorName = q.createdBy ? q.createdBy.fullName : 'Sin asignar';
-            const serviceCount = q.serviceCount || 0;
-            const updated = timeAgo(q.updatedAt);
-
-            return '<div class="quote-list-item" data-quote-id="' + q.id + '">' +
-                '<div class="flex-grow-1">' +
-                    '<div class="quote-folio">' + q.folio + '</div>' +
-                    '<div class="quote-meta">' + serviceCount + ' servicios · ' + creatorName +
-                        (updated ? ' · ' + updated : '') + '</div>' +
-                '</div>' +
-                '<span class="quote-status status-' + q.status + '">' + q.status + '</span>' +
-            '</div>';
-        }).join('');
-    }
-
-    async function showDaySelector(quoteId) {
-        const token = getAccessToken();
-
-        // Hide quote list, show loading
-        document.getElementById('quotePickerList').style.display = 'none';
-        document.querySelector('#createNewQuoteBtn').style.display = 'none';
-        document.querySelector('.quote-search-input').style.display = 'none';
-        document.getElementById('quotePickerLoading').style.display = 'block';
-
-        // Ensure daySelector container exists
-        let daySelector = document.getElementById('daySelector');
-        if (!daySelector) {
-            daySelector = document.createElement('div');
-            daySelector.id = 'daySelector';
-            document.getElementById('quotePickerList').parentNode.appendChild(daySelector);
-        }
-        daySelector.style.display = 'none';
-
-        try {
-            const quoteRes = await fetch('/api/quotes/' + quoteId, {
-                headers: { 'Authorization': 'Bearer ' + token }
-            });
-            if (!quoteRes.ok) throw new Error('Error al obtener cotización');
-
-            const quoteData = await quoteRes.json();
-            const quote = quoteData.data || quoteData;
-            window._selectedQuote = quote;
-            const days = (quote.serviceItems && quote.serviceItems.days) || [];
-
-            // 0 or 1 days → add directly, no extra interaction
-            if (days.length <= 1) {
-                document.getElementById('quotePickerLoading').style.display = 'none';
-                if (days.length === 0) {
-                    await addExperienceToNewDay(quoteId);
-                } else {
-                    await addExperienceToDay(quoteId, 0);
-                }
-                return;
-            }
-
-            // 2+ days → show day picker
-            let html = '<div class="day-selector-back mb-3"><i class="ti ti-arrow-left me-1"></i>Volver a cotizaciones</div>';
-            html += '<div class="quote-folio mb-3">' + quote.folio + ' — Seleccionar día</div>';
-
-            html += days.map((day, idx) => {
-                const scCount = (day.subconcepts || []).length;
-                return '<div class="day-list-item" data-quote-id="' + quoteId + '" data-day-index="' + idx + '">' +
-                    '<div class="flex-grow-1">' +
-                        '<div class="day-title">Día ' + day.dayNumber + (day.dayTitle ? ' — ' + day.dayTitle : '') + '</div>' +
-                        '<div class="quote-meta">' + scCount + ' servicios</div>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
-
-            html += '<div class="new-day-date-row mt-2" data-quote-id="' + quoteId + '">' +
-                '<label class="form-label small text-muted mb-1">Agregar nuevo día:</label>' +
-                '<input type="date" class="form-control form-control-sm new-day-date-input" data-quote-id="' + quoteId + '">' +
-            '</div>';
-
-            daySelector.innerHTML = html;
-            daySelector.style.display = 'block';
-
-        } catch (error) {
-            console.error('Error loading quote days:', error);
-            showAddToQuoteError(error.message);
-            // Reset to quote list
-            document.getElementById('quotePickerList').style.display = 'block';
-            document.querySelector('#createNewQuoteBtn').style.display = '';
-            document.querySelector('.quote-search-input').style.display = '';
-        } finally {
-            document.getElementById('quotePickerLoading').style.display = 'none';
-        }
-    }
-
-    async function addExperienceToDay(quoteId, dayIndex) {
-        const experience = window._selectedExperience;
-        const quote = window._selectedQuote;
-        const token = getAccessToken();
-
-        // Show loading
-        document.getElementById('daySelector').style.display = 'none';
-        document.getElementById('quoteActionLoading').style.display = 'block';
-
-        try {
-            const serviceItems = quote.serviceItems || { days: [], subtotal: 0, iva: 0, total: 0 };
-
-            // Build subconcept
-            const newSubconcept = {
-                type: 'experience',
-                experienceId: experience.id,
-                title: experience.name,
-                time: '',
-                hours: 0,
-                unitPrice: experience.price,
-                total: experience.price,
-                isPerPerson: true,
-                numberOfPeople: 1
-            };
-
-            // Add to selected day
-            serviceItems.days[dayIndex].subconcepts.push(newSubconcept);
-
-            // Recalculate totals
-            let subtotal = 0;
-            serviceItems.days.forEach(day => {
-                let dayTotal = 0;
-                (day.subconcepts || []).forEach(sc => { dayTotal += (sc.total || 0); });
-                day.dayTotal = Math.round(dayTotal * 100) / 100;
-                subtotal += dayTotal;
-            });
-            serviceItems.subtotal = Math.round(subtotal * 100) / 100;
-            serviceItems.iva = Math.round(subtotal * 0.16 * 100) / 100;
-            serviceItems.total = Math.round((serviceItems.subtotal + serviceItems.iva) * 100) / 100;
-
-            // PUT
-            const updateRes = await fetch('/api/quotes/' + quoteId + '/service-items', {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(serviceItems)
-            });
-
-            if (!updateRes.ok) {
-                const errData = await updateRes.json();
-                throw new Error(errData.error || 'Error al agregar experiencia');
-            }
-
-            bootstrap.Modal.getInstance(document.getElementById('addToQuoteModal'))?.hide();
-            showAddToQuoteSuccess(quote.folio || quoteId, quoteId);
-
-        } catch (error) {
-            console.error('Error adding experience to day:', error);
-            showAddToQuoteError(error.message);
-            document.getElementById('daySelector').style.display = 'block';
-            document.getElementById('quoteActionLoading').style.display = 'none';
-        }
-    }
-
-    async function addExperienceToNewDay(quoteId, dayTitle) {
-        const experience = window._selectedExperience;
-        const quote = window._selectedQuote;
-        const token = getAccessToken();
-
-        const daySel = document.getElementById('daySelector');
-        if (daySel) daySel.style.display = 'none';
-        document.getElementById('quoteActionLoading').style.display = 'block';
-
-        try {
-            const serviceItems = quote.serviceItems || { days: [], subtotal: 0, iva: 0, total: 0 };
-            if (!serviceItems.days) serviceItems.days = [];
-
-            const newDayNumber = serviceItems.days.length + 1;
-            serviceItems.days.push({
-                dayNumber: newDayNumber,
-                dayTitle: dayTitle || '',
-                subconcepts: [{
-                    type: 'experience',
-                    experienceId: experience.id,
-                    title: experience.name,
-                    time: '',
-                    hours: 0,
-                    unitPrice: experience.price,
-                    total: experience.price,
-                    isPerPerson: true,
-                    numberOfPeople: 1
-                }],
-                dayTotal: experience.price
-            });
-
-            // Recalculate totals
-            let subtotal = 0;
-            serviceItems.days.forEach(day => {
-                let dayTotal = 0;
-                (day.subconcepts || []).forEach(sc => { dayTotal += (sc.total || 0); });
-                day.dayTotal = Math.round(dayTotal * 100) / 100;
-                subtotal += dayTotal;
-            });
-            serviceItems.subtotal = Math.round(subtotal * 100) / 100;
-            serviceItems.iva = Math.round(subtotal * 0.16 * 100) / 100;
-            serviceItems.total = Math.round((serviceItems.subtotal + serviceItems.iva) * 100) / 100;
-
-            const updateRes = await fetch('/api/quotes/' + quoteId + '/service-items', {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(serviceItems)
-            });
-
-            if (!updateRes.ok) {
-                const errData = await updateRes.json();
-                throw new Error(errData.error || 'Error al agregar experiencia');
-            }
-
-            bootstrap.Modal.getInstance(document.getElementById('addToQuoteModal'))?.hide();
-            showAddToQuoteSuccess(quote.folio || quoteId, quoteId);
-
-        } catch (error) {
-            console.error('Error adding experience to new day:', error);
-            showAddToQuoteError(error.message);
-            document.getElementById('daySelector').style.display = 'block';
-            document.getElementById('quoteActionLoading').style.display = 'none';
-        }
-    }
-
-    async function createNewQuoteWithExperience() {
-        const experience = window._selectedExperience;
-        const token = getAccessToken();
-
-        // Show action loading
-        document.getElementById('quotePickerList').style.display = 'none';
-        document.getElementById('quoteActionLoading').style.display = 'block';
-        document.querySelector('#createNewQuoteBtn').style.display = 'none';
-        document.querySelector('.quote-search-input').style.display = 'none';
-
-        try {
-            // 1. Create new quote
-            const createRes = await fetch('/api/quotes', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    notes: 'Experiencia: ' + experience.name
-                })
-            });
-
-            if (!createRes.ok) throw new Error('Error al crear cotización');
-            const newQuote = await createRes.json();
-            const quoteId = newQuote.data.id;
-
-            // 2. Add the experience
-            const serviceItems = {
-                days: [{
-                    dayNumber: 1,
-                    dayTitle: 'Día 1',
-                    subconcepts: [{
-                        type: 'experience',
-                        experienceId: experience.id,
-                        title: experience.name,
-                        time: '',
-                        hours: 0,
-                        unitPrice: experience.price,
-                        total: experience.price,
-                        isPerPerson: true,
-                        numberOfPeople: 1
-                    }],
-                    dayTotal: experience.price
-                }],
-                subtotal: Math.round(experience.price * 100) / 100,
-                iva: Math.round(experience.price * 0.16 * 100) / 100,
-                total: Math.round(experience.price * 1.16 * 100) / 100
-            };
-
-            const updateRes = await fetch('/api/quotes/' + quoteId + '/service-items', {
-                method: 'PUT',
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(serviceItems)
-            });
-
-            if (!updateRes.ok) {
-                const errData = await updateRes.json();
-                throw new Error(errData.error || 'Error al agregar experiencia');
-            }
-
-            // 3. Close modal & redirect to quote
-            bootstrap.Modal.getInstance(document.getElementById('addToQuoteModal'))?.hide();
-            window.location.href = '/dashboard/department_manager/quotes/' + quoteId + '?section=services';
-
-        } catch (error) {
-            console.error('Error creating new quote:', error);
-            showAddToQuoteError(error.message);
-            document.getElementById('quotePickerList').style.display = 'block';
-            document.getElementById('quoteActionLoading').style.display = 'none';
-            document.querySelector('#createNewQuoteBtn').style.display = '';
-            document.querySelector('.quote-search-input').style.display = '';
-        }
-    }
-
-    function showAddToQuoteSuccess(folio, quoteId) {
-        const alertHtml = '<div class="alert alert-success alert-dismissible fade show" role="alert">' +
-            '<i class="ti ti-check me-2"></i>' +
-            'Experiencia agregada a <strong>' + folio + '</strong> ' +
-            '<a href="/dashboard/department_manager/quotes/' + quoteId + '?section=services" class="alert-link ms-2">' +
-                'Ver cotización <i class="ti ti-arrow-right"></i>' +
-            '</a>' +
-            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
-        '</div>';
-
-        // Remove existing alerts
-        document.querySelectorAll('.add-to-quote-alert').forEach(el => el.remove());
-
-        const container = document.querySelector('.row.mt-4');
-        if (container) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'add-to-quote-alert';
-            wrapper.innerHTML = alertHtml;
-            container.parentNode.insertBefore(wrapper, container);
-            setTimeout(() => {
-                wrapper.querySelector('.alert')?.classList.remove('show');
-                setTimeout(() => wrapper.remove(), 150);
-            }, 8000);
-        }
-    }
-
-    function showAddToQuoteError(message) {
-        const alertHtml = '<div class="alert alert-danger alert-dismissible fade show" role="alert">' +
-            '<i class="ti ti-alert-circle me-2"></i>' + (message || 'Error al agregar experiencia') +
-            '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>' +
-        '</div>';
-
-        document.querySelectorAll('.add-to-quote-alert').forEach(el => el.remove());
-
-        const container = document.querySelector('.row.mt-4');
-        if (container) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'add-to-quote-alert';
-            wrapper.innerHTML = alertHtml;
-            container.parentNode.insertBefore(wrapper, container);
-            setTimeout(() => {
-                wrapper.querySelector('.alert')?.classList.remove('show');
-                setTimeout(() => wrapper.remove(), 150);
-            }, 8000);
-        }
-    }
-
-    // Reset picker modal on close
-    document.getElementById('addToQuoteModal').addEventListener('hidden.bs.modal', function() {
-        document.getElementById('quotePickerList').innerHTML = '';
-        document.getElementById('quotePickerLoading').style.display = 'none';
-        document.getElementById('quoteActionLoading').style.display = 'none';
-        document.querySelector('#createNewQuoteBtn').style.display = '';
-        document.querySelector('.quote-search-input').style.display = '';
-        const daySelector = document.getElementById('daySelector');
-        if (daySelector) daySelector.style.display = 'none';
-        window._selectedQuote = null;
-    });
-
     <% } %>
 
     // Function to refresh images for a specific experience
@@ -2044,7 +1251,26 @@ document.addEventListener('DOMContentLoaded', function() {
     loadExchangeRate();
     loadTransferRate();
     loadAgencyRate();
-    loadExperiences();
+
+    // Categorías de experiencia dinámicas (desde la BD): pobla el filtro y calienta la
+    // cache ANTES de renderizar las cards, para que categoryLabel() devuelva los nombres.
+    (async function initExperienceCategoriesFilter() {
+        if (window.ExperienceCategories) {
+            try {
+                await window.ExperienceCategories.fetch();
+                const filterSel = document.getElementById('filterCategory');
+                window.ExperienceCategories.populateSelect(
+                    filterSel,
+                    filterSel ? (filterSel.value || '') : '',
+                    { placeholder: 'Tipo de experiencia' }
+                );
+            } catch (e) {
+                console.error('Error cargando categorías de experiencia:', e);
+            }
+        }
+        // Carga las experiencias después de tener las categorías listas.
+        loadExperiences();
+    })();
     
     // Modal functionality for experiences
     let storeGalleryPhotos = [];
@@ -2055,15 +1281,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const modal = new bootstrap.Modal(document.getElementById('experienceDetailsModal'));
         const heroTitle = document.getElementById('experienceHeroTitle');
         const heroImage = document.getElementById('experienceHeroImage');
+        const heroCategory = document.getElementById('experienceHeroCategory');
         const modalLoading = document.getElementById('experienceModalLoading');
-        const tabContent = document.getElementById('experienceTabContent');
-        
+        const detailBody = document.getElementById('experienceDetailBody');
+
         // Set initial data and show loading
         heroTitle.textContent = experienceName;
+        if (heroCategory) { heroCategory.style.display = 'none'; heroCategory.textContent = ''; }
         heroImage.src = '/img/amexing_logo_horizontal.avif'; // Show placeholder while loading
         modalLoading.style.display = 'block';
-        tabContent.style.display = 'none';
-        
+        if (detailBody) detailBody.innerHTML = '';
+
         // Show modal
         modal.show();
         
@@ -2190,8 +1418,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 displayImage: processedExperience.displayImage
             });
             
+            // Store the full processed experience so the currency/payment filter
+            // handlers can re-render the prices section (loadPricesTab).
+            window._selectedExperience = processedExperience;
+
             await loadExperienceDetailsIntoModal(processedExperience, experienceName);
-            
+
         } catch (error) {
             console.error('Error loading experience details:', error);
             showModalError('No se pudieron cargar los detalles de la experiencia');
@@ -2201,9 +1433,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to load experience data into modal
     async function loadExperienceDetailsIntoModal(experience, experienceName) {
         const modalLoading = document.getElementById('experienceModalLoading');
-        const tabContent = document.getElementById('experienceTabContent');
         const heroImage = document.getElementById('experienceHeroImage');
-        
+        const heroTitle = document.getElementById('experienceHeroTitle');
+        const heroCategory = document.getElementById('experienceHeroCategory');
+        const detailBody = document.getElementById('experienceDetailBody');
+
         try {
             // Set optimized hero image with progressive loading
             const heroImageContainer = heroImage.parentElement;
@@ -2276,23 +1510,408 @@ document.addEventListener('DOMContentLoaded', function() {
                 heroImage.dispatchEvent(new Event('load'));
             }
             
-            // Load content into each tab
-            loadInformationTab(experience, experienceName);
-            loadGalleryTab(experience, experienceName);
-            loadDetailsTab(experience);
+            // ---- LEFT pane caption: title + category/type pills ----
+            if (heroTitle) heroTitle.textContent = experience.name || experienceName || '';
+            if (heroCategory) {
+                const catLabel = categoryLabel(experience.experience_category);
+                if (catLabel) {
+                    heroCategory.textContent = catLabel.toUpperCase();
+                    heroCategory.style.display = '';
+                } else {
+                    heroCategory.style.display = 'none';
+                }
+            }
+            const heroType = document.getElementById('experienceHeroType');
+            if (heroType) {
+                const tipoVal = experience.tipo || experience.experienceType;
+                if (tipoVal) {
+                    heroType.textContent = String(tipoVal).charAt(0).toUpperCase() + String(tipoVal).slice(1);
+                    heroType.style.display = '';
+                } else {
+                    heroType.style.display = 'none';
+                }
+            }
+
+            // ---- Store photos for the fullscreen gallery (reused mechanism) ----
+            if (experience.photos && experience.photos.length > 0) {
+                storeGalleryPhotos = experience.photos.map((photo, index) => ({
+                    ...photo,
+                    alt: `${experienceName} - Foto ${index + 1}`
+                }));
+            } else {
+                storeGalleryPhotos = [];
+            }
+
+            // ---- Render the single-scroll body ----
+            detailBody.innerHTML = renderExperienceDetailBody(experience, experienceName);
+
+            // Galería: clic en miniatura → cambia el hero (imagen principal);
+            // clic en el hero → abre el visor a pantalla completa en la foto seleccionada.
+            const thumbEls = detailBody.querySelectorAll('.exp-lux__thumb');
+            thumbEls.forEach((el) => {
+                el.addEventListener('click', () => {
+                    const idx = parseInt(el.dataset.photoIndex, 10) || 0;
+                    if (el.dataset.photoUrl) heroImage.src = el.dataset.photoUrl;
+                    heroImage.dataset.currentIndex = idx;
+                    thumbEls.forEach((t) => t.classList.toggle('is-active', t === el));
+                });
+            });
+            heroImage.dataset.currentIndex = 0;
+            const mediaPane = heroImage.closest('.exp-lux__media');
+            const expandBtn = document.getElementById('experienceHeroExpand');
+            const hasGallery = storeGalleryPhotos.length > 0;
+            if (mediaPane) {
+                mediaPane.style.cursor = hasGallery ? 'zoom-in' : '';
+                mediaPane.onclick = () => {
+                    if (hasGallery) openFullscreenGallery(parseInt(heroImage.dataset.currentIndex, 10) || 0);
+                };
+            }
+            if (expandBtn) expandBtn.style.display = hasGallery ? '' : 'none';
+
+            // Navegación de la tira: flechas ‹ › y rueda del mouse (vertical → horizontal).
+            const galStrip = detailBody.querySelector('.exp-lux__gallery');
+            const galPrev = detailBody.querySelector('.exp-lux__gallery-nav--prev');
+            const galNext = detailBody.querySelector('.exp-lux__gallery-nav--next');
+            if (galStrip && galPrev && galNext) {
+                const galStep = () => Math.max(galStrip.clientWidth * 0.75, 200);
+                const galUpdateNav = () => {
+                    const maxScroll = galStrip.scrollWidth - galStrip.clientWidth - 2;
+                    galPrev.classList.toggle('is-hidden', galStrip.scrollLeft <= 0);
+                    galNext.classList.toggle('is-hidden', maxScroll <= 0 || galStrip.scrollLeft >= maxScroll);
+                };
+                galPrev.addEventListener('click', () => galStrip.scrollBy({ left: -galStep(), behavior: 'smooth' }));
+                galNext.addEventListener('click', () => galStrip.scrollBy({ left: galStep(), behavior: 'smooth' }));
+                galStrip.addEventListener('scroll', galUpdateNav);
+                galStrip.addEventListener('wheel', (e) => {
+                    if (galStrip.scrollWidth <= galStrip.clientWidth) return;
+                    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+                        galStrip.scrollLeft += e.deltaY;
+                        e.preventDefault();
+                    }
+                }, { passive: false });
+                // Recalcular al abrir (las imágenes pueden cambiar el ancho al cargar).
+                galUpdateNav();
+                setTimeout(galUpdateNav, 300);
+            }
+
+            // Render the prices section (kept separate for currency/payment refresh)
             loadPricesTab(experience);
 
-            // Hide loading and show content (don't wait for itinerary images)
+            // Hide loading
             modalLoading.style.display = 'none';
-            tabContent.style.display = 'block';
 
-            // Load itinerary in background (fetches images async)
-            loadItineraryTab(experience);
-            
         } catch (error) {
             console.error('Error loading experience details into modal:', error);
             showModalError('Error al cargar los detalles de la experiencia');
         }
+    }
+
+    // Build the full luxury detail body (all sections except prices, which are
+    // injected by loadPricesTab so they can be re-rendered on filter change).
+    function renderExperienceDetailBody(experience, experienceName) {
+        const currency = document.getElementById('filterCurrency').value;
+        const paymentType = document.getElementById('filterPayment').value;
+
+        // Accept arrays OR newline-delimited strings for list-type fields.
+        const toArr = (v) => {
+            if (!v) return [];
+            if (Array.isArray(v)) return v.filter(x => x !== null && x !== undefined && String(x).trim() !== '');
+            return String(v).split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        };
+
+        const sections = [];
+
+        // 1. Description (serif italic)
+        if (experience.description) {
+            sections.push(`<div class="exp-lux__section"><p class="exp-lux__desc">${experience.description}</p></div>`);
+        }
+
+        // 2. Info tiles: Duración, Capacidad y Tiempo de viaje.
+        const durVal = experience.duration ? formatDuration(experience.duration) : '';
+        const minP = experience.min_people;
+        const maxP = experience.max_people || experience.capacity;
+        let groupVal = '';
+        if (minP && maxP) groupVal = `${minP}–${maxP} personas`;
+        else if (maxP) groupVal = `Máximo ${maxP} personas`;
+        else if (minP) groupVal = `Mínimo ${minP} personas`;
+        const expTipo = experience.tipo || experience.experienceType;
+        const tiles = [
+            ['DURACIÓN', durVal || '—'],
+            ['CAPACIDAD', groupVal || '—'],
+        ];
+        if (experience.travel_duration) {
+            tiles.push(['TIEMPO DE VIAJE', formatTravelDuration(experience.travel_duration)]);
+        }
+        sections.push(`
+            <div class="exp-lux__tiles">
+                ${tiles.map(([label, val]) => `
+                <div class="exp-lux__tile">
+                    <span class="exp-lux__tile-label">${label}</span>
+                    <span class="exp-lux__tile-value">${val}</span>
+                </div>`).join('')}
+            </div>
+        `);
+
+        // 2b. Itinerario (from serviceItems.subconcepts — mirrors old loadItineraryTab accessors, synchronous)
+        const subconcepts = experience.serviceItems?.subconcepts || [];
+        if (subconcepts.length) {
+            const sortedItin = [...subconcepts].sort((a, b) =>
+                parseItineraryTime(a.time || a.startTime) - parseItineraryTime(b.time || b.startTime)
+            );
+            const itinItems = sortedItin.map(item => {
+                const startTime = item.time || item.startTime || '';
+                const endTime = item.endTime || '';
+                const timeDisplay = startTime ? (endTime ? `${startTime} – ${endTime}` : startTime) : '';
+                const name = item.concept || 'Sin nombre';
+                const notes = item.notes || '';
+                return `
+                    <li class="exp-lux__itinerary-item">
+                        <span class="exp-lux__itinerary-dot"></span>
+                        <div class="exp-lux__itinerary-body">
+                            <span class="exp-lux__itinerary-name">${name}</span>
+                            ${timeDisplay ? `<span class="exp-lux__itinerary-time">${timeDisplay}</span>` : ''}
+                            ${notes ? `<p class="exp-lux__itinerary-notes">${notes}</p>` : ''}
+                        </div>
+                    </li>
+                `;
+            }).join('');
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">ITINERARIO</h4>
+                    <ul class="exp-lux__itinerary">${itinItems}</ul>
+                </div>
+            `);
+        }
+
+        // 3 + 4. Incluye / No incluye, lado a lado en 2 columnas (se apilan en panel angosto).
+        const inc = toArr(experience.includes);
+        const ninc = toArr(experience.notincludes);
+        if (inc.length || ninc.length) {
+            const incCol = inc.length ? `
+                    <div class="exp-lux__inc-col">
+                        <h4 class="exp-lux__heading">INCLUYE</h4>
+                        <ul class="exp-lux__list">
+                            ${inc.map(i => `<li><span class="exp-lux__check">✓</span><span>${i}</span></li>`).join('')}
+                        </ul>
+                    </div>` : '';
+            const nincCol = ninc.length ? `
+                    <div class="exp-lux__inc-col">
+                        <h4 class="exp-lux__heading">NO INCLUYE</h4>
+                        <ul class="exp-lux__list exp-lux__list--muted">
+                            ${ninc.map(i => `<li><span class="exp-lux__cross">×</span><span>${i}</span></li>`).join('')}
+                        </ul>
+                    </div>` : '';
+            sections.push(`
+                <div class="exp-lux__section">
+                    <div class="exp-lux__inc-grid">${incCol}${nincCol}</div>
+                </div>
+            `);
+        }
+
+        // 4b. Requisitos (string with newlines → pre-line, or array → list)
+        const reqIsArr = Array.isArray(experience.requirements);
+        const reqHas = reqIsArr ? experience.requirements.length > 0 : (experience.requirements && String(experience.requirements).trim() !== '');
+        if (reqHas) {
+            let reqBody;
+            if (reqIsArr) {
+                const items = experience.requirements.filter(x => x !== null && x !== undefined && String(x).trim() !== '');
+                reqBody = `<ul class="exp-lux__list">${items.map(i => `<li><span class="exp-lux__check">✓</span><span>${i}</span></li>`).join('')}</ul>`;
+            } else {
+                reqBody = `<p class="exp-lux__prewrap">${experience.requirements}</p>`;
+            }
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">REQUISITOS</h4>
+                    ${reqBody}
+                </div>
+            `);
+        }
+
+        // 5. Galería: tira horizontal con TODAS las fotos. Clic en miniatura cambia el hero.
+        if (experience.photos && experience.photos.length > 0) {
+            const thumbs = experience.photos.map((photo, index) => {
+                const url = getOptimizedImageUrl(photo) || '/img/amexing_logo_horizontal.avif';
+                return `<button type="button" class="exp-lux__thumb${index === 0 ? ' is-active' : ''}" data-photo-index="${index}" data-photo-url="${url}" style="background-image:url('${url}')" aria-label="Ver foto ${index + 1}"></button>`;
+            }).join('');
+            sections.push(`
+                <div class="exp-lux__section">
+                    <div class="exp-lux__gallery-head">
+                        <h4 class="exp-lux__heading">GALERÍA</h4>
+                        <div class="exp-lux__gallery-navs">
+                            <button type="button" class="exp-lux__gallery-nav exp-lux__gallery-nav--prev is-hidden" aria-label="Anterior"><i class="ti ti-chevron-left"></i></button>
+                            <button type="button" class="exp-lux__gallery-nav exp-lux__gallery-nav--next" aria-label="Siguiente"><i class="ti ti-chevron-right"></i></button>
+                        </div>
+                    </div>
+                    <div class="exp-lux__gallery">${thumbs}</div>
+                </div>
+            `);
+        }
+
+        // 6. Reserva: tiempo de anticipación + notas de reserva, juntos en una sola sección.
+        // Fall back to booking_notes/notas/notes so content isn't lost (old modal behavior).
+        const bookingNotes = experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes;
+        // Si la experiencia no tiene reserva anticipada configurada, se asume 24h (1 día) por default.
+        const advMinResv = experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime) || 1440;
+        if (advMinResv || bookingNotes) {
+            let reservaInner = '';
+            if (advMinResv) {
+                reservaInner += `<p class="exp-lux__resv-adv">Reservar con al menos <span class="exp-lux__resv-adv-value">${formatAdvanceBooking(advMinResv)}</span> de anticipación.</p>`;
+            }
+            if (bookingNotes) {
+                reservaInner += `<p class="exp-lux__prewrap exp-lux__resv-notes">${bookingNotes}</p>`;
+            }
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">RESERVA</h4>
+                    ${reservaInner}
+                </div>
+            `);
+        }
+
+        // 7. Key-value rows (moneda/método de pago se muestran en la sección de precios;
+        //    el tipo de experiencia se muestra como pill en el hero)
+        const kv = [];
+        // Ubicación
+        const ubic = experience.location || experience.address;
+        if (ubic) kv.push(['UBICACIÓN', ubic]);
+        // Disponibilidad desglosada por día (día → sus horarios). Se agrupan los días que
+        // comparten exactamente el mismo horario para no repetir (p.ej. "Lun, Mié, Vie · 9:00 am").
+        const to12h = (hhmm) => {
+            const m = String(hhmm || '').match(/^(\d{1,2}):(\d{2})/);
+            if (!m) return '';
+            let h = parseInt(m[1], 10);
+            const min = m[2];
+            const ampm = h >= 12 ? 'pm' : 'am';
+            h = h % 12; if (h === 0) h = 12;
+            return h + ':' + min + ' ' + ampm;
+        };
+        const schedDayAbbr = {
+            '0': 'Do', '7': 'Do', 'sunday': 'Do', 'domingo': 'Do',
+            '1': 'Lu', 'monday': 'Lu', 'lunes': 'Lu',
+            '2': 'Ma', 'tuesday': 'Ma', 'martes': 'Ma',
+            '3': 'Mi', 'wednesday': 'Mi', 'miércoles': 'Mi', 'miercoles': 'Mi',
+            '4': 'Ju', 'thursday': 'Ju', 'jueves': 'Ju',
+            '5': 'Vi', 'friday': 'Vi', 'viernes': 'Vi',
+            '6': 'Sa', 'saturday': 'Sa', 'sábado': 'Sa', 'sabado': 'Sa'
+        };
+        const schedShort = { 'Lu': 'Lun', 'Ma': 'Mar', 'Mi': 'Mié', 'Ju': 'Jue', 'Vi': 'Vie', 'Sa': 'Sáb', 'Do': 'Dom' };
+        const schedFull = { 'Lu': 'Lunes', 'Ma': 'Martes', 'Mi': 'Miércoles', 'Ju': 'Jueves', 'Vi': 'Viernes', 'Sa': 'Sábado', 'Do': 'Domingo' };
+        const schedOrder = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+        let scheduleRendered = false;
+        if (Array.isArray(experience.availability) && experience.availability.length) {
+            const perDay = {}; // abbr -> [horarios formateados]
+            experience.availability.forEach(entry => {
+                if (!entry || typeof entry !== 'object') return;
+                let dv = entry.day !== undefined ? entry.day : (entry.Day !== undefined ? entry.Day : (entry.name !== undefined ? entry.name : entry.value));
+                if (dv === null || dv === undefined) return;
+                const abbr = schedDayAbbr[String(dv).toLowerCase().trim()];
+                if (!abbr) return;
+                const times = [];
+                if (Array.isArray(entry.times)) {
+                    entry.times.forEach(t => {
+                        if (!t) return;
+                        const s = to12h(t.start || t.startTime || t.start_time);
+                        const e = to12h(t.end || t.endTime || t.end_time);
+                        if (s) times.push(e ? `${s} – ${e}` : s);
+                    });
+                } else if (entry.startTime || entry.start_time) {
+                    const s = to12h(entry.startTime || entry.start_time);
+                    const e = to12h(entry.endTime || entry.end_time);
+                    if (s) times.push(e ? `${s} – ${e}` : s);
+                }
+                if (!perDay[abbr]) perDay[abbr] = [];
+                times.forEach(t => { if (!perDay[abbr].includes(t)) perDay[abbr].push(t); });
+            });
+            const activeDays = Object.keys(perDay).sort((a, b) => schedOrder.indexOf(a) - schedOrder.indexOf(b));
+            const anyTimes = activeDays.some(d => perDay[d].length);
+            if (activeDays.length && anyTimes) {
+                // Agrupar días con el mismo conjunto de horarios.
+                const groups = [];
+                activeDays.forEach(d => {
+                    const key = perDay[d].join('|');
+                    const g = groups.find(gr => gr.key === key);
+                    if (g) g.days.push(d); else groups.push({ key, days: [d], times: perDay[d] });
+                });
+                const rowsHtml = groups.map(g => {
+                    let label;
+                    if (g.days.length === 7) label = 'Todos los días';
+                    else if (g.days.length === 1) label = schedFull[g.days[0]];
+                    else label = g.days.map(d => schedShort[d]).join(', ');
+                    const timesHtml = g.times.length
+                        ? g.times.map(t => `<span class="exp-lux__sched-time">${t}</span>`).join('')
+                        : '<span class="exp-lux__sched-time exp-lux__sched-time--muted">Horario por confirmar</span>';
+                    return `<div class="exp-lux__sched-row"><span class="exp-lux__sched-days">${label}</span><span class="exp-lux__sched-times">${timesHtml}</span></div>`;
+                }).join('');
+                sections.push(`
+                    <div class="exp-lux__section">
+                        <h4 class="exp-lux__heading">${experience.fixed_schedule ? 'HORARIOS' : 'HORARIOS SUGERIDOS'}</h4>
+                        <div class="exp-lux__sched">${rowsHtml}</div>
+                    </div>
+                `);
+                scheduleRendered = true;
+            }
+        }
+        // Fallback: si no hubo horarios por día, mostrar al menos los días disponibles como texto.
+        if (!scheduleRendered) {
+            kv.push(['DÍAS DISPONIBLES', experience.displayAvailability || 'Todos los días']);
+        }
+        // Tiempo de viaje
+        if (kv.length) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <div class="exp-lux__kv">
+                        ${kv.map(([k, v]) => `<div class="exp-lux__kv-row"><span class="exp-lux__kv-key">${k}</span><span class="exp-lux__kv-val">${v}</span></div>`).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        // Idioma como chips (se lee mejor que texto plano).
+        const langs = Array.isArray(experience.languages) ? experience.languages : (experience.languages ? [experience.languages] : []);
+        if (langs.length) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">IDIOMA</h4>
+                    <div class="exp-lux__chips">
+                        ${langs.map(l => `<span class="exp-lux__chip">${l}</span>`).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        // 8. Precios por persona (filled by loadPricesTab into #pricesContent)
+        sections.push(`
+            <div class="exp-lux__section">
+                <h4 class="exp-lux__heading">PRECIOS POR PERSONA</h4>
+                <div id="pricesContent" class="exp-lux__prices"></div>
+            </div>
+        `);
+
+        // 9. Términos y condiciones (buy-out / mínimo privado) — junto a precios y cancelación al final.
+        //    El contenido lo inyecta loadPricesTab en #termsContent para que los montos se
+        //    conviertan por moneda/recargo y se actualicen en vivo (igual que los precios).
+        const hasBuyout = experience.buyout !== null && experience.buyout !== undefined && experience.buyout !== '';
+        const hasPriv = experience.private_min_value !== null && experience.private_min_value !== undefined && experience.private_min_value !== '';
+        if (hasBuyout || hasPriv) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">TÉRMINOS Y CONDICIONES</h4>
+                    <div id="termsContent" class="exp-lux__kv"></div>
+                </div>
+            `);
+        }
+
+        // 10. Política de cancelación — hasta el final, como sección normal (sobria).
+        if (experience.cancellation_policy) {
+            sections.push(`
+                <div class="exp-lux__section">
+                    <h4 class="exp-lux__heading">CANCELACIÓN</h4>
+                    <p class="exp-lux__prewrap">${experience.cancellation_policy}</p>
+                </div>
+            `);
+        }
+
+        return sections.join('');
     }
     
     // Function to load Information tab
@@ -2370,6 +1989,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 ` : ''}
 
+                <!-- Categoría (experience_category, categoría temática) -->
+                ${categoryLabel(experience.experience_category) ? `
+                    <div class="content-section">
+                        <h5><i class="ti ti-category me-2"></i>Categoría</h5>
+                        <span class="type-badge" style="background: rgba(43, 182, 115, 0.12); color: #157347;">${categoryLabel(experience.experience_category)}</span>
+                    </div>
+                ` : ''}
+
                 <!-- Tipo de Experiencia Section -->
                 ${(experience.experienceType || experience.tipo) ? `
                     <div class="content-section">
@@ -2382,7 +2009,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${(experience.advance_minutes || experience.advance_booking_time || experience.advanceBookingTime) ? `
                     <div class="alert alert-warning">
                         <i class="ti ti-clock-hour-4 me-2"></i>
-                        <strong>Reservar con anticipación:</strong> Mínimo ${formatTravelDuration(experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime) || 0)} antes
+                        <strong>Reservar con anticipación:</strong> Mínimo ${formatAdvanceBooking(experience.advance_minutes || parseInt(experience.advance_booking_time) || parseInt(experience.advanceBookingTime) || 0)} antes
                     </div>
                 ` : ''}
 
@@ -2390,7 +2017,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${(experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes) ? `
                     <div class="content-section">
                         <h5><i class="ti ti-note me-2"></i>Notas de Reserva</h5>
-                        <p>${experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes}</p>
+                        <p style="white-space: pre-line;">${experience.client_booking_notes || experience.booking_notes || experience.notas || experience.notes}</p>
                     </div>
                 ` : ''}
             </div>
@@ -2785,7 +2412,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             ${(experience.cancellation_policy || (experience.buyout !== null && experience.buyout !== undefined) || (experience.private_min_value !== null && experience.private_min_value !== undefined)) ? `
                 <div class="content-section">
-                    <h5 class="text-warning mb-3"><i class="ti ti-file-description me-2"></i>Condiciones</h5>
+                    <h5 class="text-warning mb-3"><i class="ti ti-file-description me-2"></i>Términos y condiciones</h5>
                     <ul class="list-unstyled mb-0">
                         ${experience.cancellation_policy ? `<li class="mb-2"><strong><i class="ti ti-calendar-x me-1"></i>Políticas de cancelación:</strong> <span style="white-space: pre-line;">${experience.cancellation_policy}</span></li>` : ''}
                         ${(experience.buyout !== null && experience.buyout !== undefined) ? `<li class="mb-2"><strong><i class="ti ti-cash me-1"></i>Buy-out:</strong> $${Number(experience.buyout).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</li>` : ''}
@@ -2796,106 +2423,63 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
 
-    // Function to load Prices tab (without vehicle pricing)
+    // Render the "Precios por persona" section into #pricesContent.
+    // Kept as a standalone function because it is re-invoked when the currency
+    // or payment-method filter changes (see the filter change handlers).
     function loadPricesTab(experience) {
         const pricesContent = document.getElementById('pricesContent');
-        
-        // Clear any existing content first
-        pricesContent.innerHTML = '';
-        
-        // Get current currency and payment type from dropdowns
+        if (!pricesContent) return;
+
+        // Read current currency & payment type from the page filters.
         const currency = document.getElementById('filterCurrency').value;
         const paymentType = document.getElementById('filterPayment').value;
-        
-        // Create selections info display for experiences
-        const currencyText = currency === 'USD' ? 'USD' : 'MXN';
-        const paymentText = paymentType === 'efectivo' ? 'Efectivo' : 
-                            paymentType === 'transferencia' ? 'Transferencia' : 'Tarjeta Débito/Crédito';
-        
-        let pricingHtml = `
-            <div class="alert alert-info d-flex align-items-center mb-4" style="background-color: rgba(var(--brand-primary-rgb), 0.10); border-color: rgba(var(--brand-primary-rgb), 0.25);">
-                <i class="ti ti-info-circle me-2" style="font-size: 1.2rem;"></i>
-                <div>
-                    <strong>Configuración actual de precios:</strong>
-                    <div class="mt-1">
-                        <span class="badge me-2" style="background-color: white; color: black; border: 1px solid #dee2e6;">
-                            <i class="ti ti-currency-dollar me-1"></i>${currencyText}
-                        </span>
-                        <span class="badge me-2" style="background-color: white; color: black; border: 1px solid #dee2e6;">
-                            <i class="ti ti-credit-card me-1"></i>${paymentText}
-                        </span>
+        const unit = `${currency} / PERSONA`;
+
+        const cards = [];
+        const addCard = (label, subtitle, price) => {
+            if (parseFloat(price || 0) > 0) {
+                cards.push(`
+                    <div class="exp-lux__price-card">
+                        <div class="exp-lux__price-left">
+                            <span class="exp-lux__price-name">${label}</span>
+                            <span class="exp-lux__price-sub">${subtitle}</span>
+                        </div>
+                        <div class="exp-lux__price-right">
+                            <span class="exp-lux__price-amount">${convertExperiencePrice(price, currency, paymentType)}</span>
+                            <span class="exp-lux__price-unit">${unit}</span>
+                        </div>
                     </div>
-                </div>
-            </div>
-        `;
-        
-        // Check for per-person pricing (support both original and display fields)
-        if (experience.displayPrice || experience.displayPriceChild || experience.displayPriceNoAlcohol || experience.cost || experience.price_child || experience.price_no_alcohol || experience.price) {
-            pricingHtml += `
-                <div class="additional-pricing-section">
-                    <h6 class="mb-3"><i class="ti ti-users me-2"></i>Precios por Persona</h6>
-                    <div class="row g-3">
-                        ${(experience.displayPrice || experience.cost || experience.price) ? `
-                            <div class="col-md-4">
-                                <div class="additional-price-card">
-                                    <div class="additional-price-icon bg-primary">
-                                        <i class="ti ti-user"></i>
-                                    </div>
-                                    <div class="additional-price-info">
-                                        <span class="additional-price-label">Adulto</span>
-                                        <span class="additional-price-value">${convertExperiencePrice(experience.displayPrice || experience.cost || experience.price, currency, paymentType)}</span>
-                                        <small class="text-muted">Precio general</small>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${(experience.displayPriceChild || experience.price_child) ? `
-                            <div class="col-md-4">
-                                <div class="additional-price-card">
-                                    <div class="additional-price-icon bg-info">
-                                        <i class="ti ti-mood-kid"></i>
-                                    </div>
-                                    <div class="additional-price-info">
-                                        <span class="additional-price-label">Niño</span>
-                                        <span class="additional-price-value">${convertExperiencePrice(experience.displayPriceChild || experience.price_child, currency, paymentType)}</span>
-                                        <small class="text-muted">Menor de edad</small>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                        ${(experience.displayPriceNoAlcohol || experience.price_no_alcohol) ? `
-                            <div class="col-md-4">
-                                <div class="additional-price-card">
-                                    <div class="additional-price-icon bg-success">
-                                        <i class="ti ti-user-check"></i>
-                                    </div>
-                                    <div class="additional-price-info">
-                                        <span class="additional-price-label">Sin Alcohol</span>
-                                        <span class="additional-price-value">${convertExperiencePrice(experience.displayPriceNoAlcohol || experience.price_no_alcohol, currency, paymentType)}</span>
-                                        <small class="text-muted">Sin bebidas alcohólicas</small>
-                                    </div>
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
+                `);
+            }
+        };
+
+        addCard('ADULTO', 'Precio general', experience.displayPrice || experience.cost || experience.price);
+        addCard('NIÑO', 'Precio niño', experience.displayPriceChild || experience.price_child);
+        addCard('SIN ALCOHOL', 'Sin alcohol', experience.displayPriceNoAlcohol || experience.price_no_alcohol);
+
+        // Moneda y método de pago aplicados a estos precios (se actualizan con los filtros).
+        const currencyMap = { MXN: 'MXN — Peso Mexicano', USD: 'USD — US Dollar' };
+        const payMap = { efectivo: 'Efectivo', transferencia: 'Transferencia bancaria', tarjeta: 'Tarjeta de crédito' };
+        const metaRows = [['Moneda', currencyMap[currency] || currency]];
+        if (payMap[paymentType]) metaRows.push(['Método de pago', payMap[paymentType]]);
+        const metaHtml = `<div class="exp-lux__price-meta">${metaRows.map(([k, v]) => `<div class="exp-lux__price-meta-row"><span>${k}</span><span>${v}</span></div>`).join('')}</div>`;
+
+        pricesContent.innerHTML = (cards.length ? cards.join('') : `<p class="exp-lux__quote">Por cotizar</p>`) + metaHtml;
+
+        // Términos y condiciones (buy-out / mínimo privado): los montos usan el MISMO cálculo
+        // que los precios por persona (convertExperiencePrice → recargo por pago + conversión a
+        // USD + comas) y se refrescan aquí en cada cambio de moneda/pago.
+        const termsContent = document.getElementById('termsContent');
+        if (termsContent) {
+            const trows = [];
+            const hasBuyout = experience.buyout !== null && experience.buyout !== undefined && experience.buyout !== '';
+            const hasPriv = experience.private_min_value !== null && experience.private_min_value !== undefined && experience.private_min_value !== '';
+            if (hasBuyout) trows.push(['Buy-out', convertExperiencePrice(experience.buyout, currency, paymentType)]);
+            if (hasPriv) trows.push(['Mínimo para hacerlo privado', experience.private_min_type === 'monto'
+                ? convertExperiencePrice(experience.private_min_value, currency, paymentType)
+                : Number(experience.private_min_value) + ' personas']);
+            termsContent.innerHTML = trows.map(([k, v]) => `<div class="exp-lux__kv-row"><span class="exp-lux__kv-key">${k}</span><span class="exp-lux__kv-val">${v}</span></div>`).join('');
         }
-        
-        // If no pricing data found, show a clean message (but keep the info banner)
-        const hasNoPricingData = !experience.displayPrice && !experience.displayPriceChild && !experience.displayPriceNoAlcohol && !experience.cost && !experience.price_child && !experience.price_no_alcohol && !experience.price;
-        
-        if (hasNoPricingData) {
-            pricingHtml += `
-                <div class="text-center py-5">
-                    <i class="ti ti-currency-dollar" style="font-size: 3rem; color: #dee2e6;"></i>
-                    <p class="mt-3 text-muted">No hay información de precios disponible</p>
-                    <p class="small text-muted">Por favor, contacte con nosotros para obtener cotización personalizada.</p>
-                </div>
-            `;
-        }
-        
-        pricesContent.innerHTML = pricingHtml;
     }
     
     // Function to load Itinerary tab
@@ -3261,15 +2845,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function showModalError(message) {
         const modalLoading = document.getElementById('experienceModalLoading');
-        const tabContent = document.getElementById('experienceTabContent');
-        
-        modalLoading.innerHTML = `
-            <div class="text-center py-5">
-                <i class="ti ti-alert-triangle text-warning" style="font-size: 3rem;"></i>
-                <h5 class="mt-3">Error</h5>
-                <p class="text-muted">${message}</p>
-            </div>
-        `;
+        const detailBody = document.getElementById('experienceDetailBody');
+
+        if (detailBody) detailBody.innerHTML = '';
+        if (modalLoading) {
+            modalLoading.style.display = 'block';
+            modalLoading.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="ti ti-alert-triangle text-warning" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3">Error</h5>
+                    <p class="text-muted">${message}</p>
+                </div>
+            `;
+        }
     }
     
     function openFullscreenGallery(index) {
@@ -4223,86 +3811,7 @@ document.addEventListener('DOMContentLoaded', function() {
     border: 1px solid #dee2e6;
 }
 
-/* Add to Quote Picker Modal */
-.create-new-quote-option {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 14px 16px;
-    border: 2px dashed var(--brand-primary);
-    border-radius: 8px;
-    color: var(--brand-primary-active);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.create-new-quote-option:hover {
-    background: rgba(var(--brand-primary-rgb), 0.05);
-    border-color: var(--brand-primary-active);
-    color: var(--brand-primary-active);
-}
-
-.quote-picker-list {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.quote-list-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.quote-list-item:hover {
-    background: #f8f9fa;
-    border-color: var(--brand-primary);
-    box-shadow: 0 1px 4px rgba(var(--brand-primary-rgb), 0.12);
-}
-
-.quote-list-item .quote-folio {
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--brand-secondary);
-}
-
-.quote-list-item .quote-client {
-    font-size: 0.8rem;
-    color: #6c757d;
-}
-
-.quote-list-item .quote-meta {
-    font-size: 0.75rem;
-    color: #adb5bd;
-}
-
-.quote-list-item .quote-status {
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 4px;
-    text-transform: capitalize;
-    white-space: nowrap;
-}
-
-.quote-status.status-requested { background: #fff3cd; color: #856404; }
-.quote-status.status-hold { background: rgba(var(--brand-primary-rgb), 0.10); color: var(--brand-primary-active); }
-
-.quote-search-input {
-    border-radius: 6px;
-}
-
-.quote-picker-empty {
-    text-align: center;
-    padding: 24px 16px;
-    color: #6c757d;
-}
+/* Picker de cotización → estilos en organisms/quotes/add-to-quote-modal.ejs (compartido) */
 
 .add-to-quote-btn {
     padding: 0.25rem 0.5rem;
@@ -4314,44 +3823,769 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 12px 24px;
 }
 
-.day-selector-back {
-    font-size: 0.85rem;
-    color: var(--brand-primary-active);
-    cursor: pointer;
+
+/* =====================================================================
+   Experience Detail Modal — Luxury redesign (namespaced .exp-lux__*)
+   ===================================================================== */
+.exp-lux-modal {
+    --exp-cream: #EAE7DF;
+    --exp-tile: #E4DFCF;
+    --exp-border: #d6d1c4;
+    --exp-olive: #6E7A50;
+    --exp-olive-light: #7C8A5A;
+    --exp-muted: #8a8f78;
+    --exp-gold: #b8894a;
+    --exp-dark: #2b2b2b;
+    --exp-serif: var(--font-arpona), 'Georgia', serif;
+}
+.exp-lux__dialog {
+    max-width: 1160px;
+    width: 96vw;
+    margin: 1.75rem auto;
+}
+.exp-lux__content {
+    border: none;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--exp-cream);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+.exp-lux__grid {
+    display: grid;
+    grid-template-columns: 42% 58%;
+    height: min(88vh, 820px);
+}
+
+/* ---- LEFT: media pane ---- */
+.exp-lux__media {
+    position: relative;
+    overflow: hidden;
+    background: #1c1c1c;
+}
+.exp-lux__media-img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.exp-lux__media-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.15) 45%, rgba(0, 0, 0, 0) 70%);
+    pointer-events: none;
+}
+.exp-lux__media-caption {
+    position: absolute;
+    left: 34px;
+    right: 34px;
+    bottom: 36px;
+    z-index: 2;
+    pointer-events: none;
+}
+.exp-lux__expand {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    z-index: 3;
+    width: 40px;
+    height: 40px;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.28);
+    color: #fff;
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    transition: background 0.2s, border-color 0.2s;
+}
+.exp-lux__expand:hover {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: #fff;
+}
+.exp-lux__expand i {
+    font-size: 1.15rem;
+}
+.exp-lux__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.exp-lux__category {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(20, 20, 20, 0.55);
+    backdrop-filter: blur(4px);
+    color: #f3f0e8;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.exp-lux__type-pill {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(243, 240, 232, 0.65);
+    background: rgba(20, 20, 20, 0.28);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: #f3f0e8;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+.exp-lux__title {
+    margin: 0;
+    font-family: var(--exp-serif);
+    font-weight: 500;
+    font-size: 2.15rem;
+    line-height: 1.12;
+    color: #f7f4ec;
+    letter-spacing: 0.01em;
+}
+.exp-lux__title-underline {
+    display: block;
+    width: 40px;
+    height: 2px;
+    margin-top: 16px;
+    background: var(--exp-gold);
 }
 
-.day-selector-back:hover {
-    color: var(--brand-primary-active);
-    text-decoration: underline;
+/* ---- RIGHT: content pane ---- */
+.exp-lux__panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--exp-cream);
+    min-height: 0;
 }
-
-.day-list-item {
+.exp-lux__header {
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
+    justify-content: flex-end;
+    padding: 22px 34px;
+    border-bottom: 1px solid var(--exp-border);
 }
-
-.day-list-item:hover {
-    background: #f8f9fa;
-    border-color: var(--brand-primary);
-    box-shadow: 0 1px 4px rgba(var(--brand-primary-rgb), 0.12);
-}
-
-.day-list-item .day-title {
+.exp-lux__eyebrow {
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--exp-muted);
     font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--brand-secondary);
+}
+.exp-lux__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--exp-dark);
+    font-size: 1.05rem;
+    transition: background 0.2s, color 0.2s;
+}
+.exp-lux__close:hover {
+    background: var(--exp-olive);
+    border-color: var(--exp-olive);
+    color: #fff;
 }
 
-.new-day-date-row {
-    padding: 10px 0;
+.exp-lux__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 30px 34px 34px;
+}
+.exp-lux__loading {
+    text-align: center;
+    padding: 60px 0;
+    color: var(--exp-olive);
+}
+.exp-lux__section {
+    margin-bottom: 30px;
+}
+.exp-lux__heading {
+    margin: 0 0 16px;
+    font-family: var(--exp-serif);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--exp-olive);
+    font-weight: 600;
+}
+.exp-lux__desc {
+    margin: 0;
+    font-family: var(--exp-serif);
+    font-size: 1.06rem;
+    line-height: 1.75;
+    color: var(--exp-dark);
+    white-space: pre-line;
+}
+
+/* Info tiles */
+.exp-lux__tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+    margin-bottom: 30px;
+}
+.exp-lux__tile {
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 16px 18px;
+    background: rgba(255, 255, 255, 0.25);
+}
+.exp-lux__tile-label {
+    display: block;
+    font-size: 0.66rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--exp-muted);
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+.exp-lux__tile-value {
+    display: block;
+    font-family: var(--exp-serif);
+    font-size: 1.15rem;
+    color: var(--exp-dark);
+}
+
+/* Reserva */
+.exp-lux__resv-adv {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--exp-dark);
+}
+.exp-lux__resv-adv-value {
+    font-weight: 700;
+    color: var(--exp-olive);
+}
+.exp-lux__resv-notes {
+    margin: 16px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--exp-border);
+    color: var(--exp-muted);
+}
+
+/* Meta de precios (moneda / método de pago) */
+.exp-lux__price-meta {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--exp-border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.exp-lux__price-meta-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-size: 0.8rem;
+    color: var(--exp-muted);
+}
+.exp-lux__price-meta-row span:last-child {
+    color: var(--exp-dark);
+    font-weight: 600;
+}
+
+/* Includes / excludes — 2 columnas lado a lado */
+.exp-lux__inc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 20px 32px;
+}
+.exp-lux__inc-col .exp-lux__heading {
+    margin-top: 0;
+}
+
+/* Includes / excludes lists */
+.exp-lux__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.exp-lux__list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 7px 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--exp-dark);
+}
+.exp-lux__check {
+    color: var(--exp-olive);
+    font-weight: 700;
+    flex: 0 0 auto;
+    line-height: 1.5;
+}
+.exp-lux__cross {
+    color: var(--exp-muted);
+    font-weight: 700;
+    flex: 0 0 auto;
+    line-height: 1.5;
+}
+.exp-lux__list--muted li {
+    color: #6c6c66;
+}
+
+/* Gallery thumbnails */
+.exp-lux__gallery-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.exp-lux__gallery-head .exp-lux__heading {
+    margin: 0;
+}
+.exp-lux__gallery-navs {
+    display: inline-flex;
+    gap: 4px;
+}
+.exp-lux__gallery {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.exp-lux__gallery::-webkit-scrollbar {
+    display: none;
+}
+.exp-lux__gallery-nav {
+    background: transparent;
+    border: none;
+    padding: 2px;
+    color: var(--exp-muted);
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s, opacity 0.2s;
+}
+.exp-lux__gallery-nav:hover {
+    color: var(--exp-olive);
+}
+.exp-lux__gallery-nav.is-hidden {
+    opacity: 0.25;
+    pointer-events: none;
+}
+.exp-lux__gallery-nav i {
+    font-size: 1.2rem;
+    display: block;
+}
+.exp-lux__thumb {
+    flex: 0 0 auto;
+    width: 96px;
+    height: 96px;
+    scroll-snap-align: start;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.exp-lux__thumb:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+.exp-lux__thumb.is-active {
+    border-color: var(--exp-olive);
+    box-shadow: 0 0 0 2px var(--exp-olive);
+}
+
+/* Itinerary timeline */
+.exp-lux__itinerary {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.exp-lux__itinerary-item {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px 16px 12px 14px;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    background: var(--exp-tile);
+    margin-bottom: 10px;
+}
+.exp-lux__itinerary-item:last-child {
+    margin-bottom: 0;
+}
+.exp-lux__itinerary-dot {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    margin-top: 7px;
+    border-radius: 50%;
+    background: var(--exp-olive);
+}
+.exp-lux__itinerary-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.exp-lux__itinerary-name {
+    display: block;
+    font-family: var(--exp-serif);
+    font-size: 1.05rem;
+    color: var(--exp-dark);
+    line-height: 1.4;
+}
+.exp-lux__itinerary-time {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--exp-olive);
+    font-weight: 600;
+}
+.exp-lux__itinerary-notes {
+    margin: 6px 0 0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--exp-muted);
+    white-space: pre-line;
+}
+
+/* Booking notes box */
+.exp-lux__notebox {
+    background: var(--exp-tile);
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 20px 22px;
+}
+.exp-lux__notebox .exp-lux__heading {
+    margin-bottom: 10px;
+}
+.exp-lux__prewrap {
+    white-space: pre-line;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--exp-dark);
+}
+
+/* Key-value rows */
+.exp-lux__kv {
+    display: flex;
+    flex-direction: column;
+}
+.exp-lux__kv-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 7px 0;
+}
+.exp-lux__kv-row:last-child {
+    border-bottom: none;
+}
+.exp-lux__kv-key {
+    flex: 0 0 auto;
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--exp-olive);
+    font-weight: 600;
+}
+.exp-lux__kv-val {
+    text-align: right;
+    font-size: 0.95rem;
+    color: var(--exp-dark);
+}
+
+/* Schedule breakdown (día → horarios) */
+.exp-lux__sched {
+    display: flex;
+    flex-direction: column;
+}
+.exp-lux__sched-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 7px 0;
+}
+.exp-lux__sched-row:last-child {
+    border-bottom: none;
+}
+.exp-lux__sched-days {
+    flex: 0 0 auto;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--exp-dark);
+    white-space: nowrap;
+    padding-top: 3px;
+}
+.exp-lux__sched-times {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+}
+.exp-lux__sched-time {
+    background: var(--exp-tile);
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 0.82rem;
+    color: var(--exp-dark);
+    white-space: nowrap;
+}
+.exp-lux__sched-time--muted {
+    background: transparent;
+    color: var(--exp-muted);
+    font-style: italic;
+}
+
+/* Chips (idioma, etc.) */
+.exp-lux__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.exp-lux__chip {
+    display: inline-flex;
+    align-items: center;
+    background: var(--exp-tile);
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 0.82rem;
+    color: var(--exp-dark);
+}
+
+/* Price cards */
+.exp-lux__prices {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.exp-lux__price-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    border: 1px solid var(--exp-border);
+    border-radius: 4px;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.3);
+}
+.exp-lux__price-name {
+    display: block;
+    font-family: var(--exp-serif);
+    font-size: 1.02rem;
+    letter-spacing: 0.06em;
+    color: var(--exp-dark);
+}
+.exp-lux__price-sub {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--exp-muted);
+    margin-top: 3px;
+}
+.exp-lux__price-right {
+    text-align: right;
+}
+.exp-lux__price-amount {
+    display: block;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--exp-dark);
+}
+.exp-lux__price-unit {
+    display: block;
+    font-size: 0.64rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--exp-muted);
+    margin-top: 2px;
+}
+.exp-lux__quote {
+    font-family: var(--exp-serif);
+    font-style: italic;
+    color: var(--exp-muted);
+    margin: 0;
+}
+
+/* Sticky footer CTA */
+.exp-lux__footer {
+    flex: 0 0 auto;
+    padding: 18px 34px;
+    border-top: 1px solid var(--exp-border);
+    background: var(--exp-cream);
+}
+.exp-lux__cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 15px 20px;
+    border: none;
+    border-radius: 4px;
+    background: var(--exp-olive);
+    color: #fff;
+    font-size: 0.82rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+.exp-lux__cta:hover {
+    background: #5c6743;
+}
+.exp-lux__cta-arrow {
+    font-size: 1rem;
+}
+
+/* Responsive: stack columns on small screens */
+@media (max-width: 767.98px) {
+    .exp-lux__grid {
+        grid-template-columns: 1fr;
+        height: min(92vh, 900px);
+    }
+    .exp-lux__media {
+        height: 220px;
+        min-height: 220px;
+    }
+    .exp-lux__title {
+        font-size: 1.6rem;
+    }
+    .exp-lux__media-caption {
+        left: 22px;
+        right: 22px;
+        bottom: 22px;
+    }
+    .exp-lux__header,
+    .exp-lux__body,
+    .exp-lux__footer {
+        padding-left: 22px;
+        padding-right: 22px;
+    }
+    .exp-lux__gallery {
+        gap: 8px;
+    }
+}
+</style>
+
+<style>
+/* =====================================================================
+   Catálogo de Experiencias — rediseño (paleta lujo, sans)
+   ===================================================================== */
+.exp-catalog {
+    --exp-cream: #EAE7DF; --exp-tile: #E4DFCF; --exp-border: #d6d1c4;
+    --exp-olive: #6E7A50; --exp-olive-light: #7C8A5A; --exp-muted: #8a8f78;
+    --exp-gold: #b8894a; --exp-dark: #2b2b2b;
+}
+/* Filtros */
+.exp-catalog__filters {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 8px 0 4px;
+}
+.exp-field { position: relative; }
+.exp-field input,
+.exp-field select {
+    width: 100%;
+    font-size: 0.92rem;
+    color: var(--exp-dark);
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid var(--exp-border);
+    border-radius: 6px;
+    padding: 13px 16px;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+}
+.exp-field input:focus,
+.exp-field select:focus { border-color: var(--exp-olive); background: #fff; }
+.exp-field--search input { padding-left: 42px; }
+.exp-field--select select { padding-right: 38px; }
+.exp-field__icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--exp-muted); pointer-events: none; }
+.exp-field__caret { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--exp-muted); pointer-events: none; font-size: 0.9rem; }
+.exp-catalog__count { font-size: 0.85rem; color: var(--exp-muted); text-align: right; margin: 8px 0 18px; }
+
+/* Loading / vacío */
+.exp-catalog__loading { text-align: center; padding: 60px 0; color: var(--exp-muted); }
+.exp-catalog__loading .spinner-border { color: var(--exp-olive); }
+.exp-catalog__loading p { margin-top: 12px; }
+.exp-catalog__empty { text-align: center; padding: 60px 0; color: var(--exp-muted); }
+.exp-catalog__empty i { font-size: 3rem; color: var(--exp-border); }
+.exp-catalog__empty p { margin-top: 12px; }
+
+/* Card */
+.expcard {
+    background: rgba(255, 255, 255, 0.30);
+    border: 1px solid var(--exp-border);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    transition: transform 0.25s, box-shadow 0.25s;
+}
+.expcard:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12); }
+.expcard__media { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #1c1c1c; }
+.expcard__media .image-loading-container,
+.expcard__media .experience-picture,
+.expcard__media .no-image { position: absolute; inset: 0; width: 100%; height: 100%; }
+.expcard__media .experience-img,
+.expcard__media img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s, opacity 0.3s; }
+.expcard:hover .experience-img { transform: scale(1.05); }
+.expcard__media .no-image { display: flex; align-items: center; justify-content: center; background: var(--exp-tile); }
+.expcard__media .no-image img { width: 60%; height: auto; object-fit: contain; }
+.expcard__media .experience-img.loading { opacity: 0; }
+.expcard__media .progressive-loader { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 1; }
+
+/* Tags (categoría + tipo) apilados arriba-izquierda */
+.expcard__tags { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 82%; z-index: 2; }
+.expcard__badge { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; padding: 5px 11px; border-radius: 3px; line-height: 1.3; }
+.expcard__badge--cat { background: rgba(20, 20, 20, 0.62); color: #f3f0e8; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.expcard__badge--tipo { border: 1px solid rgba(243, 240, 232, 0.7); color: #f3f0e8; background: rgba(20, 20, 20, 0.28); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); font-weight: 600; }
+
+/* Body */
+.expcard__body { padding: 20px 20px 18px; display: flex; flex-direction: column; flex: 1; }
+.expcard__title { font-weight: 600; font-size: 1.15rem; line-height: 1.2; margin: 0 0 10px; color: var(--exp-dark); }
+.expcard__desc { font-size: 0.88rem; line-height: 1.6; color: #3e4137; margin: 0 0 16px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.expcard__rows { display: flex; flex-direction: column; margin-bottom: 18px; }
+.expcard__row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 6px 0; }
+.expcard__k { font-size: 0.66rem; letter-spacing: 0.13em; text-transform: uppercase; color: var(--exp-olive); font-weight: 600; white-space: nowrap; }
+.expcard__v { font-size: 0.9rem; color: var(--exp-dark); text-align: right; }
+.expcard__sep { border: none; border-top: 1px solid var(--exp-border); margin: 8px 0; }
+
+/* Acciones */
+.expcard__actions { margin-top: auto; display: flex; gap: 8px; }
+.expcard__btn { flex: 1; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; padding: 11px 10px; border-radius: 4px; cursor: pointer; transition: 0.2s; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; }
+.expcard__btn--primary { border: 1px solid var(--exp-olive); background: var(--exp-olive); color: #fff; }
+.expcard__btn--primary:hover { background: var(--exp-olive-light); border-color: var(--exp-olive-light); color: #fff; }
+.expcard__btn--ghost { border: 1px solid var(--exp-olive); background: transparent; color: var(--exp-olive); }
+.expcard__btn--ghost:hover { background: var(--exp-olive); color: #fff; }
+
+@media (max-width: 767px) {
+    .exp-catalog__filters { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 480px) {
+    .exp-catalog__filters { grid-template-columns: 1fr; }
 }
 </style>

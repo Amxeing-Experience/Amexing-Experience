@@ -45,7 +45,9 @@ Created by Denisse Maldonado
         t: typeof t !== 'undefined' ? t : ((key) => key),
         pageTitle: t('pages:experiencias.title'),
         intro: t('pages:experiencias.intro'),
-        categories: [
+        // Categorías dinámicas (label por idioma + imagen desde la BD) inyectadas por homeController;
+        // si por alguna razón no llegan, se cae a la lista estática con i18n.
+        categories: (typeof categories !== 'undefined' && Array.isArray(categories) && categories.length) ? categories : [
             { label: t('pages:categories.catas'), img: '/images/7.png', value: 'catas' },
             { label: t('pages:categories.arte'), img: '/images/4.png', value: 'arte' },
             { label: t('pages:categories.historiaArquitectura'), img: '/images/3.png', value: 'historia_arquitectura' },

@@ -390,14 +390,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <div class="mb-2">
                 <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Tipo de experiencia</label>
                 <select class="form-select experiencia-category-input">
+                    <%# Opciones cargadas dinámicamente desde la BD (ExperienceCategories.populateSelect). %>
                     <option value="">Seleccionar</option>
-                    <option value="catas">Catas</option>
-                    <option value="arte">Arte</option>
-                    <option value="historia_arquitectura">Historia y Arquitectura</option>
-                    <option value="gastronomicas">Gastronómicas</option>
-                    <option value="aventura">Aventura</option>
-                    <option value="naturaleza">Naturaleza</option>
-                    <option value="de_temporada">De Temporada</option>
                 </select>
             </div>
 
@@ -702,8 +696,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     </div>
 </template>
 
+<!-- Util para categorías de experiencias dinámicas (desde la BD) -->
+<script src="/dashboard/js/utils/experience-categories.js"></script>
 <script>
 (function() {
+    // Precarga las categorías de experiencia (desde la BD) para que estén listas al renderizar cards.
+    if (window.ExperienceCategories) window.ExperienceCategories.fetch();
+
     function initEstablishmentsDataTable() {
         // Check if jQuery and DataTables are available
         if (typeof $ === 'undefined') {
@@ -1961,6 +1960,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const container = document.getElementById('establishmentExperienciasList');
             container.appendChild(clone);
 
+            // Poblar el select de categoría (dinámico desde la BD) de la experiencia nueva.
+            const newCatSel = experienciaCard.querySelector('.experiencia-category-input');
+            if (window.ExperienceCategories && newCatSel) {
+                const applyCat = () => window.ExperienceCategories.populateSelect(newCatSel, '', { placeholder: 'Seleccionar' });
+                applyCat();
+                window.ExperienceCategories.fetch().then(applyCat);
+            }
+
             updateEstablishmentNoExperienciasMessage();
 
             // Una subexperiencia nueva nace expandida para poder llenarla
@@ -2849,7 +2856,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-name-input').value = experiencia.name || '';
             card.querySelector('.experiencia-description-input').value = experiencia.description || '';
             card.querySelector('.experiencia-tipo-input').value = experiencia.tipo || experiencia.providerType || '';
-            card.querySelector('.experiencia-category-input').value = experiencia.experience_category || '';
+            // Categoría de experiencia: poblada dinámicamente desde la BD.
+            // populateSelect conserva el valor guardado aunque ya no esté activo.
+            const experienciaCategorySel = card.querySelector('.experiencia-category-input');
+            if (window.ExperienceCategories) {
+                const applyExperienciaCategory = () => window.ExperienceCategories.populateSelect(
+                    experienciaCategorySel,
+                    experiencia.experience_category || '',
+                    { placeholder: 'Seleccionar' }
+                );
+                // Aplica de inmediato (conserva el valor) y re-aplica al resolver el fetch.
+                applyExperienciaCategory();
+                window.ExperienceCategories.fetch().then(applyExperienciaCategory);
+            } else {
+                experienciaCategorySel.value = experiencia.experience_category || '';
+            }
             card.querySelector('.experiencia-price-input').value = experiencia.price || '';
             card.querySelector('.experiencia-price-no-alcohol-input').value = experiencia.price_no_alcohol || '';
             card.querySelector('.experiencia-price-child-input').value = experiencia.price_child || '';

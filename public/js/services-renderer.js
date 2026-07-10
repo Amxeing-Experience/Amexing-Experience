@@ -717,6 +717,14 @@
             // It belongs only to the internal cotización (services edit) view; the summary /
             // public quote should never expose it to clients.
 
+            // Dirección de pickup (texto libre capturado en el modal de tour/experiencia).
+            if ((service.type === 'tour' || service.type === 'experience') && service.pickupAddress) {
+                html += `<div class="service-detail-item">
+                    <i class="ti ti-map-pin-up me-1 text-success"></i>
+                    <span class="text-muted me-1">Pick-up:</span>${service.pickupAddress}
+                </div>`;
+            }
+
             // "Incluye" / "No incluye" for tours and experiences, shown in two columns.
             // The backend enriches each subconcept with these fields (no client cache
             // needed). Line breaks are preserved via white-space: pre-wrap.
@@ -727,7 +735,14 @@
                     return '';
                 };
                 let includesText = normalizeIncludes(service.includes);
-                const notIncludesText = normalizeIncludes(service.notincludes);
+                let notIncludesText = normalizeIncludes(service.notincludes);
+                // Si la guía está incluida (experienceGuide / includeGuide), no mostrar "guía" en el
+                // "No incluye" — sería contradictorio.
+                if (guideApplies && notIncludesText) {
+                    notIncludesText = notIncludesText.split('\n')
+                        .filter((line) => !/gu[ií]a/i.test(line))
+                        .join('\n');
+                }
                 // Tour con guía cuya lista "Incluye" ya menciona guía: agregamos "Driver" como
                 // ítem (el label aparte se omitió arriba para no duplicar). Así la info de
                 // guía + driver queda en un solo lugar. Solo si aún no aparece driver/chofer.
@@ -759,6 +774,17 @@
                         <strong class="text-secondary" style="font-size: 0.85rem;">Notas</strong>
                     </div>
                     <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.notes}</div>
+                </div>`;
+            }
+
+            // Notas del cliente (agencyNotes) — mismo estilo callout, icono de persona.
+            if (service.agencyNotes) {
+                html += `<div class="mt-2 p-2" style="border-left: 3px solid #adb5bd; width: 100%;">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="ti ti-message-circle me-1 text-secondary"></i>
+                        <strong class="text-secondary" style="font-size: 0.85rem;">Notas del cliente</strong>
+                    </div>
+                    <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.agencyNotes}</div>
                 </div>`;
             }
 
@@ -908,9 +934,8 @@
                 ${destination}
             </div>`;
 
-            // Pickup / drop-off addresses (Punto a Punto + Local)
-            const isPapOrLocal = service.transportType === 'punto-a-punto' || service.transportType === 'local';
-            if (isPapOrLocal) {
+            // Pickup / drop-off addresses: se muestran siempre que existan (cualquier tipo de transporte).
+            {
                 if (service.tripType === 'round-trip') {
                     // Per-leg addresses
                     if (service.pickupAddressIda || service.dropoffAddressIda) {
@@ -1182,6 +1207,17 @@
                         <strong class="text-secondary" style="font-size: 0.85rem;">Notas</strong>
                     </div>
                     <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.notes}</div>
+                </div>`;
+            }
+
+            // Notas del cliente (agencyNotes) — mismo estilo callout, icono de persona.
+            if (service.agencyNotes) {
+                html += `<div class="mt-2 p-2" style="border-left: 3px solid #adb5bd;">
+                    <div class="d-flex align-items-center mb-1">
+                        <i class="ti ti-message-circle me-1 text-secondary"></i>
+                        <strong class="text-secondary" style="font-size: 0.85rem;">Notas del cliente</strong>
+                    </div>
+                    <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.9rem;">${service.agencyNotes}</div>
                 </div>`;
             }
 
@@ -1705,16 +1741,10 @@
             // For a-disposición, return empty to avoid redundancy (vehicle shown below)
             if (service.type === 'a-disposicion') return '';
 
-            // Establishment experiences: append "- ProviderName" to match the dropdown format
-            const isEstablishmentExp = service.type === 'experience'
-                && (service.providerType || '').toLowerCase() === 'establishment'
-                && service.providerName;
-
-            let base = service.concept || service.experienceName || service.tourName || service.name;
+            // Experiencias: se muestra solo el nombre (sin el "- Proveedor" que se agregaba antes
+            // a las de establecimiento), igual que en la lista de servicios del administrador.
+            const base = service.concept || service.experienceName || service.tourName || service.name;
             if (base) {
-                if (isEstablishmentExp && !base.includes(` - ${service.providerName}`)) {
-                    base = `${base} - ${service.providerName}`;
-                }
                 return base;
             }
 

@@ -1005,6 +1005,18 @@ ItineraryBuilder.prototype.updateExtraVehiclesHeaderVisibility = function () {
     if (!header || !list) return;
     const hasRows = list.querySelectorAll('.extra-additional-vehicle-row').length > 0;
     header.classList.toggle('d-none', !hasRows);
+    // El "Tiempo de espera" de los vehículos adicionales NO aplica a tours (no entra en su fórmula):
+    // se oculta esa columna (header + filas) y se ensancha "Precio" para ocupar el hueco. En
+    // transporte se mantiene visible.
+    const isTour = document.querySelector('input[name="serviceType"]:checked')?.value === 'tour';
+    const container = document.getElementById('extraAdditionalVehiclesContainer');
+    if (container) {
+      container.querySelectorAll('.extra-waiting-col').forEach((el) => el.classList.toggle('d-none', isTour));
+      container.querySelectorAll('.extra-price-col').forEach((el) => {
+        el.classList.toggle('col-md-6', isTour);
+        el.classList.toggle('col-md-2', !isTour);
+      });
+    }
 };
 
 ItineraryBuilder.prototype.syncExtraVehiclesButtonEnabled = function () {
@@ -1475,7 +1487,22 @@ ItineraryBuilder.prototype.getExperienceGuideCostMXN = function () {
     const people = num('adultsQuantity') + num('childrenQuantity') + num('adultsNoAlcoholQuantity');
     const duration = parseFloat(document.getElementById('experienceDuration') && document.getElementById('experienceDuration').value) || 0;
     if (people <= 0 || duration <= 0) return 0;
-    return this.getWalkingTourPrice(tour, people, duration) || 0;
+    // El guía se cobra por HORA COMPLETA: a partir de 16 min de la fracción se redondea hacia
+    // arriba (p.ej. 1h45m → 2h). Menos de 16 min de la fracción se descarta. Solo aplica al costo
+    // del guía; la duración mostrada y los precios por persona no cambian.
+    const billedDuration = this.getBilledGuideHours(duration);
+    if (billedDuration <= 0) return 0;
+    return this.getWalkingTourPrice(tour, people, billedDuration) || 0;
+};
+
+// Horas facturables del guía: hora completa a partir de 16 min de la fracción (redondeo hacia
+// arriba), si no se descarta la fracción. Ej: 1.75 → 2, 1.25 → 1, 0.75 → 1, 0.20 → 0.
+ItineraryBuilder.prototype.getBilledGuideHours = function (hours) {
+    const h = parseFloat(hours) || 0;
+    if (h <= 0) return 0;
+    const whole = Math.floor(h);
+    const fractionMinutes = (h - whole) * 60;
+    return fractionMinutes >= 16 - 1e-9 ? whole + 1 : whole;
 };
 
 ItineraryBuilder.prototype.clearTourSchedule = function () {

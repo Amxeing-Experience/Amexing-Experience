@@ -156,10 +156,15 @@ async function injectServiceIncludes(serviceItems) {
     });
   });
 
-  const [tourMap, expMap] = await Promise.all([
+  // Las experiencias pueden ser de catálogo (clase Experience) o de proveedor/establecimiento
+  // (ProviderExperiencia). El id vive en una u otra clase, así que consultamos ambas y mezclamos
+  // (Experience tiene prioridad, igual que el frontend que busca primero en su caché de catálogo).
+  const [tourMap, expCatalogMap, expProviderMap] = await Promise.all([
     batchFetchIncludes('Tour', tourIds),
     batchFetchIncludes('Experience', experienceIds),
+    batchFetchIncludes('ProviderExperiencia', experienceIds),
   ]);
+  const expMap = { ...expProviderMap, ...expCatalogMap };
 
   serviceItems.days.forEach((day) => {
     (day.subconcepts || []).forEach((sc) => {
@@ -220,6 +225,7 @@ class QuoteController {
         client, clientId, clientType, clientFinalId, clientFinalName, contactPerson, contactEmail, contactPhone,
         contactFirstName, contactLastName, notes, eventType,
         leadGuestFirstName, leadGuestLastName,
+        ownerId: initialOwnerId, // Propietario inicial elegido (solo admin/superadmin; se valida)
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
       } = req.body;
 
@@ -515,11 +521,40 @@ class QuoteController {
         },
       });
 
-      // 11a. Initialize ownership for the new quote
-      await this.ownershipService.initializeOwnership(quote.id, currentUser.id);
+      // 11a. Propietario inicial: admin/superadmin puede asignar otro usuario (validado contra los
+      // owners disponibles del cliente); si no aplica o no es válido, el creador. createdBy siempre
+      // queda como el creador real.
+      let resolvedOwnerId = currentUser.id;
+      const canAssignOwner = ['admin', 'superadmin'].includes(req.userRole);
+      if (initialOwnerId && initialOwnerId !== currentUser.id && canAssignOwner) {
+        try {
+          const avail = await this.ownershipService.getAvailableOwnersForClientId({
+            clientId: clientIdNormalized,
+            clientType,
+          });
+          const list = Array.isArray(avail) ? avail : (avail && avail.users) || [];
+          if (list.some((u) => u.id === initialOwnerId)) {
+            resolvedOwnerId = initialOwnerId;
+          } else {
+            logger.warn('QuoteController.createQuote - ownerId no válido; se usa el creador', {
+              initialOwnerId,
+              clientId: clientIdNormalized,
+            });
+          }
+        } catch (e) {
+          logger.warn('QuoteController.createQuote - no se pudo validar ownerId; se usa el creador', { error: e.message });
+        }
+      }
 
-      // 11b. Set the owner field on the quote
-      quote.set('owner', createdByObj);
+      // 11b. Inicializar ownership (owner = elegido, createdBy = creador).
+      await this.ownershipService.initializeOwnership(quote.id, resolvedOwnerId, currentUser.id);
+
+      // 11c. Reflejar el owner elegido en el campo del quote (consistente con initializeOwnership).
+      quote.set('owner', {
+        __type: 'Pointer',
+        className: 'AmexingUser',
+        objectId: resolvedOwnerId,
+      });
       await quote.save(null, { useMasterKey: true });
 
       // 12. Log success (using Pointer objects - IDs only)

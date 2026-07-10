@@ -149,16 +149,80 @@ const e = __isRes ? 'reservación' : 'cotización';
                     </button>
                 </h6>
                 <div>
-                    <div class="fw-medium" id="compactOwnerName">
-                        <div class="placeholder-glow" id="ownerLoader">
-                            <span class="placeholder col-6 placeholder-sm"></span>
+                    <!-- Display del propietario. Se OCULTA al editar y el editor toma su lugar
+                         (así no se repite "propietario mostrado" + "selector de nuevo propietario"). -->
+                    <div id="ownerDisplayBlock">
+                        <div class="fw-medium" id="compactOwnerName">
+                            <div class="placeholder-glow" id="ownerLoader">
+                                <span class="placeholder col-6 placeholder-sm"></span>
+                            </div>
+                        </div>
+                        <small class="text-muted" id="compactOwnerEmail">
+                            <div class="placeholder-glow" id="ownerEmailLoader">
+                                <span class="placeholder col-8 placeholder-xs"></span>
+                            </div>
+                        </small>
+                        <!-- "Cambiar propietario": quote-ownership.js lo muestra solo si this.canTransfer. -->
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-link p-0 text-decoration-none d-none" id="btnInlineChangeOwner">
+                                <i class="ti ti-switch-horizontal me-1"></i>Cambiar propietario
+                            </button>
                         </div>
                     </div>
-                    <small class="text-muted" id="compactOwnerEmail">
-                        <div class="placeholder-glow" id="ownerEmailLoader">
-                            <span class="placeholder col-8 placeholder-xs"></span>
+
+                    <!-- Propietario inicial (solo cotización NUEVA + admin): elegir quién será el
+                         propietario al CREAR. quote-ownership.js revela #initialOwnerRow en new-quote. -->
+                    <% if (typeof userRole !== 'undefined' && (userRole === 'admin' || userRole === 'superadmin')) { %>
+                    <div class="d-none mt-2" id="initialOwnerRow">
+                        <label for="initialOwnerSelect" class="form-label small mb-1">Propietario inicial</label>
+                        <div id="initialOwnerAlerts"></div>
+                        <!-- Mismo combobox buscable que la transferencia (consistencia de diseño). -->
+                        <%- include('../../../atoms/common/tom-select', {
+                            id: 'initialOwnerSelect',
+                            name: 'initialOwnerSelect',
+                            multiple: false,
+                            placeholder: 'Seleccionar propietario…',
+                            label: '',
+                            required: false,
+                            helpText: '',
+                            options: [],
+                            selected: []
+                        }) %>
+                        <div class="form-text">Se asignará al guardar la cotización.</div>
+                    </div>
+                    <% } %>
+
+                    <!-- Editor de transferencia INLINE: ocupa el lugar del display (que se oculta).
+                         Combobox buscable + confirmar (✓) + cancelar (✕). -->
+                    <div class="d-none" id="inlineTransferRow">
+                        <div id="inlineTransferAlerts"></div>
+                        <div class="d-flex align-items-start gap-2">
+                            <div class="flex-grow-1">
+                                <%- include('../../../atoms/common/tom-select', {
+                                    id: 'inlineNewOwnerSelect',
+                                    name: 'inlineNewOwnerSelect',
+                                    multiple: false,
+                                    placeholder: 'Seleccionar nuevo propietario…',
+                                    label: '',
+                                    required: false,
+                                    helpText: '',
+                                    options: [],
+                                    selected: []
+                                }) %>
+                            </div>
+                            <button type="button" class="btn btn-primary" id="btnInlineTransfer" title="Transferir" disabled>
+                                <i class="ti ti-check"></i>
+                            </button>
+                            <button type="button" class="btn btn-light" id="btnInlineTransferCancel" title="Cancelar">
+                                <i class="ti ti-x"></i>
+                            </button>
                         </div>
-                    </small>
+                        <div class="small text-muted mt-1">
+                            La transferencia se aplica al confirmar (<i class="ti ti-check"></i>).
+                            <a href="#" class="text-decoration-none text-primary ms-1" id="btnToggleTransferReason">+ agregar razón</a>
+                        </div>
+                        <input type="text" class="form-control form-control-sm mt-1 d-none" id="inlineTransferReason" placeholder="Motivo de la transferencia (opcional)">
+                    </div>
                 </div>
             </div>
 
@@ -1461,6 +1525,15 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             role: userRole,
             id: currentUserData.id
         };
+    }
+
+    // El ownership manager calcula this.canTransfer con window.currentUser.role. Por un race de
+    // inicialización, su displayOwner corría antes de que window.currentUser estuviera seteado, así
+    // que canTransfer salía false y el botón "Cambiar propietario" aparecía solo tras abrir el modal
+    // "Compartir". Ahora que window.currentUser ya está, forzamos un displayOwner para recalcular y
+    // (re)mostrar el botón en la carga inicial. Si el owner aún no cargó, no-op y el load lo corre luego.
+    if (window.quoteOwnership && typeof window.quoteOwnership.displayOwner === 'function') {
+        try { window.quoteOwnership.displayOwner(); } catch (e) { /* owner aún no cargado */ }
     }
 
     // Get JWT token from cookies
@@ -3300,9 +3373,13 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             }
         }
         
-        // Include status from global header segmented control if exists
+        // Include status from global header segmented control if exists.
+        // OJO: en contexto de RESERVACIÓN el control refleja el status de la RESERVACIÓN
+        // (confirmed/pending/completed/cancelled), que NO es un status válido de cotización
+        // (quoted/requested/hold/scheduled/rejected) — mandarlo hace fallar el update del quote
+        // con "Invalid status". El status de la cotización se deja intacto en ese caso.
         const checkedStatus = document.querySelector('input[name="quoteStatus"]:checked');
-        if (checkedStatus) {
+        if (checkedStatus && !window.__isReservation) {
             formData.status = checkedStatus.value;
         }
 
@@ -3440,6 +3517,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                 formData.clientType = 'direct';
             }
         }
+
+        // Propietario inicial elegido (solo admin/superadmin, cotización nueva). El server valida
+        // contra los owners del cliente y, si no aplica o es inválido, usa al creador.
+        formData.ownerId = document.getElementById('initialOwnerSelect')?.value || undefined;
 
         // Debug: Log the form data being sent
         console.log('🚀 Creating quote with form data:', {
