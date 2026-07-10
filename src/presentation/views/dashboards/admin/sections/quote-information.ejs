@@ -3373,9 +3373,13 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             }
         }
         
-        // Include status from global header segmented control if exists
+        // Include status from global header segmented control if exists.
+        // OJO: en contexto de RESERVACIÓN el control refleja el status de la RESERVACIÓN
+        // (confirmed/pending/completed/cancelled), que NO es un status válido de cotización
+        // (quoted/requested/hold/scheduled/rejected) — mandarlo hace fallar el update del quote
+        // con "Invalid status". El status de la cotización se deja intacto en ese caso.
         const checkedStatus = document.querySelector('input[name="quoteStatus"]:checked');
-        if (checkedStatus) {
+        if (checkedStatus && !window.__isReservation) {
             formData.status = checkedStatus.value;
         }
 
