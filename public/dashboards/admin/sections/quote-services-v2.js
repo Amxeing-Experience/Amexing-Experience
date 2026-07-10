@@ -2630,35 +2630,35 @@ class ItineraryBuilder {
     const start = this.parseTimeToMinutes(document.getElementById('experienceStartTime')?.value);
     const end = this.parseTimeToMinutes(document.getElementById('experienceEndTime')?.value);
     const durationInput = document.getElementById('experienceDuration');
-    const hint = document.getElementById('experienceRealDuration');
-    if (start === null || end === null || !durationInput) {
-      // Sin ambas horas: se conserva la duración de catálogo/manual; se oculta el aviso.
-      if (hint) hint.classList.add('d-none');
-      return;
-    }
+    if (start === null || end === null || !durationInput) return; // sin ambas horas, no se deriva
     let diff = end - start;
     if (diff <= 0) diff += 1440; // el horario cruza medianoche
     const realHours = Math.round((diff / 60) * 100) / 100; // 2 decimales
     durationInput.value = String(realHours);
-    this._syncExperienceDurationInputs(); // reflejar en los campos visibles Horas/Minutos
-
-    // El small solo aparece cuando la duración real difiere de la de catálogo de la experiencia.
-    const catalog = parseFloat(this._experienceCatalogDuration);
-    const differs = Number.isNaN(catalog) || Math.abs(realHours - catalog) > 0.01;
-    if (hint) {
-      if (differs) {
-        // Formato amigable (ej. "1 hora y 45 minutos") en vez del decimal 1.75.
-        hint.textContent = `Duración real según horario: ${this.formatMinutesToHoursAndMinutes(Math.round(realHours * 60))}`;
-        hint.classList.remove('d-none');
-      } else {
-        hint.classList.add('d-none');
-      }
-    }
+    this._syncExperienceDurationInputs(); // reflejar en Horas/Minutos + actualizar el hint
 
     this.serviceModified = true;
     // La duración afecta el costo del guía (tier×personas × duración): recalcular desgloses.
     this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
+  }
+
+  // Aviso (solo admin, small text) con la DURACIÓN ORIGINAL de la experiencia (catálogo), cuando la
+  // duración actual del input difiere de ella. Sirve de referencia al admin de cuánto dura "de fábrica".
+  _updateExperienceOriginalDurationHint() {
+    const hint = document.getElementById('experienceRealDuration');
+    if (!hint) return;
+    const isAdmin = ['admin', 'superadmin'].includes(this.userRole);
+    const catalog = parseFloat(this._experienceCatalogDuration);
+    const current = parseFloat(document.getElementById('experienceDuration')?.value);
+    const differs = !Number.isNaN(current) && Math.abs(current - catalog) > 0.01;
+    if (!isAdmin || Number.isNaN(catalog) || catalog <= 0 || !differs) {
+      hint.classList.add('d-none');
+      hint.textContent = '';
+      return;
+    }
+    hint.textContent = `Duración original de la experiencia: ${this.formatMinutesToHoursAndMinutes(Math.round(catalog * 60))}`;
+    hint.classList.remove('d-none');
   }
 
   // Refleja el valor canónico (#experienceDuration, horas decimales) en los campos visibles
@@ -2674,6 +2674,7 @@ class ItineraryBuilder {
     if (m >= 60) { h += 1; m -= 60; } // acarreo por redondeo (p.ej. 1.999h)
     hoursInput.value = String(h);
     minutesInput.value = String(m);
+    this._updateExperienceOriginalDurationHint();
   }
 
   // Combina los campos visibles Horas + Minutos en el valor canónico #experienceDuration (horas
@@ -2685,6 +2686,7 @@ class ItineraryBuilder {
     const hidden = document.getElementById('experienceDuration');
     const decimal = h + (m / 60);
     if (hidden) hidden.value = decimal > 0 ? String(Math.round(decimal * 100) / 100) : '';
+    this._updateExperienceOriginalDurationHint();
     this.serviceModified = true;
     // El costo del "Guía" depende de la duración (tier×personas × duración), así que recalcular.
     this.updateDevPaymentBreakdown();
