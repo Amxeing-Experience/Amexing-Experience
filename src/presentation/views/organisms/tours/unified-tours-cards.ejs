@@ -2127,6 +2127,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-tour-id="${tour.id || tour.objectId}"
                                         data-tour-name="${destination}"
                                         data-walking-price-small="${tour.walkingPriceSmall || 0}"
+                                        data-walking-price-medium="${tour.walkingPriceMedium || 0}"
+                                        data-walking-price-large="${tour.walkingPriceLarge || 0}"
+                                        data-walking-range-small="${(tour.walkingRangeSmall || '').replace(/"/g, '&quot;')}"
+                                        data-walking-range-medium="${(tour.walkingRangeMedium || '').replace(/"/g, '&quot;')}"
+                                        data-walking-range-large="${(tour.walkingRangeLarge || '').replace(/"/g, '&quot;')}"
                                         data-walking-currency="${tour.walkingPriceCurrency || 'MXN'}"
                                         data-min-hours="${tour.time ? (parseInt(tour.time) / 60) : 1}"
                                         title="Agregar a Cotización">
@@ -2359,32 +2364,63 @@ document.addEventListener('DOMContentLoaded', function() {
     <% if (currentUserRole === 'department_manager' || currentUserRole === 'client') { %>
     // ========== Add Tour to Quote (módulo genérico compartido: /dashboard/js/utils/add-to-quote.js) ==========
     (function() {
-        // ── Tours A PIE (walking): un solo botón por tour ──
-        // El precio real depende del nº de personas (tramo chico/mediano/grande × horas),
-        // y eso lo calcula la cotización. Aquí guardamos el subconcepto walking con
-        // default de 1 persona (tramo chico) para que no quede en $0, y el builder
-        // recalcula el tramo/precio al ajustar el nº de personas en la cotización.
-        function buildWalkingTourSubconcept(t) {
-            const minHours = parseFloat(t.minHours) || 1;
-            let smallPrice = parseFloat(t.walkingPriceSmall) || 0;
-            const origCurrency = (t.walkingCurrency || 'MXN').toUpperCase();
-            // El builder guarda walkingTourPrice en MXN: convertir si el tour está en USD.
-            if (origCurrency === 'USD' && currentExchangeRate) {
-                smallPrice = Math.round(smallPrice * currentExchangeRate);
+        // ── Tours A PIE (walking): el precio depende del nº de personas (tramo × horas). ──
+        // Se piden las personas en el modal (pre-llenadas de la cotización) y calculamos aquí.
+        // Réplica de la lógica del builder (tramos por tamaño de grupo, reparto greedy).
+        function parseWalkingRange(rangeStr) {
+            if (!rangeStr) return null;
+            const s = String(rangeStr).replace(/pax|personas/gi, '').trim();
+            if (s.indexOf('+') >= 0) { const m = parseInt(s, 10); return isNaN(m) ? null : { min: m, max: Infinity }; }
+            const parts = s.split('-').map(function (x) { return parseInt(x, 10); });
+            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) return { min: parts[0], max: parts[1] };
+            const one = parseInt(s, 10);
+            return isNaN(one) ? null : { min: one, max: one };
+        }
+
+        // Precio base EFECTIVO (MXN) para N personas × horas.
+        function computeWalkingBaseMXN(w, peopleCount, hours) {
+            const usd = (w.walkingCurrency || 'MXN').toUpperCase() === 'USD';
+            const conv = function (p) { return (usd && currentExchangeRate) ? Math.round(p * currentExchangeRate) : p; };
+            let tiers = [
+                { range: parseWalkingRange(w.rangeSmall), price: conv(Number(w.priceSmall) || 0) },
+                { range: parseWalkingRange(w.rangeMedium), price: conv(Number(w.priceMedium) || 0) },
+                { range: parseWalkingRange(w.rangeLarge), price: conv(Number(w.priceLarge) || 0) }
+            ].filter(function (t) { return t.range && t.price > 0; });
+            if (!tiers.length) return 0;
+            tiers.sort(function (a, b) {
+                const am = a.range.max === Infinity ? 1e9 : a.range.max;
+                const bm = b.range.max === Infinity ? 1e9 : b.range.max;
+                return bm - am;
+            });
+            let remaining = Math.max(1, parseInt(peopleCount, 10) || 1);
+            let total = 0, guard = 0;
+            while (remaining > 0 && guard++ < 200) {
+                let tier = null;
+                for (let i = 0; i < tiers.length; i++) { if (tiers[i].range.min <= remaining) { tier = tiers[i]; break; } }
+                if (!tier) tier = tiers[tiers.length - 1];
+                const cap = tier.range.max === Infinity ? remaining : tier.range.max;
+                total += tier.price; // precio POR GRUPO
+                remaining -= Math.min(remaining, cap);
             }
-            const total = Math.round(smallPrice * minHours * 100) / 100; // 1 persona → tramo chico
+            return Math.round(total * (parseFloat(hours) || 1) * 100) / 100;
+        }
+
+        function buildWalkingTourSubconcept(t, counts) {
+            const minHours = parseFloat(t.minHours) || 1;
+            const people = (counts && parseInt(counts.personas, 10)) || 1;
+            const total = computeWalkingBaseMXN(t, people, minHours);
             return {
                 type: 'tour',
                 tourId: t.id,
                 title: t.name,
                 isWalkingTour: true,
                 walkingPriceMode: 'calculated',
-                walkingTourCurrency: origCurrency,
-                walkingTourPeopleCount: 1,
-                adultsQuantity: 1,
+                walkingTourCurrency: (t.walkingCurrency || 'MXN').toUpperCase(),
+                walkingTourPeopleCount: people,
+                adultsQuantity: people,
                 childrenQuantity: 0,
                 infantsQuantity: 0,
-                persons: 1,
+                persons: people,
                 duration: minHours,
                 hours: minHours,
                 walkingTourPrice: total,
@@ -2411,15 +2447,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function openTourAddToQuote(tour) {
             if (!tour) return;
-            const sub = buildWalkingTourSubconcept(tour);
-            const totalFmt = catalogSurchargedMXN(sub.total || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
             const minHours = parseFloat(tour.minHours) || 1;
             AddToQuote.open({
                 userRole: '<%= currentUserRole %>',
                 serviceLabel: 'Tour a pie',
                 itemLabel: '<strong>' + (tour.name || 'Tour') + '</strong>' +
-                    '<br><span class="small">$' + totalFmt + ' MXN · 1 persona · mín ' + minHours + 'h · ajusta el nº de personas en la cotización</span>',
-                buildSubconcept: function() { return buildWalkingTourSubconcept(tour); }
+                    '<br><span class="small">Precio por tamaño de grupo · mín ' + minHours + 'h</span>',
+                people: {
+                    title: '¿Cuántas personas?',
+                    hint: 'Se pre-llena con las personas de la cotización. El precio depende del tamaño del grupo.',
+                    minTotal: 1,
+                    fields: [
+                        { key: 'personas', label: 'Personas', quoteField: 'numberOfPeople' }
+                    ],
+                    priceFor: function(counts) { return computeWalkingBaseMXN(tour, counts.personas, minHours); }
+                },
+                buildSubconcept: function(counts) { return buildWalkingTourSubconcept(tour, counts); }
             });
         }
 
@@ -2430,9 +2473,14 @@ document.addEventListener('DOMContentLoaded', function() {
             openTourAddToQuote({
                 id: btn.dataset.tourId,
                 name: btn.dataset.tourName,
-                walkingPriceSmall: btn.dataset.walkingPriceSmall,
                 walkingCurrency: btn.dataset.walkingCurrency,
-                minHours: btn.dataset.minHours
+                minHours: btn.dataset.minHours,
+                priceSmall: btn.dataset.walkingPriceSmall,
+                priceMedium: btn.dataset.walkingPriceMedium,
+                priceLarge: btn.dataset.walkingPriceLarge,
+                rangeSmall: btn.dataset.walkingRangeSmall,
+                rangeMedium: btn.dataset.walkingRangeMedium,
+                rangeLarge: btn.dataset.walkingRangeLarge
             });
         });
 
@@ -2561,9 +2609,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 type: 'tour',
                 price: tourDetail.price || 0,
                 isWalkingTour: !!tourDetail.isWalkingTour,
-                walkingPriceSmall: tourDetail.walkingPriceSmall || 0,
                 walkingCurrency: tourDetail.walkingPriceCurrency || 'MXN',
-                minHours: tourDetail.time ? (parseInt(tourDetail.time) / 60) : 1
+                minHours: tourDetail.time ? (parseInt(tourDetail.time) / 60) : 1,
+                priceSmall: tourDetail.walkingPriceSmall || 0,
+                priceMedium: tourDetail.walkingPriceMedium || 0,
+                priceLarge: tourDetail.walkingPriceLarge || 0,
+                rangeSmall: tourDetail.walkingRangeSmall || '',
+                rangeMedium: tourDetail.walkingRangeMedium || '',
+                rangeLarge: tourDetail.walkingRangeLarge || ''
             };
             // El footer "Agregar a cotización" (global, por persona) solo aplica a tours a pie;
             // los tours con vehículo se agregan por vehículo desde la pestaña de precios.

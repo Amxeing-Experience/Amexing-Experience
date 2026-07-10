@@ -1030,6 +1030,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-experience-name="${experience.displayName}"
                                         data-experience-type="${experience.source}"
                                         data-experience-price="${experience.displayPrice || 0}"
+                                        data-experience-price-child="${experience.displayPriceChild || 0}"
+                                        data-experience-price-no-alcohol="${experience.displayPriceNoAlcohol || 0}"
                                         title="Agregar a cotización">
                                     <i class="ti ti-file-plus me-1"></i>Agregar
                                 </button>
@@ -1160,23 +1162,53 @@ document.addEventListener('DOMContentLoaded', function() {
     // ========== Add Experience to Quote (módulo genérico compartido: /dashboard/js/utils/add-to-quote.js) ==========
     (function() {
         // Payload específico de Experiencias (lo único propio de esta superficie)
-        function buildExperienceSubconcept(exp) {
+        function buildExperienceSubconcept(exp, counts) {
+            const c = counts || {};
+            const adults = Number(c.adults) || 0;
+            const children = Number(c.children) || 0;
+            const infants = Number(c.infants) || 0;
+            const adultPrice = Number(exp.price) || 0;
+            const childPrice = Number(exp.priceChild) || 0;
+            const noAlcoholPrice = Number(exp.priceNoAlcohol) || 0;
+            // Base EFECTIVO: infantes GRATIS; "sin alcohol" no se hereda del quote (0, ajustable en la cotización).
+            const total = Math.round((adults * adultPrice + children * childPrice) * 100) / 100;
+            const persons = adults + children + infants;
             return {
                 type: 'experience', experienceId: exp.id, title: exp.name,
-                time: '', hours: 0, unitPrice: exp.price, total: exp.price,
-                isPerPerson: true, numberOfPeople: 1
+                time: '', hours: 0,
+                unitPrice: adultPrice, total: total,
+                isPerPerson: true, numberOfPeople: persons || 1,
+                adultsQuantity: adults, childrenQuantity: children,
+                adultsNoAlcoholQuantity: 0, infantsQuantity: infants,
+                adultPrice: adultPrice, childPrice: childPrice, noAlcoholPrice: noAlcoholPrice
             };
         }
 
         function openExperienceAddToQuote(exp) {
             if (!exp) return;
-            // Las experiencias tienen 3 tipos de persona (adulto/niño/sin alcohol), así que
-            // no mostramos un "precio por persona" único: solo el nombre de la experiencia.
+            const adultPrice = Number(exp.price) || 0;
+            const childPrice = Number(exp.priceChild) || 0;
+            // Las experiencias cobran por persona (adulto/niño; infantes gratis). Se piden las
+            // personas en el modal, pre-llenadas con las de la cotización.
             AddToQuote.open({
                 userRole: '<%= currentUserRole %>',
                 serviceLabel: 'Experiencia',
                 itemLabel: '<strong>' + (exp.name || 'Experiencia') + '</strong>',
-                buildSubconcept: function() { return buildExperienceSubconcept(exp); }
+                people: {
+                    title: '¿Cuántas personas?',
+                    hint: 'Se pre-llena con las personas de la cotización. Infantes no pagan.',
+                    minTotal: 1,
+                    fields: [
+                        { key: 'adults', label: 'Adultos', sub: '12+', quoteField: 'numberOfAdults' },
+                        { key: 'children', label: 'Niños', sub: '3–12', quoteField: 'numberOfChildren' },
+                        { key: 'infants', label: 'Infantes', sub: '0–2 · no pagan', quoteField: 'numberOfInfants' }
+                    ],
+                    priceFor: function(counts) {
+                        const a = Number(counts.adults) || 0, ch = Number(counts.children) || 0;
+                        return a * adultPrice + ch * childPrice;
+                    }
+                },
+                buildSubconcept: function(counts) { return buildExperienceSubconcept(exp, counts); }
             });
         }
 
@@ -1187,7 +1219,9 @@ document.addEventListener('DOMContentLoaded', function() {
             openExperienceAddToQuote({
                 id: btn.dataset.experienceId,
                 name: btn.dataset.experienceName,
-                price: parseFloat(btn.dataset.experiencePrice) || 0
+                price: parseFloat(btn.dataset.experiencePrice) || 0,
+                priceChild: parseFloat(btn.dataset.experiencePriceChild) || 0,
+                priceNoAlcohol: parseFloat(btn.dataset.experiencePriceNoAlcohol) || 0
             });
         });
 
@@ -1331,7 +1365,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 id: experienceId,
                 name: experienceDetail.name || experienceName,
                 type: experienceType,
-                price: experienceDetail.cost || 0
+                price: experienceDetail.cost || experienceDetail.price || 0,
+                priceChild: experienceDetail.price_child || 0,
+                priceNoAlcohol: experienceDetail.price_no_alcohol || 0
             };
 
             // Debug the photo structure from API
