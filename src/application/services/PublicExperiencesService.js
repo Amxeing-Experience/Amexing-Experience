@@ -353,10 +353,10 @@ class PublicExperiencesService {
       query.limit(1000);
 
       const experiences = await query.find({ useMasterKey: true });
-      if (!experiences.length) {
-        return byCategory;
-      }
 
+      // NOTA: no cortar aquí si `experiences` viene vacío. Puede no haber experiencias de la
+      // clase `Experience` con categoría (p.ej. en prod solo hay `ProviderExperiencia`), y aun
+      // así debemos consultar y mostrar las de proveedores/establecimientos más abajo.
       await Promise.all(experiences.map(async (experience) => {
         const category = experience.get('experience_category');
         const card = await this.buildCard(experience);
