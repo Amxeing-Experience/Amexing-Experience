@@ -1210,12 +1210,9 @@ class ItineraryBuilder {
       });
     });
 
-    // Duración de experiencia (editable): solo marca el servicio como modificado (no afecta precio).
-    document.getElementById('experienceDuration')?.addEventListener('input', () => {
-      this.serviceModified = true;
-      // El costo del "Guía" depende de la duración (tier×personas × duración), así que recalcular.
-      this.updateDevPaymentBreakdown();
-      this.updateServicePriceBreakdown();
+    // Duración de experiencia (campos visibles Horas + Minutos): combinan en #experienceDuration.
+    ['experienceDurationHours', 'experienceDurationMinutes'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => this._updateExperienceDurationFromInputs());
     });
 
     // Horas de experiencia: al tener inicio y fin, derivar la duración real y sobrescribir el campo.
@@ -2643,6 +2640,7 @@ class ItineraryBuilder {
     if (diff <= 0) diff += 1440; // el horario cruza medianoche
     const realHours = Math.round((diff / 60) * 100) / 100; // 2 decimales
     durationInput.value = String(realHours);
+    this._syncExperienceDurationInputs(); // reflejar en los campos visibles Horas/Minutos
 
     // El small solo aparece cuando la duración real difiere de la de catálogo de la experiencia.
     const catalog = parseFloat(this._experienceCatalogDuration);
@@ -2659,6 +2657,36 @@ class ItineraryBuilder {
 
     this.serviceModified = true;
     // La duración afecta el costo del guía (tier×personas × duración): recalcular desgloses.
+    this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
+  }
+
+  // Refleja el valor canónico (#experienceDuration, horas decimales) en los campos visibles
+  // Horas + Minutos. Se llama cada vez que la duración se setea por código (catálogo/restore/horario).
+  _syncExperienceDurationInputs() {
+    const hoursInput = document.getElementById('experienceDurationHours');
+    const minutesInput = document.getElementById('experienceDurationMinutes');
+    if (!hoursInput || !minutesInput) return;
+    const dec = parseFloat(document.getElementById('experienceDuration')?.value) || 0;
+    if (dec <= 0) { hoursInput.value = ''; minutesInput.value = ''; return; }
+    let h = Math.floor(dec);
+    let m = Math.round((dec - h) * 60);
+    if (m >= 60) { h += 1; m -= 60; } // acarreo por redondeo (p.ej. 1.999h)
+    hoursInput.value = String(h);
+    minutesInput.value = String(m);
+  }
+
+  // Combina los campos visibles Horas + Minutos en el valor canónico #experienceDuration (horas
+  // decimales) y recalcula. Se llama al editar cualquiera de los dos inputs.
+  _updateExperienceDurationFromInputs() {
+    const h = parseInt(document.getElementById('experienceDurationHours')?.value, 10) || 0;
+    let m = parseInt(document.getElementById('experienceDurationMinutes')?.value, 10) || 0;
+    if (m > 59) m = 59;
+    const hidden = document.getElementById('experienceDuration');
+    const decimal = h + (m / 60);
+    if (hidden) hidden.value = decimal > 0 ? String(Math.round(decimal * 100) / 100) : '';
+    this.serviceModified = true;
+    // El costo del "Guía" depende de la duración (tier×personas × duración), así que recalcular.
     this.updateDevPaymentBreakdown();
     this.updateServicePriceBreakdown();
   }
@@ -5368,6 +5396,7 @@ class ItineraryBuilder {
             const expDurationField = document.getElementById('experienceDuration');
             if (expDurationField && service.duration !== undefined && service.duration !== null) {
               expDurationField.value = service.duration;
+              this._syncExperienceDurationInputs(); // reflejar en Horas/Minutos visibles
             }
             // Dirección de pickup.
             const expPickupField = document.getElementById('experiencePickupAddress');
@@ -13948,6 +13977,7 @@ class ItineraryBuilder {
       // restauración pone la guardada.
       const expDurationField = document.getElementById('experienceDuration');
       if (expDurationField) expDurationField.value = experience.duration || '';
+      this._syncExperienceDurationInputs(); // reflejar en Horas/Minutos visibles
     } else {
 
     }
