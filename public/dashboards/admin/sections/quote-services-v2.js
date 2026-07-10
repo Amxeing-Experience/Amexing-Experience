@@ -1210,12 +1210,14 @@ class ItineraryBuilder {
       });
     });
 
-    // Duración de experiencia (editable): solo marca el servicio como modificado (no afecta precio).
-    document.getElementById('experienceDuration')?.addEventListener('input', () => {
-      this.serviceModified = true;
-      // El costo del "Guía" depende de la duración (tier×personas × duración), así que recalcular.
-      this.updateDevPaymentBreakdown();
-      this.updateServicePriceBreakdown();
+    // Duración de experiencia (campos visibles Horas + Minutos): combinan en #experienceDuration.
+    ['experienceDurationHours', 'experienceDurationMinutes'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => this._updateExperienceDurationFromInputs());
+    });
+
+    // Horas de experiencia: al tener inicio y fin, derivar la duración real y sobrescribir el campo.
+    ['experienceStartTime', 'experienceEndTime'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => this.updateExperienceDurationFromSchedule());
     });
 
     // Local transfers: recompute the estimated arrival when the pick-up time changes.
@@ -2085,6 +2087,7 @@ class ItineraryBuilder {
         document.getElementById('serviceQuantity').value = 1;
         document.getElementById('extraAdditionalVehiclesContainer')?.classList.remove('d-none');
         this.syncExtraVehiclesButtonEnabled();
+        this.updateExtraVehiclesHeaderVisibility(); // tour: oculta la columna "Tiempo de espera"
 
         // Only uncheck if not populating form during edit
         if (!this._populatingVehicleTourForm && !this._populatingTransportForm) {
@@ -2168,6 +2171,7 @@ class ItineraryBuilder {
       document.getElementById('serviceQuantity').value = 1;
       document.getElementById('extraAdditionalVehiclesContainer')?.classList.remove('d-none');
       this.syncExtraVehiclesButtonEnabled();
+      this.updateExtraVehiclesHeaderVisibility(); // transporte: muestra "Tiempo de espera"
 
       // Only uncheck if not populating form during edit
       if (!this._populatingVehicleTourForm && !this._populatingTransportForm) {
@@ -2617,6 +2621,76 @@ class ItineraryBuilder {
     hoursInput.value = String(hours);
     this.serviceModified = true;
     this.calculateADisposicionPrice();
+  }
+
+  // Experiencia: cuando hay hora de inicio y fin, deriva la duración real (fin - inicio, cruzando
+  // medianoche si aplica) y la escribe en #experienceDuration (sobrescribe la de catálogo). Si la
+  // duración real difiere de la de catálogo, muestra un small con la duración real bajo el input.
+  updateExperienceDurationFromSchedule() {
+    const start = this.parseTimeToMinutes(document.getElementById('experienceStartTime')?.value);
+    const end = this.parseTimeToMinutes(document.getElementById('experienceEndTime')?.value);
+    const durationInput = document.getElementById('experienceDuration');
+    if (start === null || end === null || !durationInput) return; // sin ambas horas, no se deriva
+    let diff = end - start;
+    if (diff <= 0) diff += 1440; // el horario cruza medianoche
+    const realHours = Math.round((diff / 60) * 100) / 100; // 2 decimales
+    durationInput.value = String(realHours);
+    this._syncExperienceDurationInputs(); // reflejar en Horas/Minutos + actualizar el hint
+
+    this.serviceModified = true;
+    // La duración afecta el costo del guía (tier×personas × duración): recalcular desgloses.
+    this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
+  }
+
+  // Aviso (solo admin, small text) con la DURACIÓN ORIGINAL de la experiencia (catálogo), cuando la
+  // duración actual del input difiere de ella. Sirve de referencia al admin de cuánto dura "de fábrica".
+  _updateExperienceOriginalDurationHint() {
+    const hint = document.getElementById('experienceRealDuration');
+    if (!hint) return;
+    const isAdmin = ['admin', 'superadmin'].includes(this.userRole);
+    const catalog = parseFloat(this._experienceCatalogDuration);
+    const current = parseFloat(document.getElementById('experienceDuration')?.value);
+    const differs = !Number.isNaN(current) && Math.abs(current - catalog) > 0.01;
+    if (!isAdmin || Number.isNaN(catalog) || catalog <= 0 || !differs) {
+      hint.classList.add('d-none');
+      hint.textContent = '';
+      return;
+    }
+    hint.textContent = `Duración original de la experiencia: ${this.formatMinutesToHoursAndMinutes(Math.round(catalog * 60))}`;
+    hint.classList.remove('d-none');
+  }
+
+  // Refleja el valor canónico (#experienceDuration, horas decimales) en los campos visibles
+  // Horas + Minutos. Se llama cada vez que la duración se setea por código (catálogo/restore/horario).
+  _syncExperienceDurationInputs() {
+    const hoursInput = document.getElementById('experienceDurationHours');
+    const minutesInput = document.getElementById('experienceDurationMinutes');
+    if (!hoursInput || !minutesInput) return;
+    const dec = parseFloat(document.getElementById('experienceDuration')?.value) || 0;
+    if (dec <= 0) { hoursInput.value = ''; minutesInput.value = ''; return; }
+    let h = Math.floor(dec);
+    let m = Math.round((dec - h) * 60);
+    if (m >= 60) { h += 1; m -= 60; } // acarreo por redondeo (p.ej. 1.999h)
+    hoursInput.value = String(h);
+    minutesInput.value = String(m);
+    this._updateExperienceOriginalDurationHint();
+  }
+
+  // Combina los campos visibles Horas + Minutos en el valor canónico #experienceDuration (horas
+  // decimales) y recalcula. Se llama al editar cualquiera de los dos inputs.
+  _updateExperienceDurationFromInputs() {
+    const h = parseInt(document.getElementById('experienceDurationHours')?.value, 10) || 0;
+    let m = parseInt(document.getElementById('experienceDurationMinutes')?.value, 10) || 0;
+    if (m > 59) m = 59;
+    const hidden = document.getElementById('experienceDuration');
+    const decimal = h + (m / 60);
+    if (hidden) hidden.value = decimal > 0 ? String(Math.round(decimal * 100) / 100) : '';
+    this._updateExperienceOriginalDurationHint();
+    this.serviceModified = true;
+    // El costo del "Guía" depende de la duración (tier×personas × duración), así que recalcular.
+    this.updateDevPaymentBreakdown();
+    this.updateServicePriceBreakdown();
   }
 
 
@@ -3994,6 +4068,8 @@ class ItineraryBuilder {
     switch (type) {
       case 'experience': {
         data.experienceId = document.getElementById('experienceSelect')?.value;
+        // Dirección de pickup (texto libre).
+        data.pickupAddress = (document.getElementById('experiencePickupAddress')?.value || '').trim();
         // Duración editable de la experiencia (autollenada del catálogo, modificable). Se guarda en
         // data.duration (ya persistido) — informativa; no afecta el precio (que es por persona).
         data.duration = parseFloat(document.getElementById('experienceDuration')?.value) || null;
@@ -4052,6 +4128,8 @@ class ItineraryBuilder {
       }
       case 'tour': {
         data.tourId = document.getElementById('tourSelect')?.value;
+        // Dirección de pickup (texto libre) — aplica a tour con vehículo y walking tour.
+        data.pickupAddress = (document.getElementById('tourPickupAddress')?.value || '').trim();
 
         // Check if this is a walking tour
         const selectedTourData = this.toursCache.has('all')
@@ -4076,31 +4154,26 @@ class ItineraryBuilder {
 
           // Note: Removed walking tour final data log for console cleanup
 
-          // Check for price override on walking tours
-          const walkingTourOverride = document.getElementById('tourOverridePrices')?.checked;
+          // Precio del walking tour SIN depender de #tourOverridePrices (no existe en el modal):
+          //  - modo "group": los inputs por tier SON los precios (override implícito) → se guardan.
+          //  - modo "total": el precio manual si se capturó.
+          //  - si no, precio calculado del catálogo.
           const walkingPriceMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value || 'total';
+          const walkingManualPrice = document.getElementById('walkingTourManualPrice')?.value;
 
-          if (walkingTourOverride) {
-            if (walkingPriceMode === 'group') {
-              // Per-group pricing mode
-              const groupPrices = [];
-              const groupInputs = document.querySelectorAll('.walking-group-price');
-              groupInputs.forEach((input) => {
-                groupPrices.push(parseFloat(input.value) || 0);
-              });
-              data.walkingTourGroupPrices = groupPrices;
-              data.walkingTourPrice = groupPrices.reduce((sum, price) => sum + price, 0);
-              data.walkingTourPriceOverride = true;
-              data.walkingTourPriceMode = 'group';
-            } else {
-              // Total price override mode
-              const walkingTourManualPrice = document.getElementById('walkingTourManualPrice')?.value;
-              if (walkingTourManualPrice) {
-                data.walkingTourPrice = parseFloat(walkingTourManualPrice);
-                data.walkingTourPriceOverride = true;
-                data.walkingTourPriceMode = 'total';
-              }
-            }
+          if (walkingPriceMode === 'group') {
+            const groupPrices = [];
+            document.querySelectorAll('.walking-group-price').forEach((input) => {
+              groupPrices.push(parseFloat(input.value) || 0);
+            });
+            data.walkingTourGroupPrices = groupPrices;
+            data.walkingTourPrice = groupPrices.reduce((sum, price) => sum + price, 0);
+            data.walkingTourPriceOverride = true;
+            data.walkingTourPriceMode = 'group';
+          } else if (walkingManualPrice && parseFloat(walkingManualPrice) > 0) {
+            data.walkingTourPrice = parseFloat(walkingManualPrice);
+            data.walkingTourPriceOverride = true;
+            data.walkingTourPriceMode = 'total';
           } else {
             // Get duration for walking tour calculation
             const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
@@ -5325,7 +5398,13 @@ class ItineraryBuilder {
             const expDurationField = document.getElementById('experienceDuration');
             if (expDurationField && service.duration !== undefined && service.duration !== null) {
               expDurationField.value = service.duration;
+              this._syncExperienceDurationInputs(); // reflejar en Horas/Minutos visibles
             }
+            // Dirección de pickup.
+            const expPickupField = document.getElementById('experiencePickupAddress');
+            if (expPickupField) expPickupField.value = service.pickupAddress || '';
+            // Con horario restaurado, reflejar la duración real y su aviso (si difiere del catálogo).
+            this.updateExperienceDurationFromSchedule();
           } else if (attempt < 5) {
             // Retry with longer delay
 
@@ -5348,6 +5427,12 @@ class ItineraryBuilder {
             infantsQuantity: service.infantsQuantity,
           },
         });
+
+        // Restaurar la dirección de pickup (aplica a walking y vehicle tour).
+        {
+          const tourPickupField = document.getElementById('tourPickupAddress');
+          if (tourPickupField) tourPickupField.value = service.pickupAddress || '';
+        }
 
         // Use clean vehicle tour handler for non-walking tours
         if (!service.isWalkingTour) {
@@ -5544,18 +5629,16 @@ class ItineraryBuilder {
           // tour pricing section and the override UI is mounted.
           if (service.walkingTourPriceOverride) {
             setTimeout(() => {
+              // El checkbox #tourOverridePrices puede NO existir en este modal; si existe, marcarlo,
+              // pero NO depender de él para restaurar (el modo "group" honra los inputs por sí solo).
               const overrideCheckbox = document.getElementById('tourOverridePrices');
-              if (!overrideCheckbox) {
-                console.warn('⚠️ Override restore: checkbox not found in DOM');
-                return;
+              if (overrideCheckbox) {
+                overrideCheckbox.checked = true;
+                overrideCheckbox.setAttribute('checked', 'checked');
+                overrideCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+                this.handlePriceOverrideToggle('tour', true);
               }
-              overrideCheckbox.checked = true;
-              overrideCheckbox.setAttribute('checked', 'checked');
-              // Fire change event so any UI/listener picks up the new state.
-              overrideCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-              // Toggle handler also called explicitly in case the listener isn't attached yet.
-              this.handlePriceOverrideToggle('tour', true);
-              qsDevLog('✅ Walking tour override checkbox restored', { mode: service.walkingTourPriceMode });
+              qsDevLog('✅ Walking tour price restored', { mode: service.walkingTourPriceMode });
 
               if (service.walkingTourPriceMode === 'group') {
                 const groupRadio = document.getElementById('walkingPriceModeGroup');
@@ -5570,7 +5653,9 @@ class ItineraryBuilder {
                   inputs.forEach((inp, i) => {
                     if (saved[i] !== undefined) inp.value = parseFloat(saved[i]).toFixed(2);
                   });
-                  // Dev breakdown FIRST so service breakdown reads fresh values.
+                  // Dev breakdown FIRST so service breakdown reads fresh values (el walking tour lee
+                  // de los campos devBreakdown*, que hay que repoblar con los precios restaurados).
+                  this.updateDevPaymentBreakdown();
                   this.updateServicePriceBreakdown();
                 }, 50);
               } else if (service.walkingTourPriceMode === 'total') {
@@ -7017,17 +7102,20 @@ class ItineraryBuilder {
       driverTourRateCache: this.driverTourRateCache,
     });
 
-    // Get main vehicle cost — when the user has activated the manual override
-    // (tourVehicleOverridePrices) for vehicle tours, replace the calculated
-    // rate with what's typed into servicePrice so the breakdown reflects it.
+    // Costo del vehículo principal. Se honra el precio EDITADO cuando el usuario lo modificó: por el
+    // checkbox de override (#tourVehicleOverridePrices — que puede NO existir en el modal) O porque el
+    // #servicePrice difiere del costo de catálogo (misma detección que collectServiceData). Antes solo
+    // se miraba el checkbox; como no existe, el desglose ignoraba el precio modificado (mostraba catálogo).
     let mainVehicleCost = this.getMainVehicleCost();
-    const vehicleOverrideCheckbox = document.getElementById('tourVehicleOverridePrices');
-    if (vehicleOverrideCheckbox?.checked) {
-      const overriddenPrice = parseFloat(document.getElementById('servicePrice')?.value || 0);
-      if (overriddenPrice >= 0) {
-        qsDevLog('🚗 Vehicle tour override active — using servicePrice as main vehicle cost:', overriddenPrice, '(was:', mainVehicleCost, ')');
-        mainVehicleCost = overriddenPrice;
-      }
+    const catalogVehicleCost = mainVehicleCost;
+    const editedVehiclePrice = parseFloat(document.getElementById('servicePrice')?.value);
+    const vehicleOverrideChecked = document.getElementById('tourVehicleOverridePrices')?.checked;
+    const vehiclePriceManuallyEdited = !Number.isNaN(editedVehiclePrice) && !Number.isNaN(catalogVehicleCost)
+      && Math.abs(editedVehiclePrice - catalogVehicleCost) > 0.01;
+    if ((vehicleOverrideChecked || vehiclePriceManuallyEdited)
+      && !Number.isNaN(editedVehiclePrice) && editedVehiclePrice >= 0) {
+      qsDevLog('🚗 Vehicle tour: usando #servicePrice editado como costo del vehículo:', editedVehiclePrice, '(catálogo:', catalogVehicleCost, ')');
+      mainVehicleCost = editedVehiclePrice;
     }
     qsDevLog('🚗 Main vehicle cost result:', mainVehicleCost);
 
@@ -7663,6 +7751,14 @@ class ItineraryBuilder {
       }).join('')}
                                         </div>
                                     ` : ''}
+                                    ${(service.type === 'tour' || service.type === 'experience') && service.pickupAddress ? `
+                                        <div class="row g-2 text-muted small mt-1">
+                                            <div class="col-auto">
+                                                <i class="ti ti-map-pin-up me-1 text-success"></i>
+                                                <span class="text-muted">Pick-up:</span> ${service.pickupAddress}
+                                            </div>
+                                        </div>
+                                    ` : ''}
                                     ${((((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide)
                                       || (service.type === 'experience' && service.experienceGuide))
                                       && !((service.type === 'tour' || service.type === 'experience') && this.serviceIncludesMentionGuide(service))) ? `
@@ -7712,7 +7808,14 @@ class ItineraryBuilder {
                                     ${(service.type === 'tour' || service.type === 'experience') ? (() => {
         const info = this.getServiceIncludesInfo(service);
         let includes = info.includes;
-        const notIncludes = info.notIncludes;
+        let notIncludes = info.notIncludes;
+        // Si la guía está incluida (includeGuide / experienceGuide), no mostrar "guía" en el
+        // "No incluye" (sería contradictorio).
+        const guideIncluded = ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide)
+          || (service.type === 'experience' && service.experienceGuide);
+        if (guideIncluded && notIncludes) {
+          notIncludes = notIncludes.split('\n').filter((line) => !/gu[ií]a/i.test(line)).join('\n') || null;
+        }
         // Tour con guía cuya lista "Incluye" ya menciona guía: agregamos "Driver" como ítem
         // (el label aparte se ocultó para no duplicar). Solo si aún no trae driver/chofer.
         if (service.type === 'tour' && service.includeGuide && this.serviceIncludesMentionGuide(service)
@@ -7743,7 +7846,7 @@ class ItineraryBuilder {
                                     ` : ''}
                                     ${service.agencyNotes ? `
                                         <div class="service-notes mt-1 text-muted small d-flex align-items-start">
-                                            <i class="ti ti-building-store me-1"></i>
+                                            <i class="ti ti-message-circle me-1"></i>
                                             <span style="white-space: pre-wrap;">${service.agencyNotes}</span>
                                         </div>
                                     ` : ''}
@@ -9378,10 +9481,10 @@ class ItineraryBuilder {
 
         const priceCurrency = selectedTourData.walkingPriceCurrency || 'MXN';
 
-        // If user activated override + group mode, read edited per-tier prices.
-        const overrideCheckbox = document.getElementById('tourOverridePrices');
+        // Modo "group": los inputs por tier SON los precios (override implícito) — no depende de un
+        // checkbox #tourOverridePrices, que no existe en este modal. Se leen los precios editados.
         const walkingMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value;
-        const isPerGroupOverride = !!(overrideCheckbox?.checked && walkingMode === 'group');
+        const isPerGroupOverride = walkingMode === 'group';
         const overridePrices = {};
         if (isPerGroupOverride) {
           document.querySelectorAll('.walking-group-price').forEach((inp) => {
@@ -9409,9 +9512,10 @@ class ItineraryBuilder {
         // Override de TOTAL manual: el precio capturado es la BASE en efectivo; el recargo
         // por forma de pago se aplica después (decisión del cliente). En modo automático o
         // por-grupo, la base se calcula con los precios por tier (resolveTierPrice).
-        const isTotalOverride = !!(overrideCheckbox?.checked && walkingMode === 'total');
+        const manualWalkingPrice = parseFloat(document.getElementById('walkingTourManualPrice')?.value || 0);
+        const isTotalOverride = walkingMode === 'total' && manualWalkingPrice > 0;
         const baseTotal = isTotalOverride
-          ? (parseFloat(document.getElementById('walkingTourManualPrice')?.value || 0))
+          ? manualWalkingPrice
           : groups.reduce((sum, g) => sum + resolveTierPrice(g.tier) * duration, 0);
 
         // Recargo por forma de pago vía el motor único (un solo nodo: el total base; el
@@ -12323,14 +12427,14 @@ class ItineraryBuilder {
           <option value="">Primero selecciona un segmento</option>
         </select>
       </div>
-      <div class="col-md-2">
+      <div class="col-md-2 extra-price-col">
         <div class="input-group input-group-sm">
           <span class="input-group-text">$</span>
           <input type="number" min="0" step="0.01" class="form-control form-control-sm extra-price-input" placeholder="0.00">
         </div>
         <small class="text-muted extra-list-price d-block"></small>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-4 extra-waiting-col">
         <div class="row g-1">
           <div class="col-5">
             <div class="input-group input-group-sm">
@@ -13847,6 +13951,13 @@ class ItineraryBuilder {
   }
 
   fillExperienceFields(experience) {
+    // Duración de catálogo de la experiencia — referencia para comparar contra la duración real
+    // derivada del horario (updateExperienceDurationFromSchedule).
+    this._experienceCatalogDuration = experience.duration;
+    // Al (re)seleccionar experiencia se limpia el aviso de duración real (el restore lo re-muestra
+    // si hay horario que difiere).
+    document.getElementById('experienceRealDuration')?.classList.add('d-none');
+
     // Only fill quantity fields if we're NOT in edit mode
     // In edit mode, the quantities should be restored by populateServiceForm
     if (!this.currentServiceId) {
@@ -13875,6 +13986,7 @@ class ItineraryBuilder {
       // restauración pone la guardada.
       const expDurationField = document.getElementById('experienceDuration');
       if (expDurationField) expDurationField.value = experience.duration || '';
+      this._syncExperienceDurationInputs(); // reflejar en Horas/Minutos visibles
     } else {
 
     }
@@ -13897,9 +14009,6 @@ class ItineraryBuilder {
     const childPriceField = document.getElementById('childPrice');
     const noAlcoholPriceField = document.getElementById('noAlcoholPrice');
 
-    // Check if price override is enabled (admin only)
-    const isPriceOverride = document.getElementById('experienceOverridePrices')?.checked || false;
-
     // Precio ADULTO del catálogo: la experiencia lo guarda en `cost` (no `price`, que es null para
     // experiencias propias). Fallback a `price` para experiencias de proveedor.
     const adultCatalogPrice = experience.cost || experience.price;
@@ -13915,21 +14024,11 @@ class ItineraryBuilder {
       this.calculatedPrices.experience.noAlcohol = experience.price_no_alcohol;
     }
 
-    // Only update prices if override is NOT enabled or if fields are empty
-    if (!isPriceOverride || !this.canEditPrices) {
-      if (adultPriceField && adultCatalogPrice) {
-        adultPriceField.value = adultCatalogPrice;
-      }
-
-      if (childPriceField && experience.price_child) {
-        childPriceField.value = experience.price_child;
-      }
-
-      if (noAlcoholPriceField && experience.price_no_alcohol) {
-        noAlcoholPriceField.value = experience.price_no_alcohol;
-      }
-    } else {
-      // If override is enabled and fields are empty, populate with calculated values as starting point
+    // Precios de experiencia: SIEMPRE editables. Autollenar SOLO campos vacíos con el precio de
+    // catálogo — nunca pisar un precio personalizado por el usuario. En la restauración de edición
+    // no se tocan: populateServiceForm rellena los precios guardados (el bug era que aquí se
+    // sobreescribía con el precio base y tapaba el personalizado).
+    if (!this._restoringExperienceData) {
       if (adultPriceField && !adultPriceField.value && adultCatalogPrice) {
         adultPriceField.value = adultCatalogPrice;
       }
@@ -21367,12 +21466,18 @@ class ItineraryBuilder {
             inp.value = value;
           }
 
+          // Editar un precio de grupo se refleja al instante: el modo "group" ya honra los inputs
+          // (override implícito). Marcar como modificado y recalcular.
+          this.serviceModified = true;
+
           // Update total display (function lives in DOMContentLoaded scope; guard for class-method access).
           if (typeof updateWalkingGroupTotalDisplay === 'function') {
             updateWalkingGroupTotalDisplay();
           }
-          // Dev breakdown must run FIRST — it populates the devBreakdown* fields
-          // that updateServicePriceBreakdown reads from.
+          // Dev breakdown must run FIRST — it populates the devBreakdown* fields that
+          // updateServicePriceBreakdown reads for el walking tour (antes solo se llamaba al segundo,
+          // así el desglose no reflejaba el precio de grupo editado).
+          this.updateDevPaymentBreakdown();
           this.updateServicePriceBreakdown();
         });
 
