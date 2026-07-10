@@ -2398,10 +2398,21 @@ document.addEventListener('DOMContentLoaded', function() {
             };
         }
 
+        // Precio a MOSTRAR en el modal con el recargo del método de pago del catálogo.
+        // Solo display: lo GUARDADO sigue siendo base efectivo (pricesByType lo resuelve en la cotización).
+        function catalogSurchargedMXN(baseTotal) {
+            const pt = (document.getElementById('paymentTypeFilter-<%= dtTableId %>') || {}).value
+                || (document.getElementById('paymentTypeFilterMobile-<%= dtTableId %>') || {}).value || 'efectivo';
+            if (window.PricingUtils && typeof PricingUtils.applyPaymentRate === 'function') {
+                return PricingUtils.applyPaymentRate(Number(baseTotal) || 0, pt, currentTransferRate, currentAgencyRate);
+            }
+            return Number(baseTotal) || 0;
+        }
+
         function openTourAddToQuote(tour) {
             if (!tour) return;
             const sub = buildWalkingTourSubconcept(tour);
-            const totalFmt = (sub.total || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            const totalFmt = catalogSurchargedMXN(sub.total || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
             const minHours = parseFloat(tour.minHours) || 1;
             AddToQuote.open({
                 userRole: '<%= currentUserRole %>',
@@ -2482,8 +2493,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const hourly = base + (withDriver ? (parseFloat(d.driverRate) || 0) : 0);
             const minHours = parseFloat(d.minHours) || 1;
             const totalToSave = Math.round(hourly * minHours * 100) / 100;
-            const priceFmt = hourly.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-            const totalFmt = totalToSave.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            // Mostrar con el recargo del método de pago del catálogo (display); lo guardado es base.
+            const priceFmt = catalogSurchargedMXN(hourly).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            const totalFmt = catalogSurchargedMXN(totalToSave).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
             // Cerrar el modal de detalle si el botón vino de ahí
             const detailModal = bootstrap.Modal.getInstance(document.getElementById('tourDetailsModal'));
             const openIt = function() {

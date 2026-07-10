@@ -5133,6 +5133,20 @@ table.dataTable thead th:nth-child(2) select {
 <script src="/dashboard/js/utils/add-to-quote.js"></script>
 <script>
 (function() {
+    // Tarifas para MOSTRAR el precio con el recargo del método de pago del catálogo (solo display).
+    // Lo GUARDADO sigue siendo base efectivo; pricesByType lo resuelve en la cotización.
+    let _atqRates = { transferRate: 0, agencyRate: 0 };
+    if (window.PricingUtils && typeof PricingUtils.loadCurrentRates === 'function') {
+        PricingUtils.loadCurrentRates().then(function (r) { if (r) _atqRates = r; }).catch(function () {});
+    }
+    function catalogSurchargedMXN(baseTotal) {
+        const pt = (document.getElementById('paymentTypeFilter-<%= dtTableId %>') || {}).value || 'efectivo';
+        if (window.PricingUtils && typeof PricingUtils.applyPaymentRate === 'function') {
+            return PricingUtils.applyPaymentRate(Number(baseTotal) || 0, pt, _atqRates.transferRate, _atqRates.agencyRate);
+        }
+        return Number(baseTotal) || 0;
+    }
+
     // Payload específico de Traslados (lo único propio de esta superficie)
     function buildSvcSubconcept(s) {
         return {
@@ -5174,7 +5188,7 @@ table.dataTable thead th:nth-child(2) select {
             routeDuration: parseInt(ds.routeDuration) || 0
         };
         const routeLabel = (svc.origin && svc.destination) ? svc.origin + ' → ' + svc.destination : (svc.destination || 'Traslado');
-        const priceFormatted = (svc.price || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        const priceFormatted = catalogSurchargedMXN(svc.price || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
         AddToQuote.open({
             userRole: '<%= userRole %>',
             serviceLabel: 'Traslado',
