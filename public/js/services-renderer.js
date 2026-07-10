@@ -735,7 +735,14 @@
                     return '';
                 };
                 let includesText = normalizeIncludes(service.includes);
-                const notIncludesText = normalizeIncludes(service.notincludes);
+                let notIncludesText = normalizeIncludes(service.notincludes);
+                // Si la guía está incluida (experienceGuide / includeGuide), no mostrar "guía" en el
+                // "No incluye" — sería contradictorio.
+                if (guideApplies && notIncludesText) {
+                    notIncludesText = notIncludesText.split('\n')
+                        .filter((line) => !/gu[ií]a/i.test(line))
+                        .join('\n');
+                }
                 // Tour con guía cuya lista "Incluye" ya menciona guía: agregamos "Driver" como
                 // ítem (el label aparte se omitió arriba para no duplicar). Así la info de
                 // guía + driver queda en un solo lugar. Solo si aún no aparece driver/chofer.

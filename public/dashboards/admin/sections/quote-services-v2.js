@@ -7806,7 +7806,14 @@ class ItineraryBuilder {
                                     ${(service.type === 'tour' || service.type === 'experience') ? (() => {
         const info = this.getServiceIncludesInfo(service);
         let includes = info.includes;
-        const notIncludes = info.notIncludes;
+        let notIncludes = info.notIncludes;
+        // Si la guía está incluida (includeGuide / experienceGuide), no mostrar "guía" en el
+        // "No incluye" (sería contradictorio).
+        const guideIncluded = ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide)
+          || (service.type === 'experience' && service.experienceGuide);
+        if (guideIncluded && notIncludes) {
+          notIncludes = notIncludes.split('\n').filter((line) => !/gu[ií]a/i.test(line)).join('\n') || null;
+        }
         // Tour con guía cuya lista "Incluye" ya menciona guía: agregamos "Driver" como ítem
         // (el label aparte se ocultó para no duplicar). Solo si aún no trae driver/chofer.
         if (service.type === 'tour' && service.includeGuide && this.serviceIncludesMentionGuide(service)
