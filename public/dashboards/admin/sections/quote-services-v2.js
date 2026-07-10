@@ -2649,7 +2649,8 @@ class ItineraryBuilder {
     const differs = Number.isNaN(catalog) || Math.abs(realHours - catalog) > 0.01;
     if (hint) {
       if (differs) {
-        hint.textContent = `Duración real según horario: ${realHours} ${realHours === 1 ? 'hora' : 'horas'}`;
+        // Formato amigable (ej. "1 hora y 45 minutos") en vez del decimal 1.75.
+        hint.textContent = `Duración real según horario: ${this.formatMinutesToHoursAndMinutes(Math.round(realHours * 60))}`;
         hint.classList.remove('d-none');
       } else {
         hint.classList.add('d-none');
