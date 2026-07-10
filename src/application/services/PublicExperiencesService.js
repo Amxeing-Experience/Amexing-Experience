@@ -184,13 +184,18 @@ class PublicExperiencesService {
           }
           if (Array.isArray(entry.times)) {
             entry.times.forEach((slot) => {
-              if (slot && slot.start) {
-                times.push(slot.start);
+              const start = slot && (slot.start || slot.start_time || slot.startTime);
+              if (start) {
+                times.push(start);
               }
             });
-          } else if (entry.startTime) {
-            // Tolerancia: formato plano por día { day, startTime, endTime }
-            times.push(entry.startTime);
+          } else {
+            // Tolerancia: formato plano por entrada { day, start_time/startTime, end_time }.
+            // La data real de ProviderExperiencia usa snake_case (`start_time`).
+            const start = entry.start_time || entry.startTime;
+            if (start) {
+              times.push(start);
+            }
           }
         });
         return { days, times };
@@ -251,18 +256,32 @@ class PublicExperiencesService {
   }
 
   /**
-   * Formatea la duración (en MINUTOS) a horas legibles (p.ej. 360 → '6 hrs.', 90 → '1.5 hrs.').
-   * @param {number} duration - Duración en minutos.
+   * Formatea la duración (en HORAS) a horas y minutos legibles (p.ej. 6 → '6 hrs.',
+   * 1.5 → '1 hr. 30 min.', 0.5 → '30 min.'). Tanto `Experience` como `ProviderExperiencia`
+   * guardan `duration` en horas (admite fracciones).
+   * @param {number} duration - Duración en horas (admite fracciones, p.ej. 1.5).
    * @returns {string} Duración formateada o 'Por definir'.
    * @example
-   * service.formatDuration(360); // '6 hrs.'
+   * service.formatDuration(1.5); // '1 hr. 30 min.'
    */
   formatDuration(duration) {
     if (!duration) {
       return 'Por definir';
     }
-    const hours = +(duration / 60).toFixed(duration % 60 === 0 ? 0 : 1);
-    return `${hours} hrs.`;
+    const totalMinutes = Math.round(+duration * 60);
+    if (!totalMinutes) {
+      return 'Por definir';
+    }
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const parts = [];
+    if (hours > 0) {
+      parts.push(`${hours} ${hours === 1 ? 'hr.' : 'hrs.'}`);
+    }
+    if (minutes > 0) {
+      parts.push(`${minutes} min.`);
+    }
+    return parts.join(' ');
   }
 
   /**
