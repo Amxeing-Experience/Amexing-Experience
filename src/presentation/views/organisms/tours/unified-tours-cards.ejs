@@ -2460,7 +2460,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     fields: [
                         { key: 'personas', label: 'Personas', quoteField: 'numberOfPeople' }
                     ],
-                    priceFor: function(counts) { return computeWalkingBaseMXN(tour, counts.personas, minHours); }
+                    priceFor: function(counts) { return catalogSurchargedMXN(computeWalkingBaseMXN(tour, counts.personas, minHours)); }
                 },
                 buildSubconcept: function(counts) { return buildWalkingTourSubconcept(tour, counts); }
             });

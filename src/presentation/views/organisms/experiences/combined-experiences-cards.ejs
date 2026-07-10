@@ -1205,7 +1205,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     ],
                     priceFor: function(counts) {
                         const a = Number(counts.adults) || 0, ch = Number(counts.children) || 0;
-                        return a * adultPrice + ch * childPrice;
+                        const base = a * adultPrice + ch * childPrice;
+                        // Display con recargo del método de pago del catálogo (lo GUARDADO es base).
+                        const pt = (document.getElementById('filterPayment') || {}).value || 'efectivo';
+                        return (window.PricingUtils && typeof PricingUtils.applyPaymentRate === 'function')
+                            ? PricingUtils.applyPaymentRate(base, pt, currentTransferRate, currentAgencyRate)
+                            : base;
                     }
                 },
                 buildSubconcept: function(counts) { return buildExperienceSubconcept(exp, counts); }
