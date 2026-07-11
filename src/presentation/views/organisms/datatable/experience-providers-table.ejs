@@ -1637,12 +1637,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     else if (typeof abt === 'number') advMinutes = abt;
                     else if (typeof abt === 'string') advMinutes = parseInt(abt, 10) || 0;
                 }
-                const picker = card.querySelector('.advance-time-picker');
+                const hidden = card.querySelector('.experiencia-advance-minutes-input');
+                const picker = hidden ? hidden.closest('.advance-time-picker') : null;
                 if (picker && window.AdvanceTimePicker) {
                     window.AdvanceTimePicker.set(picker, advMinutes);
-                } else {
-                    const hidden = card.querySelector('.experiencia-advance-minutes-input');
-                    if (hidden) hidden.value = advMinutes || '';
+                } else if (hidden) {
+                    hidden.value = advMinutes || '';
                 }
             })();
             

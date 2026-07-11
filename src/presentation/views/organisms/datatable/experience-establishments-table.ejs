@@ -2885,11 +2885,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             })();
             (function() {
                 const advMinutes = parseInt(experiencia.advance_booking_time, 10) || 0;
-                const picker = card.querySelector('.advance-time-picker');
+                const advHidden = card.querySelector('.experiencia-advance-minutes-input');
+                const picker = advHidden ? advHidden.closest('.advance-time-picker') : null;
                 if (picker && window.AdvanceTimePicker) {
                     window.AdvanceTimePicker.set(picker, advMinutes);
-                } else {
-                    card.querySelector('.experiencia-advance-minutes-input').value = advMinutes || '';
+                } else if (advHidden) {
+                    advHidden.value = advMinutes || '';
                 }
             })();
             card.querySelector('.experiencia-min-people-input').value = experiencia.min_people || '';
