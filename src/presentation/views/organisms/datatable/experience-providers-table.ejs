@@ -161,7 +161,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label form-label-sm fw-medium text-success">Duración total</label>
-                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'quickExperienciaDuration', unit: 'hours', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'quickExperienciaDuration', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label form-label-sm fw-medium text-success">Duración de Trayecto</label>
@@ -609,7 +609,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <div class="row mb-2">
                 <div class="col-md-4">
                     <label class="form-label form-label-sm fw-medium text-success">Duración total</label>
-                    <%- include('../../molecules/forms/advance-time-picker', { hiddenClass: 'experiencia-duration-input', unit: 'hours', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
+                    <%- include('../../molecules/forms/advance-time-picker', { hiddenClass: 'experiencia-duration-input', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label form-label-sm fw-medium text-success">Duración de Trayecto</label>
@@ -1584,19 +1584,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-price-input').value = experiencia.price || '';
             card.querySelector('.experiencia-price-no-alcohol-input').value = experiencia.price_no_alcohol || '';
             card.querySelector('.experiencia-price-child-input').value = experiencia.price_child || '';
-            // Handle duration - keep as hours, convert from minutes if needed (legacy >24)
+            // Duración total: se guarda en MINUTOS (ej. 1440 = 24 h); el picker la muestra en H/M.
             (function() {
-                let durHours = 0;
-                if (experiencia.duration) {
-                    const d = parseFloat(experiencia.duration);
-                    durHours = d > 24 ? (d / 60) : d; // >24 = legacy en minutos
-                }
+                const durMin = parseInt(experiencia.duration, 10) || 0;
                 const dPicker = card.querySelector('.experiencia-duration-input')?.closest('.advance-time-picker');
                 if (dPicker && window.AdvanceTimePicker) {
-                    window.AdvanceTimePicker.set(dPicker, durHours);
+                    window.AdvanceTimePicker.set(dPicker, durMin);
                 } else {
                     const el = card.querySelector('.experiencia-duration-input');
-                    if (el) el.value = durHours || '';
+                    if (el) el.value = durMin || '';
                 }
             })();
             (function() {
