@@ -47,25 +47,31 @@ const canManageReservations = !!(locals && locals.canManageReservations);
         border-radius: 11px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     }
+    /* ===== Rediseño limpio (sin card blanca), consistente con traslados/clientes ===== */
+    .exp-catalog { --exp-border: #d6d1c4; --exp-olive: #6E7A50; --exp-olive-light: #7C8A5A; --exp-muted: #8a8f78; --exp-dark: #2b2b2b; }
+    /* Filtro de fecha (btn-check radios) al look segmentado */
+    .exp-catalog .btn-group > .btn-check + .btn.btn-outline-primary {
+        border: 1px solid var(--exp-border);
+        color: var(--exp-dark);
+        background: rgba(255, 255, 255, 0.4);
+        font-size: 0.72rem; letter-spacing: 0.04em; font-weight: 600;
+        padding: 9px 14px;
+    }
+    .exp-catalog .btn-group > .btn-check + .btn.btn-outline-primary:hover { background: rgba(110, 122, 80, 0.08); color: var(--exp-dark); }
+    .exp-catalog .btn-group > .btn-check:checked + .btn.btn-outline-primary { background: var(--exp-olive); border-color: var(--exp-olive); color: #fff; }
+    /* Selects Año/Mes/Día estilo catálogo */
+    .exp-catalog .form-select-sm { border: 1px solid var(--exp-border); background: rgba(255, 255, 255, 0.45); color: var(--exp-dark); border-radius: 6px; }
+    .exp-catalog .form-select-sm:focus { border-color: var(--exp-olive); background: #fff; box-shadow: none; }
+    /* thead sobrio (crema/versalita) */
+    .exp-catalog .table > thead.table-light th { background: rgba(228, 223, 207, 0.35); border-bottom: 1px solid var(--exp-border); color: var(--exp-muted); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; vertical-align: middle; }
 </style>
 
 <!-- Page Content -->
 <div class="page-content">
     <div class="row">
         <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-                    <div class="row align-items-center">
-                        <div class="col">
-                            <h5 class="card-title mb-0 text-white">
-                                <i class="ti ti-clipboard-list me-2"></i>Reservaciones
-                            </h5>
-                            <small class="text-white" style="opacity: 0.9;">Reservaciones creadas a partir de cotizaciones agendadas</small>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card-body">
+            <div class="exp-catalog reservations-wrap">
+                <div class="reservations-body">
                     <!-- Date Filter Pills and Date Selectors -->
                     <div class="mb-3">
                         <div class="row align-items-center">
