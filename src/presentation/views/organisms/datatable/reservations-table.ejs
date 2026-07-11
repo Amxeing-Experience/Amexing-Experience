@@ -618,7 +618,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (!row.hasPendingInvoiceRequest) {
                             actions += `<button class="btn btn-sm btn-outline-warning request-invoice-btn me-1" data-quote-id="${row.quoteId}" data-folio="${row.quoteFolio || row.folio}" title="Solicitar Factura"><i class="ti ti-file-certificate"></i></button>`;
                         } else {
-                            actions += `<button class="btn btn-sm btn-outline-secondary me-1" disabled title="Factura ya solicitada"><i class="ti ti-file-certificate"></i></button>`;
+                            // Ya solicitada: NO deshabilitado (así el tooltip nativo sí se ve) y clic
+                            // muestra el estado. Ícono con check para diferenciarlo del pendiente.
+                            actions += `<button class="btn btn-sm btn-outline-secondary invoice-requested-btn me-1" data-folio="${row.quoteFolio || row.folio}" title="Factura ya solicitada — pendiente de procesar"><i class="ti ti-file-certificate"></i></button>`;
                         }
                         <% } %>
                     }
@@ -913,6 +915,12 @@ document.addEventListener('DOMContentLoaded', function() {
         invoiceQuoteId = $(this).data('quote-id');
         $('#invoiceQuoteFolio').text($(this).data('folio') || '');
         new bootstrap.Modal(document.getElementById('requestInvoiceModal')).show();
+    });
+
+    // Factura ya solicitada: informa el estado (pendiente de procesar por facturación).
+    $('#reservations-table').on('click', '.invoice-requested-btn', function() {
+        const folio = $(this).data('folio') || '';
+        rtNotifyOk(`La factura de ${folio} ya fue solicitada y está pendiente de procesar por el departamento de facturación.`);
     });
 
     // Confirmar recibo → descarga el PDF
