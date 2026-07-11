@@ -228,6 +228,9 @@ table.dataTable thead th:nth-child(2) select {
 .exp-catalog .segbar { display: flex; justify-content: space-between; align-items: center; gap: 18px 28px; flex-wrap: wrap; margin-bottom: 18px; }
 .exp-catalog .segbar__left { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
 .exp-catalog .segbar__right { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+/* thead sobrio (crema/versalita), igual que la tabla de clientes */
+.exp-catalog .table > thead.table-light th { background: rgba(228, 223, 207, 0.35); border-bottom: 1px solid var(--exp-border); color: var(--exp-muted); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; vertical-align: middle; }
+.exp-catalog .table > thead.table-light th .form-select { text-transform: none; letter-spacing: normal; font-size: 0.9rem; color: var(--exp-dark); font-weight: 400; }
 .exp-catalog .segwrap { display: flex; align-items: center; gap: 10px; }
 .exp-catalog .seglabel { font-size: 0.64rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--exp-muted); font-weight: 600; }
 .exp-catalog .seg { display: inline-flex; border: 1px solid var(--exp-border); border-radius: 6px; overflow: hidden; background: rgba(255,255,255,0.4); }

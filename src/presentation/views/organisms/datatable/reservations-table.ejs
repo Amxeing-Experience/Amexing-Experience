@@ -29,117 +29,109 @@ const canManageReservations = !!(locals && locals.canManageReservations);
         backdrop-filter: blur(1px);
         border-radius: 0.5rem;
     }
-    /* Contador del pill "Pendientes de completar": badge salvia en la esquina sup. der. */
+    /* Contador del pill "Pendientes de completar": badge ámbar INLINE (junto al texto) */
     .pending-completion-badge {
-        position: absolute;
-        top: -8px;
-        right: -8px;
-        min-width: 22px;
-        height: 22px;
-        padding: 0 6px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: var(--brand-primary);
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        margin-left: 6px;
+        background: #b8894a;
         color: #fff;
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         font-weight: 700;
-        border-radius: 11px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
+        vertical-align: middle;
     }
+    /* ===== Rediseño limpio (sin card blanca), consistente con traslados/clientes ===== */
+    .exp-catalog { --exp-border: #d6d1c4; --exp-olive: #6E7A50; --exp-olive-light: #7C8A5A; --exp-muted: #8a8f78; --exp-dark: #2b2b2b; }
+    /* Filtro de fecha (btn-check radios) al look segmentado */
+    .exp-catalog .btn-group > .btn-check + .btn.btn-outline-primary {
+        border: 1px solid var(--exp-border);
+        color: var(--exp-dark);
+        background: rgba(255, 255, 255, 0.4);
+        font-size: 0.72rem; letter-spacing: 0.04em; font-weight: 600;
+        padding: 9px 14px;
+    }
+    .exp-catalog .btn-group > .btn-check + .btn.btn-outline-primary:hover { background: rgba(110, 122, 80, 0.08); color: var(--exp-dark); }
+    .exp-catalog .btn-group > .btn-check:checked + .btn.btn-outline-primary { background: var(--exp-olive); border-color: var(--exp-olive); color: #fff; }
+    /* Selects Año/Mes/Día estilo catálogo */
+    .exp-catalog .form-select-sm { border: 1px solid var(--exp-border); background: rgba(255, 255, 255, 0.45); color: var(--exp-dark); border-radius: 6px; }
+    .exp-catalog .form-select-sm:focus { border-color: var(--exp-olive); background: #fff; box-shadow: none; }
+    /* thead sobrio (crema/versalita) */
+    .exp-catalog .table > thead.table-light th { background: rgba(228, 223, 207, 0.35); border-bottom: 1px solid var(--exp-border); color: var(--exp-muted); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; vertical-align: middle; }
+    /* Barra de filtros: fecha (izq) · Año/Mes/Día (der) */
+    .reservations-filters { display: flex; justify-content: space-between; align-items: center; gap: 14px 24px; flex-wrap: wrap; margin-bottom: 18px; }
+    .reservations-filters .date-selects { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .reservations-filters .date-sel { display: inline-flex; align-items: center; gap: 8px; }
+    .reservations-filters .date-sel .seglabel { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--exp-muted); font-weight: 600; }
+    .reservations-filters .date-sel .form-select-sm { min-width: 90px; }
+    .reservations-filters .info-icon { color: var(--exp-olive); cursor: pointer; font-size: 1.1rem; }
 </style>
 
 <!-- Page Content -->
 <div class="page-content">
     <div class="row">
         <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-                    <div class="row align-items-center">
-                        <div class="col">
-                            <h5 class="card-title mb-0 text-white">
-                                <i class="ti ti-clipboard-list me-2"></i>Reservaciones
-                            </h5>
-                            <small class="text-white" style="opacity: 0.9;">Reservaciones creadas a partir de cotizaciones agendadas</small>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card-body">
+            <div class="exp-catalog reservations-wrap">
+                <div class="reservations-body">
                     <!-- Date Filter Pills and Date Selectors -->
-                    <div class="mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-md-auto mb-2 mb-md-0">
-                                <div class="btn-group" role="group" aria-label="Filtro por fecha de reservaciones">
-                                    <input type="radio" class="btn-check" name="dateFilter" id="filterPendingCompletion" value="pending_completion">
-                                    <label class="btn btn-outline-primary position-relative" for="filterPendingCompletion">
-                                        <i class="ti ti-alert-triangle me-1"></i>PENDIENTES DE COMPLETAR
-                                        <span id="pendingCompletionCounter" class="pending-completion-badge d-none">0</span>
-                                    </label>
+                    <!-- Barra de filtros: fecha (izquierda) · Año/Mes/Día (derecha) -->
+                    <div class="reservations-filters">
+                        <div class="btn-group" role="group" aria-label="Filtro por fecha de reservaciones">
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterPendingCompletion" value="pending_completion">
+                            <label class="btn btn-outline-primary position-relative" for="filterPendingCompletion">
+                                <i class="ti ti-alert-triangle me-1"></i>Pendientes de completar
+                                <span id="pendingCompletionCounter" class="pending-completion-badge d-none">0</span>
+                            </label>
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterUpcoming" value="upcoming" checked>
+                            <label class="btn btn-outline-primary" for="filterUpcoming">
+                                <i class="ti ti-calendar-forward me-1"></i>Próximas
+                            </label>
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterOngoing" value="ongoing">
+                            <label class="btn btn-outline-primary" for="filterOngoing">
+                                <i class="ti ti-calendar-event me-1"></i>En curso
+                            </label>
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterPast" value="past">
+                            <label class="btn btn-outline-primary" for="filterPast">
+                                <i class="ti ti-calendar-time me-1"></i>Pasadas
+                            </label>
+                        </div>
 
-                                    <input type="radio" class="btn-check" name="dateFilter" id="filterUpcoming" value="upcoming" checked>
-                                    <label class="btn btn-outline-primary" for="filterUpcoming">
-                                        <i class="ti ti-calendar-forward me-1"></i>PRÓXIMAS
-                                    </label>
-                                    
-                                    <input type="radio" class="btn-check" name="dateFilter" id="filterOngoing" value="ongoing">
-                                    <label class="btn btn-outline-primary" for="filterOngoing">
-                                        <i class="ti ti-calendar-event me-1"></i>EN CURSO
-                                    </label>
-                                    
-                                    <input type="radio" class="btn-check" name="dateFilter" id="filterPast" value="past">
-                                    <label class="btn btn-outline-primary" for="filterPast">
-                                        <i class="ti ti-calendar-time me-1"></i>PASADAS
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-auto">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="text-muted">|</span>
-                                    
-                                    <!-- Year Filter -->
-                                    <div class="d-flex align-items-center">
-                                        <label for="yearFilter" class="form-label mb-0 me-2 text-muted">Año:</label>
-                                        <select class="form-select form-select-sm" id="yearFilter" style="width: 100px;">
-                                            <!-- Options will be populated by JavaScript -->
-                                        </select>
-                                    </div>
-                                    
-                                    <!-- Month Filter -->
-                                    <div class="d-flex align-items-center">
-                                        <label for="monthFilter" class="form-label mb-0 me-2 text-muted">Mes:</label>
-                                        <select class="form-select form-select-sm" id="monthFilter" style="width: 130px;">
-                                            <option value="">Todos</option>
-                                            <option value="1">Enero</option>
-                                            <option value="2">Febrero</option>
-                                            <option value="3">Marzo</option>
-                                            <option value="4">Abril</option>
-                                            <option value="5">Mayo</option>
-                                            <option value="6">Junio</option>
-                                            <option value="7">Julio</option>
-                                            <option value="8">Agosto</option>
-                                            <option value="9">Septiembre</option>
-                                            <option value="10">Octubre</option>
-                                            <option value="11">Noviembre</option>
-                                            <option value="12">Diciembre</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <!-- Day Filter -->
-                                    <div class="d-flex align-items-center">
-                                        <label for="dayFilter" class="form-label mb-0 me-2 text-muted">Día:</label>
-                                        <select class="form-select form-select-sm" id="dayFilter" style="width: 85px;">
-                                            <option value="">Todos</option>
-                                            <!-- Days 1-31 will be populated by JavaScript -->
-                                        </select>
-                                    </div>
-
-                                    <!-- Info: cómo funcionan los filtros de fecha -->
-                                    <i class="ti ti-info-circle text-primary"
+                        <div class="date-selects">
+                            <span class="date-sel">
+                                <span class="seglabel">Año</span>
+                                <select class="form-select form-select-sm" id="yearFilter" aria-label="Año"></select>
+                            </span>
+                            <span class="date-sel">
+                                <span class="seglabel">Mes</span>
+                                <select class="form-select form-select-sm" id="monthFilter" aria-label="Mes">
+                                    <option value="">Todos</option>
+                                    <option value="1">Enero</option>
+                                    <option value="2">Febrero</option>
+                                    <option value="3">Marzo</option>
+                                    <option value="4">Abril</option>
+                                    <option value="5">Mayo</option>
+                                    <option value="6">Junio</option>
+                                    <option value="7">Julio</option>
+                                    <option value="8">Agosto</option>
+                                    <option value="9">Septiembre</option>
+                                    <option value="10">Octubre</option>
+                                    <option value="11">Noviembre</option>
+                                    <option value="12">Diciembre</option>
+                                </select>
+                            </span>
+                            <span class="date-sel">
+                                <span class="seglabel">Día</span>
+                                <select class="form-select form-select-sm" id="dayFilter" aria-label="Día">
+                                    <option value="">Todos</option>
+                                </select>
+                            </span>
+                                    <i class="ti ti-info-circle info-icon"
                                        role="button"
                                        tabindex="0"
-                                       style="cursor: pointer; font-size: 1.15rem;"
                                        aria-label="Cómo funcionan los filtros de fecha"
                                        data-bs-toggle="popover"
                                        data-bs-html="true"
@@ -147,8 +139,6 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                                        data-bs-placement="bottom"
                                        data-bs-title="¿Cómo funcionan los filtros?"
                                        data-bs-content="<strong>Pendientes de completar:</strong> reservaciones con la cotización bloqueada (faltan datos). No usan fecha.<br><br>Los demás filtros usan el rango de fechas de los servicios (inicio y fin):<br><strong>Próximas:</strong> aún no inicia.<br><strong>En curso:</strong> ya inició y no ha terminado.<br><strong>Pasadas:</strong> ya terminó.<br><br>El Año/Mes/Día acota a ese periodo: se muestra si la reservación tiene un servicio en la fecha seleccionada."></i>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
