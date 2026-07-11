@@ -228,7 +228,9 @@ table.dataTable thead th:nth-child(2) select {
 .traslados-title { margin: 0; font-size: 1.35rem; font-weight: 700; color: var(--exp-dark); }
 .traslados-new-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--exp-olive); background: var(--exp-olive); color: #fff; border-radius: 8px; font-size: 0.82rem; font-weight: 600; padding: 9px 16px; cursor: pointer; transition: all 0.15s; }
 .traslados-new-btn:hover { background: var(--exp-olive-light); border-color: var(--exp-olive-light); color: #fff; }
-.exp-catalog .segbar { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.exp-catalog .segbar { display: flex; justify-content: space-between; align-items: center; gap: 18px 28px; flex-wrap: wrap; margin-bottom: 18px; }
+.exp-catalog .segbar__left { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+.exp-catalog .segbar__right { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .exp-catalog .segwrap { display: flex; align-items: center; gap: 10px; }
 .exp-catalog .seglabel { font-size: 0.64rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--exp-muted); font-weight: 600; }
 .exp-catalog .seg { display: inline-flex; border: 1px solid var(--exp-border); border-radius: 6px; overflow: hidden; background: rgba(255,255,255,0.4); }
@@ -238,7 +240,6 @@ table.dataTable thead th:nth-child(2) select {
 .exp-catalog .seg .filter-pill.active { background: var(--exp-olive); color: #fff; }
 .exp-catalog .segwrap .form-check { margin: 0; min-height: auto; }
 .exp-catalog .segwrap .form-check-label { font-size: 0.78rem; color: var(--exp-dark); }
-.trasl-filters { display: flex; gap: 12px; flex-wrap: wrap; margin: 0 0 18px; }
 .exp-catalog .exp-field { position: relative; min-width: 150px; }
 .exp-catalog .exp-field select { width: 100%; font-size: 0.9rem; color: var(--exp-dark); background: rgba(255,255,255,0.45); border: 1px solid var(--exp-border); border-radius: 6px; padding: 11px 38px 11px 14px; appearance: none; -webkit-appearance: none; outline: none; }
 .exp-catalog .exp-field select:focus { border-color: var(--exp-olive); background: #fff; }
@@ -256,51 +257,51 @@ table.dataTable thead th:nth-child(2) select {
         <% } %>
     </div>
 
-    <!-- Controles segmentados: Tipo + Guía + Greeter -->
+    <!-- Barra de filtros: Tipo + Guía/Greeter (izquierda) · Moneda + Pago (derecha) -->
     <div class="segbar">
-        <div class="segwrap">
-            <span class="seglabel">Tipo</span>
-            <div class="seg">
-                <button type="button" class="filter-pill active" data-filter="airport">Aeropuerto</button>
-                <button type="button" class="filter-pill" data-filter="p2p">Punto a Punto</button>
-                <button type="button" class="filter-pill" data-filter="local">Local</button>
+        <div class="segbar__left">
+            <div class="segwrap">
+                <span class="seglabel">Tipo</span>
+                <div class="seg">
+                    <button type="button" class="filter-pill active" data-filter="airport">Aeropuerto</button>
+                    <button type="button" class="filter-pill" data-filter="p2p">Punto a Punto</button>
+                    <button type="button" class="filter-pill" data-filter="local">Local</button>
+                </div>
+            </div>
+            <div class="segwrap">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="driverToggle-<%= dtTableId %>">
+                    <label class="form-check-label" for="driverToggle-<%= dtTableId %>" id="driverLabel-<%= dtTableId %>">Sin Guía</label>
+                </div>
+            </div>
+            <div class="segwrap">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="greeterToggle-<%= dtTableId %>">
+                    <label class="form-check-label" for="greeterToggle-<%= dtTableId %>" id="greeterLabel-<%= dtTableId %>">Sin Greeter</label>
+                </div>
             </div>
         </div>
-        <div class="segwrap">
-            <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" id="driverToggle-<%= dtTableId %>">
-                <label class="form-check-label" for="driverToggle-<%= dtTableId %>" id="driverLabel-<%= dtTableId %>">Sin Guía</label>
+        <div class="segbar__right">
+            <div class="exp-field exp-field--select">
+                <select id="currencyFilter-<%= dtTableId %>">
+                    <option value="MXN" selected>MXN</option>
+                    <option value="USD">USD</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
-        </div>
-        <div class="segwrap">
-            <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" id="greeterToggle-<%= dtTableId %>">
-                <label class="form-check-label" for="greeterToggle-<%= dtTableId %>" id="greeterLabel-<%= dtTableId %>">Sin Greeter</label>
+            <div class="exp-field exp-field--select">
+                <select id="paymentTypeFilter-<%= dtTableId %>">
+                    <% if (isDepartmentManager || isClient) { %>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia" selected>Transferencia</option>
+                    <% } else { %>
+                        <option value="efectivo" selected>Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                    <% } %>
+                    <option value="tarjeta">Tarjeta Débito/Crédito</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
-        </div>
-    </div>
-
-    <!-- Filtros: Moneda + Pago -->
-    <div class="trasl-filters">
-        <div class="exp-field exp-field--select">
-            <select id="currencyFilter-<%= dtTableId %>">
-                <option value="MXN" selected>MXN</option>
-                <option value="USD">USD</option>
-            </select>
-            <i class="ti ti-chevron-down exp-field__caret"></i>
-        </div>
-        <div class="exp-field exp-field--select">
-            <select id="paymentTypeFilter-<%= dtTableId %>">
-                <% if (isDepartmentManager || isClient) { %>
-                    <option value="efectivo">Efectivo</option>
-                    <option value="transferencia" selected>Transferencia</option>
-                <% } else { %>
-                    <option value="efectivo" selected>Efectivo</option>
-                    <option value="transferencia">Transferencia</option>
-                <% } %>
-                <option value="tarjeta">Tarjeta Débito/Crédito</option>
-            </select>
-            <i class="ti ti-chevron-down exp-field__caret"></i>
         </div>
     </div>
 
