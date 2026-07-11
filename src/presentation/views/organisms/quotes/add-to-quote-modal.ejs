@@ -39,6 +39,8 @@
 
                 <div id="atqDaySelector" style="display: none;"></div>
 
+                <div id="atqPeople" style="display: none;"></div>
+
                 <div id="atqActionLoading" class="text-center py-4" style="display: none;">
                     <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
                     <div class="text-muted small mt-2">Agregando a la cotización...</div>
@@ -74,4 +76,21 @@
 .day-list-item .day-title { font-weight: 600; font-size: 0.85rem; color: #344767; }
 .new-day-date-row { padding: 10px 0; }
 .atq-alert { position: fixed; top: 20px; right: 20px; z-index: 10600; min-width: 320px; max-width: 480px; }
+/* People step (personas por servicio) */
+.atq-people-back { font-size: 0.85rem; color: #6E7A50; cursor: pointer; display: inline-flex; align-items: center; margin-bottom: 12px; }
+.atq-people-back:hover { color: #5c6743; text-decoration: underline; }
+.atq-people-title { font-weight: 600; font-size: 0.9rem; color: #344767; margin-bottom: 4px; }
+.atq-people-hint { font-size: 0.76rem; color: #adb5bd; margin-bottom: 10px; }
+.atq-people-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+.atq-people-row .lbl { font-size: 0.85rem; color: #344767; }
+.atq-people-row .lbl small { color: #adb5bd; display: block; font-size: 0.72rem; }
+.atq-stepper { display: inline-flex; align-items: center; gap: 10px; }
+.atq-stepper button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid #6E7A50; background: #fff; color: #6E7A50; font-weight: 700; line-height: 1; cursor: pointer; transition: all 0.15s; }
+.atq-stepper button:hover:not(:disabled) { background: #6E7A50; color: #fff; }
+.atq-stepper button:disabled { opacity: 0.4; cursor: not-allowed; }
+.atq-stepper .val { min-width: 24px; text-align: center; font-weight: 600; font-size: 0.9rem; color: #344767; }
+.atq-people-total { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e9ecef; margin-top: 10px; padding-top: 12px; }
+.atq-people-total .amt { font-weight: 700; font-size: 1.05rem; color: #344767; }
+.atq-people-confirm { width: 100%; margin-top: 14px; padding: 11px; border: none; border-radius: 8px; background: #6E7A50; color: #fff; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: background 0.15s; }
+.atq-people-confirm:hover { background: #5c6743; }
 </style>

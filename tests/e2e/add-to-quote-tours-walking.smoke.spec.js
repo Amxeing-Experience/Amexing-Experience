@@ -48,10 +48,15 @@ test.describe('Agregar a cotización — Tour a pie (walking)', () => {
     await addBtn.click();
     const createBtn = page.locator('#atqCreateNew');
     await expect(createBtn, 'el modal genérico #atqModal debe abrir').toBeVisible({ timeout: 15_000 });
+    await createBtn.click();
+
+    // Paso de personas (nuevo): cotización NUEVA vacía → default 1 persona (tramo chico).
+    const peopleConfirm = page.locator('.atq-people-confirm');
+    await expect(peopleConfirm, 'debe aparecer el paso de personas').toBeVisible({ timeout: 10_000 });
 
     await Promise.all([
       page.waitForURL(/\/quotes\/[A-Za-z0-9]+/, { timeout: 30_000 }),
-      createBtn.click(),
+      peopleConfirm.click(),
     ]);
 
     const quoteId = page.url().match(/\/quotes\/([A-Za-z0-9]+)/)[1];
@@ -69,6 +74,7 @@ test.describe('Agregar a cotización — Tour a pie (walking)', () => {
     expect(Number(s.walkingTourPeopleCount), 'default 1 persona').toBe(1);
     expect(s.walkingPriceMode, 'modo calculado (lo recalcula la cotización)').toBe('calculated');
     expect(Number(s.hours), 'hours = mínimo de horas del tour').toBeCloseTo(w.minHours, 2);
+    expect(s.pricesByType, 'el subconcepto trae pricesByType').toBeTruthy();
 
     // Total esperado sólo comparable exacto en MXN (en USD depende del tipo de cambio del server).
     if (w.currency === 'MXN' && w.priceSmall > 0) {

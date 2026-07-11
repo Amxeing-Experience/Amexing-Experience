@@ -52,11 +52,17 @@ test.describe('Agregar a cotización — Experiencias', () => {
     const createBtn = page.locator('#atqCreateNew');
     await expect(createBtn, 'el modal genérico #atqModal debe abrir con "Crear nueva cotización"')
       .toBeVisible({ timeout: 15_000 });
+    await createBtn.click();
 
-    // Al crear, el módulo hace POST /api/quotes + PUT service-items y redirige a la cotización.
+    // Paso de personas (nuevo): pre-llenado con las personas de la cotización. Como es una
+    // cotización NUEVA (vacía), cae al default de 1 persona (1 adulto).
+    const peopleConfirm = page.locator('.atq-people-confirm');
+    await expect(peopleConfirm, 'debe aparecer el paso de personas').toBeVisible({ timeout: 10_000 });
+
+    // Al confirmar, el módulo hace POST /api/quotes + PUT service-items y redirige.
     await Promise.all([
       page.waitForURL(/\/quotes\/[A-Za-z0-9]+/, { timeout: 30_000 }),
-      createBtn.click(),
+      peopleConfirm.click(),
     ]);
 
     const quoteId = page.url().match(/\/quotes\/([A-Za-z0-9]+)/)[1];
@@ -73,9 +79,11 @@ test.describe('Agregar a cotización — Experiencias', () => {
 
     expect(expSub, 'la cotización debe contener un subconcepto de experiencia').toBeTruthy();
     expect(expSub.experienceId, 'el experienceId del subconcepto debe coincidir con la card').toBe(exp.id);
-    expect(Number(expSub.total), 'el total del subconcepto debe coincidir con el precio de la card')
-      .toBeCloseTo(exp.price, 2);
+    expect(Number(expSub.adultsQuantity), 'default 1 adulto en cotización nueva').toBe(1);
+    // 1 adulto → total = precio adulto de la card.
+    expect(Number(expSub.total), 'total = 1 × precio adulto').toBeCloseTo(exp.price, 2);
     expect(expSub.isPerPerson, 'la experiencia se marca por persona').toBe(true);
+    expect(expSub.pricesByType, 'el subconcepto trae pricesByType').toBeTruthy();
 
     // --- Limpieza best-effort: borrar la cotización de prueba ---
     try {
