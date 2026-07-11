@@ -12,46 +12,34 @@ const apiEndpoint = typeof vehicleRatesEndpoint !== 'undefined' ? vehicleRatesEn
 %>
 
 <!-- Vehicle Rate Prices Section -->
-<div class="card mb-4" id="<%= sectionId %>">
-    <div class="card-header bg-light">
-        <div class="d-flex align-items-center justify-content-between">
-            <div>
-                <h5 class="card-title mb-1">
-                    <i class="ti ti-car me-2 text-primary"></i>Tiempo de Espera
-                </h5>
-                <p class="text-muted small mb-0">Tarifas por hora por tipo de vehículo y categoría</p>
+<div class="exp-catalog vehicle-rates-section mb-4" id="<%= sectionId %>">
+    <!-- Encabezado limpio (sin card blanca) -->
+    <div class="vrates-head">
+        <div class="vrates-head__title">
+            <h5 class="vrates-title"><i class="ti ti-car me-2"></i>Tiempo de Espera</h5>
+            <p class="vrates-sub">Tarifas por hora por tipo de vehículo y categoría</p>
+        </div>
+        <div class="vrates-head__filters">
+            <div class="exp-field exp-field--select">
+                <select id="vehicleRatesCurrencyFilter-<%= sectionId %>">
+                    <option value="MXN" selected>MXN</option>
+                    <option value="USD">USD</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
-            <div class="d-flex align-items-center gap-3">
-                <!-- Filter Controls -->
-                <div class="d-flex gap-2 align-items-center">
-                    <!-- Currency Dropdown -->
-                    <div class="d-flex align-items-center gap-1">
-                        <label for="vehicleRatesCurrencyFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Moneda:</label>
-                        <select class="form-select form-select-sm" id="vehicleRatesCurrencyFilter-<%= sectionId %>" style="min-width: 80px;">
-                            <option value="MXN" selected>MXN</option>
-                            <option value="USD">USD</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Payment Type Dropdown -->
-                    <div class="d-flex align-items-center gap-1">
-                        <label for="vehicleRatesPaymentFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Pago:</label>
-                        <select class="form-select form-select-sm" id="vehicleRatesPaymentFilter-<%= sectionId %>" style="min-width: 180px;">
-                            <option value="efectivo" selected>Efectivo</option>
-                            <option value="transferencia">Transferencia</option>
-                            <option value="tarjeta">Tarjeta de Crédito/Débito</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div class="badge bg-primary-subtle text-primary">
-                    <i class="ti ti-clock me-1"></i>Por hora
-                </div>
+            <div class="exp-field exp-field--select">
+                <select id="vehicleRatesPaymentFilter-<%= sectionId %>">
+                    <option value="efectivo" selected>Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="tarjeta">Tarjeta de Crédito/Débito</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
+            <span class="vrates-badge"><i class="ti ti-clock me-1"></i>Por hora</span>
         </div>
     </div>
-    
-    <div class="card-body">
+
+    <div class="vrates-body">
         <!-- Loading state -->
         <div id="vehicle-rates-loading" class="text-center py-4">
             <div class="spinner-border text-primary" role="status">
@@ -59,19 +47,19 @@ const apiEndpoint = typeof vehicleRatesEndpoint !== 'undefined' ? vehicleRatesEn
             </div>
             <p class="text-muted mt-2">Cargando precios de vehículos...</p>
         </div>
-        
-        <!-- Rate Selection Pills -->
+
+        <!-- Rate Selection Pills (los colores los pone el JS por rateData.color) -->
         <div id="vehicle-rates-pills" class="d-none mb-4">
             <div class="d-flex gap-2 flex-wrap" id="rate-pills-container">
                 <!-- Rate pills will be populated by JavaScript -->
             </div>
         </div>
-        
+
         <!-- Vehicle rates container -->
         <div id="vehicle-rates-container" class="d-none">
             <!-- Selected rate vehicles will be populated here via JavaScript -->
         </div>
-        
+
         <!-- No vehicle rates message -->
         <div id="no-vehicle-rates" class="text-center py-4 d-none">
             <div class="text-muted">
@@ -343,8 +331,8 @@ function displaySingleRate(rateName, rateData) {
         
         return `
         <div class="col-md-2 col-6">
-            <div class="text-center p-3 bg-white border rounded-2 shadow-sm">
-                <div class="fw-bold text-dark mb-1">${vehicleCode}</div>
+            <div class="text-center vrates-vehicle-tile">
+                <div class="vrates-vehicle-name">${vehicleCode}</div>
                 <div class="h6 mb-0 vehicle-rate-price text-primary" data-original-price="${originalPrice}">
                     <div class="price-loader d-flex align-items-center justify-content-center">
                         <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
@@ -551,14 +539,39 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+/* Rediseño limpio "Tiempo de Espera" (sin card blanca). Los colores de las pills los
+   pone el JS por rateData.color (inline) — no se tocan aquí. */
+.vehicle-rates-section {
+    --exp-border: #d6d1c4; --exp-olive: #6E7A50; --exp-muted: #8a8f78; --exp-dark: #2b2b2b;
+    background: transparent;
+    /* Separador sutil respecto a la tabla de Traslados que va debajo */
+    padding-bottom: 26px;
+    border-bottom: 1px solid #e6e2d8;
+}
+.vrates-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.vrates-title { margin: 0 0 2px; font-size: 1.3rem; font-weight: 700; color: var(--exp-dark); display: flex; align-items: center; }
+.vrates-title i { color: var(--exp-olive); }
+.vrates-sub { margin: 0; font-size: 0.82rem; color: var(--exp-muted); }
+.vrates-head__filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.vehicle-rates-section .exp-field { position: relative; min-width: 130px; }
+.vehicle-rates-section .exp-field select { width: 100%; font-size: 0.9rem; color: var(--exp-dark); background: rgba(255,255,255,0.45); border: 1px solid var(--exp-border); border-radius: 6px; padding: 10px 36px 10px 14px; appearance: none; -webkit-appearance: none; outline: none; }
+.vehicle-rates-section .exp-field select:focus { border-color: var(--exp-olive); background: #fff; }
+.vehicle-rates-section .exp-field__caret { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--exp-muted); pointer-events: none; font-size: 0.9rem; }
+.vrates-badge { display: inline-flex; align-items: center; font-size: 0.72rem; font-weight: 600; color: var(--exp-olive); background: rgba(110,122,80,0.10); border-radius: 999px; padding: 6px 12px; white-space: nowrap; }
+/* Tiles de vehículo aplanadas (sin sombra ni blanco duro) */
+.vrates-vehicle-tile { padding: 16px 14px; background: #f6f4ee; border: 1px solid #e9e5db; border-radius: 8px; transition: border-color 0.15s ease; }
+.vrates-vehicle-tile:hover { border-color: var(--exp-border); }
+.vrates-vehicle-name { font-weight: 600; font-size: 0.82rem; letter-spacing: 0.04em; color: var(--exp-dark); margin-bottom: 6px; }
+
 /* Rate Pills Styling */
 .rate-pill {
-    border-width: 2px;
-    font-weight: 500;
-    padding: 8px 16px;
-    border-radius: 25px;
-    transition: all 0.3s ease;
-    font-size: 14px;
+    border-width: 1.5px;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
 }
 
 .rate-pill:hover {
