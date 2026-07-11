@@ -211,27 +211,16 @@ const canManageReservations = !!(locals && locals.canManageReservations);
             </div>
             <div class="modal-body">
                 <p>¿Desea generar el recibo para la reservación <strong id="receiptQuoteFolio"></strong>?</p>
-                <% if (basePath === 'admin') { %>
-                <!-- Payment Info Selection for Admin Only -->
-                <div class="mb-3">
-                    <label for="paymentInfoSelect" class="form-label">
-                        <strong>Método de Pago a Incluir</strong>
-                    </label>
-                    <select class="form-select" id="paymentInfoSelect">
-                        <option value="">Sin información de pago</option>
-                        <option value="loading" disabled>Cargando métodos de pago...</option>
-                    </select>
-                    <div class="form-text">Selecciona qué información de pago incluir en el recibo</div>
-                </div>
-                <% } %>
+                <!-- "Método de Pago a Incluir" oculto por ahora: el recibo actual no imprime
+                     datos de pago. (El JS que lo cargaba hace no-op si el select no existe.) -->
                 <!-- Perfil de Facturación (datos fiscales de la agencia) — para los 3 roles -->
                 <div class="mb-3">
                     <label for="billingProfileSelect" class="form-label">
                         <strong>Perfil de Facturación</strong>
+                        <span id="billingProfileSpinner" class="spinner-border spinner-border-sm text-secondary ms-2 d-none" role="status" aria-hidden="true"></span>
                     </label>
                     <select class="form-select" id="billingProfileSelect">
                         <option value="">Sin datos de facturación</option>
-                        <option value="loading" disabled>Cargando perfiles...</option>
                     </select>
                     <div class="form-text">Datos fiscales (RFC, razón social…) que se imprimen en el recibo</div>
                 </div>
@@ -870,8 +859,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Preselecciona el guardado en la reservación o el principal.
     async function loadBillingProfileOptions(quoteId) {
         const select = document.getElementById('billingProfileSelect');
+        const spinner = document.getElementById('billingProfileSpinner');
         if (!select || !quoteId) return;
-        select.innerHTML = '<option value="">Sin datos de facturación</option><option value="loading" disabled>Cargando perfiles...</option>';
+        // Estado de carga: spinner visible + select deshabilitado mostrando "Cargando…".
+        if (spinner) spinner.classList.remove('d-none');
+        select.disabled = true;
+        select.innerHTML = '<option value="" selected>Cargando perfiles…</option>';
         try {
             const response = await fetch(`/api/quotes/${quoteId}/billing-profiles`, {
                 headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -899,6 +892,10 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Error loading billing profiles:', error);
             select.innerHTML = '<option value="">Error al cargar perfiles</option>';
+        } finally {
+            // Fin de carga: ocultar spinner y reactivar el select.
+            if (spinner) spinner.classList.add('d-none');
+            select.disabled = false;
         }
     }
 
@@ -962,7 +959,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
                     hideReceiptModal();
-                    rtNotifyOk('Recibo generado y descargado exitosamente');
+                    // Sin alerta de éxito: la descarga del PDF ya es señal suficiente.
                     table.ajax.reload(null, false);
                     receiptQuoteId = null;
                 });
@@ -970,7 +967,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json().then((data) => {
                 if (data.success) {
                     hideReceiptModal();
-                    rtNotifyOk(data.message || 'Recibo generado exitosamente');
                     table.ajax.reload(null, false);
                     receiptQuoteId = null;
                 } else {
