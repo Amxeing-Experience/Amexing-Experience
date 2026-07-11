@@ -98,6 +98,10 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                             <label class="btn btn-outline-primary" for="filterPast">
                                 <i class="ti ti-calendar-time me-1"></i>Pasadas
                             </label>
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterCancelled" value="cancelled">
+                            <label class="btn btn-outline-primary" for="filterCancelled">
+                                <i class="ti ti-calendar-off me-1"></i>Canceladas
+                            </label>
                         </div>
 
                         <div class="date-selects">
@@ -706,7 +710,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // En "Pendientes de completar" (filtro por estado, no por fecha) los selectores
         // de fecha no aplican: no cambiamos el pill.
         const activePill = document.querySelector('input[name="dateFilter"]:checked');
-        if (activePill && activePill.value === 'pending_completion') return false;
+        // 'pending_completion' y 'cancelled' son filtros por estado (no por fecha):
+        // no se auto-cambian al tocar los selectores de Año/Mes/Día.
+        if (activePill && (activePill.value === 'pending_completion' || activePill.value === 'cancelled')) return false;
         const period = getSelectedPeriod();
         if (!period) return;
         const today = new Date(); today.setHours(0, 0, 0, 0);
