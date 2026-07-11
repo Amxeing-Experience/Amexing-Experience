@@ -88,7 +88,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         <th class="text-center">No. Personas</th>
                         <th class="text-center">Fecha inicio de servicios</th>
                         <th class="text-center">Fecha Creación</th>
-                        <th class="text-center">Estatus</th>
+                        <th class="text-center status-col">Estatus</th>
                         <th class="text-center">Última Modificación</th>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
@@ -355,6 +355,15 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 .quotes-wrap .table > tbody td {
     border-bottom: 1px solid #f1efe8;
     vertical-align: middle;
+}
+/* Columna de Estatus más ancha para el dropdown */
+.quotes-wrap .table th.status-col,
+.quotes-wrap .table td.status-col {
+    min-width: 170px;
+}
+.quotes-wrap .table td.status-col .status-select-wrapper,
+.quotes-wrap .table td.status-col .status-selector {
+    width: 100%;
 }
 
 /* Gradient backgrounds for role badges */
@@ -691,7 +700,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 },
                 {
                     data: 'status',
-                    className: 'text-center',
+                    className: 'text-center status-col',
                     render: function(data, type, row) {
                         const userRole = '<%= dtUserRole %>';
 
