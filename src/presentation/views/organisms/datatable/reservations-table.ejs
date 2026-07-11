@@ -52,8 +52,8 @@ const canManageReservations = !!(locals && locals.canManageReservations);
         border: 1px solid var(--exp-border);
         color: var(--exp-dark);
         background: rgba(255, 255, 255, 0.4);
-        font-size: 0.72rem; letter-spacing: 0.04em; font-weight: 600;
-        padding: 9px 14px;
+        font-size: 0.85rem; letter-spacing: 0.02em; font-weight: 600;
+        padding: 9px 15px;
     }
     .exp-catalog .btn-group > .btn-check + .btn.btn-outline-primary:hover { background: rgba(110, 122, 80, 0.08); color: var(--exp-dark); }
     .exp-catalog .btn-group > .btn-check:checked + .btn.btn-outline-primary { background: var(--exp-olive); border-color: var(--exp-olive); color: #fff; }
@@ -66,8 +66,8 @@ const canManageReservations = !!(locals && locals.canManageReservations);
     .reservations-filters { display: flex; justify-content: space-between; align-items: center; gap: 14px 24px; flex-wrap: wrap; margin-bottom: 18px; }
     .reservations-filters .date-selects { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
     .reservations-filters .date-sel { display: inline-flex; align-items: center; gap: 8px; }
-    .reservations-filters .date-sel .seglabel { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--exp-muted); font-weight: 600; }
-    .reservations-filters .date-sel .form-select-sm { min-width: 90px; }
+    .reservations-filters .date-sel .seglabel { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--exp-muted); font-weight: 600; }
+    .reservations-filters .date-sel .form-select-sm { min-width: 96px; font-size: 0.85rem; }
     .reservations-filters .info-icon { color: var(--exp-olive); cursor: pointer; font-size: 1.1rem; }
 </style>
 
@@ -88,7 +88,7 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                             </label>
                             <input type="radio" class="btn-check" name="dateFilter" id="filterUpcoming" value="upcoming" checked>
                             <label class="btn btn-outline-primary" for="filterUpcoming">
-                                <i class="ti ti-calendar-forward me-1"></i>Próximas
+                                <i class="ti ti-calendar-plus me-1"></i>Próximas
                             </label>
                             <input type="radio" class="btn-check" name="dateFilter" id="filterOngoing" value="ongoing">
                             <label class="btn btn-outline-primary" for="filterOngoing">
