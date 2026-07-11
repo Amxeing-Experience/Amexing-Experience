@@ -331,8 +331,8 @@ function displaySingleRate(rateName, rateData) {
         
         return `
         <div class="col-md-2 col-6">
-            <div class="text-center p-3 bg-white border rounded-2 shadow-sm">
-                <div class="fw-bold text-dark mb-1">${vehicleCode}</div>
+            <div class="text-center vrates-vehicle-tile">
+                <div class="vrates-vehicle-name">${vehicleCode}</div>
                 <div class="h6 mb-0 vehicle-rate-price text-primary" data-original-price="${originalPrice}">
                     <div class="price-loader d-flex align-items-center justify-content-center">
                         <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
@@ -558,6 +558,10 @@ document.addEventListener('DOMContentLoaded', function() {
 .vehicle-rates-section .exp-field select:focus { border-color: var(--exp-olive); background: #fff; }
 .vehicle-rates-section .exp-field__caret { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--exp-muted); pointer-events: none; font-size: 0.9rem; }
 .vrates-badge { display: inline-flex; align-items: center; font-size: 0.72rem; font-weight: 600; color: var(--exp-olive); background: rgba(110,122,80,0.10); border-radius: 999px; padding: 6px 12px; white-space: nowrap; }
+/* Tiles de vehículo aplanadas (sin sombra ni blanco duro) */
+.vrates-vehicle-tile { padding: 16px 14px; background: #f6f4ee; border: 1px solid #e9e5db; border-radius: 8px; transition: border-color 0.15s ease; }
+.vrates-vehicle-tile:hover { border-color: var(--exp-border); }
+.vrates-vehicle-name { font-weight: 600; font-size: 0.82rem; letter-spacing: 0.04em; color: var(--exp-dark); margin-bottom: 6px; }
 
 /* Rate Pills Styling */
 .rate-pill {
