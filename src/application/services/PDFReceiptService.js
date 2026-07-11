@@ -67,6 +67,7 @@ class PDFReceiptService {
     try {
       const {
         quote, client, serviceItems, totals, includePaymentInfo = true, selectedPaymentInfo,
+        billingProfile,
       } = quoteData;
 
       // Create PDF document with smaller margins
@@ -87,6 +88,11 @@ class PDFReceiptService {
       this.addInvoiceAndClientInfo(doc, quote, client);
       this.addServiceItems(doc, serviceItems || []);
       this.addTotals(doc, totals);
+
+      // Datos de Facturación (perfil fiscal de la agencia elegido para el recibo).
+      if (billingProfile) {
+        this.addBillingInfo(doc, billingProfile);
+      }
 
       // Only include payment info if requested (admin/superadmin roles)
       if (includePaymentInfo) {
@@ -596,6 +602,61 @@ class PDFReceiptService {
     const newY = Math.max(currentY, hasRightColumn ? rightColumnY : currentY) + 20;
     /* eslint-disable-next-line no-param-reassign */
     doc.y = newY;
+  }
+
+  /**
+   * Add the fiscal billing profile block (RFC, razón social, régimen, uso CFDI, dirección).
+   * @param {PDFDocument} doc - PDF document instance.
+   * @param {object} billingProfile - Serialized BillingProfile of the agency.
+   * @example
+   *   this.addBillingInfo(doc, { rfc: 'AAA010101AAA', razonSocial: 'Agencia X', ... });
+   */
+  addBillingInfo(doc, billingProfile) {
+    if (!billingProfile) return;
+    const margin = doc.page.margins.left;
+
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333').text('DATOS DE FACTURACIÓN:', margin, doc.y);
+    doc.y += 15;
+    let currentY = doc.y;
+    doc.font('Helvetica').fontSize(8).fillColor('#333333');
+
+    // Líneas fiscales (solo las que tengan valor). Se soportan alias MX e internacional.
+    const lines = [
+      ['Razón Social', billingProfile.razonSocial || billingProfile.commercialName],
+      ['RFC', billingProfile.rfc || billingProfile.taxId],
+      ['Régimen Fiscal', billingProfile.regimenFiscal],
+      ['Uso CFDI', billingProfile.usoCfdi],
+      ['Email de Facturación', billingProfile.emailFacturacion || billingProfile.billingEmail],
+    ];
+    lines.forEach(([label, value]) => {
+      if (value) {
+        doc.text(`${label}: ${value}`, margin, currentY);
+        currentY += 12;
+      }
+    });
+
+    // Dirección fiscal compuesta (calle + número, colonia, ciudad, estado, CP, país).
+    const streetLine = [
+      billingProfile.streetType, billingProfile.street || billingProfile.streetName,
+      billingProfile.exteriorNumber ? `#${billingProfile.exteriorNumber}` : '',
+      billingProfile.interiorNumber ? `Int. ${billingProfile.interiorNumber}` : '',
+    ].filter(Boolean).join(' ');
+    const cityLine = [
+      billingProfile.colonia,
+      billingProfile.city,
+      billingProfile.state,
+      billingProfile.codigoPostal || billingProfile.postalCode ? `C.P. ${billingProfile.codigoPostal || billingProfile.postalCode}` : '',
+      billingProfile.country,
+    ].filter(Boolean).join(', ');
+    [streetLine, cityLine].forEach((line) => {
+      if (line) {
+        doc.text(`Dirección: ${line}`, margin, currentY, { width: 480 });
+        currentY += 12;
+      }
+    });
+
+    /* eslint-disable-next-line no-param-reassign */
+    doc.y = currentY + 20;
   }
 
   /**

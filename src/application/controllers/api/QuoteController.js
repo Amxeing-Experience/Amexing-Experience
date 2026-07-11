@@ -3591,14 +3591,16 @@ class QuoteController {
       const quoteId = req.params.id;
 
       // Get payment info parameters from request body (for admin role)
-      const { includePaymentInfo, paymentInfoId } = req.body;
+      // billingProfileId: perfil fiscal de la agencia a imprimir en el recibo (los 3 roles).
+      const { includePaymentInfo, paymentInfoId, billingProfileId } = req.body;
 
       const result = await this.quoteService.generateReceipt(
         currentUser,
         quoteId,
         req.userRole, // Pass userRole from JWT middleware
         includePaymentInfo, // Pass the flag from request
-        paymentInfoId // Pass the specific payment info ID
+        paymentInfoId, // Pass the specific payment info ID
+        billingProfileId // Perfil de facturación elegido (o undefined)
       );
 
       // If PDF buffer is returned, send it as a downloadable file
@@ -3626,6 +3628,68 @@ class QuoteController {
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al generar el recibo',
         500
       );
+    }
+  }
+
+  /**
+   * GET /api/quotes/:id/billing-profiles — Perfiles de facturación de la AGENCIA de la
+   * cotización (quote.client = AmexingUser de la agencia), para elegir cuál se imprime en el
+   * recibo. Devuelve además el perfil ya guardado en la reservación (o el principal) para
+   * preseleccionarlo. Accesible por los roles que pueden generar el recibo (nivel 4+).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { success, data: { profiles, selectedProfileId } }.
+   * @example
+   *   GET /api/quotes/abc123/billing-profiles
+   */
+  async getQuoteBillingProfiles(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+      const quoteId = req.params.id;
+
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      query.include('client');
+      const quote = await query.get(quoteId, { useMasterKey: true });
+      if (!quote) {
+        return this.sendError(res, 'Cotización no encontrada', 404);
+      }
+
+      const agency = quote.get('client'); // AmexingUser de la agencia (o cliente directo)
+      if (!agency) {
+        return res.json({ success: true, data: { profiles: [], selectedProfileId: null } });
+      }
+
+      const bpQuery = new Parse.Query('BillingProfile');
+      bpQuery.equalTo('userPtr', agency);
+      bpQuery.equalTo('exists', true);
+      bpQuery.equalTo('active', true);
+      bpQuery.descending('isPrimary');
+      bpQuery.addAscending('label');
+      bpQuery.limit(200);
+      const bps = await bpQuery.find({ useMasterKey: true });
+
+      const profiles = bps.map((bp) => ({
+        id: bp.id,
+        label: bp.get('label') || bp.get('razonSocial') || bp.get('commercialName') || 'Perfil',
+        rfc: bp.get('rfc') || bp.get('taxId') || '',
+        razonSocial: bp.get('razonSocial') || bp.get('commercialName') || '',
+        isPrimary: bp.get('isPrimary') || false,
+      }));
+
+      // Preselección: SIEMPRE el perfil principal (o el primero si ninguno es principal).
+      const primary = profiles.find((p) => p.isPrimary);
+      const selectedProfileId = primary ? primary.id : (profiles[0]?.id || null);
+
+      return res.json({ success: true, data: { profiles, selectedProfileId } });
+    } catch (error) {
+      logger.error('Error in QuoteController.getQuoteBillingProfiles', {
+        error: error.message, quoteId: req.params.id, userId: req.user?.id,
+      });
+      return this.sendError(res, 'Error al obtener perfiles de facturación', 500);
     }
   }
 

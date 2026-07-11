@@ -913,7 +913,8 @@ class QuoteService {
     quoteId,
     userRole = null,
     includePaymentInfoOverride = null,
-    paymentInfoId = null
+    paymentInfoId = null,
+    billingProfileId = null
   ) {
     try {
       // Validate user authentication
@@ -1076,6 +1077,56 @@ class QuoteService {
         }
       }
 
+      // Perfil de facturación (datos fiscales) elegido para el recibo. Debe pertenecer a la
+      // AGENCIA de la cotización (quote.client = AmexingUser de la agencia; el dueño/agente
+      // está en quote.owner). Se persiste en la reservación para recordar cuál se usó.
+      let billingProfile = null;
+      if (billingProfileId) {
+        try {
+          const agency = quote.get('client'); // AmexingUser de la agencia (o cliente directo)
+          const bpQuery = new Parse.Query('BillingProfile');
+          bpQuery.equalTo('exists', true);
+          if (agency) bpQuery.equalTo('userPtr', agency);
+          const bp = await bpQuery.get(billingProfileId, { useMasterKey: true });
+          if (bp) {
+            billingProfile = {
+              id: bp.id,
+              label: bp.get('label') || '',
+              country: bp.get('country') || '',
+              rfc: bp.get('rfc') || '',
+              razonSocial: bp.get('razonSocial') || '',
+              regimenFiscal: bp.get('regimenFiscal') || '',
+              usoCfdi: bp.get('usoCfdi') || '',
+              codigoPostal: bp.get('codigoPostal') || bp.get('postalCode') || '',
+              emailFacturacion: bp.get('emailFacturacion') || '',
+              taxId: bp.get('taxId') || '',
+              commercialName: bp.get('commercialName') || '',
+              streetType: bp.get('streetType') || '',
+              street: bp.get('street') || '',
+              exteriorNumber: bp.get('exteriorNumber') || '',
+              interiorNumber: bp.get('interiorNumber') || '',
+              colonia: bp.get('colonia') || '',
+              city: bp.get('city') || '',
+              state: bp.get('state') || '',
+            };
+            // Persistir el perfil elegido en la reservación (recuerda el último usado).
+            try {
+              reservation.set('billingProfilePtr', bp);
+              await reservation.save(null, { useMasterKey: true });
+            } catch (persistErr) {
+              logger.warn('No se pudo guardar billingProfilePtr en la reservación', {
+                quoteId, billingProfileId, error: persistErr.message,
+              });
+            }
+          }
+        } catch (bpErr) {
+          logger.warn('No se pudo cargar el perfil de facturación para el recibo', {
+            quoteId, billingProfileId, error: bpErr.message,
+          });
+          billingProfile = null;
+        }
+      }
+
       // Prepare quote data for PDF generation
       const quoteData = {
         quote: {
@@ -1105,6 +1156,7 @@ class QuoteService {
         },
         includePaymentInfo, // Pass the flag to PDF service
         selectedPaymentInfo, // Pass the specific payment info data
+        billingProfile, // Perfil fiscal de la agencia (o null) para el bloque de facturación
       };
 
       // Generate PDF receipt
