@@ -223,8 +223,6 @@ table.dataTable thead th:nth-child(2) select {
     --exp-border: #d6d1c4; --exp-olive: #6E7A50; --exp-olive-light: #7C8A5A;
     --exp-muted: #8a8f78; --exp-dark: #2b2b2b;
 }
-.traslados-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
-.traslados-title { margin: 0; font-size: 1.35rem; font-weight: 700; color: var(--exp-dark); }
 .traslados-new-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--exp-olive); background: var(--exp-olive); color: #fff; border-radius: 8px; font-size: 0.82rem; font-weight: 600; padding: 9px 16px; cursor: pointer; transition: all 0.15s; }
 .traslados-new-btn:hover { background: var(--exp-olive-light); border-color: var(--exp-olive-light); color: #fff; }
 .exp-catalog .segbar { display: flex; justify-content: space-between; align-items: center; gap: 18px 28px; flex-wrap: wrap; margin-bottom: 18px; }
@@ -246,16 +244,6 @@ table.dataTable thead th:nth-child(2) select {
 </style>
 
 <div class="exp-catalog">
-    <!-- Encabezado limpio -->
-    <div class="traslados-head">
-        <h5 class="traslados-title">Traslados</h5>
-        <% if (canCreate) { %>
-        <button type="button" class="traslados-new-btn" id="createServiceBtn">
-            <i class="ti ti-plus"></i>Nuevo Traslado
-        </button>
-        <% } %>
-    </div>
-
     <!-- Barra de filtros: Tipo + Guía/Greeter (izquierda) · Moneda + Pago (derecha) -->
     <div class="segbar">
         <div class="segbar__left">

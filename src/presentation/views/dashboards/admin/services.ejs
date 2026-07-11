@@ -41,6 +41,11 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
                     </ol>
                 </nav>
             </div>
+            <% if (['superadmin', 'admin'].includes(currentUserRole)) { %>
+            <button type="button" class="traslados-new-btn" id="createServiceBtn">
+                <i class="ti ti-plus"></i>Nuevo Traslado
+            </button>
+            <% } %>
         </div>
     </div>
 </div>
