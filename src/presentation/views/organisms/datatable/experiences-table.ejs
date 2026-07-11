@@ -1198,7 +1198,10 @@ const isClient = dtUserRole === 'client';
                 },
                 // 2. Duración
                 {
-                    data: 'duration',
+                    // Función en vez de 'duration' string: tolera filas sin la propiedad
+                    // (evita "Requested unknown parameter 'duration'" en DataTables).
+                    data: function(row) { return row.duration; },
+                    defaultContent: '',
                     orderable: false,
                     render: function(data) {
                         if (!data) return '<span class="text-muted">No especificado</span>';
@@ -1207,7 +1210,8 @@ const isClient = dtUserRole === 'client';
                 },
                 // 4. Mín. Personas
                 {
-                    data: 'min_people',
+                    data: function(row) { return row.min_people; },
+                    defaultContent: '',
                     orderable: false,
                     render: function(data) {
                         if (!data) return '<span class="text-muted">No especificado</span>';
