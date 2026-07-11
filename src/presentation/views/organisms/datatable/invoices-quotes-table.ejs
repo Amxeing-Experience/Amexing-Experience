@@ -24,42 +24,80 @@ const canDownload = dtUserRole === 'department_manager';
 const baseDashboardPath = '/dashboard/department_manager';
 %>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-        <div class="row align-items-center">
-            <div class="col">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-receipt me-2"></i>Facturas Disponibles
-                </h5>
-                <small class="text-white" style="opacity: 0.9;">Cotizaciones con facturas completadas y archivos disponibles para descarga</small>
-            </div>
-            <div class="col-auto">
-                <button type="button" class="btn btn-light btn-sm" id="refreshBtn">
-                    <i class="ti ti-refresh me-1"></i>Actualizar
-                </button>
-            </div>
-        </div>
+<div class="exp-catalog invoices-wrap" id="invoices-content">
+    <div class="invoices-toolbar">
+        <button type="button" class="btn inv-refresh-btn" id="refreshBtn">
+            <i class="ti ti-refresh me-1"></i>Actualizar
+        </button>
     </div>
 
-    <div class="card-body" id="invoices-content">
-        <div class="table-responsive">
-            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
-                <thead class="table-light">
-                    <tr>
-                        <th>Folio</th>
-                        <th>Tipo de Evento</th>
-                        <th class="text-center">No. Personas</th>
-                        <th class="text-center">Fecha de Factura</th>
-                        <% if (dtShowDownloadActions) { %>
-                            <th class="text-center">Descargas</th>
-                        <% } %>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+    <div class="table-responsive">
+        <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+            <thead class="table-light">
+                <tr>
+                    <th>Folio</th>
+                    <th>Tipo de Evento</th>
+                    <th class="text-center">No. Personas</th>
+                    <th class="text-center">Fecha de Factura</th>
+                    <% if (dtShowDownloadActions) { %>
+                        <th class="text-center">Descargas</th>
+                    <% } %>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
     </div>
 </div>
+
+<style>
+/* ===== Rediseño limpio (catálogo) — facturas ===== */
+.invoices-wrap {
+    --olive: #6E7A50;
+    --olive-d: #566040;
+    --line: #e7e3d8;
+    --ink: #4a4a42;
+}
+.invoices-wrap .invoices-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+.invoices-wrap .inv-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: border-color .15s ease, color .15s ease;
+}
+.invoices-wrap .inv-refresh-btn:hover {
+    border-color: var(--olive);
+    color: var(--olive-d);
+}
+/* Encabezado de tabla sobrio */
+.invoices-wrap .table { margin-bottom: 0; }
+.invoices-wrap .table > thead th {
+    background: #faf9f5;
+    color: #6b6656;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--line);
+    border-top: none;
+    padding: 0.7rem 0.75rem;
+    white-space: nowrap;
+}
+.invoices-wrap .table > tbody td {
+    border-bottom: 1px solid #f1efe8;
+    vertical-align: middle;
+}
+</style>
 
 <script>
 (function() {
