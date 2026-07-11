@@ -34,64 +34,51 @@ const rolePaths = {
 const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 %>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-        <div class="row align-items-center">
-            <div class="col">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-file-invoice me-2"></i>Cotizaciones
-                </h5>
-                <small class="text-white" style="opacity: 0.9;">Gestión de cotizaciones del sistema</small>
+<div class="exp-catalog quotes-wrap" id="quotes-content">
+    <!-- Barra de filtros: fecha/estado (izq) · Nueva Cotización (der) -->
+    <div class="quotes-filters">
+        <div class="quotes-filters__left">
+            <div class="btn-group seg-group" role="group" aria-label="Filtro por estado de servicios">
+                <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
+                <label class="btn" for="filterFuture">
+                    <i class="ti ti-calendar-event me-1"></i>Actuales
+                </label>
+
+                <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
+                <label class="btn" for="filterPrevious">
+                    <i class="ti ti-calendar-time me-1"></i>Anteriores
+                </label>
             </div>
-            <div class="col-auto">
-                <% if (canCreate) { %>
-                    <a href="<%= baseDashboardPath %>/quotes/new" class="btn btn-light btn-sm">
-                        <i class="ti ti-plus me-1"></i>Nueva Cotización
-                    </a>
-                <% } %>
+
+            <div class="d-inline-flex gap-2">
+                <button type="button" class="btn seg-btn position-relative" id="filterSolicitadas">
+                    <i class="ti ti-check me-1"></i>Solicitadas
+                    <span class="badge position-absolute top-0 start-100 translate-middle" id="solicitadasCount">0</span>
+                </button>
+
+                <button type="button" class="btn seg-btn-light" id="clearStatusFilter" style="display: none;">
+                    <i class="ti ti-x"></i> Limpiar filtro
+                </button>
             </div>
         </div>
+
+        <% if (canCreate) { %>
+            <a href="<%= baseDashboardPath %>/quotes/new" class="quotes-new-btn">
+                <i class="ti ti-plus me-1"></i>Nueva Cotización
+            </a>
+        <% } %>
     </div>
 
-    <div class="card-body" id="quotes-content">
-        <!-- Date Filter Pills and Status Filter Buttons -->
-        <div class="mb-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="btn-group" role="group" aria-label="Filtro por estado de servicios">
-                    <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
-                    <label class="btn btn-outline-primary" for="filterFuture">
-                        <i class="ti ti-calendar-event me-1"></i>Actuales
-                    </label>
-                    
-                    <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
-                    <label class="btn btn-outline-primary" for="filterPrevious">
-                        <i class="ti ti-calendar-time me-1"></i>Anteriores
-                    </label>
-                </div>
+    <% if (showClientColumn) { %>
+    <!-- Filtro genérico por Agencia / Cliente (solo admin/superadmin) -->
+    <div class="quotes-agencyfilter">
+        <%- include('../../molecules/filters/client-agency-filter', { idPrefix: 'quotes' }) %>
+    </div>
+    <% } %>
 
-                <div class="d-inline-flex gap-2">
-                    <button type="button" class="btn btn-outline-primary position-relative" id="filterSolicitadas">
-                        <i class="ti ti-check me-1"></i>Solicitadas
-                        <span class="badge bg-primary text-white position-absolute top-0 start-100 translate-middle" id="solicitadasCount">0</span>
-                    </button>
-
-                    <button type="button" class="btn btn-sm btn-light" id="clearStatusFilter" style="display: none;">
-                        <i class="ti ti-x"></i> Limpiar filtro
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <% if (showClientColumn) { %>
-        <!-- Filtro genérico por Agencia / Cliente (solo admin/superadmin) -->
-        <div class="mb-3">
-            <%- include('../../molecules/filters/client-agency-filter', { idPrefix: 'quotes' }) %>
-        </div>
-        <% } %>
-
-        <div class="table-responsive">
-            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
-                <thead class="table-light">
+    <div class="table-responsive">
+        <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+            <thead class="table-light">
                     <tr>
                         <th>Folio</th>
                         <% if (showClientColumn) { %><th>Cliente</th><% } %>
@@ -111,7 +98,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 <tbody></tbody>
             </table>
         </div>
-    </div>
 </div>
 
 <!-- Copy Quote Modal -->
@@ -267,6 +253,110 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 <!-- Note: Modal HTML will be dynamically generated to match quote summary implementation -->
 
 <style>
+/* ===== Rediseño limpio (catálogo) — cotizaciones ===== */
+.quotes-wrap {
+    --olive: #6E7A50;
+    --olive-d: #566040;
+    --line: #e7e3d8;
+    --ink: #4a4a42;
+}
+.quotes-wrap .quotes-filters {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 1rem;
+}
+.quotes-wrap .quotes-filters__left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+/* Segmento de fecha (Actuales / Anteriores) */
+.quotes-wrap .seg-group .btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.4rem 0.9rem;
+}
+.quotes-wrap .seg-group .btn:hover {
+    border-color: var(--olive);
+    color: var(--olive-d);
+}
+.quotes-wrap .seg-group .btn-check:checked + .btn {
+    background: var(--olive);
+    border-color: var(--olive);
+    color: #fff;
+}
+/* Botón Solicitadas */
+.quotes-wrap .seg-btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.4rem 0.9rem;
+}
+.quotes-wrap .seg-btn:hover,
+.quotes-wrap .seg-btn.active {
+    border-color: var(--olive);
+    color: var(--olive-d);
+}
+.quotes-wrap .seg-btn .badge {
+    background: var(--olive) !important;
+    color: #fff;
+    font-size: 0.68rem;
+}
+.quotes-wrap .seg-btn-light {
+    border: 1px solid var(--line);
+    background: #f6f4ee;
+    color: #8a8578;
+    font-size: 0.8rem;
+    padding: 0.35rem 0.75rem;
+}
+/* Botón Nueva Cotización */
+.quotes-wrap .quotes-new-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--olive);
+    color: #fff;
+    border: 1px solid var(--olive);
+    border-radius: 8px;
+    padding: 0.45rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background .15s ease;
+}
+.quotes-wrap .quotes-new-btn:hover {
+    background: var(--olive-d);
+    color: #fff;
+}
+.quotes-wrap .quotes-agencyfilter { margin-bottom: 1rem; }
+/* Encabezado de tabla sobrio */
+.quotes-wrap .table { margin-bottom: 0; }
+.quotes-wrap .table > thead th {
+    background: #faf9f5;
+    color: #6b6656;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--line);
+    border-top: none;
+    padding: 0.7rem 0.75rem;
+    white-space: nowrap;
+}
+.quotes-wrap .table > tbody td {
+    border-bottom: 1px solid #f1efe8;
+    vertical-align: middle;
+}
+
 /* Gradient backgrounds for role badges */
 .bg-gradient-purple {
     background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%) !important;
