@@ -693,6 +693,18 @@ router.post(
 );
 
 /**
+ * GET /api/quotes/:id/billing-profiles - Perfiles de facturación de la agencia de la
+ * cotización, para elegir cuál se imprime en el recibo. Mismo nivel que generar recibo.
+ */
+router.get(
+  '/:id/billing-profiles',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), client (5), Admin (6), SuperAdmin (7)
+  (req, res) => QuoteController.getQuoteBillingProfiles(req, res)
+);
+
+/**
  * POST /api/quotes/:id/send-email - Send quote confirmation email with PDF.
  * Private access (Department Manager, Admin and SuperAdmin).
  */
