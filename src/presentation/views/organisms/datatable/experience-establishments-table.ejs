@@ -22,6 +22,9 @@ const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 %>
 
+<!-- Util del selector amigable de "Tiempo de Anticipación" (presets + Días/Horas/Min → minutos) -->
+<script src="/dashboard/js/utils/advance-time-picker.js"></script>
+
 <!-- Bandeja master-detail: lista de establecimientos (izquierda) + detalle inline (derecha) -->
 <div class="row g-3 establishment-inbox">
     <!-- Columna lista (master) -->
@@ -155,28 +158,16 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <!-- Campos de tiempo -->
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Duración (hrs)</label>
-                            <input type="number" class="form-control" id="quickEstablishmentExperienciaDuration" min="0" step="0.5" 
-                                   placeholder="2.5">
-                            <div class="form-text">
-                                <small>Tiempo total experiencia</small>
-                            </div>
+                            <label class="form-label form-label-sm fw-medium text-success">Duración total</label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'quickEstablishmentExperienciaDuration', unit: 'hours', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Duración Trayecto (min)</label>
-                            <input type="number" class="form-control" id="quickEstablishmentExperienciaTravelDuration" min="0" step="1" 
-                                   placeholder="60">
-                            <div class="form-text">
-                                <small>Tiempo traslado</small>
-                            </div>
+                            <label class="form-label form-label-sm fw-medium text-success">Duración de Trayecto</label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'quickEstablishmentExperienciaTravelDuration', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación (min)</label>
-                            <input type="number" class="form-control" id="quickEstablishmentExperienciaAdvanceTime" min="0" step="1" 
-                                   placeholder="1440">
-                            <div class="form-text">
-                                <small>Ej: 1440 = 24hrs</small>
-                            </div>
+                            <label class="form-label form-label-sm fw-medium text-success">Tiempo de Anticipación</label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'quickEstablishmentExperienciaAdvanceTime' }) %>
                         </div>
                     </div>
 
@@ -433,28 +424,16 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <!-- Campos de tiempo en una fila -->
             <div class="row mb-2">
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Duración (hrs)</label>
-                    <input type="number" class="form-control experiencia-duration-input" min="0" step="0.5" 
-                           placeholder="2.5">
-                    <div class="form-text">
-                        <small>Tiempo total experiencia</small>
-                    </div>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Duración total</label>
+                    <%- include('../../molecules/forms/advance-time-picker', { hiddenClass: 'experiencia-duration-input', unit: 'hours', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Duración Trayecto (min)</label>
-                    <input type="number" class="form-control experiencia-travel-duration-input" min="0" step="1" 
-                           placeholder="60">
-                    <div class="form-text">
-                        <small>Tiempo traslado</small>
-                    </div>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Duración de Trayecto</label>
+                    <%- include('../../molecules/forms/advance-time-picker', { hiddenClass: 'experiencia-travel-duration-input', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Tiempo Anticipación (min)</label>
-                    <input type="number" class="form-control experiencia-advance-minutes-input" 
-                           min="0" step="1" placeholder="1440">
-                    <div class="form-text">
-                        <small>Ej: 1440 = 24hrs</small>
-                    </div>
+                    <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Tiempo de Anticipación</label>
+                    <%- include('../../molecules/forms/advance-time-picker', { hiddenClass: 'experiencia-advance-minutes-input' }) %>
                 </div>
             </div>
             
@@ -1847,6 +1826,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         // Clear form
         $('#quickAddEstablishmentExperienceForm')[0].reset();
         $('#quickAddEstablishmentModalAlerts').empty();
+
+        // Reset de los selectores de tiempo (anticipación + trayecto);
+        // form.reset() nativo no limpia presets/personalizado.
+        if (window.AdvanceTimePicker) {
+            document.querySelectorAll('#quickAddEstablishmentExperienceModal .advance-time-picker')
+                .forEach(p => window.AdvanceTimePicker.set(p, 0));
+        }
         
         // Show modal
         const modal = new bootstrap.Modal(document.getElementById('quickAddEstablishmentExperienceModal'));
@@ -2875,14 +2861,41 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-price-no-alcohol-input').value = experiencia.price_no_alcohol || '';
             card.querySelector('.experiencia-price-child-input').value = experiencia.price_child || '';
             
-            // Handle duration
-            if (experiencia.duration) {
-                const duration = parseFloat(experiencia.duration);
-                card.querySelector('.experiencia-duration-input').value = duration > 24 ? (duration / 60).toFixed(1) : duration;
-            }
+            // Handle duration (horas; >24 = legacy en minutos)
+            (function() {
+                let durHours = 0;
+                if (experiencia.duration) {
+                    const d = parseFloat(experiencia.duration);
+                    durHours = d > 24 ? (d / 60) : d;
+                }
+                const dPicker = card.querySelector('.experiencia-duration-input')?.closest('.advance-time-picker');
+                if (dPicker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(dPicker, durHours);
+                } else {
+                    const el = card.querySelector('.experiencia-duration-input');
+                    if (el) el.value = durHours || '';
+                }
+            })();
             
-            card.querySelector('.experiencia-travel-duration-input').value = experiencia.travel_duration || '';
-            card.querySelector('.experiencia-advance-minutes-input').value = experiencia.advance_booking_time || '';
+            (function() {
+                const travelMin = parseInt(experiencia.travel_duration, 10) || 0;
+                const tPicker = card.querySelector('.experiencia-travel-duration-input')?.closest('.advance-time-picker');
+                if (tPicker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(tPicker, travelMin);
+                } else {
+                    const el = card.querySelector('.experiencia-travel-duration-input');
+                    if (el) el.value = travelMin || '';
+                }
+            })();
+            (function() {
+                const advMinutes = parseInt(experiencia.advance_booking_time, 10) || 0;
+                const picker = card.querySelector('.advance-time-picker');
+                if (picker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(picker, advMinutes);
+                } else {
+                    card.querySelector('.experiencia-advance-minutes-input').value = advMinutes || '';
+                }
+            })();
             card.querySelector('.experiencia-min-people-input').value = experiencia.min_people || '';
             card.querySelector('.experiencia-max-people-input').value = experiencia.max_people || '';
             card.querySelector('.experiencia-private-min-type-input').value = experiencia.private_min_type || '';

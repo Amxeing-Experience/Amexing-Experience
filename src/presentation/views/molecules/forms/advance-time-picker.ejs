@@ -1,0 +1,62 @@
+<%
+/**
+ * Advance Time Picker (molecule)
+ * Selector amigable para "Tiempo de Anticipación" de una experiencia.
+ *
+ * UX: botones de preset (1h/24h/48h/72h) + "Personalizado" que despliega
+ * un desglose Días / Horas / Minutos. SIEMPRE guarda el total en MINUTOS en
+ * un <input hidden> (para que el resto del sistema lo siga leyendo igual).
+ *
+ * @param {string} [hiddenId]     - id del input hidden (usar en formularios de alta rápida)
+ * @param {string} [hiddenClass]  - clase(s) extra del input hidden (usar en tarjetas de edición,
+ *                                   típicamente 'experiencia-advance-minutes-input')
+ * @param {string} [hiddenName]   - atributo name del input hidden (si el form usa FormData/serialize)
+ * @param {Array}  [presets]      - [{ label, minutes }] (por defecto 1h/24h/48h/72h)
+ * @param {boolean}[showDays]     - mostrar el campo "Días" en Personalizado (default true).
+ *                                  Poner false para trayectos (solo Horas/Min).
+ * @param {string} [unit]         - unidad guardada en el hidden: 'minutes' (default) o 'hours'.
+ *                                  Con 'hours' el hidden guarda horas decimales (2 h 30 → 2.5),
+ *                                  pero el usuario sigue capturando Horas/Min.
+ *
+ * @author Denisse Maldonado
+ */
+const atpHiddenId = typeof hiddenId !== 'undefined' ? hiddenId : '';
+const atpHiddenClass = typeof hiddenClass !== 'undefined' ? hiddenClass : '';
+const atpHiddenName = typeof hiddenName !== 'undefined' ? hiddenName : '';
+const atpShowDays = typeof showDays !== 'undefined' ? showDays : true;
+const atpUnit = typeof unit !== 'undefined' ? unit : 'minutes';
+const atpColClass = atpShowDays ? 'col-4' : 'col-6';
+const atpPresets = typeof presets !== 'undefined' ? presets : [
+    { label: '1 h', minutes: 60 },
+    { label: '24 h', minutes: 1440 },
+    { label: '48 h', minutes: 2880 },
+    { label: '72 h', minutes: 4320 }
+];
+%>
+<div class="advance-time-picker" data-atp data-atp-unit="<%= atpUnit %>">
+    <div class="atp-presets btn-group btn-group-sm flex-wrap" role="group" aria-label="Tiempo de anticipación">
+        <% atpPresets.forEach(function(p) { %>
+        <button type="button" class="btn atp-preset" data-minutes="<%= p.minutes %>"><%= p.label %></button>
+        <% }); %>
+        <button type="button" class="btn atp-custom-toggle">Personalizado</button>
+    </div>
+    <div class="atp-custom mt-2" style="display:none;">
+        <div class="row g-2">
+            <% if (atpShowDays) { %>
+            <div class="<%= atpColClass %>">
+                <label class="form-label form-label-sm mb-1"><small class="text-muted">Días</small></label>
+                <input type="number" class="form-control form-control-sm atp-days" min="0" step="1" placeholder="0">
+            </div>
+            <% } %>
+            <div class="<%= atpColClass %>">
+                <label class="form-label form-label-sm mb-1"><small class="text-muted">Horas</small></label>
+                <input type="number" class="form-control form-control-sm atp-hours" min="0" step="1" placeholder="0">
+            </div>
+            <div class="<%= atpColClass %>">
+                <label class="form-label form-label-sm mb-1"><small class="text-muted">Min</small></label>
+                <input type="number" class="form-control form-control-sm atp-mins" min="0" max="59" step="1" placeholder="0">
+            </div>
+        </div>
+    </div>
+    <input type="hidden"<% if (atpHiddenId) { %> id="<%= atpHiddenId %>"<% } %><% if (atpHiddenName) { %> name="<%= atpHiddenName %>"<% } %> class="atp-hidden<%= atpHiddenClass ? ' ' + atpHiddenClass : '' %>" value="">
+</div>

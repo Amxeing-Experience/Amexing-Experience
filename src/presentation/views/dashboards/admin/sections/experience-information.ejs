@@ -6,6 +6,9 @@
  */
 %>
 
+<!-- Util del selector amigable de "Tiempo de Anticipación" (presets + Días/Horas/Min → minutos) -->
+<script src="/dashboard/js/utils/advance-time-picker.js"></script>
+
 <div id="experienceInformationCard" class="p-4">
     <!-- Alerts Container -->
     <div id="experienceInfoAlerts"></div>
@@ -86,16 +89,14 @@
                         con la "duración sugerida" (suma de tiempos de los servicios). %>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="experienceTravelDuration" class="form-label">Duracion Trayecto (min)</label>
-                            <input type="number" class="form-control" id="experienceTravelDuration" name="travel_duration" min="0" step="1" placeholder="60">
-                            <div class="form-text"><small>Tiempo traslado</small></div>
+                            <label class="form-label">Duración de Trayecto</label>
+                            <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceTravelDuration', hiddenName: 'travel_duration', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="experienceAdvanceMinutes" class="form-label">Anticipacion (min)</label>
-                            <input type="number" class="form-control" id="experienceAdvanceMinutes" name="advance_minutes" min="0" step="1" placeholder="1440">
-                            <div class="form-text"><small>Ej: 1440 = 24hrs</small></div>
+                            <label class="form-label">Tiempo de Anticipación</label>
+                            <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceAdvanceMinutes', hiddenName: 'advance_minutes' }) %>
                         </div>
                     </div>
                 </div>
@@ -1317,8 +1318,26 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('experiencePriceChild').value = data.price_child || '';
             document.getElementById('experiencePriceInfant').value = data.price_infant || '';
             document.getElementById('experienceDuration').value = data.duration || '';
-            document.getElementById('experienceTravelDuration').value = data.travel_duration || '';
-            document.getElementById('experienceAdvanceMinutes').value = data.advance_minutes || '';
+            (function() {
+                const travelMin = parseInt(data.travel_duration, 10) || 0;
+                const tHidden = document.getElementById('experienceTravelDuration');
+                const tPicker = tHidden ? tHidden.closest('.advance-time-picker') : null;
+                if (tPicker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(tPicker, travelMin);
+                } else if (tHidden) {
+                    tHidden.value = travelMin || '';
+                }
+            })();
+            (function() {
+                const advMinutes = parseInt(data.advance_minutes, 10) || 0;
+                const advHidden = document.getElementById('experienceAdvanceMinutes');
+                const picker = advHidden ? advHidden.closest('.advance-time-picker') : null;
+                if (picker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(picker, advMinutes);
+                } else if (advHidden) {
+                    advHidden.value = advMinutes || '';
+                }
+            })();
             document.getElementById('experienceMinPeople').value = data.min_people || '';
             document.getElementById('experienceMaxPeople').value = data.max_people || '';
             document.getElementById('experienceCancellationPolicy').value = data.cancellation_policy || '';
