@@ -1193,7 +1193,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const adultPrice = Number(exp.price) || 0;
             // Niños e infantes: precio de niño si existe, si no el de adulto.
             const childPrice = (Number(exp.priceChild) || 0) > 0 ? Number(exp.priceChild) : adultPrice;
-            const hasChildPrice = (Number(exp.priceChild) || 0) > 0;
             // Las experiencias cobran por persona: adultos a precio adulto; niños e infantes a
             // precio de niño (o adulto si no hay). Se piden las personas en el modal, pre-llenadas.
             AddToQuote.open({
@@ -1206,8 +1205,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     minTotal: 1,
                     fields: [
                         { key: 'adults', label: 'Adultos', sub: '12+', quoteField: 'numberOfAdults' },
-                        { key: 'children', label: 'Niños', sub: '3–12' + (hasChildPrice ? '' : ' · precio adulto'), quoteField: 'numberOfChildren' },
-                        { key: 'infants', label: 'Infantes', sub: '0–2 · ' + (hasChildPrice ? 'precio niño' : 'precio adulto'), quoteField: 'numberOfInfants' }
+                        { key: 'children', label: 'Niños', sub: '3–12', quoteField: 'numberOfChildren' },
+                        { key: 'infants', label: 'Infantes', sub: '0–2', quoteField: 'numberOfInfants' }
                     ],
                     priceFor: function(counts) {
                         const a = Number(counts.adults) || 0;
