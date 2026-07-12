@@ -13,8 +13,8 @@ const profileData = {
   firstName: user.firstName || '',
   lastName: user.lastName || '',
   fullName: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A',
-  joinedDate: (user.createdAt || user.created_at || user._created_at) ? 
-    new Date(user.createdAt || user.created_at || user._created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 
+  joinedDate: (user.createdAt || user.created_at || user._created_at) ?
+    new Date(user.createdAt || user.created_at || user._created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) :
     '1 ene 2024',
   lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Sin registro',
   emailVerified: user.emailVerified || false,
@@ -46,135 +46,162 @@ const formatRoleName = (role) => {
 };
 %>
 
-<!-- Page Header -->
-<div class="page-breadcrumb">
-  <div class="row align-items-center">
-    <div class="col-12">
-      <nav aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0 d-flex align-items-center">
-          <li class="breadcrumb-item">
-            <a href="/dashboard/admin" class="link">
-              <i class="ti ti-home fs-6"></i>
-            </a>
-          </li>
-          <li class="breadcrumb-item active" aria-current="page">My Profile</li>
-        </ol>
-      </nav>
-      <h1 class="mb-0 fw-bold">My Profile</h1>
-    </div>
-  </div>
-</div>
-
 <style>
-  /* ===== Rediseño limpio (sin card blanca) — perfil de usuario ===== */
-  .profile-wrap { --olive: #6E7A50; --olive-d: #566040; --line: #e7e3d8; --ink: #2b2b2b; --muted: #8a8f78; }
-  .profile-wrap .profile-name { font-size: 1.35rem; font-weight: 700; color: var(--ink); margin-bottom: .4rem; }
-  .profile-wrap .profile-role { display: inline-flex; align-items: center; gap: 5px; background: #eef0e6; color: var(--olive-d); border: 1px solid var(--line); border-radius: 999px; padding: .25rem .85rem; font-size: .78rem; font-weight: 600; }
-  .profile-wrap .profile-contact { display: inline-block; text-align: left; margin-top: 4px; }
-  .profile-wrap .profile-contact-item { display: flex; align-items: center; gap: 9px; color: var(--ink); font-size: .88rem; padding: 4px 0; }
-  .profile-wrap .profile-contact-item i { color: var(--olive); font-size: 1.05rem; width: 18px; text-align: center; flex-shrink: 0; }
-  .profile-wrap .profile-contact-item span { word-break: break-word; }
-  .profile-wrap .profile-info { border-left: 1px solid var(--line); padding-left: 32px; }
-  .profile-wrap .profile-section-title { color: var(--olive-d); font-weight: 700; font-size: 1rem; border-bottom: 1px solid var(--line); padding-bottom: .6rem; }
-  .profile-wrap .profile-field label { text-transform: uppercase; letter-spacing: .06em; font-size: .68rem; color: var(--muted); font-weight: 600; margin-bottom: 2px; display: block; }
-  .profile-wrap .profile-field p { color: var(--ink); font-weight: 600; margin-bottom: 0; }
-  .profile-wrap .profile-change-btn { border: 1px solid var(--line); color: var(--olive-d); background: #fff; border-radius: 8px; padding: .3rem .85rem; font-size: .82rem; font-weight: 600; transition: background .15s ease, border-color .15s ease; }
-  .profile-wrap .profile-change-btn:hover { border-color: var(--olive); background: #eef0e6; color: var(--olive-d); }
+  /* ===== Perfil editorial (sin card blanca pesada) ===== */
+  .profile-wrap { --olive: #6E7A50; --olive-d: #566040; --line: #ded9cb; --panel: #faf9f4; --panel-2: #fbfaf6; --ink: #2b2b2b; --muted: #8a8f78; }
+
+  /* Encabezado */
+  .profile-wrap .profile-eyebrow { text-transform: uppercase; letter-spacing: .34em; font-size: .7rem; color: var(--olive); font-weight: 600; margin-bottom: 2px; }
+  .profile-wrap .profile-title { font-weight: 400; letter-spacing: .1em; font-size: 2rem; color: var(--ink); margin: 0; }
+
+  /* Aside (tarjeta de identidad) */
+  .profile-wrap .profile-aside { border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); padding: 22px 20px; text-align: center; }
+  .profile-wrap #profileImage,
+  .profile-wrap #avatar-placeholder { border-radius: 12px !important; width: 108px !important; height: 108px !important; font-size: 1.7rem !important; }
+  .profile-wrap #avatar-placeholder { background: var(--olive) !important; }
+  .profile-wrap .profile-name { font-size: 1.05rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 14px 0 8px; }
+  .profile-wrap .profile-role { display: inline-flex; align-items: center; gap: 5px; background: #eef0e6; color: var(--olive-d); border: 1px solid var(--line); border-radius: 999px; padding: .22rem .8rem; font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+  .profile-wrap .aside-contact { text-align: left; margin-top: 18px; }
+  .profile-wrap .aside-contact .item { display: flex; align-items: center; gap: 10px; color: var(--ink); font-size: .84rem; font-style: italic; padding: 5px 0; }
+  .profile-wrap .aside-contact .item i { color: var(--olive); font-size: 1rem; width: 18px; text-align: center; flex-shrink: 0; font-style: normal; }
+  .profile-wrap .aside-divider { border-top: 1px solid var(--line); margin: 16px 0; }
+  .profile-wrap .aside-stat { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; }
+  .profile-wrap .aside-stat .k { text-transform: uppercase; letter-spacing: .08em; font-size: .64rem; color: var(--muted); font-weight: 600; }
+  .profile-wrap .aside-stat .v { font-size: .82rem; color: var(--ink); font-style: italic; }
+  .profile-wrap .estado-badge { display: inline-flex; align-items: center; gap: 5px; background: #eef0e6; color: var(--olive-d); border: 1px solid var(--line); border-radius: 6px; padding: .12rem .5rem; font-size: .66rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-style: normal; }
+  .profile-wrap .estado-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--olive); }
+  .profile-wrap .estado-badge.off { color: #a15b5b; } .profile-wrap .estado-badge.off .dot { background: #b45c5c; }
+  .profile-wrap .aside-pass { margin-top: 6px; }
+  .profile-wrap .aside-pass .k { text-transform: uppercase; letter-spacing: .08em; font-size: .64rem; color: var(--muted); font-weight: 600; display: block; margin-bottom: 8px; }
+  .profile-wrap .btn-pass { width: 100%; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 8px; padding: .7rem; font-size: .82rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; transition: background .15s ease, border-color .15s ease; }
+  .profile-wrap .btn-pass:hover { border-color: var(--olive); background: #eef0e6; color: var(--olive-d); }
+
+  /* Secciones numeradas */
+  .profile-wrap .profile-section { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 22px 26px 16px; margin-bottom: 22px; }
+  .profile-wrap .section-head { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+  .profile-wrap .section-num { color: var(--olive); font-weight: 700; letter-spacing: .18em; font-size: .95rem; flex-shrink: 0; }
+  .profile-wrap .section-head .rule { flex: 1; height: 1px; background: var(--line); }
+  .profile-wrap .section-title { text-transform: uppercase; letter-spacing: .26em; font-size: .92rem; color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .profile-wrap .section-subtitle { color: var(--muted); font-style: italic; font-size: .9rem; margin: -10px 0 0; }
+  .profile-wrap .field { margin-bottom: 20px; }
+  .profile-wrap .field label { text-transform: uppercase; letter-spacing: .09em; font-size: .64rem; color: var(--muted); font-weight: 600; display: block; margin-bottom: 5px; }
+  .profile-wrap .field .val { color: var(--ink); font-size: .96rem; }
+  .profile-wrap .field .val a { color: var(--olive-d); text-decoration: none; }
+  .profile-wrap .field .val a:hover { text-decoration: underline; }
+
+  /* Botón editar por sección */
+  .profile-wrap .section-actions { display: flex; justify-content: flex-end; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 16px; }
+  .profile-wrap .btn-editorial { display: inline-flex; align-items: center; gap: 9px; border: 1px solid var(--line); background: #fff; color: var(--olive-d); border-radius: 8px; padding: .55rem 1.2rem; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+  .profile-wrap .btn-editorial:hover { border-color: var(--olive); background: #eef0e6; }
+
   @media (max-width: 991.98px) {
-    .profile-wrap .profile-info { border-left: 0; padding-left: 12px; margin-top: 14px; }
+    .profile-wrap .profile-aside { margin-bottom: 22px; }
   }
 </style>
 
-<!-- Profile Content -->
+<!-- Page Header -->
 <div class="container-fluid profile-wrap">
-  <div class="row justify-content-center">
-    <div class="col-12 col-lg-10">
-      <div class="row g-4 align-items-start">
-        <!-- Identity & contact aside -->
-        <div class="col-lg-4 text-center">
-          <!-- Profile Image Upload Component -->
-          <%- include('../../organisms/profile/profile-image-upload', { profileData, initials }) %>
+  <div class="mb-4">
+    <div class="profile-eyebrow">Cuenta</div>
+    <h1 class="profile-title">Mi Perfil</h1>
+  </div>
 
-          <h3 class="profile-name mt-3"><%= profileData.fullName %></h3>
-          <div class="mb-3">
-            <span class="profile-role"><i class="ti ti-user-shield"></i><%= formatRoleName(profileData.role) %></span>
-          </div>
+  <div class="row g-4">
+    <!-- Aside: identidad -->
+    <div class="col-12 col-lg-3">
+      <div class="profile-aside">
+        <!-- Profile Image Upload Component -->
+        <%- include('../../organisms/profile/profile-image-upload', { profileData, initials }) %>
 
-          <!-- Contact quick facts -->
-          <div class="profile-contact">
-            <div class="profile-contact-item"><i class="ti ti-mail"></i><span><%= profileData.email || 'Not provided' %></span></div>
-            <div class="profile-contact-item"><i class="ti ti-phone"></i><span><%= profileData.phone || 'Not provided' %></span></div>
-            <div class="profile-contact-item"><i class="ti ti-calendar-event"></i><span>Member since <%= profileData.joinedDate %></span></div>
-          </div>
+        <div class="profile-name"><%= profileData.fullName %></div>
+        <span class="profile-role"><i class="ti ti-user-shield"></i><%= formatRoleName(profileData.role) %></span>
+
+        <!-- Contacto -->
+        <div class="aside-contact">
+          <div class="item"><i class="ti ti-mail"></i><span><%= profileData.email || 'Sin registro' %></span></div>
+          <div class="item"><i class="ti ti-phone"></i><span><%= profileData.phone || 'Sin registro' %></span></div>
+          <div class="item"><i class="ti ti-clock"></i><span>Miembro desde <%= profileData.joinedDate %></span></div>
         </div>
 
-        <!-- Info -->
-        <div class="col-lg-8">
-          <div class="profile-info">
-            <!-- Personal Information -->
-            <h5 class="profile-section-title mb-4">Personal Information</h5>
-            <div class="row">
-              <div class="col-md-6 mb-3 profile-field">
-                <label>First Name</label>
-                <p><%= profileData.firstName || 'Not provided' %></p>
-              </div>
-              <div class="col-md-6 mb-3 profile-field">
-                <label>Last Name</label>
-                <p><%= profileData.lastName || 'Not provided' %></p>
-              </div>
-              <div class="col-md-6 mb-3 profile-field">
-                <label>Account Status</label>
-                <p>
-                  <% if (profileData.active) { %>
-                    <span class="badge bg-success">Active</span>
-                  <% } else { %>
-                    <span class="badge bg-danger">Inactive</span>
-                  <% } %>
-                </p>
-              </div>
-              <div class="col-md-6 mb-3 profile-field">
-                <label>Last login</label>
-                <p><%= profileData.lastLoginAt %></p>
-              </div>
-              <div class="col-12 mb-3 profile-field">
-                <label>Password</label>
-                <p>
-                  <button class="profile-change-btn" id="change-password-btn">
-                    <i class="ti ti-key me-1"></i>Change
-                  </button>
-                </p>
-              </div>
-            </div>
+        <div class="aside-divider"></div>
 
-            <!-- Company Information -->
-            <h5 class="profile-section-title mb-4 mt-4">Company Information</h5>
-            <div class="row">
-              <div class="col-12 mb-3 profile-field"><label>Company Name</label><p><%= profileData.companyName || 'Not provided' %></p></div>
-              <div class="col-md-6 mb-3 profile-field"><label>RFC / Tax ID</label><p><%= profileData.taxId || 'Not provided' %></p></div>
-              <div class="col-md-6 mb-3 profile-field"><label>Website</label><p><% if (profileData.website) { %><a href="<%= profileData.website %>" target="_blank"><i class="ti ti-external-link me-1"></i><%= profileData.website %></a><% } else { %>Not provided<% } %></p></div>
-            </div>
-          </div>
+        <div class="aside-stat">
+          <span class="k">Estado</span>
+          <% if (profileData.active) { %>
+            <span class="estado-badge"><span class="dot"></span>Activo</span>
+          <% } else { %>
+            <span class="estado-badge off"><span class="dot"></span>Inactivo</span>
+          <% } %>
+        </div>
+        <div class="aside-stat">
+          <span class="k">Último acceso</span>
+          <span class="v"><%= profileData.lastLoginAt %></span>
+        </div>
+
+        <div class="aside-divider"></div>
+
+        <div class="aside-pass text-start">
+          <span class="k">Contraseña</span>
+          <button class="btn-pass" id="change-password-btn">
+            <i class="ti ti-key me-1"></i>Cambiar Contraseña
+          </button>
         </div>
       </div>
     </div>
-  </div>
 
-  <% if (profileData.notes) { %>
-  <!-- Notes -->
-  <div class="row justify-content-center mt-4">
-    <div class="col-12 col-lg-10 profile-field">
-      <h5 class="profile-section-title mb-3">Notes</h5>
-      <p class="mb-0" style="color: #2b2b2b;"><%= profileData.notes %></p>
-    </div>
-  </div>
-  <% } %>
+    <!-- Main: secciones -->
+    <div class="col-12 col-lg-9">
+      <!-- 01 · Información Personal -->
+      <div class="profile-section">
+        <div class="section-head">
+          <span class="section-num">01</span>
+          <span class="rule"></span>
+          <span class="section-title">Información Personal</span>
+          <span class="rule"></span>
+        </div>
+        <div class="row">
+          <div class="col-md-6 field"><label>Nombre</label><div class="val"><%= profileData.firstName || 'Sin registro' %></div></div>
+          <div class="col-md-6 field"><label>Apellido</label><div class="val"><%= profileData.lastName || 'Sin registro' %></div></div>
+          <div class="col-md-6 field"><label>Cargo</label><div class="val"><%= formatRoleName(profileData.role) %></div></div>
+          <div class="col-md-6 field"><label>Teléfono</label><div class="val"><%= profileData.phone || 'Sin registro' %></div></div>
+          <div class="col-12 field"><label>Email</label><div class="val"><%= profileData.email || 'Sin registro' %></div></div>
+        </div>
+        <div class="section-actions">
+          <button type="button" class="btn-editorial" id="editPersonalBtn"><i class="ti ti-pencil"></i>Editar Información</button>
+        </div>
+      </div>
 
-  <!-- Billing Profiles Section -->
-  <div class="row justify-content-center mt-4">
-    <div class="col-12 col-lg-10">
-      <%- include('../../organisms/billing/billing-profiles-section', {
-        userRole: typeof userRole !== 'undefined' ? userRole : 'department_manager'
-      }) %>
+      <!-- 02 · Información de Empresa -->
+      <div class="profile-section">
+        <div class="section-head">
+          <span class="section-num">02</span>
+          <span class="rule"></span>
+          <span class="section-title">Información de Empresa</span>
+          <span class="rule"></span>
+        </div>
+        <div class="row">
+          <div class="col-md-6 field"><label>Nombre de Empresa</label><div class="val"><%= profileData.companyName || 'Sin registro' %></div></div>
+          <div class="col-md-6 field"><label>RFC / Tax ID</label><div class="val"><%= profileData.taxId || 'Sin registro' %></div></div>
+          <div class="col-md-6 field"><label>Sitio Web</label><div class="val"><% if (profileData.website) { %><a href="<%= profileData.website %>" target="_blank"><%= profileData.website %></a><% } else { %>Sin registro<% } %></div></div>
+          <div class="col-md-6 field"><label>País</label><div class="val"><%= (profileData.address && profileData.address.country) || 'Sin registro' %></div></div>
+        </div>
+        <div class="section-actions">
+          <button type="button" class="btn-editorial" id="editCompanyBtn"><i class="ti ti-pencil"></i>Editar Empresa</button>
+        </div>
+      </div>
+
+      <!-- 03 · Perfiles de Facturación -->
+      <div class="profile-section">
+        <div class="section-head">
+          <span class="section-num">03</span>
+          <span class="rule"></span>
+          <span class="section-title">Perfiles de Facturación</span>
+          <span class="rule"></span>
+        </div>
+        <%- include('../../organisms/billing/billing-profiles-section', {
+          userRole: typeof userRole !== 'undefined' ? userRole : 'department_manager'
+        }) %>
+      </div>
     </div>
   </div>
 </div>
