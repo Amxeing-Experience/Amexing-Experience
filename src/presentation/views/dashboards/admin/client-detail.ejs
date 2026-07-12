@@ -68,6 +68,8 @@ const menuItems = [
     // Agencies are entities (no personal profile); people-type clients get Perfil, agencies get Agentes.
     ...(!isAgency ? [{ label: 'Perfil', icon: 'address-book', section: 'profile', href: `/dashboard/admin/clients/${clientId}?section=profile` }] : []),
     ...(isAgency ? [{ label: 'Agentes', icon: 'users', section: 'employees', href: `/dashboard/admin/clients/${clientId}?section=employees` }] : []),
+    // Perfiles de facturación (solo lectura) — solo agencias.
+    ...(isAgency ? [{ label: 'Facturación', icon: 'file-invoice', section: 'billing', href: `/dashboard/admin/clients/${clientId}?section=billing` }] : []),
     { label: 'Trips', icon: 'plane', section: 'quotes', href: `/dashboard/admin/clients/${clientId}?section=quotes` },
     { label: 'Tarifario', icon: 'receipt-2', section: 'tarifario', href: `/dashboard/admin/clients/${clientId}?section=tarifario` }
 ];
@@ -438,6 +440,19 @@ const tarifarioTabs = [
             }) %>
             <% } else { %>
             <div class="alert alert-info mb-0"><i class="ti ti-info-circle me-2"></i>Solo las agencias tienen agentes.</div>
+            <% } %>
+        <% } else if (activeSection === 'billing') { %>
+            <!-- Perfiles de Facturación (admin, solo lectura) — agencias. Reusa el organism
+                 con targetUserId=clientId; el endpoint /api/billing-profiles/user/:id resuelve
+                 el Client → su dueño (department_manager) y devuelve sus perfiles. -->
+            <% if (isAgency) { %>
+            <%- include('../../organisms/billing/billing-profiles-section', {
+                userRole: typeof userRole !== 'undefined' ? userRole : 'admin',
+                readOnly: true,
+                targetUserId: clientId
+            }) %>
+            <% } else { %>
+            <div class="alert alert-info mb-0"><i class="ti ti-info-circle me-2"></i>Solo las agencias tienen perfiles de facturación.</div>
             <% } %>
         <% } else if (activeSection === 'quotes') { %>
             <!-- Trips: read-only quotes/reservations linked to this client. Loaded via AJAX. -->
