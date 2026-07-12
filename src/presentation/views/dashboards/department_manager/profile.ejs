@@ -21,7 +21,13 @@ const profileData = {
   active: user.active !== undefined ? user.active : true,
   profilePicture: user.profilePicture || user.avatar || '',
   role: user.role || 'employee',
-  organizationId: user.organizationId || ''
+  organizationId: user.organizationId || '',
+  phone: user.phone || '',
+  companyName: user.companyName || '',
+  taxId: user.taxId || '',
+  website: user.website || '',
+  notes: user.notes || '',
+  address: user.address || {}
 };
 
 // Generate initials for avatar placeholder
@@ -114,6 +120,10 @@ const formatRoleName = (role) => {
                 <p><%= profileData.email || 'Not provided' %></p>
               </div>
               <div class="col-md-6 mb-3 profile-field">
+                <label>Phone</label>
+                <p><%= profileData.phone || 'Not provided' %></p>
+              </div>
+              <div class="col-md-6 mb-3 profile-field">
                 <label>Account Status</label>
                 <p>
                   <% if (profileData.active) { %>
@@ -143,6 +153,38 @@ const formatRoleName = (role) => {
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Company & Fiscal Information -->
+  <div class="row justify-content-center mt-4">
+    <div class="col-12 col-lg-10">
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <h5 class="profile-section-title mb-4">Company Information</h5>
+          <div class="row">
+            <div class="col-12 mb-3 profile-field"><label>Company Name</label><p><%= profileData.companyName || 'Not provided' %></p></div>
+            <div class="col-md-6 mb-3 profile-field"><label>RFC / Tax ID</label><p><%= profileData.taxId || 'Not provided' %></p></div>
+            <div class="col-md-6 mb-3 profile-field"><label>Website</label><p><% if (profileData.website) { %><a href="<%= profileData.website %>" target="_blank"><i class="ti ti-external-link me-1"></i><%= profileData.website %></a><% } else { %>Not provided<% } %></p></div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <h5 class="profile-section-title mb-4">Fiscal Address</h5>
+          <div class="row">
+            <div class="col-12 mb-3 profile-field"><label>Street</label><p><%= (profileData.address && profileData.address.street) || 'Not provided' %></p></div>
+            <div class="col-md-6 mb-3 profile-field"><label>City</label><p><%= (profileData.address && profileData.address.city) || 'Not provided' %></p></div>
+            <div class="col-md-6 mb-3 profile-field"><label>State</label><p><%= (profileData.address && profileData.address.state) || 'Not provided' %></p></div>
+            <div class="col-md-6 mb-3 profile-field"><label>ZIP Code</label><p><%= (profileData.address && profileData.address.zipCode) || 'Not provided' %></p></div>
+            <div class="col-md-6 mb-3 profile-field"><label>Country</label><p><%= (profileData.address && profileData.address.country) || 'Not provided' %></p></div>
+          </div>
+        </div>
+      </div>
+      <% if (profileData.notes) { %>
+      <div class="mt-2 profile-field">
+        <h5 class="profile-section-title mb-3">Notes</h5>
+        <p class="mb-0" style="color: #2b2b2b;"><%= profileData.notes %></p>
+      </div>
+      <% } %>
     </div>
   </div>
 

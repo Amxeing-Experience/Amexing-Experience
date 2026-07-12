@@ -192,6 +192,12 @@ class RoleBasedController extends DashboardController {
             profilePicture: parseUser.get('profilePicture'),
             role: parseUser.get('role') || basicUserData.role,
             organizationId: parseUser.get('organizationId'),
+            // Datos de empresa/fiscales (agencias): para que el perfil muestre lo mismo que el admin.
+            companyName: parseUser.get('contextualData')?.companyName || '',
+            taxId: parseUser.get('taxId') || '',
+            website: parseUser.get('website') || '',
+            notes: parseUser.get('notes') || '',
+            address: parseUser.get('address') || {},
           };
 
           // La URL de foto guardada en `profilePicture` es presignada y expira (→ 403).
@@ -235,6 +241,11 @@ class RoleBasedController extends DashboardController {
         profilePicture: fullUserData.profilePicture || fullUserData.avatar || '',
         role: fullUserData.role || this.role,
         organizationId: fullUserData.organizationId || fullUserData.organization_id || '',
+        companyName: fullUserData.companyName || '',
+        taxId: fullUserData.taxId || '',
+        website: fullUserData.website || '',
+        notes: fullUserData.notes || '',
+        address: fullUserData.address || {},
       };
 
       await this.renderRoleView(req, res, 'profile', {
