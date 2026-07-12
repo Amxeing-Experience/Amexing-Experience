@@ -223,7 +223,7 @@ class QuoteController {
       // 2. Extract fields from request body
       const {
         client, clientId, clientType, clientFinalId, clientFinalName, contactPerson, contactEmail, contactPhone,
-        contactFirstName, contactLastName, notes, eventType,
+        contactFirstName, contactLastName, notes, lodging, eventType,
         leadGuestFirstName, leadGuestLastName,
         ownerId: initialOwnerId, // Propietario inicial elegido (solo admin/superadmin; se valida)
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
@@ -465,6 +465,7 @@ class QuoteController {
       // Mutuamente excluyente con clientFinalId (el frontend envía solo uno con valor).
       quote.set('clientFinalName', clientFinalName || '');
       quote.set('notes', notes || '');
+      quote.set('lodging', lodging || '');
       quote.set('eventType', eventType || '');
 
       // Set individual person counts
@@ -944,6 +945,7 @@ class QuoteController {
             leadGuestFirstName: quote.get('leadGuestFirstName') || '',
             leadGuestLastName: quote.get('leadGuestLastName') || '',
             notes: quote.get('notes') || '',
+            lodging: quote.get('lodging') || '',
             clientFinalId: quote.get('clientFinalId') || null,
             clientFinalName: quote.get('clientFinalName') || '',
             // Nombre a mostrar del Cliente Final: cliente resuelto por id, o texto libre tecleado.
@@ -1181,6 +1183,7 @@ class QuoteController {
         leadGuestFirstName: quote.get('leadGuestFirstName') || '',
         leadGuestLastName: quote.get('leadGuestLastName') || '',
         notes: quote.get('notes') || '',
+        lodging: quote.get('lodging') || '',
         clientFinalId: quote.get('clientFinalId') || null,
         clientFinalName: quote.get('clientFinalName') || '',
         status: quote.get('status') || 'quoted',

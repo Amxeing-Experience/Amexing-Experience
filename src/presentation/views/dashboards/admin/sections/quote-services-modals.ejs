@@ -276,7 +276,10 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                             <div class="row mb-3">
                                 <div class="col-md-12">
                                     <label for="tourPickupAddress" class="form-label"><i class="ti ti-map-pin me-1"></i>Dirección de pickup</label>
-                                    <input type="text" class="form-control" id="tourPickupAddress" placeholder="Hotel, dirección o punto de encuentro" autocomplete="off">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="tourPickupAddress" placeholder="Hotel, dirección o punto de encuentro" autocomplete="off">
+                                        <button class="btn btn-outline-secondary use-lodging-btn d-none" type="button" data-target="tourPickupAddress" title="Usar el hospedaje de la cotización"><i class="ti ti-bed"></i></button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -447,11 +450,17 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                 <div class="row d-none" id="papAddressesRow">
                                     <div class="col-md-6 mb-3" id="papPickupCol">
                                         <label class="form-label" for="transportPickupAddress">Dirección de pick-up</label>
-                                        <input type="text" class="form-control" id="transportPickupAddress" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="transportPickupAddress" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                            <button class="btn btn-outline-secondary use-lodging-btn d-none" type="button" data-target="transportPickupAddress" title="Usar el hospedaje de la cotización"><i class="ti ti-bed"></i></button>
+                                        </div>
                                     </div>
                                     <div class="col-md-6 mb-3" id="papDropoffCol">
                                         <label class="form-label" for="transportDropoffAddress">Dirección de drop-off</label>
-                                        <input type="text" class="form-control" id="transportDropoffAddress" placeholder="Ej: Aeropuerto BJX, Casa particular...">
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="transportDropoffAddress" placeholder="Ej: Aeropuerto BJX, Casa particular...">
+                                            <button class="btn btn-outline-secondary use-lodging-btn d-none" type="button" data-target="transportDropoffAddress" title="Usar el hospedaje de la cotización"><i class="ti ti-bed"></i></button>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -584,11 +593,17 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                     <div class="row d-none" id="papAddressesRowIda">
                                         <div class="col-md-6 mb-3" id="papPickupColIda">
                                             <label class="form-label" for="roundTripPickupAddressIda">Dirección de pick-up</label>
-                                            <input type="text" class="form-control" id="roundTripPickupAddressIda" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="roundTripPickupAddressIda" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                                <button class="btn btn-outline-secondary use-lodging-btn d-none" type="button" data-target="roundTripPickupAddressIda" title="Usar el hospedaje de la cotización"><i class="ti ti-bed"></i></button>
+                                            </div>
                                         </div>
                                         <div class="col-md-6 mb-3" id="papDropoffColIda">
                                             <label class="form-label" for="roundTripDropoffAddressIda">Dirección de drop-off</label>
-                                            <input type="text" class="form-control" id="roundTripDropoffAddressIda" placeholder="Ej: Aeropuerto BJX, Casa particular...">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="roundTripDropoffAddressIda" placeholder="Ej: Aeropuerto BJX, Casa particular...">
+                                                <button class="btn btn-outline-secondary use-lodging-btn d-none" type="button" data-target="roundTripDropoffAddressIda" title="Usar el hospedaje de la cotización"><i class="ti ti-bed"></i></button>
+                                            </div>
                                         </div>
                                     </div>
                                     <!-- Specific Location for Ida (shown for certain destinations like San Miguel) -->
@@ -694,11 +709,17 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                     <div class="row d-none" id="papAddressesRowVuelta">
                                         <div class="col-md-6 mb-3" id="papPickupColVuelta">
                                             <label class="form-label" for="roundTripPickupAddressVuelta">Dirección de pick-up</label>
-                                            <input type="text" class="form-control" id="roundTripPickupAddressVuelta" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="roundTripPickupAddressVuelta" placeholder="Ej: Hotel Rosewood, Calle Aldama 15...">
+                                                <button class="btn btn-outline-secondary use-lodging-btn d-none" type="button" data-target="roundTripPickupAddressVuelta" title="Usar el hospedaje de la cotización"><i class="ti ti-bed"></i></button>
+                                            </div>
                                         </div>
                                         <div class="col-md-6 mb-3" id="papDropoffColVuelta">
                                             <label class="form-label" for="roundTripDropoffAddressVuelta">Dirección de drop-off</label>
-                                            <input type="text" class="form-control" id="roundTripDropoffAddressVuelta" placeholder="Ej: Aeropuerto BJX, Casa particular...">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="roundTripDropoffAddressVuelta" placeholder="Ej: Aeropuerto BJX, Casa particular...">
+                                                <button class="btn btn-outline-secondary use-lodging-btn d-none" type="button" data-target="roundTripDropoffAddressVuelta" title="Usar el hospedaje de la cotización"><i class="ti ti-bed"></i></button>
+                                            </div>
                                         </div>
                                     </div>
                                     <!-- Specific Location for Vuelta (shown for certain origins like San Miguel) -->
@@ -1221,7 +1242,10 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                         <div class="row mb-3">
                             <div class="col-md-12">
                                 <label for="experiencePickupAddress" class="form-label"><i class="ti ti-map-pin me-1"></i>Dirección de pickup</label>
-                                <input type="text" class="form-control" id="experiencePickupAddress" placeholder="Hotel, dirección o punto de encuentro" autocomplete="off">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="experiencePickupAddress" placeholder="Hotel, dirección o punto de encuentro" autocomplete="off">
+                                    <button class="btn btn-outline-secondary use-lodging-btn d-none" type="button" data-target="experiencePickupAddress" title="Usar el hospedaje de la cotización"><i class="ti ti-bed"></i></button>
+                                </div>
                             </div>
                         </div>
 
@@ -1464,6 +1488,123 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
         document.addEventListener('DOMContentLoaded', initServiceNotesAutoGrow);
     } else {
         initServiceNotesAutoGrow();
+    }
+})();
+
+// ── Hospedaje → prellenar direcciones de pickup/drop-off ─────────────────────────
+// El input #lodging (Hospedaje, en Información de la cotización) prellena las direcciones
+// de pickup/drop-off de los servicios cuando están VACÍAS y VISIBLES (al abrir el modal y al
+// cambiar de tipo). Botón "usar hospedaje" (ícono cama) junto a cada campo para reponerlo.
+(function () {
+    const ADDRESS_IDS = [
+        'experiencePickupAddress', 'tourPickupAddress',
+        'transportPickupAddress', 'transportDropoffAddress',
+        'roundTripPickupAddressIda', 'roundTripDropoffAddressIda',
+        'roundTripPickupAddressVuelta', 'roundTripDropoffAddressVuelta',
+    ];
+    // El hospedaje vive en la sección de Información (#lodging). Pero en ?section=services esa
+    // sección NO se renderiza (quote-detail incluye solo la de servicios), así que #lodging no
+    // está en el DOM. En ese caso se pide a la API de la cotización y se cachea.
+    let lodgingCache = null; // null = aún no cargado
+    function getToken() {
+        if (typeof getAccessToken === 'function') return getAccessToken();
+        return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+    }
+    function quoteIdFromUrl() {
+        const m = window.location.pathname.match(/\/quotes\/([A-Za-z0-9]+)/);
+        return m && m[1] !== 'new' ? m[1] : '';
+    }
+    async function loadLodging() {
+        const el = document.getElementById('lodging');
+        if (el) { lodgingCache = el.value ? el.value.trim() : ''; return lodgingCache; }
+        const quoteId = quoteIdFromUrl();
+        if (!quoteId) { lodgingCache = ''; return ''; }
+        try {
+            const resp = await fetch(`/api/quotes/${quoteId}`, {
+                headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+            });
+            const result = await resp.json();
+            lodgingCache = (result && result.data && result.data.lodging) ? String(result.data.lodging).trim() : '';
+        } catch (e) { lodgingCache = ''; }
+        return lodgingCache;
+    }
+    function getLodging() {
+        const el = document.getElementById('lodging');
+        if (el) return el.value ? el.value.trim() : '';
+        return lodgingCache || '';
+    }
+    // Muestra/oculta los botones "usar hospedaje" según haya o no hospedaje capturado.
+    function toggleLodgingButtons() {
+        const has = !!getLodging();
+        document.querySelectorAll('#serviceModal .use-lodging-btn').forEach((b) => b.classList.toggle('d-none', !has));
+    }
+    // Prellena los campos de dirección VISIBLES y VACÍOS con el hospedaje. Se re-ejecuta ante
+    // cualquier cambio del modal (observer), así que cubre los sub-modos (aeropuerto/local/
+    // ida-vuelta/llegada-salida) que revelan o resetean campos. Si el usuario ya escribió algo,
+    // no se toca; para reponer un campo borrado a propósito está el botón "usar hospedaje".
+    function prefillFromLodging() {
+        const lodging = getLodging();
+        if (!lodging) return;
+        ADDRESS_IDS.forEach((id) => {
+            const f = document.getElementById(id);
+            // Solo campos VISIBLES y VACÍOS: cuando una sección se revela o se resetea por cambio
+            // de sub-modo (aeropuerto/local/ida-vuelta/llegada-salida), el observer re-ejecuta esto
+            // y prellena el campo que quedó vacío. Si el usuario ya escribió algo, no se toca.
+            if (f && f.offsetParent !== null && !f.value.trim()) {
+                f.value = lodging;
+                f.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
+    }
+    function init() {
+        const modal = document.getElementById('serviceModal');
+        if (!modal || modal.dataset.lodgingPrefill) return;
+        modal.dataset.lodgingPrefill = '1';
+        let prefillTimer = null;
+        const schedulePrefill = () => {
+            clearTimeout(prefillTimer);
+            prefillTimer = setTimeout(() => { toggleLodgingButtons(); prefillFromLodging(); }, 60);
+        };
+        // Precargar el hospedaje desde la API (para ?section=services, donde no hay #lodging).
+        loadLodging();
+        // Al mostrar el modal (nueva sesión): recargar hospedaje, limpiar marcas y prellenar.
+        modal.addEventListener('shown.bs.modal', async () => {
+            await loadLodging();
+            schedulePrefill();
+        });
+        // Los campos de dirección aparecen al elegir experiencia/tour o al togglear el sub-modo de
+        // transporte (aeropuerto/local/ida-vuelta), muchas veces sin un `change` que burbujee. Un
+        // MutationObserver detecta cuando dejan de estar ocultos (cambia class/style) y los prellena.
+        new MutationObserver(schedulePrefill).observe(modal, {
+            attributes: true, attributeFilter: ['class', 'style'], subtree: true, childList: true,
+        });
+        // Botón "usar hospedaje": rellena su campo objetivo con el hospedaje.
+        modal.addEventListener('click', (e) => {
+            const btn = e.target.closest('.use-lodging-btn');
+            if (!btn) return;
+            const lodging = getLodging();
+            const target = document.getElementById(btn.dataset.target);
+            if (target && lodging) {
+                target.value = lodging;
+                target.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
+        // Infalible: al enfocar un campo de dirección vacío, se prellena con el hospedaje (el
+        // campo enfocado siempre está visible). Cubre reveals que el observer no llegue a atrapar.
+        modal.addEventListener('focusin', (e) => {
+            const f = e.target;
+            if (!f || ADDRESS_IDS.indexOf(f.id) === -1) return;
+            const lodging = getLodging();
+            if (lodging && !f.value.trim()) {
+                f.value = lodging;
+                f.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
     }
 })();
 </script>
