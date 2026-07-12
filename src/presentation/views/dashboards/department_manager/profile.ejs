@@ -70,7 +70,10 @@ const formatRoleName = (role) => {
   .profile-wrap { --olive: #6E7A50; --olive-d: #566040; --line: #e7e3d8; --ink: #2b2b2b; --muted: #8a8f78; }
   .profile-wrap .profile-name { font-size: 1.35rem; font-weight: 700; color: var(--ink); margin-bottom: .4rem; }
   .profile-wrap .profile-role { display: inline-flex; align-items: center; gap: 5px; background: #eef0e6; color: var(--olive-d); border: 1px solid var(--line); border-radius: 999px; padding: .25rem .85rem; font-size: .78rem; font-weight: 600; }
-  .profile-wrap .profile-email { color: var(--muted); font-size: .9rem; }
+  .profile-wrap .profile-contact { display: inline-block; text-align: left; margin-top: 4px; }
+  .profile-wrap .profile-contact-item { display: flex; align-items: center; gap: 9px; color: var(--ink); font-size: .88rem; padding: 4px 0; }
+  .profile-wrap .profile-contact-item i { color: var(--olive); font-size: 1.05rem; width: 18px; text-align: center; flex-shrink: 0; }
+  .profile-wrap .profile-contact-item span { word-break: break-word; }
   .profile-wrap .profile-info { border-left: 1px solid var(--line); padding-left: 32px; }
   .profile-wrap .profile-section-title { color: var(--olive-d); font-weight: 700; font-size: 1rem; border-bottom: 1px solid var(--line); padding-bottom: .6rem; }
   .profile-wrap .profile-field label { text-transform: uppercase; letter-spacing: .06em; font-size: .68rem; color: var(--muted); font-weight: 600; margin-bottom: 2px; display: block; }
@@ -87,24 +90,28 @@ const formatRoleName = (role) => {
   <div class="row justify-content-center">
     <div class="col-12 col-lg-10">
       <div class="row g-4 align-items-start">
-        <!-- Profile Picture & Basic Info -->
+        <!-- Identity & contact aside -->
         <div class="col-lg-4 text-center">
           <!-- Profile Image Upload Component -->
           <%- include('../../organisms/profile/profile-image-upload', { profileData, initials }) %>
 
-          <!-- Basic Info -->
           <h3 class="profile-name mt-3"><%= profileData.fullName %></h3>
-          <div class="mb-2">
+          <div class="mb-3">
             <span class="profile-role"><i class="ti ti-user-shield"></i><%= formatRoleName(profileData.role) %></span>
           </div>
-          <div class="profile-email">
-            <i class="ti ti-mail me-1"></i><%= profileData.email %>
+
+          <!-- Contact quick facts -->
+          <div class="profile-contact">
+            <div class="profile-contact-item"><i class="ti ti-mail"></i><span><%= profileData.email || 'Not provided' %></span></div>
+            <div class="profile-contact-item"><i class="ti ti-phone"></i><span><%= profileData.phone || 'Not provided' %></span></div>
+            <div class="profile-contact-item"><i class="ti ti-calendar-event"></i><span>Member since <%= profileData.joinedDate %></span></div>
           </div>
         </div>
 
-        <!-- Personal Information -->
+        <!-- Info -->
         <div class="col-lg-8">
           <div class="profile-info">
+            <!-- Personal Information -->
             <h5 class="profile-section-title mb-4">Personal Information</h5>
             <div class="row">
               <div class="col-md-6 mb-3 profile-field">
@@ -116,14 +123,6 @@ const formatRoleName = (role) => {
                 <p><%= profileData.lastName || 'Not provided' %></p>
               </div>
               <div class="col-md-6 mb-3 profile-field">
-                <label>Email Address</label>
-                <p><%= profileData.email || 'Not provided' %></p>
-              </div>
-              <div class="col-md-6 mb-3 profile-field">
-                <label>Phone</label>
-                <p><%= profileData.phone || 'Not provided' %></p>
-              </div>
-              <div class="col-md-6 mb-3 profile-field">
                 <label>Account Status</label>
                 <p>
                   <% if (profileData.active) { %>
@@ -133,6 +132,10 @@ const formatRoleName = (role) => {
                   <% } %>
                 </p>
               </div>
+              <div class="col-md-6 mb-3 profile-field">
+                <label>Last login</label>
+                <p><%= profileData.lastLoginAt %></p>
+              </div>
               <div class="col-12 mb-3 profile-field">
                 <label>Password</label>
                 <p>
@@ -141,14 +144,14 @@ const formatRoleName = (role) => {
                   </button>
                 </p>
               </div>
-              <div class="col-md-6 mb-3 profile-field">
-                <label>Member Since</label>
-                <p><%= profileData.joinedDate %></p>
-              </div>
-              <div class="col-md-6 mb-3 profile-field">
-                <label>Last login</label>
-                <p><%= profileData.lastLoginAt %></p>
-              </div>
+            </div>
+
+            <!-- Company Information -->
+            <h5 class="profile-section-title mb-4 mt-4">Company Information</h5>
+            <div class="row">
+              <div class="col-12 mb-3 profile-field"><label>Company Name</label><p><%= profileData.companyName || 'Not provided' %></p></div>
+              <div class="col-md-6 mb-3 profile-field"><label>RFC / Tax ID</label><p><%= profileData.taxId || 'Not provided' %></p></div>
+              <div class="col-md-6 mb-3 profile-field"><label>Website</label><p><% if (profileData.website) { %><a href="<%= profileData.website %>" target="_blank"><i class="ti ti-external-link me-1"></i><%= profileData.website %></a><% } else { %>Not provided<% } %></p></div>
             </div>
           </div>
         </div>
@@ -156,37 +159,15 @@ const formatRoleName = (role) => {
     </div>
   </div>
 
-  <!-- Company & Fiscal Information -->
+  <% if (profileData.notes) { %>
+  <!-- Notes -->
   <div class="row justify-content-center mt-4">
-    <div class="col-12 col-lg-10">
-      <div class="row g-4">
-        <div class="col-lg-6">
-          <h5 class="profile-section-title mb-4">Company Information</h5>
-          <div class="row">
-            <div class="col-12 mb-3 profile-field"><label>Company Name</label><p><%= profileData.companyName || 'Not provided' %></p></div>
-            <div class="col-md-6 mb-3 profile-field"><label>RFC / Tax ID</label><p><%= profileData.taxId || 'Not provided' %></p></div>
-            <div class="col-md-6 mb-3 profile-field"><label>Website</label><p><% if (profileData.website) { %><a href="<%= profileData.website %>" target="_blank"><i class="ti ti-external-link me-1"></i><%= profileData.website %></a><% } else { %>Not provided<% } %></p></div>
-          </div>
-        </div>
-        <div class="col-lg-6">
-          <h5 class="profile-section-title mb-4">Fiscal Address</h5>
-          <div class="row">
-            <div class="col-12 mb-3 profile-field"><label>Street</label><p><%= (profileData.address && profileData.address.street) || 'Not provided' %></p></div>
-            <div class="col-md-6 mb-3 profile-field"><label>City</label><p><%= (profileData.address && profileData.address.city) || 'Not provided' %></p></div>
-            <div class="col-md-6 mb-3 profile-field"><label>State</label><p><%= (profileData.address && profileData.address.state) || 'Not provided' %></p></div>
-            <div class="col-md-6 mb-3 profile-field"><label>ZIP Code</label><p><%= (profileData.address && profileData.address.zipCode) || 'Not provided' %></p></div>
-            <div class="col-md-6 mb-3 profile-field"><label>Country</label><p><%= (profileData.address && profileData.address.country) || 'Not provided' %></p></div>
-          </div>
-        </div>
-      </div>
-      <% if (profileData.notes) { %>
-      <div class="mt-2 profile-field">
-        <h5 class="profile-section-title mb-3">Notes</h5>
-        <p class="mb-0" style="color: #2b2b2b;"><%= profileData.notes %></p>
-      </div>
-      <% } %>
+    <div class="col-12 col-lg-10 profile-field">
+      <h5 class="profile-section-title mb-3">Notes</h5>
+      <p class="mb-0" style="color: #2b2b2b;"><%= profileData.notes %></p>
     </div>
   </div>
+  <% } %>
 
   <!-- Billing Profiles Section -->
   <div class="row justify-content-center mt-4">
