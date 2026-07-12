@@ -59,75 +59,85 @@ const formatRoleName = (role) => {
   </div>
 </div>
 
+<style>
+  /* ===== Rediseño limpio (sin card blanca) — perfil de usuario ===== */
+  .profile-wrap { --olive: #6E7A50; --olive-d: #566040; --line: #e7e3d8; --ink: #2b2b2b; --muted: #8a8f78; }
+  .profile-wrap .profile-name { font-size: 1.35rem; font-weight: 700; color: var(--ink); margin-bottom: .4rem; }
+  .profile-wrap .profile-role { display: inline-flex; align-items: center; gap: 5px; background: #eef0e6; color: var(--olive-d); border: 1px solid var(--line); border-radius: 999px; padding: .25rem .85rem; font-size: .78rem; font-weight: 600; }
+  .profile-wrap .profile-email { color: var(--muted); font-size: .9rem; }
+  .profile-wrap .profile-info { border-left: 1px solid var(--line); padding-left: 32px; }
+  .profile-wrap .profile-section-title { color: var(--olive-d); font-weight: 700; font-size: 1rem; border-bottom: 1px solid var(--line); padding-bottom: .6rem; }
+  .profile-wrap .profile-field label { text-transform: uppercase; letter-spacing: .06em; font-size: .68rem; color: var(--muted); font-weight: 600; margin-bottom: 2px; display: block; }
+  .profile-wrap .profile-field p { color: var(--ink); font-weight: 600; margin-bottom: 0; }
+  .profile-wrap .profile-change-btn { border: 1px solid var(--line); color: var(--olive-d); background: #fff; border-radius: 8px; padding: .3rem .85rem; font-size: .82rem; font-weight: 600; transition: background .15s ease, border-color .15s ease; }
+  .profile-wrap .profile-change-btn:hover { border-color: var(--olive); background: #eef0e6; color: var(--olive-d); }
+  @media (max-width: 991.98px) {
+    .profile-wrap .profile-info { border-left: 0; padding-left: 12px; margin-top: 14px; }
+  }
+</style>
+
 <!-- Profile Content -->
-<div class="container-fluid">
+<div class="container-fluid profile-wrap">
   <div class="row justify-content-center">
     <div class="col-12 col-lg-10">
-      <div class="card">
-        <div class="card-body">
-          <div class="row">
-            <!-- Profile Picture & Basic Info -->
-            <div class="col-lg-4 text-center mb-4 mb-lg-0">
-              <!-- Profile Image Upload Component -->
-              <%- include('../../organisms/profile/profile-image-upload', { profileData, initials }) %>
+      <div class="row g-4 align-items-start">
+        <!-- Profile Picture & Basic Info -->
+        <div class="col-lg-4 text-center">
+          <!-- Profile Image Upload Component -->
+          <%- include('../../organisms/profile/profile-image-upload', { profileData, initials }) %>
 
-              <!-- Basic Info -->
-              <h3 class="mb-2"><%= profileData.fullName %></h3>
-              <p class="text-muted mb-2">
-                <span class="badge bg-light-primary text-primary">
-                  <%= formatRoleName(profileData.role) %>
-                </span>
-              </p>
-              <p class="text-muted mb-0">
-                <i class="ti ti-mail me-1"></i>
-                <%= profileData.email %>
-              </p>
-            </div>
+          <!-- Basic Info -->
+          <h3 class="profile-name mt-3"><%= profileData.fullName %></h3>
+          <div class="mb-2">
+            <span class="profile-role"><i class="ti ti-user-shield"></i><%= formatRoleName(profileData.role) %></span>
+          </div>
+          <div class="profile-email">
+            <i class="ti ti-mail me-1"></i><%= profileData.email %>
+          </div>
+        </div>
 
-            <!-- Personal Information -->
-            <div class="col-lg-8">
-              <h5 class="mb-4">Personal Information</h5>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">First Name</label>
-                  <p class="fw-semibold mb-0"><%= profileData.firstName || 'Not provided' %></p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Last Name</label>
-                  <p class="fw-semibold mb-0"><%= profileData.lastName || 'Not provided' %></p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Email Address</label>
-                  <p class="fw-semibold mb-0">
-                    <%= profileData.email || 'Not provided' %>
-                  </p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Account Status</label>
-                  <p class="fw-semibold mb-0">
-                    <% if (profileData.active) { %>
-                      <span class="badge bg-success">Active</span>
-                    <% } else { %>
-                      <span class="badge bg-danger">Inactive</span>
-                    <% } %>
-                  </p>
-                </div>
-                <div class="col-12 mb-3">
-                  <label class="text-muted small">Password</label>
-                  <p class="fw-semibold mb-0">
-                    <button class="btn btn-sm btn-outline-primary ms-2" id="change-password-btn">
-                      Change
-                    </button>
-                  </p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Member Since</label>
-                  <p class="fw-semibold mb-0"><%= profileData.joinedDate %></p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Last login</label>
-                  <p class="fw-semibold mb-0"><%= profileData.lastLoginAt %></p>
-                </div>
+        <!-- Personal Information -->
+        <div class="col-lg-8">
+          <div class="profile-info">
+            <h5 class="profile-section-title mb-4">Personal Information</h5>
+            <div class="row">
+              <div class="col-md-6 mb-3 profile-field">
+                <label>First Name</label>
+                <p><%= profileData.firstName || 'Not provided' %></p>
+              </div>
+              <div class="col-md-6 mb-3 profile-field">
+                <label>Last Name</label>
+                <p><%= profileData.lastName || 'Not provided' %></p>
+              </div>
+              <div class="col-md-6 mb-3 profile-field">
+                <label>Email Address</label>
+                <p><%= profileData.email || 'Not provided' %></p>
+              </div>
+              <div class="col-md-6 mb-3 profile-field">
+                <label>Account Status</label>
+                <p>
+                  <% if (profileData.active) { %>
+                    <span class="badge bg-success">Active</span>
+                  <% } else { %>
+                    <span class="badge bg-danger">Inactive</span>
+                  <% } %>
+                </p>
+              </div>
+              <div class="col-12 mb-3 profile-field">
+                <label>Password</label>
+                <p>
+                  <button class="profile-change-btn" id="change-password-btn">
+                    <i class="ti ti-key me-1"></i>Change
+                  </button>
+                </p>
+              </div>
+              <div class="col-md-6 mb-3 profile-field">
+                <label>Member Since</label>
+                <p><%= profileData.joinedDate %></p>
+              </div>
+              <div class="col-md-6 mb-3 profile-field">
+                <label>Last login</label>
+                <p><%= profileData.lastLoginAt %></p>
               </div>
             </div>
           </div>
