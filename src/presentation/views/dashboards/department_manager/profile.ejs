@@ -98,13 +98,13 @@ const formatRoleName = (role) => {
     .profile-wrap .profile-aside { margin-bottom: 22px; }
   }
 
-  /* Modal Cambiar Contraseña (olivo) */
-  #changePasswordModal .modal-header { background: #6E7A50; color: #fff; border: none; }
-  #changePasswordModal .modal-title,
-  #changePasswordModal .modal-title i { color: #fff !important; letter-spacing: .04em; }
-  #changePasswordModal .form-control:focus { border-color: #6E7A50; box-shadow: 0 0 0 .2rem rgba(110, 122, 80, .15); }
-  #changePasswordModal .btn-olive { background: #6E7A50; border: 1px solid #6E7A50; color: #fff; font-weight: 600; }
-  #changePasswordModal .btn-olive:hover { background: #566040; border-color: #566040; color: #fff; }
+  /* Modales del perfil (olivo) */
+  #changePasswordModal .modal-header, #editInfoModal .modal-header { background: #6E7A50; color: #fff; border: none; }
+  #changePasswordModal .modal-title, #changePasswordModal .modal-title i,
+  #editInfoModal .modal-title, #editInfoModal .modal-title i { color: #fff !important; letter-spacing: .04em; }
+  #changePasswordModal .form-control:focus, #editInfoModal .form-control:focus { border-color: #6E7A50; box-shadow: 0 0 0 .2rem rgba(110, 122, 80, .15); }
+  #changePasswordModal .btn-olive, #editInfoModal .btn-olive { background: #6E7A50; border: 1px solid #6E7A50; color: #fff; font-weight: 600; }
+  #changePasswordModal .btn-olive:hover, #editInfoModal .btn-olive:hover { background: #566040; border-color: #566040; color: #fff; }
 </style>
 
 <!-- Page Header -->
@@ -193,9 +193,6 @@ const formatRoleName = (role) => {
           <div class="col-md-6 field"><label>Sitio Web</label><div class="val"><% if (profileData.website) { %><a href="<%= profileData.website %>" target="_blank"><%= profileData.website %></a><% } else { %>Sin registro<% } %></div></div>
           <div class="col-md-6 field"><label>País</label><div class="val"><%= (profileData.address && profileData.address.country) || 'Sin registro' %></div></div>
         </div>
-        <div class="section-actions">
-          <button type="button" class="btn-editorial" id="editCompanyBtn"><i class="ti ti-pencil"></i>Editar Empresa</button>
-        </div>
       </div>
 
       <!-- 03 · Perfiles de Facturación -->
@@ -213,6 +210,108 @@ const formatRoleName = (role) => {
     </div>
   </div>
 </div>
+
+<!-- Modal: Editar Información -->
+<div class="modal fade" id="editInfoModal" tabindex="-1" aria-labelledby="editInfoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editInfoModalLabel"><i class="ti ti-pencil me-2"></i>Editar Información</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="epAlert" class="alert d-none" role="alert"></div>
+        <form id="editInfoForm" novalidate>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="epFirstName">Nombre</label>
+              <input type="text" class="form-control" id="epFirstName" value="<%= profileData.firstName %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="epLastName">Apellido</label>
+              <input type="text" class="form-control" id="epLastName" value="<%= profileData.lastName %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="epPhone">Teléfono</label>
+              <input type="text" class="form-control" id="epPhone" value="<%= profileData.phone %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="epEmail">Email</label>
+              <input type="email" class="form-control" id="epEmail" value="<%= profileData.email %>" readonly disabled>
+              <div class="form-text">El email no se puede cambiar aquí.</div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-olive" id="epSubmit"><i class="ti ti-check me-1"></i>Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const editBtn = document.getElementById('editPersonalBtn');
+  const modalEl = document.getElementById('editInfoModal');
+  const modal = (modalEl && window.bootstrap) ? new bootstrap.Modal(modalEl) : null;
+  if (editBtn && modal) {
+    editBtn.addEventListener('click', function() { modal.show(); });
+  }
+
+  // JWT para /api (mismo criterio que el billing): storage → cookie.
+  function getAuthToken() {
+    let t = localStorage.getItem('accessToken') || localStorage.getItem('authToken') ||
+            localStorage.getItem('token') || sessionStorage.getItem('accessToken') ||
+            sessionStorage.getItem('authToken');
+    if (t && t !== 'undefined' && t !== 'null') return t;
+    const m = document.cookie.match(/accessToken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  const alertEl = document.getElementById('epAlert');
+  function epShow(msg, type) { alertEl.className = 'alert alert-' + type; alertEl.textContent = msg; }
+
+  const submit = document.getElementById('epSubmit');
+  if (submit) {
+    submit.addEventListener('click', async function() {
+      alertEl.className = 'alert d-none';
+      const firstName = document.getElementById('epFirstName').value.trim();
+      const lastName = document.getElementById('epLastName').value.trim();
+      const phone = document.getElementById('epPhone').value.trim();
+      if (!firstName || !lastName) { epShow('Nombre y apellido son obligatorios.', 'danger'); return; }
+
+      submit.disabled = true;
+      const orig = submit.innerHTML;
+      submit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = getAuthToken();
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        const resp = await fetch('/api/users/me/profile', {
+          method: 'PUT',
+          headers: headers,
+          credentials: 'include',
+          body: JSON.stringify({ firstName: firstName, lastName: lastName, phone: phone })
+        });
+        const result = await resp.json().catch(function() { return {}; });
+        if (resp.ok && result.success !== false) {
+          epShow('¡Datos actualizados!', 'success');
+          setTimeout(function() { window.location.reload(); }, 900);
+        } else {
+          throw new Error(result.error || result.message || 'No se pudo actualizar.');
+        }
+      } catch (err) {
+        epShow(err.message || 'Ocurrió un error. Intenta de nuevo.', 'danger');
+      } finally {
+        submit.disabled = false;
+        submit.innerHTML = orig;
+      }
+    });
+  }
+});
+</script>
 
 <!-- Modal: Cambiar Contraseña -->
 <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
