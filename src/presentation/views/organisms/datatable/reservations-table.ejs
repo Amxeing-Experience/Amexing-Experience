@@ -64,6 +64,10 @@ const canManageReservations = !!(locals && locals.canManageReservations);
     .exp-catalog .table > thead.table-light th { background: rgba(228, 223, 207, 0.35); border-bottom: 1px solid var(--exp-border); color: var(--exp-muted); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; vertical-align: middle; }
     /* Barra de filtros: fecha (izq) · Año/Mes/Día (der) */
     .reservations-filters { display: flex; justify-content: space-between; align-items: center; gap: 14px 24px; flex-wrap: wrap; margin-bottom: 18px; }
+    /* Los pills de fecha se mantienen SIEMPRE en una sola fila (no se parten al aparecer
+       el badge de pendientes); si algo baja, es el bloque Año/Mes/Día. */
+    .reservations-filters .btn-group { flex-wrap: nowrap; flex-shrink: 0; }
+    .reservations-filters .btn-group > .btn { white-space: nowrap; }
     .reservations-filters .date-selects { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
     .reservations-filters .date-sel { display: inline-flex; align-items: center; gap: 8px; }
     .reservations-filters .date-sel .seglabel { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--exp-muted); font-weight: 600; }
