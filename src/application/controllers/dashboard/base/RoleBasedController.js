@@ -193,6 +193,19 @@ class RoleBasedController extends DashboardController {
             role: parseUser.get('role') || basicUserData.role,
             organizationId: parseUser.get('organizationId'),
           };
+
+          // La URL de foto guardada en `profilePicture` es presignada y expira (→ 403).
+          // Se regenera fresca desde el S3 key estable, igual que apiController.getUserProfile.
+          const profilePictureS3Key = parseUser.get('profilePictureS3Key');
+          if (profilePictureS3Key) {
+            try {
+              const FileStorageService = require('../../../services/FileStorageService');
+              const fileStorageService = new FileStorageService();
+              fullUserData.profilePicture = await fileStorageService.getPresignedUrl(profilePictureS3Key);
+            } catch (imgError) {
+              // Si falla, se conserva la URL guardada (el front cae a iniciales si da 403).
+            }
+          }
         } else {
           // User not found in either table, will use basic user data
         }
