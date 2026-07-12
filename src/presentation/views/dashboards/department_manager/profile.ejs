@@ -192,14 +192,14 @@ const formatRoleName = (role) => {
 
       <!-- 03 · Perfiles de Facturación -->
       <div class="profile-section">
-        <div class="section-head">
+        <div class="section-head section-head--left">
           <span class="section-num">03</span>
-          <span class="rule"></span>
           <span class="section-title">Perfiles de Facturación</span>
-          <span class="rule"></span>
         </div>
+        <p class="section-subtitle mb-4">Administra tus perfiles de facturación para diferentes entidades fiscales.</p>
         <%- include('../../organisms/billing/billing-profiles-section', {
-          userRole: typeof userRole !== 'undefined' ? userRole : 'department_manager'
+          userRole: typeof userRole !== 'undefined' ? userRole : 'department_manager',
+          showHeader: false
         }) %>
       </div>
     </div>
