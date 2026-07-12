@@ -103,6 +103,20 @@ const billingShowHeader = typeof showHeader !== 'undefined' ? showHeader : true;
 .bp-btn.del:hover { border-color:#b45c5c; background:#f7ecec; }
 .bp-new-btn { width:100%; border:1px dashed var(--bp-line); background:transparent; color:var(--bp-muted); border-radius:10px; padding:16px; font-size:.85rem; font-weight:600; text-transform:uppercase; letter-spacing:.14em; cursor:pointer; transition:border-color .15s ease, color .15s ease; }
 .bp-new-btn:hover { border-color:var(--bp-olive); color:var(--bp-olive-d); }
+
+/* ===== Modal Nuevo/Editar Perfil (look editorial olivo) ===== */
+#billingProfileModal .modal-content { border: 1px solid #ded9cb; border-radius: 12px; overflow: hidden; }
+#billingProfileModal .modal-header { background: #6E7A50 !important; border: none; }
+#billingProfileModal .modal-title { letter-spacing: .05em; }
+#billingProfileModal .modal-body h6 { color: #566040 !important; text-transform: uppercase; letter-spacing: .1em; font-size: .8rem; }
+#billingProfileModal .modal-body .bg-light { background: #faf9f4 !important; border: 1px solid #e7e3d8; }
+#billingProfileModal .border-success, #billingProfileModal .border-info { border-color: #e7e3d8 !important; }
+#billingProfileModal .form-label { font-weight: 600; font-size: .82rem; color: #4a4a42; }
+#billingProfileModal .form-control:focus,
+#billingProfileModal .form-select:focus { border-color: #6E7A50; box-shadow: 0 0 0 .2rem rgba(110, 122, 80, .15); }
+#billingProfileModal .form-check-input:checked { background-color: #6E7A50; border-color: #6E7A50; }
+#billingProfileModal .btn-primary { background: #6E7A50; border-color: #6E7A50; }
+#billingProfileModal .btn-primary:hover { background: #566040; border-color: #566040; }
 </style>
 
 <!-- Billing Profiles Section -->
@@ -190,7 +204,7 @@ const billingShowHeader = typeof showHeader !== 'undefined' ? showHeader : true;
 
                     <!-- Datos Fiscales Mexico -->
                     <div class="billing-mx-fields mb-4">
-                        <div class="p-3 border rounded border-success" style="border-left: 4px solid #059669 !important;">
+                        <div class="p-3 border rounded" style="border-left: 4px solid #6E7A50 !important;">
                             <h6 class="fw-bold text-success mb-3"><i class="ti ti-building me-2"></i>Datos Fiscales (Mexico)</h6>
                             <div class="row g-3">
                                 <div class="col-md-6">
@@ -254,7 +268,7 @@ const billingShowHeader = typeof showHeader !== 'undefined' ? showHeader : true;
 
                     <!-- Datos Fiscales Internacional -->
                     <div class="billing-intl-fields mb-4">
-                        <div class="p-3 border rounded border-info" style="border-left: 4px solid #0891b2 !important;">
+                        <div class="p-3 border rounded" style="border-left: 4px solid #6E7A50 !important;">
                             <h6 class="fw-bold text-info mb-3"><i class="ti ti-world me-2"></i>Datos Fiscales (Internacional)</h6>
                             <div class="row g-3">
                                 <div class="col-md-6">
@@ -384,8 +398,8 @@ const billingShowHeader = typeof showHeader !== 'undefined' ? showHeader : true;
 
                     <!-- Constancia de Situacion Fiscal (Mexico) -->
                     <div class="billing-constancia-section mb-4">
-                        <div class="p-3 border rounded" style="border-left: 4px solid #f59e0b !important;">
-                            <h6 class="fw-bold mb-3" style="color: #d97706;"><i class="ti ti-certificate me-2"></i>Constancia de Situacion Fiscal</h6>
+                        <div class="p-3 border rounded" style="border-left: 4px solid #6E7A50 !important;">
+                            <h6 class="fw-bold mb-3"><i class="ti ti-certificate me-2"></i>Constancia de Situacion Fiscal</h6>
                             <div id="bp_constanciaInfo" style="display:none;" class="billing-constancia-info mb-3"></div>
                             <div>
                                 <label for="bp_constanciaFile" class="form-label small text-muted">Subir constancia (solo PDF)</label>
