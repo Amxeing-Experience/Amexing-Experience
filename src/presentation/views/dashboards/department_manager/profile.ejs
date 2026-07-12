@@ -97,6 +97,13 @@ const formatRoleName = (role) => {
   @media (max-width: 991.98px) {
     .profile-wrap .profile-aside { margin-bottom: 22px; }
   }
+
+  /* Modal Cambiar Contraseña (olivo) */
+  #changePasswordModal .modal-header { background: #6E7A50; color: #fff; border: none; }
+  #changePasswordModal .modal-title { letter-spacing: .04em; }
+  #changePasswordModal .form-control:focus { border-color: #6E7A50; box-shadow: 0 0 0 .2rem rgba(110, 122, 80, .15); }
+  #changePasswordModal .btn-olive { background: #6E7A50; border: 1px solid #6E7A50; color: #fff; font-weight: 600; }
+  #changePasswordModal .btn-olive:hover { background: #566040; border-color: #566040; color: #fff; }
 </style>
 
 <!-- Page Header -->
@@ -206,12 +213,118 @@ const formatRoleName = (role) => {
   </div>
 </div>
 
+<!-- Modal: Cambiar Contraseña -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="changePasswordModalLabel"><i class="ti ti-key me-2"></i>Cambiar Contraseña</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="cpAlert" class="alert d-none" role="alert"></div>
+        <form id="changePasswordForm" novalidate>
+          <div class="mb-3">
+            <label class="form-label" for="cpCurrent">Contraseña actual</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="cpCurrent" autocomplete="current-password" required>
+              <button class="btn btn-outline-secondary" type="button" data-cp-toggle="cpCurrent"><i class="ti ti-eye"></i></button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="cpNew">Nueva contraseña</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="cpNew" autocomplete="new-password" minlength="8" required>
+              <button class="btn btn-outline-secondary" type="button" data-cp-toggle="cpNew"><i class="ti ti-eye"></i></button>
+            </div>
+            <div class="form-text">Mínimo 8 caracteres, con mayúscula, minúscula, número y carácter especial.</div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="cpConfirm">Confirmar nueva contraseña</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="cpConfirm" autocomplete="new-password" required>
+              <button class="btn btn-outline-secondary" type="button" data-cp-toggle="cpConfirm"><i class="ti ti-eye"></i></button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-olive" id="cpSubmit"><i class="ti ti-lock me-1"></i>Cambiar Contraseña</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const changePasswordBtn = document.getElementById('change-password-btn');
+  const cpModalEl = document.getElementById('changePasswordModal');
+  const cpModal = (cpModalEl && window.bootstrap) ? new bootstrap.Modal(cpModalEl) : null;
+
+  // El botón abre el modal (mejor UX que navegar a otra página). Fallback: la página.
   if (changePasswordBtn) {
     changePasswordBtn.addEventListener('click', function() {
-      window.location.href = '/dashboard/<%= profileData.role %>/change-password';
+      if (cpModal) { cpModal.show(); }
+      else { window.location.href = '/dashboard/<%= profileData.role %>/change-password'; }
+    });
+  }
+
+  // Mostrar/ocultar contraseña
+  document.querySelectorAll('[data-cp-toggle]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const f = document.getElementById(this.getAttribute('data-cp-toggle'));
+      const icon = this.querySelector('i');
+      if (!f) return;
+      if (f.type === 'password') { f.type = 'text'; if (icon) icon.className = 'ti ti-eye-off'; }
+      else { f.type = 'password'; if (icon) icon.className = 'ti ti-eye'; }
+    });
+  });
+
+  const cpAlert = document.getElementById('cpAlert');
+  function cpShow(msg, type) { cpAlert.className = 'alert alert-' + type; cpAlert.textContent = msg; }
+  function cpHide() { cpAlert.className = 'alert d-none'; }
+
+  const cpSubmit = document.getElementById('cpSubmit');
+  if (cpSubmit) {
+    cpSubmit.addEventListener('click', async function() {
+      cpHide();
+      const cur = document.getElementById('cpCurrent').value;
+      const nw = document.getElementById('cpNew').value;
+      const cf = document.getElementById('cpConfirm').value;
+      if (!cur || !nw || !cf) { cpShow('Completa todos los campos.', 'danger'); return; }
+      if (nw !== cf) { cpShow('Las contraseñas nuevas no coinciden.', 'danger'); return; }
+      if (nw.length < 8) { cpShow('La nueva contraseña debe tener al menos 8 caracteres.', 'danger'); return; }
+      if (cur === nw) { cpShow('La nueva contraseña debe ser distinta de la actual.', 'danger'); return; }
+
+      const csrf = document.querySelector('meta[name="csrf-token"]');
+      const csrfToken = csrf ? csrf.getAttribute('content') : '';
+      cpSubmit.disabled = true;
+      const orig = cpSubmit.innerHTML;
+      cpSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Cambiando...';
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers['x-csrf-token'] = csrfToken;
+        const resp = await fetch('/auth/change-password', {
+          method: 'POST',
+          headers: headers,
+          credentials: 'include',
+          body: JSON.stringify({ currentPassword: cur, newPassword: nw, confirmPassword: cf })
+        });
+        const result = await resp.json().catch(function() { return {}; });
+        if (resp.ok && result.success) {
+          cpShow('¡Contraseña actualizada!', 'success');
+          document.getElementById('changePasswordForm').reset();
+          setTimeout(function() { if (cpModal) cpModal.hide(); }, 1200);
+        } else {
+          throw new Error(result.error || 'No se pudo cambiar la contraseña.');
+        }
+      } catch (err) {
+        cpShow(err.message || 'Ocurrió un error. Intenta de nuevo.', 'danger');
+      } finally {
+        cpSubmit.disabled = false;
+        cpSubmit.innerHTML = orig;
+      }
     });
   }
 });
