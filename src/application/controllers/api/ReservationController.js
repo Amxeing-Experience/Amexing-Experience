@@ -284,9 +284,10 @@ class ReservationController {
        *   applyDateConstraints(query, 'ongoing', today, 2026, 5, null);
        */
       const applyDateConstraints = (q, filter, today, yearVal, monthVal, dayVal) => {
-        // 'pending_completion' no es un filtro por fecha sino por estado de cotización
-        // (hold) → no aplica ninguna restricción de fecha/periodo.
+        // 'pending_completion' (estado de cotización hold) y 'cancelled' (estado de la
+        // reservación) no son filtros por fecha → no aplican restricción de periodo.
         if (filter === 'pending_completion') return;
+        if (filter === 'cancelled') return;
         /**
          * Return the later of two dates, treating a falsy value as unbounded.
          * @param {Date|null} a - First date, or null if unbounded.
@@ -356,6 +357,23 @@ class ReservationController {
         if (startLt) q.lessThan('startDate', startLt);
         if (endGte) q.greaterThanOrEqualTo('endDate', endGte);
         if (endLt) q.lessThan('endDate', endLt);
+      };
+
+      /**
+       * Visibilidad de reservaciones canceladas: viven SOLO en el filtro 'cancelled'.
+       * - dateFilter === 'cancelled' → solo status = 'cancelled'.
+       * - cualquier otro filtro (sin statusFilter explícito) → se excluyen las canceladas.
+       * @param {Parse.Query} q - Query de Reservation a restringir.
+       * @returns {void}
+       * @example
+       *   applyCancelledVisibility(query);
+       */
+      const applyCancelledVisibility = (q) => {
+        if (dateFilter === 'cancelled') {
+          q.equalTo('status', 'cancelled');
+        } else if (!statusFilter) {
+          q.notEqualTo('status', 'cancelled');
+        }
       };
 
       /**
@@ -465,6 +483,7 @@ class ReservationController {
       // Apply the same combined date constraints to the total count
       applyDateConstraints(totalQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
       applyQuoteConstraint(totalQuery, clientTypeFilter, clientIdFilter, holdMode);
+      applyCancelledVisibility(totalQuery);
 
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
@@ -477,6 +496,8 @@ class ReservationController {
         pendingCountQuery.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
       }
       applyQuoteConstraint(pendingCountQuery, clientTypeFilter, clientIdFilter, 'only');
+      // El badge de pendientes siempre excluye canceladas (viven solo en su propio filtro).
+      pendingCountQuery.notEqualTo('status', 'cancelled');
       const pendingCompletionCount = await pendingCountQuery.count({ useMasterKey: true });
 
       // Apply search filter
@@ -532,6 +553,7 @@ class ReservationController {
         if (statusFilter) {
           compoundQuery.equalTo('status', statusFilter);
         }
+        applyCancelledVisibility(compoundQuery);
 
         // Sort
         if (orderDir === 'descending') {
@@ -569,6 +591,7 @@ class ReservationController {
       if (statusFilter) {
         query.equalTo('status', statusFilter);
       }
+      applyCancelledVisibility(query);
 
       // Count filtered
       const countQuery = new Parse.Query('Reservation');
@@ -580,6 +603,7 @@ class ReservationController {
       if (statusFilter) {
         countQuery.equalTo('status', statusFilter);
       }
+      applyCancelledVisibility(countQuery);
 
       // Apply the same combined date constraints to the count query
       applyDateConstraints(countQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
