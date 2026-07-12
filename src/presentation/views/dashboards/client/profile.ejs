@@ -1,7 +1,7 @@
 <%
 /**
- * Employee Profile View
- * Displays the employee's personal information and settings
+ * Client Profile View
+ * Displays the client's personal information, settings and (read-only) billing profiles.
  * Created by Denisse Maldonado
  */
 
@@ -16,15 +16,16 @@ const profileData = {
   firstName: user.firstName || '',
   lastName: user.lastName || '',
   fullName: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A',
-  joinedDate: (user.createdAt || user.created_at || user._created_at) ? 
-    new Date(user.createdAt || user.created_at || user._created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 
+  joinedDate: (user.createdAt || user.created_at || user._created_at) ?
+    new Date(user.createdAt || user.created_at || user._created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) :
     '1 ene 2024',
   lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Sin registro',
   emailVerified: user.emailVerified || false,
   active: user.active !== undefined ? user.active : true,
   profilePicture: user.profilePicture || user.avatar || '',
-  role: user.role || 'employee',
-  organizationId: user.organizationId || ''
+  role: user.role || 'client',
+  organizationId: user.organizationId || '',
+  phone: user.phone || ''
 };
 
 // Generate initials for avatar placeholder
@@ -39,126 +40,360 @@ const formatRoleName = (role) => {
   if (role === 'department_manager') return 'Department Manager';
   if (role === 'superadmin') return 'Super Admin';
   if (role === 'employee_amexing') return 'Amexing Employee';
+  if (role === 'client') return 'Cliente';
   return role.charAt(0).toUpperCase() + role.slice(1);
 };
 %>
 
+<style>
+  /* ===== Perfil editorial (sin card blanca pesada) ===== */
+  .profile-wrap { --olive: #6E7A50; --olive-d: #566040; --line: #ded9cb; --panel: #faf9f4; --panel-2: #fbfaf6; --ink: #2b2b2b; --muted: #8a8f78; }
+
+  /* Encabezado */
+  .profile-wrap .profile-eyebrow { text-transform: uppercase; letter-spacing: .34em; font-size: .7rem; color: var(--olive); font-weight: 600; margin-bottom: 2px; }
+  .profile-wrap .profile-title { font-weight: 400; letter-spacing: .1em; font-size: 2rem; color: var(--ink); margin: 0; }
+
+  /* Aside (tarjeta de identidad) */
+  .profile-wrap .profile-aside { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 22px 20px; text-align: center; }
+  .profile-wrap #profileImage,
+  .profile-wrap #avatar-placeholder { border-radius: 12px !important; width: 108px !important; height: 108px !important; font-size: 1.7rem !important; }
+  .profile-wrap #avatar-placeholder { background: var(--olive) !important; }
+  .profile-wrap .profile-name { font-size: 1.05rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 14px 0 8px; }
+  .profile-wrap .profile-role { display: inline-flex; align-items: center; gap: 5px; background: #eef0e6; color: var(--olive-d); border: 1px solid var(--line); border-radius: 999px; padding: .22rem .8rem; font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+  .profile-wrap .aside-contact { text-align: left; margin-top: 18px; }
+  .profile-wrap .aside-contact .item { display: flex; align-items: center; gap: 10px; color: var(--ink); font-size: .84rem; font-style: italic; padding: 5px 0; }
+  .profile-wrap .aside-contact .item i { color: var(--olive); font-size: 1rem; width: 18px; text-align: center; flex-shrink: 0; font-style: normal; }
+  .profile-wrap .aside-divider { border-top: 1px solid var(--line); margin: 16px 0; }
+  .profile-wrap .aside-stat { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; }
+  .profile-wrap .aside-stat .k { text-transform: uppercase; letter-spacing: .08em; font-size: .64rem; color: var(--muted); font-weight: 600; }
+  .profile-wrap .aside-stat .v { font-size: .82rem; color: var(--ink); font-style: italic; }
+  .profile-wrap .estado-badge { display: inline-flex; align-items: center; gap: 5px; background: #eef0e6; color: var(--olive-d); border: 1px solid var(--line); border-radius: 6px; padding: .12rem .5rem; font-size: .66rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; font-style: normal; }
+  .profile-wrap .estado-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--olive); }
+  .profile-wrap .estado-badge.off { color: #a15b5b; } .profile-wrap .estado-badge.off .dot { background: #b45c5c; }
+  .profile-wrap .aside-pass { margin-top: 6px; }
+  .profile-wrap .aside-pass .k { text-transform: uppercase; letter-spacing: .08em; font-size: .64rem; color: var(--muted); font-weight: 600; display: block; margin-bottom: 8px; }
+  .profile-wrap .btn-pass { width: 100%; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 8px; padding: .7rem; font-size: .82rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; transition: background .15s ease, border-color .15s ease; }
+  .profile-wrap .btn-pass:hover { border-color: var(--olive); background: #eef0e6; color: var(--olive-d); }
+
+  /* Secciones numeradas */
+  .profile-wrap .profile-section { border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 22px 26px 16px; margin-bottom: 22px; }
+  .profile-wrap .section-head { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+  .profile-wrap .section-num { color: var(--olive); font-weight: 700; letter-spacing: .18em; font-size: .95rem; flex-shrink: 0; }
+  .profile-wrap .section-head .rule { flex: 1; height: 1px; background: var(--line); }
+  .profile-wrap .section-title { text-transform: uppercase; letter-spacing: .26em; font-size: .92rem; color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .profile-wrap .section-subtitle { color: var(--muted); font-style: italic; font-size: .9rem; margin: -10px 0 0; }
+  .profile-wrap .field { margin-bottom: 20px; }
+  .profile-wrap .field label { text-transform: uppercase; letter-spacing: .09em; font-size: .64rem; color: var(--muted); font-weight: 600; display: block; margin-bottom: 5px; }
+  .profile-wrap .field .val { color: var(--ink); font-size: .96rem; }
+
+  /* Botón editar por sección */
+  .profile-wrap .section-actions { display: flex; justify-content: flex-end; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 16px; }
+  .profile-wrap .btn-editorial { display: inline-flex; align-items: center; gap: 9px; border: 1px solid var(--line); background: #fff; color: var(--olive-d); border-radius: 8px; padding: .55rem 1.2rem; font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+  .profile-wrap .btn-editorial:hover { border-color: var(--olive); background: #eef0e6; }
+
+  @media (max-width: 991.98px) {
+    .profile-wrap .profile-aside { margin-bottom: 22px; }
+  }
+
+  /* Modales del perfil (olivo) */
+  #changePasswordModal .modal-header, #editInfoModal .modal-header { background: #6E7A50; color: #fff; border: none; }
+  #changePasswordModal .modal-title, #changePasswordModal .modal-title i,
+  #editInfoModal .modal-title, #editInfoModal .modal-title i { color: #fff !important; letter-spacing: .04em; }
+  #changePasswordModal .form-control:focus, #editInfoModal .form-control:focus { border-color: #6E7A50; box-shadow: 0 0 0 .2rem rgba(110, 122, 80, .15); }
+  #changePasswordModal .btn-olive, #editInfoModal .btn-olive { background: #6E7A50; border: 1px solid #6E7A50; color: #fff; font-weight: 600; }
+  #changePasswordModal .btn-olive:hover, #editInfoModal .btn-olive:hover { background: #566040; border-color: #566040; color: #fff; }
+</style>
+
 <!-- Page Header -->
-<div class="page-breadcrumb">
-  <div class="row align-items-center">
-    <div class="col-12">
-      <nav aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0 d-flex align-items-center">
-          <li class="breadcrumb-item">
-            <a href="/dashboard/admin" class="link">
-              <i class="ti ti-home fs-6"></i>
-            </a>
-          </li>
-          <li class="breadcrumb-item active" aria-current="page">My Profile</li>
-        </ol>
-      </nav>
-      <h1 class="mb-0 fw-bold">My Profile</h1>
-    </div>
+<div class="container-fluid profile-wrap">
+  <div class="mb-4">
+    <div class="profile-eyebrow">Cuenta</div>
+    <h1 class="profile-title">Mi Perfil</h1>
   </div>
-</div>
 
-<!-- Profile Content -->
-<div class="container-fluid">
-  <div class="row justify-content-center">
-    <div class="col-12 col-lg-10">
-      <div class="card">
-        <div class="card-body">
-          <div class="row">
-            <!-- Profile Picture & Basic Info -->
-            <div class="col-lg-4 text-center mb-4 mb-lg-0">
-              <!-- Profile Image Upload Component -->
-              <%- include('../../organisms/profile/profile-image-upload', { profileData, initials }) %>
+  <div class="row g-4">
+    <!-- Aside: identidad -->
+    <div class="col-12 col-lg-3">
+      <div class="profile-aside">
+        <!-- Profile Image Upload Component -->
+        <%- include('../../organisms/profile/profile-image-upload', { profileData, initials }) %>
 
-              <!-- Basic Info -->
-              <h3 class="mb-2"><%= profileData.fullName %></h3>
-              <p class="text-muted mb-2">
-                <span class="badge bg-light-primary text-primary">
-                  <%= formatRoleName(profileData.role) %>
-                </span>
-              </p>
-              <p class="text-muted mb-0">
-                <i class="ti ti-mail me-1"></i>
-                <%= profileData.email %>
-              </p>
-            </div>
+        <div class="profile-name"><%= profileData.fullName %></div>
+        <span class="profile-role"><i class="ti ti-user"></i><%= formatRoleName(profileData.role) %></span>
 
-            <!-- Personal Information -->
-            <div class="col-lg-8">
-              <h5 class="mb-4">Personal Information</h5>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">First Name</label>
-                  <p class="fw-semibold mb-0"><%= profileData.firstName || 'Not provided' %></p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Last Name</label>
-                  <p class="fw-semibold mb-0"><%= profileData.lastName || 'Not provided' %></p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Email Address</label>
-                  <p class="fw-semibold mb-0">
-                    <%= profileData.email || 'Not provided' %>
-                  </p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Account Status</label>
-                  <p class="fw-semibold mb-0">
-                    <% if (profileData.active) { %>
-                      <span class="badge bg-success">Active</span>
-                    <% } else { %>
-                      <span class="badge bg-danger">Inactive</span>
-                    <% } %>
-                  </p>
-                </div>
-                <div class="col-12 mb-3">
-                  <label class="text-muted small">Password</label>
-                  <p class="fw-semibold mb-0">
-                    <button class="btn btn-sm btn-outline-primary ms-2" id="change-password-btn">
-                      Change
-                    </button>
-                  </p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Member Since</label>
-                  <p class="fw-semibold mb-0"><%= profileData.joinedDate %></p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Last login</label>
-                  <p class="fw-semibold mb-0"><%= profileData.lastLoginAt %></p>
-                </div>
-              </div>
-            </div>
-          </div>
+        <!-- Contacto -->
+        <div class="aside-contact">
+          <div class="item"><i class="ti ti-mail"></i><span><%= profileData.email || 'Sin registro' %></span></div>
+          <div class="item"><i class="ti ti-phone"></i><span><%= profileData.phone || 'Sin registro' %></span></div>
+          <div class="item"><i class="ti ti-clock"></i><span>Miembro desde <%= profileData.joinedDate %></span></div>
         </div>
+
+        <div class="aside-divider"></div>
+
+        <div class="aside-stat">
+          <span class="k">Estado</span>
+          <% if (profileData.active) { %>
+            <span class="estado-badge"><span class="dot"></span>Activo</span>
+          <% } else { %>
+            <span class="estado-badge off"><span class="dot"></span>Inactivo</span>
+          <% } %>
+        </div>
+        <div class="aside-stat">
+          <span class="k">Último acceso</span>
+          <span class="v"><%= profileData.lastLoginAt %></span>
+        </div>
+
+        <div class="aside-divider"></div>
+
+        <div class="aside-pass text-start">
+          <span class="k">Contraseña</span>
+          <button class="btn-pass" id="change-password-btn">
+            <i class="ti ti-key me-1"></i>Cambiar Contraseña
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main: secciones -->
+    <div class="col-12 col-lg-9">
+      <!-- 01 · Información Personal -->
+      <div class="profile-section">
+        <div class="section-head">
+          <span class="section-num">01</span>
+          <span class="rule"></span>
+          <span class="section-title">Información Personal</span>
+          <span class="rule"></span>
+        </div>
+        <div class="row">
+          <div class="col-md-6 field"><label>Nombre</label><div class="val"><%= profileData.firstName || 'Sin registro' %></div></div>
+          <div class="col-md-6 field"><label>Apellido</label><div class="val"><%= profileData.lastName || 'Sin registro' %></div></div>
+          <div class="col-md-6 field"><label>Teléfono</label><div class="val"><%= profileData.phone || 'Sin registro' %></div></div>
+          <div class="col-md-6 field"><label>Email</label><div class="val"><%= profileData.email || 'Sin registro' %></div></div>
+        </div>
+        <div class="section-actions">
+          <button type="button" class="btn-editorial" id="editPersonalBtn"><i class="ti ti-pencil"></i>Editar Información</button>
+        </div>
+      </div>
+
+      <!-- 02 · Perfiles de Facturación (solo lectura) -->
+      <div class="profile-section">
+        <div class="section-head section-head--left">
+          <span class="section-num">02</span>
+          <span class="section-title">Perfiles de Facturación</span>
+        </div>
+        <p class="section-subtitle mb-4">Perfiles de facturación asociados a tu cuenta (solo lectura).</p>
+        <%- include('../../organisms/billing/billing-profiles-section', {
+          userRole: typeof userRole !== 'undefined' ? userRole : 'client',
+          readOnly: true,
+          targetUserId: dashboardClientId,
+          showHeader: false
+        }) %>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Billing Profiles Section (Read-Only for Client) -->
-<div class="container-fluid">
-  <div class="row justify-content-center mt-4">
-    <div class="col-12 col-lg-10">
-        <%- include('../../organisms/billing/billing-profiles-section', {
-            userRole: typeof userRole !== 'undefined' ? userRole : 'client',
-            readOnly: true,
-            targetUserId: dashboardClientId
-        }) %>
+<!-- Modal: Editar Información -->
+<div class="modal fade" id="editInfoModal" tabindex="-1" aria-labelledby="editInfoModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editInfoModalLabel"><i class="ti ti-pencil me-2"></i>Editar Información</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="epAlert" class="alert d-none" role="alert"></div>
+        <form id="editInfoForm" novalidate>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="epFirstName">Nombre</label>
+              <input type="text" class="form-control" id="epFirstName" value="<%= profileData.firstName %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="epLastName">Apellido</label>
+              <input type="text" class="form-control" id="epLastName" value="<%= profileData.lastName %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="epPhone">Teléfono</label>
+              <input type="text" class="form-control" id="epPhone" value="<%= profileData.phone %>">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label" for="epEmail">Email</label>
+              <input type="email" class="form-control" id="epEmail" value="<%= profileData.email %>" readonly disabled>
+              <div class="form-text">El email no se puede cambiar aquí.</div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-olive" id="epSubmit"><i class="ti ti-check me-1"></i>Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cambiar Contraseña -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="changePasswordModalLabel"><i class="ti ti-key me-2"></i>Cambiar Contraseña</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="cpAlert" class="alert d-none" role="alert"></div>
+        <form id="changePasswordForm" novalidate>
+          <div class="mb-3">
+            <label class="form-label" for="cpCurrent">Contraseña actual</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="cpCurrent" autocomplete="current-password" required>
+              <button class="btn btn-outline-secondary" type="button" data-cp-toggle="cpCurrent"><i class="ti ti-eye"></i></button>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="cpNew">Nueva contraseña</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="cpNew" autocomplete="new-password" minlength="8" required>
+              <button class="btn btn-outline-secondary" type="button" data-cp-toggle="cpNew"><i class="ti ti-eye"></i></button>
+            </div>
+            <div class="form-text">Mínimo 8 caracteres, con mayúscula, minúscula, número y carácter especial.</div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label" for="cpConfirm">Confirmar nueva contraseña</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="cpConfirm" autocomplete="new-password" required>
+              <button class="btn btn-outline-secondary" type="button" data-cp-toggle="cpConfirm"><i class="ti ti-eye"></i></button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-olive" id="cpSubmit"><i class="ti ti-lock me-1"></i>Cambiar Contraseña</button>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // JWT para /api (mismo criterio que el billing): storage → cookie.
+  function getAuthToken() {
+    let t = localStorage.getItem('accessToken') || localStorage.getItem('authToken') ||
+            localStorage.getItem('token') || sessionStorage.getItem('accessToken') ||
+            sessionStorage.getItem('authToken');
+    if (t && t !== 'undefined' && t !== 'null') return t;
+    const m = document.cookie.match(/accessToken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  // ===== Editar Información =====
+  const editBtn = document.getElementById('editPersonalBtn');
+  const editModalEl = document.getElementById('editInfoModal');
+  const editModal = (editModalEl && window.bootstrap) ? new bootstrap.Modal(editModalEl) : null;
+  if (editBtn && editModal) {
+    editBtn.addEventListener('click', function() { editModal.show(); });
+  }
+  const epAlert = document.getElementById('epAlert');
+  function epShow(msg, type) { epAlert.className = 'alert alert-' + type; epAlert.textContent = msg; }
+  const epSubmit = document.getElementById('epSubmit');
+  if (epSubmit) {
+    epSubmit.addEventListener('click', async function() {
+      epAlert.className = 'alert d-none';
+      const firstName = document.getElementById('epFirstName').value.trim();
+      const lastName = document.getElementById('epLastName').value.trim();
+      const phone = document.getElementById('epPhone').value.trim();
+      if (!firstName || !lastName) { epShow('Nombre y apellido son obligatorios.', 'danger'); return; }
+      epSubmit.disabled = true;
+      const orig = epSubmit.innerHTML;
+      epSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando...';
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = getAuthToken();
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        const resp = await fetch('/api/users/me/profile', {
+          method: 'PUT',
+          headers: headers,
+          credentials: 'include',
+          body: JSON.stringify({ firstName: firstName, lastName: lastName, phone: phone })
+        });
+        const result = await resp.json().catch(function() { return {}; });
+        if (resp.ok && result.success !== false) {
+          epShow('¡Datos actualizados!', 'success');
+          setTimeout(function() { window.location.reload(); }, 900);
+        } else {
+          throw new Error(result.error || result.message || 'No se pudo actualizar.');
+        }
+      } catch (err) {
+        epShow(err.message || 'Ocurrió un error. Intenta de nuevo.', 'danger');
+      } finally {
+        epSubmit.disabled = false;
+        epSubmit.innerHTML = orig;
+      }
+    });
+  }
+
+  // ===== Cambiar Contraseña =====
   const changePasswordBtn = document.getElementById('change-password-btn');
+  const cpModalEl = document.getElementById('changePasswordModal');
+  const cpModal = (cpModalEl && window.bootstrap) ? new bootstrap.Modal(cpModalEl) : null;
   if (changePasswordBtn) {
     changePasswordBtn.addEventListener('click', function() {
-      window.location.href = '/dashboard/<%= profileData.role %>/change-password';
+      if (cpModal) { cpModal.show(); }
+      else { window.location.href = '/dashboard/<%= profileData.role %>/change-password'; }
+    });
+  }
+  document.querySelectorAll('[data-cp-toggle]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const f = document.getElementById(this.getAttribute('data-cp-toggle'));
+      const icon = this.querySelector('i');
+      if (!f) return;
+      if (f.type === 'password') { f.type = 'text'; if (icon) icon.className = 'ti ti-eye-off'; }
+      else { f.type = 'password'; if (icon) icon.className = 'ti ti-eye'; }
+    });
+  });
+  const cpAlert = document.getElementById('cpAlert');
+  function cpShow(msg, type) { cpAlert.className = 'alert alert-' + type; cpAlert.textContent = msg; }
+  const cpSubmit = document.getElementById('cpSubmit');
+  if (cpSubmit) {
+    cpSubmit.addEventListener('click', async function() {
+      cpAlert.className = 'alert d-none';
+      const cur = document.getElementById('cpCurrent').value;
+      const nw = document.getElementById('cpNew').value;
+      const cf = document.getElementById('cpConfirm').value;
+      if (!cur || !nw || !cf) { cpShow('Completa todos los campos.', 'danger'); return; }
+      if (nw !== cf) { cpShow('Las contraseñas nuevas no coinciden.', 'danger'); return; }
+      if (nw.length < 8) { cpShow('La nueva contraseña debe tener al menos 8 caracteres.', 'danger'); return; }
+      if (cur === nw) { cpShow('La nueva contraseña debe ser distinta de la actual.', 'danger'); return; }
+      const csrf = document.querySelector('meta[name="csrf-token"]');
+      const csrfToken = csrf ? csrf.getAttribute('content') : '';
+      cpSubmit.disabled = true;
+      const orig = cpSubmit.innerHTML;
+      cpSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Cambiando...';
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (csrfToken) headers['x-csrf-token'] = csrfToken;
+        const resp = await fetch('/auth/change-password', {
+          method: 'POST',
+          headers: headers,
+          credentials: 'include',
+          body: JSON.stringify({ currentPassword: cur, newPassword: nw, confirmPassword: cf })
+        });
+        const result = await resp.json().catch(function() { return {}; });
+        if (resp.ok && result.success) {
+          cpShow('¡Contraseña actualizada!', 'success');
+          document.getElementById('changePasswordForm').reset();
+          setTimeout(function() { if (cpModal) cpModal.hide(); }, 1200);
+        } else {
+          throw new Error(result.error || 'No se pudo cambiar la contraseña.');
+        }
+      } catch (err) {
+        cpShow(err.message || 'Ocurrió un error. Intenta de nuevo.', 'danger');
+      } finally {
+        cpSubmit.disabled = false;
+        cpSubmit.innerHTML = orig;
+      }
     });
   }
 });
