@@ -9,6 +9,22 @@ const E = __isRes ? 'Reservación' : 'Cotización';
 const e = __isRes ? 'reservación' : 'cotización';
 %>
 
+<style>
+  /* Cliente Final unificado con Lead Guest: se oculta la tarjeta de Cliente Final, pero
+     SIN cambiar su `display` (varios scripts derivan el "modo agencia" de la visibilidad
+     de #finalClientRow). Se colapsa a cero e invisible, conservando su display. */
+  #finalClientRow {
+    height: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-width: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+</style>
+
 <div class="card border-0 shadow-sm" id="quoteInformationCard">
     <!-- Page Loader -->
     <%- include('../../../atoms/common/page-loader', {
@@ -471,6 +487,15 @@ const e = __isRes ? 'reservación' : 'cotización';
                     </div>
                 </div>
                 <input type="hidden" id="numberOfPeople" name="numberOfPeople" value="0">
+
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <label for="lodging" class="form-label">Hospedaje durante su estadía</label>
+                        <input type="text" class="form-control" id="lodging" name="lodging"
+                               placeholder="Ej: Hotel Rosewood San Miguel de Allende">
+                        <div class="form-text">Hospedaje del huésped durante su estadía (opcional)</div>
+                    </div>
+                </div>
             </div>
 
             <!-- Sección: Notas Adicionales -->
@@ -1412,47 +1437,16 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
     syncLeadGuestNameUi();
     document.getElementById('clientId')?.addEventListener('change', syncLeadGuestNameUi);
 
-    // Resuelve el Cliente Final para el payload. { clientFinalId, clientFinalName }.
-    // Typed-new + "guardar como cliente" marcado → crea el cliente (y setea su id en el combobox).
+    // Cliente Final UNIFICADO con el Lead Guest: la tarjeta de Cliente Final está oculta y su
+    // valor deja de capturarse por separado — el nombre del Cliente Final = el del Lead Guest.
+    // Se conserva la firma { clientFinalId, clientFinalName } para no romper a los llamadores
+    // (payload de crear/editar). clientFinalId se limpia (unifica las cotizaciones al guardar);
+    // clientFinalName lleva el nombre del Lead Guest para que la tabla/vista pública lo muestren.
     async function resolveClientFinalForSave() {
-        const el = document.getElementById('clientFinalId');
-        const inst = el && el.customSelect;
-        if (!inst) return { clientFinalId: (el && el.value) || '', clientFinalName: '' };
-        const typed = inst.isTyped && inst.isTyped();
-        if (!typed) return { clientFinalId: inst.getValue() || '', clientFinalName: '' };
-        // Nombre = texto tecleado en el combobox; Apellido = su campo.
-        const firstName = ((inst.getTypedText && inst.getTypedText()) || '').trim();
-        const lastName = (document.getElementById('finalClientLastName')?.value || '').trim();
-        const fullName = `${firstName} ${lastName}`.trim() || firstName;
-        const saveCb = document.getElementById('saveFinalClientAsClient');
-        if (saveCb && saveCb.checked) {
-            if (firstName && lastName) {
-                const asAgency = leadGuestSavesAsAgencyClient();
-                const endpoint = asAgency ? '/api/owned-clients/admin-create-subclient' : '/api/owned-clients/quick';
-                const payload = asAgency
-                    ? { firstName, lastName, enterpriseId: document.getElementById('clientId')?.value || '' }
-                    : { firstName, lastName };
-                try {
-                    const resp = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: { 'Authorization': `Bearer ${getAccessToken()}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload),
-                    });
-                    const result = await resp.json();
-                    if (result && result.success && result.data) {
-                        inst.addOption({
-                            value: result.data.value, text: result.data.label,
-                            email: result.data.email || '', contactPerson: result.data.contactPerson || result.data.label,
-                            phone: result.data.phone || '', firstName, lastName,
-                        });
-                        inst.setValue(result.data.value);
-                        saveCb.checked = false;
-                        return { clientFinalId: result.data.value, clientFinalName: '' };
-                    }
-                } catch (err) { console.error('Error creando cliente final:', err); }
-            }
-        }
-        return { clientFinalId: '', clientFinalName: fullName };
+        const first = (document.getElementById('leadGuestFirstName')?.value || '').trim();
+        const last = (document.getElementById('leadGuestLastName')?.value || '').trim();
+        const clientFinalName = [first, last].filter(Boolean).join(' ');
+        return { clientFinalId: '', clientFinalName };
     }
     // Al marcar "El Lead Guest es el cliente final": el Lead Guest debe volverse el cliente final.
     // Si hay uno seleccionado y el Lead Guest actual DIFIERE, se confirma antes de reemplazar (si
@@ -3279,6 +3273,10 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
                     document.getElementById('notes').value = quote.notes;
                 }
 
+                if (quote.lodging) {
+                    document.getElementById('lodging').value = quote.lodging;
+                }
+
                 // Change button text to "Actualizar"
                 const submitBtn = document.getElementById('createQuoteBtn');
                 submitBtn.innerHTML = 'Siguiente <i class="ti ti-arrow-right ms-1"></i>';
@@ -3358,6 +3356,7 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             contactPhone: contactPhone || undefined,
             leadGuestFirstName: document.getElementById('leadGuestFirstName')?.value.trim() || undefined,
             leadGuestLastName: document.getElementById('leadGuestLastName')?.value.trim() || undefined,
+            lodging: document.getElementById('lodging').value.trim() || undefined,
             notes: document.getElementById('notes').value.trim() || undefined
         };
 
@@ -3503,6 +3502,7 @@ const Qe = window.__isReservation ? 'reservación' : 'cotización';
             contactPhone: contactPhone || undefined,
             leadGuestFirstName: document.getElementById('leadGuestFirstName')?.value.trim() || undefined,
             leadGuestLastName: document.getElementById('leadGuestLastName')?.value.trim() || undefined,
+            lodging: document.getElementById('lodging').value.trim() || undefined,
             notes: document.getElementById('notes').value.trim() || undefined
         };
 

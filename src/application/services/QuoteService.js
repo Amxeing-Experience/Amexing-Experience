@@ -324,6 +324,7 @@ class QuoteService {
         'leadGuestFirstName',
         'leadGuestLastName',
         'notes',
+        'lodging',
         'validUntil',
         'eventType',
         'clientFinalId',
@@ -1766,6 +1767,7 @@ class QuoteService {
     reservation.set('leadGuestFirstName', quote.get('leadGuestFirstName') || '');
     reservation.set('leadGuestLastName', quote.get('leadGuestLastName') || '');
     reservation.set('notes', quote.get('notes') || '');
+    reservation.set('lodging', quote.get('lodging') || '');
 
     // 2) Service-level fields (snapshot + totals + dates) — only when serviceItems
     // are provided (i.e. called from the service-items save).
@@ -2040,6 +2042,7 @@ class QuoteService {
       reservation.set('leadGuestFirstName', quote.get('leadGuestFirstName') || '');
       reservation.set('leadGuestLastName', quote.get('leadGuestLastName') || '');
       reservation.set('notes', quote.get('notes') || '');
+      reservation.set('lodging', quote.get('lodging') || '');
       reservation.set('serviceItemsSnapshot', serviceItems);
       reservation.set('active', true);
       reservation.set('exists', true);
