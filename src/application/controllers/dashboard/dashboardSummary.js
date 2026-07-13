@@ -17,6 +17,11 @@ const logger = require('../../../infrastructure/logger');
  */
 async function getDashboardSummary(req) {
   const role = req.userRole || req.user?.role || 'client';
+  // El middleware del dashboard (dashboardAuthMiddleware) setea req.user y res.locals.userRole,
+  // pero NO req.userRole. Los helpers de ReservationController (getRoleFilterPointers /
+  // getClientEligibleQuoteIds) leen req.userRole directamente, así que lo normalizamos aquí para
+  // que tomen la rama correcta del rol (si no, client caería al scope por clientPtr por defecto).
+  if (!req.userRole) req.userRole = role;
   const summary = {
     segments: { quoted: 0, hold: 0, scheduled: 0 },
     pendingPayments: [],
