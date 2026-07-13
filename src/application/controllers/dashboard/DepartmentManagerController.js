@@ -103,10 +103,15 @@ class DepartmentManagerController extends RoleBasedController {
       schedRes.matchesQuery('quotePtr', schedQuote);
       summary.segments.scheduled = await schedRes.count({ useMasterKey: true });
 
-      // PENDIENTES DE PAGO: paymentStatus pending/partial, saldo > 0 (top 5, más próximas).
+      // PENDIENTES DE PAGO: solo reservaciones CONFIRMADAS (cotización 'scheduled') y NO canceladas,
+      // con paymentStatus pending/partial y saldo > 0 (top 5, más próximas).
       const payRes = scopeReservation(new Parse.Query('Reservation'));
       payRes.containedIn('paymentStatus', ['pending', 'partial']);
       payRes.greaterThan('balance', 0);
+      payRes.notEqualTo('status', 'cancelled');
+      const payScheduledQuote = new Parse.Query('Quote');
+      payScheduledQuote.equalTo('status', 'scheduled');
+      payRes.matchesQuery('quotePtr', payScheduledQuote);
       payRes.ascending('startDate');
       payRes.limit(5);
       const rows = await payRes.find({ useMasterKey: true });
