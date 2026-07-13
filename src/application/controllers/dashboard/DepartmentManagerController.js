@@ -107,23 +107,18 @@ class DepartmentManagerController extends RoleBasedController {
       const payRes = scopeReservation(new Parse.Query('Reservation'));
       payRes.containedIn('paymentStatus', ['pending', 'partial']);
       payRes.greaterThan('balance', 0);
-      payRes.include('quotePtr');
-      payRes.include('quotePtr.client');
-      payRes.include('quotePtr.companyClientPtr');
-      payRes.include('clientPtr');
       payRes.ascending('startDate');
       payRes.limit(5);
       const rows = await payRes.find({ useMasterKey: true });
       summary.pendingPayments = rows.map((r) => {
-        let clientName = 'N/A';
-        try {
-          clientName = ReservationController.formatReservationRow(r, { totalCount: 0, assignedCount: 0 }).clientName || 'N/A';
-        } catch (e) { /* nombre por defecto */ }
+        // Cliente Final = contactPerson (o lead guest), igual que la columna de la tabla de reservaciones.
+        const contactPerson = (r.get('contactPerson') || '').trim();
+        const leadGuest = `${r.get('leadGuestFirstName') || ''} ${r.get('leadGuestLastName') || ''}`.trim();
         const balance = Number(r.get('balance') || 0);
         const start = r.get('startDate');
         return {
           folio: r.get('folio') || '',
-          client: clientName,
+          client: contactPerson || leadGuest || '—',
           date: start ? new Date(start).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
           balance: `$ ${balance.toLocaleString('es-MX')}`,
           status: r.get('paymentStatus') || 'pending',
