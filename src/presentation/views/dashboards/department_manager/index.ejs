@@ -149,7 +149,7 @@ const pendingPayments = d.pendingPayments || [];
           <td><%= p.date %></td>
           <td class="saldo"><%= p.balance %></td>
           <td><span class="badge <%= p.status === 'partial' ? 'part' : 'pend' %>"><%= p.status === 'partial' ? 'Parcial' : 'Pendiente' %></span></td>
-          <td><a class="link-btn" href="/dashboard/<%= bp %>/bookings">Ver</a></td>
+          <td><a class="link-btn" href="/dashboard/<%= bp %>/bookings/<%= p.id %>">Ver</a></td>
         </tr>
         <% }); %>
       </tbody>

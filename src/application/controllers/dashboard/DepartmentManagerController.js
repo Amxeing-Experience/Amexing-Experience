@@ -140,6 +140,7 @@ class DepartmentManagerController extends RoleBasedController {
         const contactPerson = (r.get('contactPerson') || '').trim();
         const start = r.get('startDate');
         list.push({
+          id: r.id,
           folio: r.get('folio') || '',
           client: leadGuest || contactPerson || '—',
           date: start ? new Date(start).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
