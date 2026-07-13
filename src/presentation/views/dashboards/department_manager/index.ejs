@@ -49,7 +49,7 @@ const pendingPayments = d.pendingPayments || [];
   .dash-wrap .seg .lbl{text-transform:uppercase;letter-spacing:.1em;font-size:.7rem;font-weight:700;color:var(--muted);}
   .dash-wrap .seg .sub{font-size:.72rem;color:var(--muted);font-style:italic;margin-top:2px;min-height:1em;}
   .dash-wrap .seg .num{font-size:2.6rem;font-weight:700;line-height:1;margin:14px 0 4px;color:var(--ink);}
-  .dash-wrap .seg .foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
+  .dash-wrap .seg .foot{display:flex;justify-content:flex-end;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
   .dash-wrap .seg .internal{font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
   .dash-wrap .seg .ver{color:var(--olive-d);font-weight:600;font-size:.82rem;}
   .dash-wrap .seg.blo .ver{color:var(--amber);}
@@ -111,19 +111,19 @@ const pendingPayments = d.pendingPayments || [];
       <div class="lbl">Cotizado</div>
       <div class="sub">&nbsp;</div>
       <div class="num"><%= seg.quoted %></div>
-      <div class="foot"><span class="internal">Interno: Cotizado</span><span class="ver">Ver todas &rarr;</span></div>
+      <div class="foot"><span class="ver">Ver todas &rarr;</span></div>
     </a>
     <a class="seg blo" href="/dashboard/<%= bp %>/bookings">
       <div class="lbl">Agendado</div>
       <div class="sub">Pendiente por completar información</div>
       <div class="num"><%= seg.hold %></div>
-      <div class="foot"><span class="internal">Interno: Bloqueado</span><span class="ver">Completar &rarr;</span></div>
+      <div class="foot"><span class="ver">Completar &rarr;</span></div>
     </a>
     <a class="seg con" href="/dashboard/<%= bp %>/bookings">
       <div class="lbl">Confirmado</div>
       <div class="sub">&nbsp;</div>
       <div class="num"><%= seg.scheduled %></div>
-      <div class="foot"><span class="internal">Interno: Agendado</span><span class="ver">Ver todas &rarr;</span></div>
+      <div class="foot"><span class="ver">Ver todas &rarr;</span></div>
     </a>
   </div>
 
