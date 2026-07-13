@@ -22,10 +22,24 @@ async function getDashboardSummary(req) {
     pendingPayments: [],
   };
 
-  // COTIZADO: cotizaciones 'quoted' (reusa el scoping por rol de QuoteController).
+  // COTIZADO: cotizaciones 'quoted' + 'requested' (reusa el scoping por rol de QuoteController),
+  // excluyendo las cotizaciones vacías (sin ningún servicio agregado). Como "vacía" depende del
+  // JSON serviceItems (no consultable con count), traemos solo ese campo y filtramos en memoria.
   try {
-    const quotedQuery = await QuoteController.buildBaseQuoteQuery(req.user, role, 'quoted');
-    summary.segments.quoted = await quotedQuery.count({ useMasterKey: true });
+    // statusFilter null → el helper aplica por defecto containedIn('status', ['quoted','requested']).
+    const quotedQuery = await QuoteController.buildBaseQuoteQuery(req.user, role, null);
+    quotedQuery.select('serviceItems');
+    quotedQuery.limit(10000);
+    const quoteObjs = await quotedQuery.find({ useMasterKey: true });
+    summary.segments.quoted = quoteObjs.filter((q) => {
+      const si = q.get('serviceItems');
+      if (!si || !Array.isArray(si.days)) return false;
+      const services = si.days.reduce(
+        (sum, day) => sum + (Array.isArray(day.subconcepts) ? day.subconcepts.length : 0),
+        0
+      );
+      return services > 0; // vacía = sin servicios → no se cuenta
+    }).length;
   } catch (e) {
     logger.warn('Dashboard: fallo al contar cotizaciones', { error: e.message });
   }
