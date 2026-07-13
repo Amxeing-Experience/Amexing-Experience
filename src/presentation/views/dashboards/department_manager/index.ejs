@@ -27,6 +27,11 @@ const pendingPayments = d.pendingPayments || [];
     border-radius:11px;padding:.72rem 1.35rem;font-size:.88rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;text-decoration:none;}
   .dash-wrap .btn-reservar:hover{background:var(--olive-d);color:#fff;}
 
+  /* Aviso de tarifas */
+  .dash-wrap .dash-notice{display:flex;gap:12px;align-items:flex-start;background:#faf7f0;border:1px solid #e7d6bd;
+    border-left:4px solid var(--amber);border-radius:10px;padding:14px 18px;margin-top:22px;color:#6b5a3f;font-size:.86rem;line-height:1.55;}
+  .dash-wrap .dash-notice i{color:var(--amber);font-size:1.25rem;flex-shrink:0;margin-top:1px;}
+
   /* Sección */
   .dash-wrap .section-title{text-transform:uppercase;letter-spacing:.2em;font-size:.82rem;font-weight:700;color:var(--olive-d);
     margin:36px 0 16px;display:flex;align-items:center;gap:12px;}
@@ -120,6 +125,12 @@ const pendingPayments = d.pendingPayments || [];
       <div class="num"><%= seg.scheduled %></div>
       <div class="foot"><span class="internal">Interno: Agendado</span><span class="ver">Ver todas &rarr;</span></div>
     </a>
+  </div>
+
+  <!-- Aviso de actualización de tarifas -->
+  <div class="dash-notice">
+    <i class="ti ti-info-circle"></i>
+    <div>Las cotizaciones correspondientes a servicios programados para 2027 en adelante están sujetas a actualización de tarifas. Para garantizar el precio cotizado, será necesario realizar durante 2026 un pago anticipado mínimo del 50% del total de los servicios confirmados. De lo contrario, aplicarán las tarifas vigentes al momento de la confirmación.</div>
   </div>
 
   <!-- Pendientes de pago -->
