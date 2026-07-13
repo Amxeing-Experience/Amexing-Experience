@@ -17,22 +17,30 @@ const logger = require('../../../infrastructure/logger');
  */
 async function getDashboardSummary(req) {
   const role = req.userRole || req.user?.role || 'client';
-  // El middleware del dashboard (dashboardAuthMiddleware) setea req.user y res.locals.userRole,
-  // pero NO req.userRole. Los helpers de ReservationController (getRoleFilterPointers /
-  // getClientEligibleQuoteIds) leen req.userRole directamente, así que lo normalizamos aquí para
-  // que tomen la rama correcta del rol (si no, client caería al scope por clientPtr por defecto).
-  if (!req.userRole) req.userRole = role;
   const summary = {
     segments: { quoted: 0, hold: 0, scheduled: 0 },
     pendingPayments: [],
   };
+
+  // En la ruta del dashboard, dashboardAuthMiddleware deja req.user como un POJO mínimo del JWT
+  // (sin .get() ni departmentId) y NO setea req.userRole. Los helpers de scoping por rol de
+  // Quote/Reservation esperan un AmexingUser completo (usan .get() y departmentId, p. ej. para
+  // department_manager) y leen req.userRole. Cargamos el usuario real y armamos un req scopeado
+  // para que el scoping funcione igual que en las rutas de API. Si falla la carga, usamos el POJO.
+  let scopedReq = { userRole: role, user: req.user };
+  try {
+    const fullUser = await new Parse.Query('AmexingUser').get(req.user.id, { useMasterKey: true });
+    scopedReq = { userRole: role, user: fullUser };
+  } catch (e) {
+    logger.warn('Dashboard: no se pudo cargar el usuario completo; uso el del request', { error: e.message });
+  }
 
   // COTIZADO: cotizaciones 'quoted' + 'requested' (reusa el scoping por rol de QuoteController),
   // excluyendo las cotizaciones vacías (sin ningún servicio agregado). Como "vacía" depende del
   // JSON serviceItems (no consultable con count), traemos solo ese campo y filtramos en memoria.
   try {
     // statusFilter null → el helper aplica por defecto containedIn('status', ['quoted','requested']).
-    const quotedQuery = await QuoteController.buildBaseQuoteQuery(req.user, role, null);
+    const quotedQuery = await QuoteController.buildBaseQuoteQuery(scopedReq.user, role, null);
     quotedQuery.select('serviceItems');
     quotedQuery.limit(10000);
     const quoteObjs = await quotedQuery.find({ useMasterKey: true });
@@ -55,9 +63,9 @@ async function getDashboardSummary(req) {
   // filtro de estatus en UNA sola subquery de Quote, porque dos matchesQuery sobre quotePtr se
   // pisan entre sí (mismo criterio que la lista de reservaciones: applyQuoteConstraint).
   try {
-    const rfp = await ReservationController.getRoleFilterPointers(req);
+    const rfp = await ReservationController.getRoleFilterPointers(scopedReq);
     // Ids de cotizaciones que el client puede ver (owner/legacy/compartidas); null para otros roles.
-    const clientQuoteIds = await ReservationController.getClientEligibleQuoteIds(req);
+    const clientQuoteIds = await ReservationController.getClientEligibleQuoteIds(scopedReq);
 
     /**
      * Aplica los filtros base (active/exists) y el scope por clientPtr (department_manager)
