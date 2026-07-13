@@ -1081,6 +1081,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             }
         });
 
+        // Reordena EN VIVO (sin guardar) los horarios de un día por hora de inicio.
+        function sortEstTimeSlotsLive($container) {
+            if (!$container || $container.length === 0) return;
+            const toMin = function(t) { const p = String(t || '').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); };
+            const slots = $container.children('.time-slot').get();
+            slots.sort(function(a, b) { return toMin($(a).find('.start-time').val()) - toMin($(b).find('.start-time').val()); });
+            slots.forEach(function(s) { $container.append(s); });
+        }
+        $(document).on('change', '.time-slots-container .time-slot .start-time', function() {
+            sortEstTimeSlotsLive($(this).closest('.time-slots-container'));
+        });
+
         // Remove day schedule
         $(document).on('click', '.remove-day-btn', function(e) {
             e.preventDefault();
@@ -2321,20 +2333,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     const selectedDays = availabilitySection.querySelectorAll('.day-schedule');
                     if (selectedDays.length > 0) {
                         experiencia.availability = [];
+                        const estToMin = function(t) { const p = String(t || '').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); };
                         selectedDays.forEach(daySchedule => {
-                            const day = daySchedule.getAttribute('data-day');
+                            const day = parseInt(daySchedule.getAttribute('data-day'));
                             const timeSlots = daySchedule.querySelectorAll('.time-slot');
+                            const daySlots = [];
                             timeSlots.forEach(slot => {
                                 const startTime = slot.querySelector('.start-time').value;
                                 const endTime = slot.querySelector('.end-time').value;
                                 if (startTime && endTime) {
-                                    experiencia.availability.push({
-                                        day: parseInt(day),
-                                        start_time: startTime,
-                                        end_time: endTime
-                                    });
+                                    daySlots.push({ day: day, start_time: startTime, end_time: endTime });
                                 }
                             });
+                            // Ordena los horarios del día por hora de inicio (pueden capturarse desordenados)
+                            daySlots.sort(function(a, b) { return estToMin(a.start_time) - estToMin(b.start_time); });
+                            daySlots.forEach(s => experiencia.availability.push(s));
                         });
                     }
                 }
@@ -2985,7 +2998,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     end: schedule.end_time
                 });
             });
-            
+
+            // Ordena los horarios de cada día por hora de inicio (para mostrar lo existente en orden)
+            const estToMin = function(t) { const p = String(t || '').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); };
+            Object.keys(schedulesByDay).forEach(function(d) {
+                schedulesByDay[d].sort(function(a, b) { return estToMin(a.start) - estToMin(b.start); });
+            });
+
             // Select day buttons and update UI
             Object.keys(schedulesByDay).forEach(day => {
                 const dayButton = availabilitySection.find(`.day-btn[data-day="${day}"]`);
