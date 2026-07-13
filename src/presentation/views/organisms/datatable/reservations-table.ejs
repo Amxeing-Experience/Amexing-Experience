@@ -446,6 +446,18 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>`;
     }
 
+    // Pre-selecciona el filtro de fecha desde ?dateFilter= (p.ej. el link del dashboard
+    // "Agendado" → pending_completion). Se hace antes de inicializar la tabla para que el
+    // primer fetch ya use ese filtro.
+    (function() {
+        const urlFilter = new URLSearchParams(window.location.search).get('dateFilter');
+        const valid = ['pending_completion', 'upcoming', 'ongoing', 'past', 'cancelled'];
+        if (urlFilter && valid.indexOf(urlFilter) !== -1) {
+            const radio = document.querySelector('input[name="dateFilter"][value="' + urlFilter + '"]');
+            if (radio) { radio.checked = true; }
+        }
+    })();
+
     const table = $('#reservations-table').DataTable({
         // Built-in indicator off — we show our own overlay (#reservations-loading)
         // via preXhr.dt/xhr.dt to avoid a double "Cargando..." on filter reloads.
