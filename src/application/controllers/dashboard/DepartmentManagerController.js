@@ -111,14 +111,14 @@ class DepartmentManagerController extends RoleBasedController {
       payRes.limit(5);
       const rows = await payRes.find({ useMasterKey: true });
       summary.pendingPayments = rows.map((r) => {
-        // Cliente Final = contactPerson (o lead guest), igual que la columna de la tabla de reservaciones.
-        const contactPerson = (r.get('contactPerson') || '').trim();
+        // Cliente Final = lead guest (prioritario) y, si no hay, contactPerson.
         const leadGuest = `${r.get('leadGuestFirstName') || ''} ${r.get('leadGuestLastName') || ''}`.trim();
+        const contactPerson = (r.get('contactPerson') || '').trim();
         const balance = Number(r.get('balance') || 0);
         const start = r.get('startDate');
         return {
           folio: r.get('folio') || '',
-          client: contactPerson || leadGuest || '—',
+          client: leadGuest || contactPerson || '—',
           date: start ? new Date(start).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
           balance: `$ ${balance.toLocaleString('es-MX')}`,
           status: r.get('paymentStatus') || 'pending',
