@@ -1,4 +1,5 @@
 const RoleBasedController = require('./base/RoleBasedController');
+const { getDashboardSummary } = require('./dashboardSummary');
 
 /**
  * ClientController - Implements client-specific dashboard functionality.
@@ -26,10 +27,24 @@ class ClientController extends RoleBasedController {
    */
   async index(req, res) {
     try {
+      const { user } = req;
+      const agencyName = user?.fullName
+        || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+        || 'Cliente';
+
+      const summary = await getDashboardSummary(req);
+
+      const dashboardData = {
+        agencyName,
+        basePath: 'client',
+        segments: summary.segments,
+        pendingPayments: summary.pendingPayments,
+      };
+
       await this.renderRoleView(req, res, 'index', {
-        title: 'Client Dashboard',
-        stats: await this.getClientStats(),
+        title: 'Inicio',
         breadcrumb: null,
+        dashboardData,
       });
     } catch (error) {
       this.handleError(res, error);

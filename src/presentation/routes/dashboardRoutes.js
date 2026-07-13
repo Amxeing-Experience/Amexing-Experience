@@ -81,8 +81,8 @@ router.get('/admin/form-preview', dashboardAuth.requireRole('admin'), (req, res)
 router.get('/admin/cancellation-requests', dashboardAuth.requireRole('admin'), (req, res) => adminController.cancellationRequests(req, res));
 router.get('/admin/tarifario-export', dashboardAuth.requireRole('admin'), (req, res) => adminController.tarifarioExport(req, res));
 
-// Client Routes - Redirect to vehicles (first item in Servicios)
-router.get('/client', dashboardAuth.requireRole('client'), (req, res) => res.redirect('/dashboard/client/vehicles'));
+// Client Routes - Dashboard de inicio (antes redirigía a /vehicles)
+router.get('/client', dashboardAuth.requireRole('client'), (req, res) => clientController.index(req, res));
 router.get('/client/profile', dashboardAuth.requireRole('client'), (req, res) => clientController.profile(req, res));
 router.get('/client/change-password', dashboardAuth.requireRole('client'), (req, res) => clientController.changePassword(req, res));
 router.get('/client/clients', dashboardAuth.requireRole('client'), (req, res) => clientController.ownedClients(req, res));
