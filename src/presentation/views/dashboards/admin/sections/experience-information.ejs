@@ -1136,6 +1136,22 @@ document.addEventListener('DOMContentLoaded', function() {
         container.appendChild(col);
     }
 
+    // ===== Orden de horarios por hora de inicio (los <input type=time> dan HH:MM 24h) =====
+    function toMinExp(t) { const p = String(t || '').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); }
+    function sortExpTimes(times) { return (times || []).slice().sort(function(a, b) { return toMinExp(a.start) - toMinExp(b.start); }); }
+    // Reordena EN VIVO (sin guardar) las filas de horario de un día por hora de inicio.
+    function sortExpSlotsLive(container) {
+        if (!container) return;
+        const rows = Array.prototype.filter.call(container.children, function(el) { return el.classList && el.classList.contains('time-slot-row'); });
+        rows.sort(function(a, b) { return toMinExp((a.querySelector('.start-time') || {}).value) - toMinExp((b.querySelector('.start-time') || {}).value); });
+        rows.forEach(function(r) { container.appendChild(r); });
+    }
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('start-time') && e.target.closest('#daySchedulesContainer')) {
+            sortExpSlotsLive(e.target.closest('.time-slots-container'));
+        }
+    });
+
     function addDayScheduleRow(day, dayName, startTime = '09:00', endTime = '18:00') {
         const container = document.getElementById('daySchedulesContainer');
 
@@ -1498,11 +1514,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         selectedDays.set(dayStr, true);
 
                         if (schedule.times && schedule.times.length > 0) {
-                            // New multi-slot format
-                            addDayScheduleRow(dayStr, dayBtn.dataset.dayName, schedule.times[0].start, schedule.times[0].end);
+                            // New multi-slot format (ordenado por hora de inicio)
+                            const sortedTimes = sortExpTimes(schedule.times);
+                            addDayScheduleRow(dayStr, dayBtn.dataset.dayName, sortedTimes[0].start, sortedTimes[0].end);
                             const dayRow = document.querySelector(`#daySchedulesContainer .day-schedule-row[data-day="${dayStr}"]`);
-                            for (let i = 1; i < schedule.times.length; i++) {
-                                addTimeSlotToDay(dayRow, schedule.times[i].start, schedule.times[i].end);
+                            for (let i = 1; i < sortedTimes.length; i++) {
+                                addTimeSlotToDay(dayRow, sortedTimes[i].start, sortedTimes[i].end);
                             }
                         } else if (schedule.startTime || schedule.endTime) {
                             // Old single-slot format
@@ -1792,6 +1809,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         daySchedule.times.push({ start, end });
                     }
                 });
+                // Ordena por hora de inicio (pueden capturarse desordenados)
+                daySchedule.times = sortExpTimes(daySchedule.times);
                 if (daySchedule.times.length > 0) {
                     availability.push(daySchedule);
                 }
