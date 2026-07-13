@@ -44,9 +44,24 @@ async function getDashboardSummary(req) {
     logger.warn('Dashboard: fallo al contar cotizaciones', { error: e.message });
   }
 
-  // Reservaciones (scopeadas por rol con getRoleFilterPointers).
+  // Reservaciones (scopeadas por rol). Para department_manager el scope va por clientPtr
+  // (getRoleFilterPointers); para client va por la cotización (quotePtr), usando los ids de
+  // cotizaciones elegibles (getClientEligibleQuoteIds). Ese scope de client se combina con el
+  // filtro de estatus en UNA sola subquery de Quote, porque dos matchesQuery sobre quotePtr se
+  // pisan entre sí (mismo criterio que la lista de reservaciones: applyQuoteConstraint).
   try {
     const rfp = await ReservationController.getRoleFilterPointers(req);
+    // Ids de cotizaciones que el client puede ver (owner/legacy/compartidas); null para otros roles.
+    const clientQuoteIds = await ReservationController.getClientEligibleQuoteIds(req);
+
+    /**
+     * Aplica los filtros base (active/exists) y el scope por clientPtr (department_manager)
+     * a una query de Reservation. Para client rfp es null y el scope va por quotePtr.
+     * @param {Parse.Query} query - Query de Reservation a acotar.
+     * @returns {Parse.Query} La misma query, ya restringida.
+     * @example
+     * const q = scopeReservation(new Parse.Query('Reservation'));
+     */
     const scopeReservation = (query) => {
       query.equalTo('active', true);
       query.equalTo('exists', true);
@@ -56,18 +71,31 @@ async function getDashboardSummary(req) {
       return query;
     };
 
+    /**
+     * Subquery de Quote por estatus, combinando el scope de client (quotePtr) cuando aplica.
+     * Un clientQuoteIds vacío ([]) produce cero resultados (el client no ve nada), correcto.
+     * @param {string} status - Estatus de cotización a filtrar ('hold' | 'scheduled').
+     * @returns {Parse.Query} Subquery de Quote lista para matchesQuery('quotePtr', ...).
+     * @example
+     * reservationQuery.matchesQuery('quotePtr', quoteSubquery('scheduled'));
+     */
+    const quoteSubquery = (status) => {
+      const q = new Parse.Query('Quote');
+      q.equalTo('status', status);
+      if (clientQuoteIds) {
+        q.containedIn('objectId', clientQuoteIds);
+      }
+      return q;
+    };
+
     // AGENDADO (pendiente): reservaciones cuya cotización está en 'hold'.
-    const holdQuote = new Parse.Query('Quote');
-    holdQuote.equalTo('status', 'hold');
     const holdRes = scopeReservation(new Parse.Query('Reservation'));
-    holdRes.matchesQuery('quotePtr', holdQuote);
+    holdRes.matchesQuery('quotePtr', quoteSubquery('hold'));
     summary.segments.hold = await holdRes.count({ useMasterKey: true });
 
     // CONFIRMADO: reservaciones cuya cotización está 'scheduled'.
-    const schedQuote = new Parse.Query('Quote');
-    schedQuote.equalTo('status', 'scheduled');
     const schedRes = scopeReservation(new Parse.Query('Reservation'));
-    schedRes.matchesQuery('quotePtr', schedQuote);
+    schedRes.matchesQuery('quotePtr', quoteSubquery('scheduled'));
     summary.segments.scheduled = await schedRes.count({ useMasterKey: true });
 
     // PENDIENTES DE PAGO: solo reservaciones CONFIRMADAS (cotización 'scheduled') y NO canceladas,
@@ -76,9 +104,7 @@ async function getDashboardSummary(req) {
     payRes.containedIn('paymentStatus', ['pending', 'partial']);
     payRes.greaterThan('balance', 0);
     payRes.notEqualTo('status', 'cancelled');
-    const payScheduledQuote = new Parse.Query('Quote');
-    payScheduledQuote.equalTo('status', 'scheduled');
-    payRes.matchesQuery('quotePtr', payScheduledQuote);
+    payRes.matchesQuery('quotePtr', quoteSubquery('scheduled'));
     payRes.ascending('startDate');
     payRes.limit(10); // candidatos: se recalcula el pago real y se descartan los ya pagados.
     const candidates = await payRes.find({ useMasterKey: true });
