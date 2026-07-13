@@ -113,7 +113,7 @@ const pendingPayments = d.pendingPayments || [];
       <div class="num"><%= seg.quoted %></div>
       <div class="foot"><span class="ver">Ver todas &rarr;</span></div>
     </a>
-    <a class="seg blo" href="/dashboard/<%= bp %>/bookings">
+    <a class="seg blo" href="/dashboard/<%= bp %>/bookings?dateFilter=pending_completion">
       <div class="lbl">Agendado</div>
       <div class="sub">Pendiente por completar información</div>
       <div class="num"><%= seg.hold %></div>
