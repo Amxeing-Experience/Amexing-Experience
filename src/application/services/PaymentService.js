@@ -214,7 +214,8 @@ class PaymentService {
       const amt = Number(a && a.amount) || 0;
       return a && a.type === 'discount' ? sum - amt : sum + amt;
     }, 0);
-    const totals = this.computeTotals(this.toServiceItems(services), paymentType, reservationTip, adjustmentsNet, currency);
+    const serviceItems = this.toServiceItems(services);
+    const totals = this.computeTotals(serviceItems, paymentType, reservationTip, adjustmentsNet, currency);
 
     const paidGlobal = this.sumPayments(payments.map((payment) => ({ amount: payment.get('amount') })));
 
