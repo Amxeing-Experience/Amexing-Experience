@@ -552,8 +552,8 @@ class PublicReservationController {
       };
     }));
 
-    // Totales por método de pago (misma fuente de verdad que PaymentService): base en efectivo × factor.
-    // efectivo = base, transferencia = base × 1.16, tarjeta = base × 1.21 (IVA + comisión sobre el base).
+    // Totales por método de pago (misma fuente de verdad que PaymentService): se cobra
+    // pricesByType[paymentType], el valor ya calculado y aprobado por la cotización.
     const paymentType = reservation.get('paymentType') || snapshot.paymentType || 'efectivo';
     const currency = reservation.get('currency') || snapshot.currency || 'MXN';
 
@@ -563,7 +563,7 @@ class PublicReservationController {
         totalItems.push({ includeInTotal: sc.includeInTotal, pricesByType: sc.pricesByType, total: sc.total });
       }
     }
-    // Servicios solos (sin ajustes ni propina) para el desglose Subtotal/IVA/Total de la vista.
+    // Servicios solos (sin ajustes ni propina) para el desglose Subtotal/recargo/Total de la vista.
     const dispTotals = PaymentService.computeTotals(totalItems, paymentType, 0, 0, currency);
     const subtotal = dispTotals.subtotal; // base (efectivo)
     const iva = dispTotals.iva; // recargo por método (IVA, o IVA + comisión de tarjeta)

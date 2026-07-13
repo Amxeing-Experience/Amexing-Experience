@@ -8,13 +8,17 @@
  * are plain money amounts applied against the grand total (balance = total − paid);
  * there is no per-service payment split.
  *
- * Modelo de precio por método de pago (solo reservación): se parte del precio base
- * en efectivo (pricesByType.efectivo, intacto de la cotización) y se aplica un factor
- * por método — efectivo = base, transferencia = base × (1 + IVA), tarjeta = base ×
- * (1 + IVA + tarjeta). El IVA (16%) y la comisión de tarjeta (5%) se suman ambos sobre
- * el base (no compuestos): tarjeta = base × 1.21. El efectivo en MXN se redondea a
- * múltiplo de 5 (ley de redondeo, applyCashRounding). NO se usan agencyRate/transferRate
- * ni se toca el motor de cotizaciones.
+ * Modelo de precio por método de pago (solo reservación): se COBRA el valor que la
+ * cotización ya calculó y el cliente ya aprobó para ese método — pricesByType.efectivo,
+ * .transferencia o .tarjeta, según reservation.paymentType — sin recalcular con ninguna
+ * tasa. Esto garantiza paridad exacta con la cotización por construcción (no por
+ * coincidencia de números): no hay fetch de tasas, no hay riesgo de que AgencyRate/
+ * TransferRate cambien entre cotizar y pagar, y no hay porcentajes propios en esta capa.
+ * El efectivo en MXN se redondea a múltiplo de 5 (ley de redondeo, applyCashRounding) —
+ * es una regla física del efectivo (no hay billete/moneda de 1 o 2 pesos practicable),
+ * distinta de la paridad con la cotización, así que puede diferir en unos pesos del
+ * monto sin redondear que muestra la cotización; tarjeta/transferencia NO se redondean.
+ * NO se toca el motor de cotizaciones (pricingEngine); solo se lee lo que ya calculó.
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0
@@ -25,9 +29,6 @@ const BaseModel = require('../../domain/models/BaseModel');
 const logger = require('../../infrastructure/logger');
 // Solo se importa el redondeo a efectivo (múltiplo de 5). No se modifica el motor.
 const { applyCashRounding } = require('../../domain/pricing/pricingEngine');
-
-const IVA_RATE = 0.16;
-const CARD_RATE = 0.05;
 
 /**
  * Round to 2 decimals (currency precision).
@@ -45,61 +46,63 @@ function round2(n) {
  */
 class PaymentService {
   /**
-   * Resolve a single service's BASE price (efectivo, sin IVA ni comisión), reading
-   * pricesByType.efectivo (fallback to total). Es el cimiento sobre el que se aplica
-   * el factor por método de pago.
+   * Lee el precio YA calculado y aprobado por la cotización para un método de pago
+   * (pricesByType[paymentType]), sin recalcular con ninguna tasa. Fallback a item.total
+   * cuando ese método no está presente (dato viejo o incompleto), igual que antes.
    * @param {object} item - Plain service item { includeInTotal, pricesByType, total }.
-   * @returns {number} Base (efectivo) price (0 when excluded from total).
+   * @param {string} paymentType - Método (efectivo|transferencia|tarjeta).
+   * @returns {number} Monto a cobrar por ese método (0 si está excluido del total).
    * @example
-   * PaymentService.serviceBase({ pricesByType: { efectivo: 100 } }) // 100
+   * PaymentService.chargeAmount({ pricesByType: { tarjeta: 121 } }, 'tarjeta') // 121
    */
-  static serviceBase(item) {
+  static chargeAmount(item, paymentType) {
     if (!item || item.includeInTotal === false) return 0;
     const prices = item.pricesByType;
     if (prices && typeof prices === 'object') {
-      const base = Number(prices.efectivo);
-      if (Number.isFinite(base)) return base;
+      const amount = Number(prices[paymentType]);
+      if (Number.isFinite(amount)) return amount;
     }
     const total = Number(item.total);
     return Number.isFinite(total) ? total : 0;
   }
 
   /**
-   * Factor por método de pago sobre el precio base: efectivo = 1, transferencia = 1 + IVA
-   * (1.16), tarjeta = 1 + IVA + comisión de tarjeta (1.21). IVA y comisión se suman ambos
-   * sobre el base (no compuestos).
-   * @param {string} paymentType - Método (efectivo|transferencia|tarjeta).
-   * @returns {number} Factor multiplicador (1 para métodos desconocidos).
+   * Resolve a single service's BASE price (efectivo), reading pricesByType.efectivo
+   * (fallback to total). Es el precio de referencia para el desglose Subtotal/recargo
+   * que se muestra en la UI (no se usa para calcular el cobro de otros métodos).
+   * @param {object} item - Plain service item { includeInTotal, pricesByType, total }.
+   * @returns {number} Base (efectivo) price (0 when excluded from total).
    * @example
-   * PaymentService.methodFactor('tarjeta') // 1.21
+   * PaymentService.serviceBase({ pricesByType: { efectivo: 100 } }) // 100
    */
-  static methodFactor(paymentType) {
-    if (paymentType === 'transferencia') return 1 + IVA_RATE;
-    if (paymentType === 'tarjeta') return 1 + IVA_RATE + CARD_RATE;
-    return 1;
+  static serviceBase(item) {
+    return this.chargeAmount(item, 'efectivo');
   }
 
   /**
-   * Compute reservation totals from plain service items using the payment-method model:
-   * base (efectivo) × factor(paymentType), + net adjustments + tip. Efectivo en MXN se
-   * redondea a múltiplo de 5.
+   * Compute reservation totals from plain service items: se suma pricesByType[paymentType]
+   * por servicio (el valor ya aprobado en la cotización), + net adjustments + tip. Efectivo
+   * en MXN se redondea a múltiplo de 5 (regla física del efectivo, no afecta tarjeta/transferencia).
    * @param {Array<object>} serviceItems - Plain items { id, includeInTotal, pricesByType, total }.
    * @param {string} paymentType - Método (efectivo|transferencia|tarjeta).
-   * @param {number} [reservationTip] - Reservation-level tip, added on top (sin factor).
+   * @param {number} [reservationTip] - Reservation-level tip, added on top.
    * @param {number} [adjustmentsNet] - Net reservation adjustments (charges − discounts), pesos finales.
    * @param {string} [currency] - Moneda (MXN aplica redondeo a efectivo).
    * @returns {object} { subtotal, adjustments, iva, surcharge, servicesTotal, tip, total, paymentType }.
    * @example
-   * PaymentService.computeTotals([{ id: 'a', pricesByType: { efectivo: 100 } }], 'tarjeta')
+   * PaymentService.computeTotals([{ id: 'a', pricesByType: { efectivo: 100, tarjeta: 121 } }], 'tarjeta') // total 121
    */
   static computeTotals(serviceItems, paymentType, reservationTip = 0, adjustmentsNet = 0, currency = 'MXN') {
     const items = Array.isArray(serviceItems) ? serviceItems : [];
     let base = 0;
-    for (const item of items) base += this.serviceBase(item);
+    let chargeSum = 0;
+    for (const item of items) {
+      base += this.serviceBase(item);
+      chargeSum += this.chargeAmount(item, paymentType);
+    }
     base = round2(base);
 
-    const factor = this.methodFactor(paymentType);
-    let servicesTotal = round2(base * factor);
+    let servicesTotal = round2(chargeSum);
     // Efectivo en MXN: redondeo a múltiplo de 5 sobre el total (ley de redondeo del proyecto).
     if (paymentType === 'efectivo' && String(currency).toUpperCase() === 'MXN') {
       servicesTotal = round2(applyCashRounding(servicesTotal));
@@ -108,7 +111,8 @@ class PaymentService {
     // Ajustes (cargos/descuentos) y propina se suman como pesos finales (sin factor).
     const adjustments = round2(Number(adjustmentsNet) || 0);
     const tip = round2(reservationTip);
-    const total = round2(servicesTotal + adjustments + tip);
+    // El total nunca es negativo: un descuento mayor al monto lo deja en 0 (no se debe "menos que nada").
+    const total = Math.max(0, round2(servicesTotal + adjustments + tip));
     // Recargo agregado por el método (IVA, o IVA + tarjeta). Se expone también como `iva`
     // por compatibilidad con los consumidores existentes del summary.
     const surcharge = round2(servicesTotal - base);
