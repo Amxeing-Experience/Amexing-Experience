@@ -3595,7 +3595,13 @@ class QuoteController {
 
       // Get payment info parameters from request body (for admin role)
       // billingProfileId: perfil fiscal de la agencia a imprimir en el recibo (los 3 roles).
-      const { includePaymentInfo, paymentInfoId, billingProfileId } = req.body;
+      // force: solo admin/superadmin puede saltarse el bloqueo de "reservación no saldada".
+      const {
+        includePaymentInfo,
+        paymentInfoId,
+        billingProfileId,
+        force,
+      } = req.body;
 
       const result = await this.quoteService.generateReceipt(
         currentUser,
@@ -3603,7 +3609,8 @@ class QuoteController {
         req.userRole, // Pass userRole from JWT middleware
         includePaymentInfo, // Pass the flag from request
         paymentInfoId, // Pass the specific payment info ID
-        billingProfileId // Perfil de facturación elegido (o undefined)
+        billingProfileId, // Perfil de facturación elegido (o undefined)
+        force === true // Override admin del bloqueo de reservación no saldada
       );
 
       // If PDF buffer is returned, send it as a downloadable file
@@ -3619,6 +3626,17 @@ class QuoteController {
 
       return res.json(result);
     } catch (error) {
+      // Reservación no saldada: 409 estructurado para que el front muestre el saldo pendiente
+      // y (solo a admin/superadmin) ofrezca "Generar de todos modos".
+      if (error && error.code === 'RESERVATION_NOT_SETTLED') {
+        return res.status(409).json({
+          success: false,
+          code: 'RESERVATION_NOT_SETTLED',
+          error: error.message,
+          data: error.payment || null,
+        });
+      }
+
       logger.error('Error in QuoteController.generateReceipt', {
         error: error.message,
         stack: error.stack,

@@ -1232,6 +1232,35 @@ class ReservationController {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
 
+      // Gate: si la reservación incluye experiencias con proveedor/establecimiento, NO se permite
+      // la cancelación DIRECTA (muchos terceros no reembolsan) — debe pasar por una solicitud de
+      // cancelación para aprobación. El flujo de aprobación usa su propio cascade
+      // (CancellationRequestsController.cascadeCancelReservation), no este endpoint, así que
+      // aprobar una solicitud no se ve afectado por este gate.
+      const provExpQuery = new Parse.Query('ReservationService');
+      provExpQuery.equalTo('reservationPtr', reservation);
+      provExpQuery.equalTo('type', 'experience');
+      provExpQuery.equalTo('active', true);
+      provExpQuery.equalTo('exists', true);
+      provExpQuery.limit(1000);
+      const expServices = await provExpQuery.find({ useMasterKey: true });
+      const hasProviderExperience = expServices.some((svc) => {
+        const sub = svc.get('subconcept') || {};
+        return !!(sub.providerType || sub.providerName);
+      });
+      if (hasProviderExperience) {
+        logger.info('Cancelación directa bloqueada: reservación con experiencias de proveedor/establecimiento', {
+          reservationId: id,
+          experienceServices: expServices.length,
+          performedBy: req.user?.id,
+        });
+        return res.status(409).json({
+          success: false,
+          code: 'REQUIRES_PROVIDER_APPROVAL',
+          error: 'La reservación incluye experiencias con proveedores o establecimientos. La cancelación requiere aprobación: crea una solicitud de cancelación.',
+        });
+      }
+
       // Cancel reservation
       reservation.set('status', 'cancelled');
       await reservation.save(null, { useMasterKey: true });

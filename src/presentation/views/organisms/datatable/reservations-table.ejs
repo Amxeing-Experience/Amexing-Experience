@@ -223,7 +223,7 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                     </select>
                     <div class="form-text">Datos fiscales (RFC, razón social…) que se imprimen en el recibo</div>
                 </div>
-                <div class="alert alert-info d-flex align-items-start" role="alert">
+                <div class="alert alert-info d-flex align-items-start" id="receiptInfoAlert" role="alert">
                     <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                     <div>
                         <strong>Información:</strong>
@@ -232,6 +232,23 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                             <li>El recibo se descargará en PDF</li>
                         </ul>
                     </div>
+                </div>
+                <!-- Aviso: reservación no saldada. Se muestra al recibir 409 RESERVATION_NOT_SETTLED. -->
+                <div class="alert alert-warning d-none" id="receiptNotSettledAlert" role="alert">
+                    <div class="d-flex align-items-start">
+                        <i class="ti ti-alert-triangle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>La reservación no está saldada.</strong>
+                            <div class="mt-1" id="receiptNotSettledDetail">Registra el pago total antes de generar el recibo.</div>
+                        </div>
+                    </div>
+                    <% if (basePath === 'admin') { %>
+                    <div class="mt-2 text-end">
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="forceGenerateReceiptBtn">
+                            <i class="ti ti-alert-triangle me-1"></i>Generar de todos modos
+                        </button>
+                    </div>
+                    <% } %>
                 </div>
             </div>
             <div class="modal-footer">
@@ -906,6 +923,9 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#reservations-table').on('click', '.generate-receipt-btn', function() {
         receiptQuoteId = $(this).data('quote-id');
         $('#receiptQuoteFolio').text($(this).data('folio') || '');
+        // Reset del aviso de "no saldada" por si quedó de una apertura anterior.
+        document.getElementById('receiptNotSettledAlert')?.classList.add('d-none');
+        document.getElementById('receiptInfoAlert')?.classList.remove('d-none');
         loadReceiptPaymentInfoOptions();
         loadBillingProfileOptions(receiptQuoteId);
         new bootstrap.Modal(document.getElementById('generateReceiptModal')).show();
@@ -924,13 +944,16 @@ document.addEventListener('DOMContentLoaded', function() {
         rtNotifyOk(`La factura de ${folio} ya fue solicitada y está pendiente de procesar por el departamento de facturación.`);
     });
 
-    // Confirmar recibo → descarga el PDF
-    $('#confirmGenerateReceiptBtn').on('click', function() {
+    // Genera el recibo. force=true solo lo usa el botón admin "Generar de todos modos"
+    // para saltarse el bloqueo de "reservación no saldada" (el server revalida el permiso).
+    function doGenerateReceipt(force) {
         if (!receiptQuoteId) return;
         const quoteId = receiptQuoteId;
-        const confirmButton = $(this);
+        const confirmButton = $('#confirmGenerateReceiptBtn');
+        const forceButton = $('#forceGenerateReceiptBtn');
         const originalText = confirmButton.html();
         confirmButton.prop('disabled', true).html('<i class="ti ti-loader ti-spin me-1"></i>Generando...');
+        forceButton.prop('disabled', true);
 
         let includePaymentInfo = true;
         let selectedPaymentInfoId = null;
@@ -948,9 +971,30 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`/api/quotes/${quoteId}/generate-receipt`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ includePaymentInfo, paymentInfoId: selectedPaymentInfoId, billingProfileId })
+            body: JSON.stringify({ includePaymentInfo, paymentInfoId: selectedPaymentInfoId, billingProfileId, force: force === true })
         })
         .then((response) => {
+            // Reservación no saldada: mantener el modal abierto y mostrar el saldo pendiente.
+            if (response.status === 409) {
+                return response.json().then((data) => {
+                    if (data && data.code === 'RESERVATION_NOT_SETTLED') {
+                        const p = data.data || {};
+                        const detail = document.getElementById('receiptNotSettledDetail');
+                        if (detail) {
+                            const bal = (typeof p.balance === 'number')
+                                ? p.balance.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })
+                                : null;
+                            detail.textContent = bal
+                                ? `Saldo pendiente: ${bal}. Registra el pago total antes de generar el recibo.`
+                                : (data.error || 'Registra el pago total antes de generar el recibo.');
+                        }
+                        document.getElementById('receiptInfoAlert')?.classList.add('d-none');
+                        document.getElementById('receiptNotSettledAlert')?.classList.remove('d-none');
+                        return; // no lanzar: el modal queda abierto con el aviso
+                    }
+                    throw new Error(data.error || 'La reservación no está saldada.');
+                });
+            }
             if (!response.ok) {
                 return response.json().then((errorData) => {
                     throw new Error(`${response.status}: ${errorData.error || errorData.message || 'Error del servidor'}`);
@@ -995,8 +1039,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             rtNotifyErr(errorMessage);
         })
-        .finally(() => { confirmButton.prop('disabled', false).html(originalText); });
-    });
+        .finally(() => {
+            confirmButton.prop('disabled', false).html(originalText);
+            forceButton.prop('disabled', false);
+        });
+    }
+
+    // Confirmar recibo → descarga el PDF (respeta el bloqueo de "no saldada").
+    $('#confirmGenerateReceiptBtn').on('click', function() { doGenerateReceipt(false); });
+    // Admin: forzar la generación aunque no esté saldada.
+    $(document).on('click', '#forceGenerateReceiptBtn', function() { doGenerateReceipt(true); });
 
     // Confirmar solicitud de factura
     $('#confirmRequestInvoiceBtn').on('click', function() {
