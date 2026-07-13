@@ -1,4 +1,5 @@
 const RoleBasedController = require('./base/RoleBasedController');
+const logger = require('../../../infrastructure/logger');
 
 /**
  * DepartmentManagerController - Implements department manager dashboard functionality.
@@ -28,39 +29,13 @@ class DepartmentManagerController extends RoleBasedController {
         || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
         || 'Agente';
 
-      // TODO(datos): reemplazar por conteos/reservaciones reales.
-      //   - segments.quoted   → cotizaciones status 'quoted'  (QuoteController statusCounts)
-      //   - segments.hold     → reservaciones en hold         (ReservationController pendingCompletionCount)
-      //   - segments.scheduled→ reservaciones confirmadas      (scheduled)
-      //   - pendingPayments   → reservaciones con paymentStatus pending/partial (balance > 0)
-      // Por ahora son datos de ejemplo para ver la estructura.
+      const summary = await this.getDashboardData(req);
+
       const dashboardData = {
         agencyName,
         basePath: 'department_manager',
-        segments: { quoted: 12, hold: 4, scheduled: 27 },
-        pendingPayments: [
-          {
-            folio: 'AMX-1042',
-            client: 'Boda Martínez',
-            date: '18 jul 2026',
-            balance: '$ 24,500',
-            status: 'pending',
-          },
-          {
-            folio: 'AMX-1039',
-            client: 'Grupo Herrera',
-            date: '22 jul 2026',
-            balance: '$ 8,200',
-            status: 'partial',
-          },
-          {
-            folio: 'AMX-1035',
-            client: 'Aniversario López',
-            date: '30 jul 2026',
-            balance: '$ 15,000',
-            status: 'pending',
-          },
-        ],
+        segments: summary.segments,
+        pendingPayments: summary.pendingPayments,
       };
 
       await this.renderRoleView(req, res, 'index', {
@@ -71,6 +46,94 @@ class DepartmentManagerController extends RoleBasedController {
     } catch (error) {
       this.handleError(res, error);
     }
+  }
+
+  /**
+   * Calcula el resumen del dashboard, scopeado por rol y reusando los helpers existentes.
+   * quoted = cotizaciones 'quoted'; hold = reservaciones con cotización 'hold'; scheduled =
+   * reservaciones con cotización 'scheduled'; pendingPayments = reservaciones pending/partial
+   * con saldo &gt; 0 (top 5). Todo en try/catch: si falla, devuelve ceros/vacío.
+   * @param {object} req - Express request (user + role).
+   * @returns {Promise<object>} Resumen con segments y pendingPayments.
+   * @example
+   * const summary = await controller.getDashboardData(req);
+   */
+  async getDashboardData(req) {
+    const Parse = require('parse/node');
+    const QuoteController = require('../api/QuoteController');
+    const ReservationController = require('../api/ReservationController');
+
+    const role = req.userRole || req.user?.role || 'department_manager';
+    const summary = {
+      segments: { quoted: 0, hold: 0, scheduled: 0 },
+      pendingPayments: [],
+    };
+
+    // COTIZADO: cotizaciones 'quoted' (reusa el scoping por rol de QuoteController).
+    try {
+      const quotedQuery = await QuoteController.buildBaseQuoteQuery(req.user, role, 'quoted');
+      summary.segments.quoted = await quotedQuery.count({ useMasterKey: true });
+    } catch (e) {
+      logger.warn('Dashboard: fallo al contar cotizaciones', { error: e.message });
+    }
+
+    // Reservaciones (scopeadas por rol con getRoleFilterPointers).
+    try {
+      const rfp = await ReservationController.getRoleFilterPointers(req);
+      const scopeReservation = (query) => {
+        query.equalTo('active', true);
+        query.equalTo('exists', true);
+        if (rfp && rfp.field && Array.isArray(rfp.pointers)) {
+          query.containedIn(rfp.field, rfp.pointers);
+        }
+        return query;
+      };
+
+      // AGENDADO (pendiente): reservaciones cuya cotización está en 'hold'.
+      const holdQuote = new Parse.Query('Quote');
+      holdQuote.equalTo('status', 'hold');
+      const holdRes = scopeReservation(new Parse.Query('Reservation'));
+      holdRes.matchesQuery('quotePtr', holdQuote);
+      summary.segments.hold = await holdRes.count({ useMasterKey: true });
+
+      // CONFIRMADO: reservaciones cuya cotización está 'scheduled'.
+      const schedQuote = new Parse.Query('Quote');
+      schedQuote.equalTo('status', 'scheduled');
+      const schedRes = scopeReservation(new Parse.Query('Reservation'));
+      schedRes.matchesQuery('quotePtr', schedQuote);
+      summary.segments.scheduled = await schedRes.count({ useMasterKey: true });
+
+      // PENDIENTES DE PAGO: paymentStatus pending/partial, saldo > 0 (top 5, más próximas).
+      const payRes = scopeReservation(new Parse.Query('Reservation'));
+      payRes.containedIn('paymentStatus', ['pending', 'partial']);
+      payRes.greaterThan('balance', 0);
+      payRes.include('quotePtr');
+      payRes.include('quotePtr.client');
+      payRes.include('quotePtr.companyClientPtr');
+      payRes.include('clientPtr');
+      payRes.ascending('startDate');
+      payRes.limit(5);
+      const rows = await payRes.find({ useMasterKey: true });
+      summary.pendingPayments = rows.map((r) => {
+        let clientName = 'N/A';
+        try {
+          clientName = ReservationController.formatReservationRow(r, { totalCount: 0, assignedCount: 0 }).clientName || 'N/A';
+        } catch (e) { /* nombre por defecto */ }
+        const balance = Number(r.get('balance') || 0);
+        const start = r.get('startDate');
+        return {
+          folio: r.get('folio') || '',
+          client: clientName,
+          date: start ? new Date(start).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
+          balance: `$ ${balance.toLocaleString('es-MX')}`,
+          status: r.get('paymentStatus') || 'pending',
+        };
+      });
+    } catch (e) {
+      logger.warn('Dashboard: fallo al contar reservaciones', { error: e.message });
+    }
+
+    return summary;
   }
 
   /**
