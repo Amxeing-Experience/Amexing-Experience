@@ -138,6 +138,9 @@ class ItineraryBuilder {
     this.vehiclesCache = null;
     this.experiencesCache = new Map();
     this.toursCache = new Map();
+    // Destinos adicionales combinados en un tour (array de tourId). El mínimo de horas del tour
+    // toma el mayor de los mínimos de todos los destinos; el precio del vehículo es del principal.
+    this.additionalTourIds = [];
 
     // Cache for pricing data
     this.tourPricesMap = new Map(); // Key: `${tourId}_${rateId}` -> Array of TourPrices
@@ -801,7 +804,10 @@ class ItineraryBuilder {
     document.getElementById('tourSelect')?.addEventListener('change', (e) => {
       this.serviceModified = true; // Mark as modified when user changes tour selection
       this.resetMainPriceManualEdit(); // nuevo tour → reautollenar precio de catálogo
+      // Cambiar el destino principal reinicia los destinos adicionales combinados.
+      this.additionalTourIds = [];
       this.handleTourSelection(e.target.value);
+      this.updateAdditionalDestinationsUI();
       // Bug fix: al cambiar de tour con un segmento YA seleccionado, los vehículos quedaban los del
       // tour anterior (handleTourSelection no repuebla el dropdown). Rates son globales, así que
       // recargamos vehículos/precios del NUEVO tour reusando el segmento actual. Si el nuevo tour no
@@ -810,6 +816,29 @@ class ItineraryBuilder {
       if (e.target.value && currentSegment) {
         this.handleRateSelection(currentSegment);
       }
+    });
+
+    // Destinos adicionales del tour: al ELEGIR en el dropdown se agrega solo (UX más clara
+    // que "elegir + botón agregar"). El select se resetea al placeholder tras agregar.
+    document.getElementById('tourAdditionalDestinationSelect')?.addEventListener('change', (e) => {
+      const id = e.target.value;
+      const mainId = document.getElementById('tourSelect')?.value;
+      if (!id || id === mainId || (this.additionalTourIds || []).includes(id)) { e.target.value = ''; return; }
+      this.additionalTourIds.push(id);
+      this.renderAdditionalDestinationChips();
+      this.populateAdditionalDestinationSelect();
+      this.recalcTourMinHours();
+      this.serviceModified = true;
+    });
+    // Destinos adicionales del tour: quitar (delegado en los chips)
+    document.getElementById('tourAdditionalDestinations')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-tour-id]');
+      if (!btn) return;
+      this.additionalTourIds = (this.additionalTourIds || []).filter((x) => x !== btn.dataset.tourId);
+      this.renderAdditionalDestinationChips();
+      this.populateAdditionalDestinationSelect();
+      this.recalcTourMinHours();
+      this.serviceModified = true;
     });
 
     // Price Override Toggle Handlers (Admin Only)
@@ -4128,6 +4157,16 @@ class ItineraryBuilder {
       }
       case 'tour': {
         data.tourId = document.getElementById('tourSelect')?.value;
+        // Destinos adicionales combinados (solo tours con vehículo; en walking se limpian).
+        // El nombre del servicio se compone con todos los destinos ("Principal + Adic1 + …").
+        data.additionalTourIds = Array.isArray(this.additionalTourIds) ? [...this.additionalTourIds] : [];
+        data.additionalDestinationNames = data.additionalTourIds
+          .map((id) => this.getTourName(id)).filter(Boolean);
+        if (data.additionalTourIds.length) {
+          const combinedName = [data.tourId, ...data.additionalTourIds]
+            .map((id) => this.getTourName(id)).filter(Boolean).join(' + ');
+          if (combinedName) { data.tourName = combinedName; data.concept = combinedName; }
+        }
         // Dirección de pickup (texto libre) — aplica a tour con vehículo y walking tour.
         data.pickupAddress = (document.getElementById('tourPickupAddress')?.value || '').trim();
 
@@ -6834,6 +6873,10 @@ class ItineraryBuilder {
       tourSelect.value = service.tourId;
       // Trigger tour selection to load tour-specific data
       await this.handleTourSelection(service.tourId);
+      // Restaurar destinos adicionales combinados (sin forzar el mínimo: la duración guardada
+      // se restaura en el Step de duración; aquí solo repoblamos chips/select).
+      this.additionalTourIds = Array.isArray(service.additionalTourIds) ? [...service.additionalTourIds] : [];
+      this.updateAdditionalDestinationsUI();
     }
 
     // Step 2: Restore vehicle and rate selection
@@ -11290,8 +11333,18 @@ class ItineraryBuilder {
         // "- Proveedor" que traía antes para las de establecimiento).
         return this.getExperienceName(service.experienceId) || 'Experiencia';
       }
-      case 'tour':
-        return this.getTourName(service.tourId) || 'Tour';
+      case 'tour': {
+        const base = this.getTourName(service.tourId) || 'Tour';
+        // Destinos adicionales combinados: "Principal + Adic1 + …". Usa additionalDestinationNames
+        // guardado como fallback cuando el tour adicional no está en cache.
+        const extraIds = Array.isArray(service.additionalTourIds) ? service.additionalTourIds : [];
+        const savedNames = Array.isArray(service.additionalDestinationNames)
+          ? service.additionalDestinationNames : [];
+        const extra = extraIds
+          .map((id, i) => this.getTourName(id) || savedNames[i] || '')
+          .filter((n) => n && n !== 'Tour');
+        return extra.length ? `${base} + ${extra.join(' + ')}` : base;
+      }
       case 'transport':
         return service.concept || 'Transporte';
       case 'concepto':
@@ -11599,6 +11652,143 @@ class ItineraryBuilder {
     return finalName;
   }
 
+  // ── Destinos adicionales del tour (combinar múltiples destinos) ─────────────────
+  /**
+   * Busca un tour en el cache por id/objectId.
+   * @param {string} id - Id del tour.
+   * @returns {object|null} El tour o null.
+   */
+  findTourById(id) {
+    const tours = this.toursCache.get('all') || [];
+    return tours.find((t) => t.id === id || t.objectId === id) || null;
+  }
+
+  /**
+   * Puebla el select de destino adicional clonando las opciones de #tourSelect,
+   * excluyendo el destino principal y los ya agregados.
+   */
+  populateAdditionalDestinationSelect() {
+    const sel = document.getElementById('tourAdditionalDestinationSelect');
+    const main = document.getElementById('tourSelect');
+    if (!sel || !main) return;
+    const excluded = new Set([main.value, ...(this.additionalTourIds || [])].filter(Boolean));
+    sel.innerHTML = '<option value="">-- Selecciona un destino a combinar --</option>';
+    Array.from(main.options).forEach((opt) => {
+      if (!opt.value || excluded.has(opt.value)) return;
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.textContent;
+      sel.appendChild(o);
+    });
+  }
+
+  /**
+   * Pinta los chips de destinos adicionales (con botón para quitar).
+   */
+  renderAdditionalDestinationChips() {
+    const box = document.getElementById('tourAdditionalDestinations');
+    if (!box) return;
+    box.innerHTML = '';
+    (this.additionalTourIds || []).forEach((id) => {
+      const chip = document.createElement('span');
+      chip.className = 'badge rounded-pill bg-primary-subtle text-primary-emphasis border border-primary-subtle d-inline-flex align-items-center gap-1 py-2 ps-2 pe-1 fw-medium';
+      const pin = document.createElement('i');
+      pin.className = 'ti ti-map-pin';
+      const label = document.createElement('span');
+      label.textContent = this.getTourName(id) || 'Destino';
+      const rm = document.createElement('button');
+      rm.type = 'button';
+      rm.className = 'btn-close btn-close-sm ms-1';
+      rm.style.fontSize = '0.55rem';
+      rm.setAttribute('data-tour-id', id);
+      rm.setAttribute('aria-label', 'Quitar destino');
+      rm.setAttribute('title', 'Quitar destino');
+      chip.appendChild(pin);
+      chip.appendChild(label);
+      chip.appendChild(rm);
+      box.appendChild(chip);
+    });
+  }
+
+  /**
+   * Ajusta #tourDuration al MÁXIMO de los mínimos de horas del destino principal y los
+   * adicionales (min de cada uno = ceil(time/60)). El campo queda editable; dispara 'input'
+   * para recalcular el precio (costo/hora del principal × horas).
+   */
+  /**
+   * Reúne el mínimo de horas (ceil(time/60)) del destino principal y los adicionales.
+   * @returns {{winner: {name: string, min: number}, entries: Array}} Ganador (mayor mín) y lista.
+   */
+  getTourMinHoursInfo() {
+    const minOf = (t) => (t && t.time ? Math.ceil(t.time / 60) : 0);
+    const entries = [];
+    const mainId = document.getElementById('tourSelect')?.value;
+    if (this.currentTourData) {
+      entries.push({ name: this.getTourName(mainId) || 'Principal', min: minOf(this.currentTourData) });
+    }
+    (this.additionalTourIds || []).forEach((id) => {
+      entries.push({ name: this.getTourName(id) || 'Destino', min: minOf(this.findTourById(id)) });
+    });
+    const winner = entries.reduce((a, b) => (b.min > a.min ? b : a), { name: '', min: 0 });
+    return { winner, entries };
+  }
+
+  recalcTourMinHours() {
+    const durationField = document.getElementById('tourDuration');
+    if (!durationField) return;
+    const { winner, entries } = this.getTourMinHoursInfo();
+    if (winner.min > 0) {
+      durationField.value = winner.min;
+      durationField.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    this.updateTourMinHoursDevHint(winner, entries);
+  }
+
+  /**
+   * Dev only: muestra bajo el campo de duración qué mínimo se está usando y de qué destino.
+   * @param {object|null} winner - { name, min } del destino con el mínimo mayor.
+   * @param {Array} entries - Todos los destinos con su mínimo (para el detalle).
+   */
+  updateTourMinHoursDevHint(winner, entries) {
+    const hint = document.getElementById('tourMinHoursDevHint');
+    if (!hint) return;
+    if (!this.isDevelopmentMode || !winner || !winner.min) {
+      hint.classList.add('d-none');
+      hint.textContent = '';
+      return;
+    }
+    let txt = `[dev] Mínimo aplicado: ${winner.min}h (de "${winner.name}")`;
+    if (Array.isArray(entries) && entries.length > 1) {
+      txt += ` · ${entries.map((e) => `${e.name}: ${e.min}h`).join(', ')}`;
+    }
+    hint.textContent = txt;
+    hint.classList.remove('d-none');
+  }
+
+  /**
+   * Muestra/oculta la UI de destinos adicionales: visible solo para tours CON VEHÍCULO.
+   * Para walking tour o sin tour, se oculta y se limpian los destinos combinados.
+   */
+  updateAdditionalDestinationsUI() {
+    const container = document.getElementById('tourAdditionalDestinationsContainer');
+    const mainId = document.getElementById('tourSelect')?.value;
+    const tour = mainId ? this.findTourById(mainId) : null;
+    const isVehicleTour = !!tour && !tour.isWalkingTour;
+    if (container) container.classList.toggle('d-none', !isVehicleTour);
+    if (isVehicleTour) {
+      this.populateAdditionalDestinationSelect();
+    } else {
+      this.additionalTourIds = [];
+    }
+    this.renderAdditionalDestinationChips();
+    // Dev hint del mínimo aplicado (solo tour con vehículo).
+    if (isVehicleTour) {
+      const info = this.getTourMinHoursInfo();
+      this.updateTourMinHoursDevHint(info.winner, info.entries);
+    } else {
+      this.updateTourMinHoursDevHint(null, []);
+    }
+  }
 
   updateEmptyState() {
     const emptyState = document.getElementById('emptyStateContainer');
@@ -11812,6 +12002,7 @@ class ItineraryBuilder {
     this._restoringWalkingTourData = false;
     this._populatingForm = false;
     this.currentServiceCopy = null;
+    this.additionalTourIds = []; // limpiar destinos adicionales combinados del tour
     this.serviceTypeFields = {
       experience: {},
       tour: {},

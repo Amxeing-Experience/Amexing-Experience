@@ -221,6 +221,21 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                     *Se verificará disponibilidad y se confirmará en la reservación
                                 </div>
                             </div>
+
+                            <!-- Destinos adicionales combinados (misma lista que #tourSelect). El mínimo
+                                 de horas del tour se ajusta al máximo de los mínimos de todos los destinos;
+                                 el precio del vehículo se mantiene del principal. Solo para tours con vehículo. -->
+                            <div class="mb-3 d-none" id="tourAdditionalDestinationsContainer">
+                                <label for="tourAdditionalDestinationSelect" class="form-label mb-1">
+                                    <i class="ti ti-map-pin-plus me-1"></i>Destinos adicionales
+                                </label>
+                                <select class="form-select" id="tourAdditionalDestinationSelect">
+                                    <option value="">+ Elige un destino para combinarlo…</option>
+                                </select>
+                                <div class="form-text">Al elegir un destino se agrega automáticamente. El mínimo de horas toma el mayor de los destinos combinados.</div>
+                                <div id="tourAdditionalDestinations" class="d-flex flex-wrap gap-2 mt-2"></div>
+                            </div>
+
                             <!-- Tour Details Card (minimalist) -->
                             <div id="tourDetailsCard" class="card border mb-3 d-none">
                                 <div class="card-body p-3" id="tourDetailsCardBody">
@@ -269,6 +284,8 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                         <input type="number" class="form-control" id="tourDuration" min="0.5" step="0.5" value="1">
                                         <span class="input-group-text">horas</span>
                                     </div>
+                                    <!-- Dev only: mínimo de horas aplicado y de qué destino viene. -->
+                                    <small class="text-info d-block mt-1 d-none" id="tourMinHoursDevHint"></small>
                                 </div>
                             </div>
 
