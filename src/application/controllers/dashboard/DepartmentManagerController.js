@@ -126,8 +126,14 @@ class DepartmentManagerController extends RoleBasedController {
       candidates.forEach((r, i) => {
         if (list.length >= 5) return;
         const ps = summaries[i];
-        const paymentStatus = ps ? ps.paymentStatus : (r.get('paymentStatus') || 'pending');
+        const paidAmount = Number(ps ? ps.paidAmount : (r.get('paidAmount') || 0)) || 0;
         const balance = Number(ps ? ps.balance : (r.get('balance') || 0)) || 0;
+        // Si summarize falla, derivamos el estado del monto pagado (0 → pendiente),
+        // no del rollup guardado 'paymentStatus' (que puede estar desactualizado).
+        let paymentStatus = paidAmount > 0 ? 'partial' : 'pending';
+        if (ps) {
+          ({ paymentStatus } = ps);
+        }
         if (paymentStatus === 'paid' || balance <= 0) return; // ya no debe nada
         // Cliente Final = lead guest (prioritario) y, si no hay, contactPerson.
         const leadGuest = `${r.get('leadGuestFirstName') || ''} ${r.get('leadGuestLastName') || ''}`.trim();
