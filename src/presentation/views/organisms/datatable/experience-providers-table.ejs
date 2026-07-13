@@ -1811,6 +1811,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             }
         }
 
+        // Ordena una lista de horarios [{start,end}] por hora de inicio.
+        // Los <input type="time"> devuelven "HH:MM" 24h, así que basta convertir a minutos.
+        function sortTimesByStart(times) {
+            const toMinutes = function(t) {
+                const parts = String(t || '').split(':');
+                return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+            };
+            return (times || []).slice().sort(function(a, b) {
+                return toMinutes(a.start) - toMinutes(b.start);
+            });
+        }
+
         function collectAvailabilityFromCard(card) {
             const availability = [];
             
@@ -1838,12 +1850,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     }
                 });
                 
+                // Ordena por hora de inicio (el usuario puede capturarlos desordenados).
+                daySchedule.times = sortTimesByStart(daySchedule.times);
                 // Only add if there are times or if the day is selected without specific times
                 if (daySchedule.times.length > 0) {
                     availability.push(daySchedule);
                 }
             });
-            
+
             return availability.length > 0 ? availability : null;
         }
 
@@ -1861,14 +1875,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 if (dayButton.length > 0) {
                     dayButton.removeClass('btn-outline-primary').addClass('active btn-primary');
                     
-                    // Create day schedule with existing times
-                    if (daySchedule.times && daySchedule.times.length > 0) {
+                    // Create day schedule with existing times (ordenados por hora de inicio)
+                    const sortedTimes = sortTimesByStart(daySchedule.times);
+                    if (sortedTimes && sortedTimes.length > 0) {
                         // Add day schedule with the first time slot
-                        addProviderExperienciaDaySchedule(card, dayCode, dayName, daySchedule.times[0].start, daySchedule.times[0].end);
-                        
+                        addProviderExperienciaDaySchedule(card, dayCode, dayName, sortedTimes[0].start, sortedTimes[0].end);
+
                         // Add any additional time slots
-                        for (let i = 1; i < daySchedule.times.length; i++) {
-                            const timeSlot = daySchedule.times[i];
+                        for (let i = 1; i < sortedTimes.length; i++) {
+                            const timeSlot = sortedTimes[i];
                             const dayScheduleRow = card.find(`.experiencia-selected-schedule-days .day-schedule-row[data-day="${dayCode}"]`);
                             const timeSlotsContainer = dayScheduleRow.find('.time-slots-container');
                             
@@ -2617,11 +2632,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     }
                 });
                 
+                daySchedule.times = sortTimesByStart(daySchedule.times);
                 if (daySchedule.times.length > 0) {
                     availability.push(daySchedule);
                 }
             });
-            
+
             return availability.length > 0 ? availability : null;
         }
 
