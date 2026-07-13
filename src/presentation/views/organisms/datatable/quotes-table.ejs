@@ -34,64 +34,51 @@ const rolePaths = {
 const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 %>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-        <div class="row align-items-center">
-            <div class="col">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-file-invoice me-2"></i>Cotizaciones
-                </h5>
-                <small class="text-white" style="opacity: 0.9;">Gestión de cotizaciones del sistema</small>
+<div class="exp-catalog quotes-wrap" id="quotes-content">
+    <!-- Barra de filtros: fecha/estado (izq) · Nueva Cotización (der) -->
+    <div class="quotes-filters">
+        <div class="quotes-filters__left">
+            <div class="btn-group seg-group" role="group" aria-label="Filtro por estado de servicios">
+                <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
+                <label class="btn" for="filterFuture">
+                    <i class="ti ti-calendar-event me-1"></i>Actuales
+                </label>
+
+                <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
+                <label class="btn" for="filterPrevious">
+                    <i class="ti ti-calendar-time me-1"></i>Anteriores
+                </label>
             </div>
-            <div class="col-auto">
-                <% if (canCreate) { %>
-                    <a href="<%= baseDashboardPath %>/quotes/new" class="btn btn-light btn-sm">
-                        <i class="ti ti-plus me-1"></i>Nueva Cotización
-                    </a>
-                <% } %>
+
+            <div class="d-inline-flex gap-2">
+                <button type="button" class="btn seg-btn position-relative" id="filterSolicitadas">
+                    <i class="ti ti-check me-1"></i>Solicitadas
+                    <span class="badge position-absolute top-0 start-100 translate-middle" id="solicitadasCount">0</span>
+                </button>
+
+                <button type="button" class="btn seg-btn-light" id="clearStatusFilter" style="display: none;">
+                    <i class="ti ti-x"></i> Limpiar filtro
+                </button>
             </div>
         </div>
+
+        <% if (canCreate) { %>
+            <a href="<%= baseDashboardPath %>/quotes/new" class="quotes-new-btn">
+                <i class="ti ti-plus me-1"></i>Nueva Cotización
+            </a>
+        <% } %>
     </div>
 
-    <div class="card-body" id="quotes-content">
-        <!-- Date Filter Pills and Status Filter Buttons -->
-        <div class="mb-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="btn-group" role="group" aria-label="Filtro por estado de servicios">
-                    <input type="radio" class="btn-check" name="dateFilter" id="filterFuture" value="future" checked>
-                    <label class="btn btn-outline-primary" for="filterFuture">
-                        <i class="ti ti-calendar-event me-1"></i>Actuales
-                    </label>
-                    
-                    <input type="radio" class="btn-check" name="dateFilter" id="filterPrevious" value="previous">
-                    <label class="btn btn-outline-primary" for="filterPrevious">
-                        <i class="ti ti-calendar-time me-1"></i>Anteriores
-                    </label>
-                </div>
+    <% if (showClientColumn) { %>
+    <!-- Filtro genérico por Agencia / Cliente (solo admin/superadmin) -->
+    <div class="quotes-agencyfilter">
+        <%- include('../../molecules/filters/client-agency-filter', { idPrefix: 'quotes' }) %>
+    </div>
+    <% } %>
 
-                <div class="d-inline-flex gap-2">
-                    <button type="button" class="btn btn-outline-primary position-relative" id="filterSolicitadas">
-                        <i class="ti ti-check me-1"></i>Solicitadas
-                        <span class="badge bg-primary text-white position-absolute top-0 start-100 translate-middle" id="solicitadasCount">0</span>
-                    </button>
-
-                    <button type="button" class="btn btn-sm btn-light" id="clearStatusFilter" style="display: none;">
-                        <i class="ti ti-x"></i> Limpiar filtro
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <% if (showClientColumn) { %>
-        <!-- Filtro genérico por Agencia / Cliente (solo admin/superadmin) -->
-        <div class="mb-3">
-            <%- include('../../molecules/filters/client-agency-filter', { idPrefix: 'quotes' }) %>
-        </div>
-        <% } %>
-
-        <div class="table-responsive">
-            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
-                <thead class="table-light">
+    <div class="table-responsive">
+        <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+            <thead class="table-light">
                     <tr>
                         <th>Folio</th>
                         <% if (showClientColumn) { %><th>Cliente</th><% } %>
@@ -101,7 +88,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                         <th class="text-center">No. Personas</th>
                         <th class="text-center">Fecha inicio de servicios</th>
                         <th class="text-center">Fecha Creación</th>
-                        <th class="text-center">Estatus</th>
+                        <th class="text-center status-col">Estatus</th>
                         <th class="text-center">Última Modificación</th>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
@@ -111,7 +98,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 <tbody></tbody>
             </table>
         </div>
-    </div>
 </div>
 
 <!-- Copy Quote Modal -->
@@ -212,92 +198,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
     </div>
 </div>
 
-<!-- Generate Receipt Modal -->
-<div class="modal fade" id="generateReceiptModal" tabindex="-1" aria-labelledby="generateReceiptModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title text-white" id="generateReceiptModalLabel">
-                    <i class="ti ti-receipt me-2"></i>Generar Recibo
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>¿Desea generar el recibo para la cotización <strong id="receiptQuoteFolio"></strong>?</p>
-                
-                <% if (dtUserRole === 'admin') { %>
-                <!-- Payment Info Selection for Admin Only -->
-                <div class="mb-3">
-                    <label for="paymentInfoSelect" class="form-label">
-                        <strong>Método de Pago a Incluir</strong>
-                    </label>
-                    <select class="form-select" id="paymentInfoSelect">
-                        <option value="">Sin información de pago</option>
-                        <option value="loading" disabled>Cargando métodos de pago...</option>
-                    </select>
-                    <div class="form-text">Selecciona qué información de pago incluir en el recibo</div>
-                </div>
-                <% } %>
-                
-                <div class="alert alert-info d-flex align-items-start" role="alert">
-                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
-                    <div>
-                        <strong>Información:</strong>
-                        <ul class="mb-0 mt-1 ps-3">
-                            <li>Se generará un recibo oficial</li>
-                            <li>La cotización debe estar en estado "<%= dtUserRole === 'admin' ? 'APROBADO' : 'AGENDADO' %>"</li>
-                            <li>El recibo se enviará por correo electrónico</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="ti ti-x me-1"></i>Cancelar
-                </button>
-                <button type="button" class="btn btn-success" id="confirmGenerateReceiptBtn">
-                    <i class="ti ti-receipt me-1"></i>Generar Recibo
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Request Invoice Modal -->
-<div class="modal fade" id="requestInvoiceModal" tabindex="-1" aria-labelledby="requestInvoiceModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-white">
-                <h5 class="modal-title text-white" id="requestInvoiceModalLabel">
-                    <i class="ti ti-file-invoice me-2"></i>Solicitar Factura
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>¿Desea solicitar la factura para la cotización <strong id="invoiceQuoteFolio"></strong>?</p>
-                <div class="alert alert-info d-flex align-items-start" role="alert">
-                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
-                    <div>
-                        <strong>Información:</strong>
-                        <ul class="mb-0 mt-1 ps-3">
-                            <li>Se enviará una solicitud al departamento de facturación</li>
-                            <li>La cotización debe estar en estado "<%= dtUserRole === 'admin' ? 'APROBADO' : 'AGENDADO' %>"</li>
-                            <li>Recibirá confirmación por correo electrónico</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="ti ti-x me-1"></i>Cancelar
-                </button>
-                <button type="button" class="btn btn-warning" id="confirmRequestInvoiceBtn">
-                    <i class="ti ti-file-invoice me-1"></i>Solicitar Factura
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Los modales de Recibo y Factura se movieron a reservations-table.ejs -->
 
 <!-- Convert to Reservation Modal -->
 <div class="modal fade" id="convertReservationModal" tabindex="-1" aria-labelledby="convertReservationModalLabel" aria-hidden="true">
@@ -352,6 +253,119 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 <!-- Note: Modal HTML will be dynamically generated to match quote summary implementation -->
 
 <style>
+/* ===== Rediseño limpio (catálogo) — cotizaciones ===== */
+.quotes-wrap {
+    --olive: #6E7A50;
+    --olive-d: #566040;
+    --line: #e7e3d8;
+    --ink: #4a4a42;
+}
+.quotes-wrap .quotes-filters {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 1rem;
+}
+.quotes-wrap .quotes-filters__left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+/* Segmento de fecha (Actuales / Anteriores) */
+.quotes-wrap .seg-group .btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.4rem 0.9rem;
+}
+.quotes-wrap .seg-group .btn:hover {
+    border-color: var(--olive);
+    color: var(--olive-d);
+}
+.quotes-wrap .seg-group .btn-check:checked + .btn {
+    background: var(--olive);
+    border-color: var(--olive);
+    color: #fff;
+}
+/* Botón Solicitadas */
+.quotes-wrap .seg-btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.4rem 0.9rem;
+}
+.quotes-wrap .seg-btn:hover,
+.quotes-wrap .seg-btn.active {
+    border-color: var(--olive);
+    color: var(--olive-d);
+}
+.quotes-wrap .seg-btn .badge {
+    background: var(--olive) !important;
+    color: #fff;
+    font-size: 0.68rem;
+}
+.quotes-wrap .seg-btn-light {
+    border: 1px solid var(--line);
+    background: #f6f4ee;
+    color: #8a8578;
+    font-size: 0.8rem;
+    padding: 0.35rem 0.75rem;
+}
+/* Botón Nueva Cotización */
+.quotes-wrap .quotes-new-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--olive);
+    color: #fff;
+    border: 1px solid var(--olive);
+    border-radius: 8px;
+    padding: 0.45rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background .15s ease;
+}
+.quotes-wrap .quotes-new-btn:hover {
+    background: var(--olive-d);
+    color: #fff;
+}
+.quotes-wrap .quotes-agencyfilter { margin-bottom: 1rem; }
+/* Encabezado de tabla sobrio */
+.quotes-wrap .table { margin-bottom: 0; }
+.quotes-wrap .table > thead th {
+    background: #faf9f5;
+    color: #6b6656;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--line);
+    border-top: none;
+    padding: 0.7rem 0.75rem;
+    white-space: nowrap;
+}
+.quotes-wrap .table > tbody td {
+    border-bottom: 1px solid #f1efe8;
+    vertical-align: middle;
+}
+/* Columna de Estatus más ancha para el dropdown */
+.quotes-wrap .table th.status-col,
+.quotes-wrap .table td.status-col {
+    min-width: 170px;
+}
+.quotes-wrap .table td.status-col .status-select-wrapper,
+.quotes-wrap .table td.status-col .status-selector {
+    width: 100%;
+}
+
 /* Gradient backgrounds for role badges */
 .bg-gradient-purple {
     background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%) !important;
@@ -393,8 +407,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         // Variables to store quote IDs for modal actions
         let copyQuoteId = null;
         let deleteQuoteId = null;
-        let generateReceiptQuoteId = null;
-        let requestInvoiceQuoteId = null;
         let cancelReservationQuoteId = null;
         let convertReservationData = null;
 
@@ -600,10 +612,11 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                     }
                 },
                 {
-                    data: 'contactPerson',
+                    // Columna "Cliente Final": el cliente final real (resuelto por id o texto libre),
+                    // NO el contacto. Antes mostraba contactPerson (p.ej. "Admin User" con contacto=propietario).
+                    data: 'clientFinalDisplay',
                     render: function(data, type, row) {
-                        const name = (data && data.trim())
-                            || `${row.contactFirstName || ''} ${row.contactLastName || ''}`.trim();
+                        const name = (data && data.trim()) || (row.clientFinalName || '').trim();
                         if (!name) return '<em class="text-muted">—</em>';
                         return `<span>${name}</span>`;
                     }
@@ -687,7 +700,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 },
                 {
                     data: 'status',
-                    className: 'text-center',
+                    className: 'text-center status-col',
                     render: function(data, type, row) {
                         const userRole = '<%= dtUserRole %>';
 
@@ -804,40 +817,9 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                                             <i class="ti ti-file-text"></i>
                                         </button>`;
                             <% } %>
-                            
-                            // Generate Receipt button
-                            actions += `<button type="button"
-                                            class="btn btn-success generate-receipt-btn"
-                                            data-id="${data.objectId || data.id}"
-                                            data-folio="${data.folio}"
-                                            data-bs-toggle="tooltip"
-                                            data-bs-placement="top"
-                                            title="Generar Recibo">
-                                            <i class="ti ti-receipt"></i>
-                                        </button>`;
 
-                            // Request Invoice button (only show if no pending request)
-                            if (!data.hasPendingInvoiceRequest) {
-                                actions += `<button type="button"
-                                                class="btn btn-warning request-invoice-btn"
-                                                data-id="${data.objectId || data.id}"
-                                                data-folio="${data.folio}"
-                                                data-bs-toggle="tooltip"
-                                                data-bs-placement="top"
-                                                title="Solicitar Factura">
-                                                <i class="ti ti-file-invoice"></i>
-                                            </button>`;
-                            } else {
-                                // Show disabled button with different text when invoice already requested
-                                actions += `<button type="button"
-                                                class="btn btn-secondary"
-                                                disabled
-                                                data-bs-toggle="tooltip"
-                                                data-bs-placement="top"
-                                                title="Factura ya solicitada">
-                                                <i class="ti ti-file-invoice"></i>
-                                            </button>`;
-                            }
+                            // NOTA: "Generar Recibo" y "Solicitar Factura" se movieron a la
+                            // tabla de RESERVACIONES (reservations-table.ejs). Ya no viven aquí.
 
                             // Cancel Reservation button
                             actions += `<button type="button"
@@ -1213,39 +1195,13 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
 
         // Reserved Quote Action Event Handlers
 
-        // Generate Receipt button click
-        $(`#${tableId}`).on('click', '.generate-receipt-btn', function() {
-            const quoteId = $(this).data('id');
-            const quoteFolio = $(this).data('folio');
-            openGenerateReceiptModal(quoteId, quoteFolio);
-        });
-
-        // Request Invoice button click
-        $(`#${tableId}`).on('click', '.request-invoice-btn', function() {
-            const quoteId = $(this).data('id');
-            const quoteFolio = $(this).data('folio');
-            openRequestInvoiceModal(quoteId, quoteFolio);
-        });
+        // Recibo/Factura: sus handlers viven ahora en reservations-table.ejs.
 
         // Cancel Reservation button click
         $(`#${tableId}`).on('click', '.cancel-reservation-btn', function() {
             const quoteId = $(this).data('id');
             const quoteFolio = $(this).data('folio');
             openCancelReservationModal(quoteId, quoteFolio);
-        });
-
-        // Confirm Generate Receipt button in modal
-        $('#confirmGenerateReceiptBtn').on('click', function() {
-            if (generateReceiptQuoteId) {
-                executeGenerateReceipt(generateReceiptQuoteId);
-            }
-        });
-
-        // Confirm Request Invoice button in modal
-        $('#confirmRequestInvoiceBtn').on('click', function() {
-            if (requestInvoiceQuoteId) {
-                executeRequestInvoice(requestInvoiceQuoteId);
-            }
         });
 
         // Note: Cancel reservation confirmation is handled in the dynamically created modal
@@ -1643,83 +1599,9 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         }
 
         // Reserved Quote Action Functions
-
-        /**
-         * Load payment info options for admin
-         */
-        async function loadPaymentInfoOptions() {
-            const userRole = '<%= dtUserRole %>';
-            if (userRole !== 'admin') return;
-
-            const select = document.getElementById('paymentInfoSelect');
-            if (!select) return;
-
-            try {
-                const response = await fetch('/api/payment-info', {
-                    headers: {
-                        'Authorization': `Bearer ${getAccessToken()}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                const result = await response.json();
-                
-                // Clear loading option
-                select.innerHTML = '<option value="">Sin información de pago</option>';
-                
-                if (result.success && result.data && result.data.length > 0) {
-                    result.data.forEach(paymentInfo => {
-                        const option = document.createElement('option');
-                        option.value = paymentInfo.id;
-                        option.textContent = paymentInfo.name;
-                        
-                        // Set default option as selected
-                        if (paymentInfo.isDefault) {
-                            option.selected = true;
-                        }
-                        
-                        select.appendChild(option);
-                    });
-                } else {
-                    const option = document.createElement('option');
-                    option.value = '';
-                    option.textContent = 'No hay métodos de pago configurados';
-                    option.disabled = true;
-                    select.appendChild(option);
-                }
-            } catch (error) {
-                console.error('Error loading payment info options:', error);
-                select.innerHTML = '<option value="">Error al cargar métodos de pago</option>';
-            }
-        }
-
-        /**
-         * Open generate receipt confirmation modal
-         * @param {string} quoteId - Quote ID to generate receipt for
-         * @param {string} quoteFolio - Quote folio for display
-         */
-        function openGenerateReceiptModal(quoteId, quoteFolio) {
-            generateReceiptQuoteId = quoteId;
-            $('#receiptQuoteFolio').text(quoteFolio);
-            
-            // Load payment info options for admin
-            loadPaymentInfoOptions();
-            
-            const receiptModal = new bootstrap.Modal(document.getElementById('generateReceiptModal'));
-            receiptModal.show();
-        }
-
-        /**
-         * Open request invoice confirmation modal
-         * @param {string} quoteId - Quote ID to request invoice for
-         * @param {string} quoteFolio - Quote folio for display
-         */
-        function openRequestInvoiceModal(quoteId, quoteFolio) {
-            requestInvoiceQuoteId = quoteId;
-            $('#invoiceQuoteFolio').text(quoteFolio);
-            const invoiceModal = new bootstrap.Modal(document.getElementById('requestInvoiceModal'));
-            invoiceModal.show();
-        }
+        // NOTA: las funciones de Recibo/Factura (loadPaymentInfoOptions,
+        // openGenerateReceiptModal, openRequestInvoiceModal, executeGenerateReceipt,
+        // executeRequestInvoice y sus close*) se movieron a reservations-table.ejs.
 
         /**
          * Open cancel reservation modal using the same implementation as quote summary
@@ -1899,162 +1781,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         }
 
         /**
-         * Execute receipt generation
-         * @param {string} quoteId - Quote ID to generate receipt for
-         */
-        function executeGenerateReceipt(quoteId) {
-            // Show loading state
-            const confirmButton = $('#confirmGenerateReceiptBtn');
-            const originalText = confirmButton.html();
-            confirmButton.prop('disabled', true).html('<i class="ti ti-loader ti-spin me-1"></i>Generando...');
-
-            // Get selected payment info (admin only)
-            const userRole = '<%= dtUserRole %>';
-            let includePaymentInfo = true; // Default for non-admin roles
-            let selectedPaymentInfoId = null;
-            
-            if (userRole === 'admin') {
-                const select = document.getElementById('paymentInfoSelect');
-                if (select && select.value) {
-                    selectedPaymentInfoId = select.value;
-                    includePaymentInfo = true; // Include payment info if a method is selected
-                } else {
-                    includePaymentInfo = false; // No payment info if nothing selected
-                }
-            }
-
-            // Create a form and submit it to trigger download
-            const token = getAccessToken();
-            const form = $('<form>', {
-                'method': 'POST',
-                'action': `${apiEndpoint}/${quoteId}/generate-receipt`,
-                'target': '_blank'
-            });
-
-            // Add authorization header through a hidden input (for download)
-            // Note: For file downloads, we'll use a different approach
-            
-            // Alternative approach: Use fetch API for better control
-            fetch(`${apiEndpoint}/${quoteId}/generate-receipt`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    includePaymentInfo,
-                    paymentInfoId: selectedPaymentInfoId 
-                })
-            })
-            .then(response => {
-                console.log('PDF generation response status:', response.status);
-                console.log('PDF generation response headers:', response.headers);
-                
-                if (!response.ok) {
-                    // Try to get the error message from the response
-                    return response.json().then(errorData => {
-                        console.error('Server error details:', errorData);
-                        throw new Error(`${response.status}: ${errorData.error || errorData.message || 'Unknown server error'}`);
-                    }).catch(jsonError => {
-                        // If response isn't JSON, throw a generic error
-                        console.error('Failed to parse error response:', jsonError);
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    });
-                }
-                
-                // Check if the response is a PDF
-                const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('application/pdf')) {
-                    // Handle PDF download
-                    return response.blob().then(blob => {
-                        // Create download link
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `Receipt-${quoteId}.pdf`;
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        document.body.removeChild(a);
-                        
-                        // Show success message
-                        closeGenerateReceiptModal();
-                        showSuccessAlert('Recibo generado y descargado exitosamente');
-                        dataTable.ajax.reload(null, false);
-                        generateReceiptQuoteId = null;
-                    });
-                } else {
-                    // Handle JSON response
-                    return response.json().then(data => {
-                        if (data.success) {
-                            closeGenerateReceiptModal();
-                            showSuccessAlert(data.message || 'Recibo generado exitosamente');
-                            dataTable.ajax.reload(null, false);
-                            generateReceiptQuoteId = null;
-                        } else {
-                            throw new Error(data.error || 'Error al generar el recibo');
-                        }
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('PDF generation error:', error);
-                closeGenerateReceiptModal();
-                
-                // Provide more detailed error information
-                let errorMessage = 'Error al generar el recibo';
-                if (error.message) {
-                    if (error.message.includes('401')) {
-                        errorMessage = 'Error de autenticación. Por favor, inicia sesión de nuevo.';
-                    } else if (error.message.includes('403')) {
-                        errorMessage = 'No tienes permisos para generar recibos.';
-                    } else if (error.message.includes('404')) {
-                        errorMessage = 'La cotización no fue encontrada.';
-                    } else if (error.message.includes('500')) {
-                        errorMessage = 'Error del servidor. Intenta de nuevo más tarde.';
-                    } else {
-                        errorMessage = `Error: ${error.message}`;
-                    }
-                }
-                
-                showErrorAlert(errorMessage);
-            })
-            .finally(() => {
-                // Reset button state
-                confirmButton.prop('disabled', false).html(originalText);
-            });
-        }
-
-        /**
-         * Execute invoice request
-         * @param {string} quoteId - Quote ID to request invoice for
-         */
-        function executeRequestInvoice(quoteId) {
-            $.ajax({
-                url: `${apiEndpoint}/${quoteId}/request-invoice`,
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({}),
-                success: function(response) {
-                    if (response.success) {
-                        closeRequestInvoiceModal();
-                        showSuccessAlert(response.message || 'Solicitud de factura enviada exitosamente');
-                        dataTable.ajax.reload(null, false);
-                        requestInvoiceQuoteId = null;
-                    } else {
-                        closeRequestInvoiceModal();
-                        showErrorAlert(response.error || 'Error al solicitar la factura');
-                    }
-                },
-                error: function(xhr) {
-                    closeRequestInvoiceModal();
-                    const errorMsg = xhr.responseJSON?.error || 'Error al solicitar la factura';
-                    showErrorAlert(errorMsg);
-                }
-            });
-        }
-
-        /**
          * Process cancellation request (identical to quote summary implementation)
          * @param {object} quote - Quote data
          * @param {boolean} requiresApproval - Whether approval is required
@@ -2133,34 +1859,6 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                 // Restore button state
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-            }
-        }
-
-        /**
-         * Close generate receipt modal properly
-         */
-        function closeGenerateReceiptModal() {
-            const modalElement = document.getElementById('generateReceiptModal');
-            if (modalElement) {
-                const modal = bootstrap.Modal.getInstance(modalElement);
-                if (modal) {
-                    modal.hide();
-                }
-                cleanupModal();
-            }
-        }
-
-        /**
-         * Close request invoice modal properly
-         */
-        function closeRequestInvoiceModal() {
-            const modalElement = document.getElementById('requestInvoiceModal');
-            if (modalElement) {
-                const modal = bootstrap.Modal.getInstance(modalElement);
-                if (modal) {
-                    modal.hide();
-                }
-                cleanupModal();
             }
         }
 

@@ -37,9 +37,14 @@ const currentPath = '/dashboard/clients';
                     </ol>
                 </nav>
             </div>
-            <div class="text-muted">
-                <small class="d-block">Total clientes registrados</small>
-                <strong id="total-clients-count">-</strong>
+            <div class="d-flex align-items-center gap-3">
+                <div class="text-muted text-end">
+                    <small class="d-block">Total clientes registrados</small>
+                    <strong id="total-clients-count">-</strong>
+                </div>
+                <button type="button" class="clientes-new-btn" data-bs-toggle="modal" data-bs-target="#createClientModal">
+                    <i class="ti ti-plus"></i>Nuevo Cliente
+                </button>
             </div>
         </div>
     </div>

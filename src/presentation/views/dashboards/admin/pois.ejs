@@ -18,7 +18,8 @@ const activeSection = typeof section !== 'undefined' ? section : 'pois';
 // Menu items configuration
 const menuItems = [
     { label: 'Destinos', icon: 'map-pin', section: 'pois', href: '/dashboard/admin/pois' },
-    { label: 'Tipos de Traslado', icon: 'list', section: 'types', href: '/dashboard/admin/pois?section=types' }
+    { label: 'Tipos de Traslado', icon: 'list', section: 'types', href: '/dashboard/admin/pois?section=types' },
+    { label: 'Categorías de Experiencias', icon: 'category', section: 'experience-categories', href: '/dashboard/admin/pois?section=experience-categories' }
 ];
 %>
 
@@ -73,6 +74,16 @@ const menuItems = [
             <%- include('../../organisms/datatable/service-types-table', {
                 tableId: 'service-types-table',
                 apiEndpoint: '/api/service-types',
+                userRole: currentUserRole,
+                showActions: true
+            }) %>
+
+        <% } else if (activeSection === 'experience-categories') { %>
+            <!-- Experience Categories Management Section -->
+
+            <%- include('../../organisms/datatable/experience-categories-table', {
+                tableId: 'experience-categories-table',
+                apiEndpoint: '/api/experience-categories',
                 userRole: currentUserRole,
                 showActions: true
             }) %>

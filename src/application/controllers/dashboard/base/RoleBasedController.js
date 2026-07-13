@@ -192,7 +192,26 @@ class RoleBasedController extends DashboardController {
             profilePicture: parseUser.get('profilePicture'),
             role: parseUser.get('role') || basicUserData.role,
             organizationId: parseUser.get('organizationId'),
+            // Datos de empresa/fiscales (agencias): para que el perfil muestre lo mismo que el admin.
+            companyName: parseUser.get('contextualData')?.companyName || '',
+            taxId: parseUser.get('taxId') || '',
+            website: parseUser.get('website') || '',
+            notes: parseUser.get('notes') || '',
+            address: parseUser.get('address') || {},
           };
+
+          // La URL de foto guardada en `profilePicture` es presignada y expira (→ 403).
+          // Se regenera fresca desde el S3 key estable, igual que apiController.getUserProfile.
+          const profilePictureS3Key = parseUser.get('profilePictureS3Key');
+          if (profilePictureS3Key) {
+            try {
+              const FileStorageService = require('../../../services/FileStorageService');
+              const fileStorageService = new FileStorageService();
+              fullUserData.profilePicture = await fileStorageService.getPresignedUrl(profilePictureS3Key);
+            } catch (imgError) {
+              // Si falla, se conserva la URL guardada (el front cae a iniciales si da 403).
+            }
+          }
         } else {
           // User not found in either table, will use basic user data
         }
@@ -222,6 +241,11 @@ class RoleBasedController extends DashboardController {
         profilePicture: fullUserData.profilePicture || fullUserData.avatar || '',
         role: fullUserData.role || this.role,
         organizationId: fullUserData.organizationId || fullUserData.organization_id || '',
+        companyName: fullUserData.companyName || '',
+        taxId: fullUserData.taxId || '',
+        website: fullUserData.website || '',
+        notes: fullUserData.notes || '',
+        address: fullUserData.address || {},
       };
 
       await this.renderRoleView(req, res, 'profile', {

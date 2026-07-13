@@ -29,117 +29,118 @@ const canManageReservations = !!(locals && locals.canManageReservations);
         backdrop-filter: blur(1px);
         border-radius: 0.5rem;
     }
-    /* Contador del pill "Pendientes de completar": badge salvia en la esquina sup. der. */
+    /* Contador del pill "Pendientes de completar": badge ámbar INLINE (junto al texto) */
     .pending-completion-badge {
-        position: absolute;
-        top: -8px;
-        right: -8px;
-        min-width: 22px;
-        height: 22px;
-        padding: 0 6px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: var(--brand-primary);
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        margin-left: 6px;
+        background: #b8894a;
         color: #fff;
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         font-weight: 700;
-        border-radius: 11px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
+        vertical-align: middle;
     }
+    /* ===== Rediseño limpio (sin card blanca), consistente con traslados/clientes ===== */
+    .exp-catalog { --exp-border: #d6d1c4; --exp-olive: #6E7A50; --exp-olive-light: #7C8A5A; --exp-muted: #8a8f78; --exp-dark: #2b2b2b; }
+    /* Filtro de fecha (btn-check radios) al look segmentado */
+    .exp-catalog .btn-group > .btn-check + .btn.btn-outline-primary {
+        border: 1px solid var(--exp-border);
+        color: var(--exp-dark);
+        background: rgba(255, 255, 255, 0.4);
+        font-size: 0.85rem; letter-spacing: 0.02em; font-weight: 600;
+        padding: 9px 15px;
+    }
+    .exp-catalog .btn-group > .btn-check + .btn.btn-outline-primary:hover { background: rgba(110, 122, 80, 0.08); color: var(--exp-dark); }
+    .exp-catalog .btn-group > .btn-check:checked + .btn.btn-outline-primary { background: var(--exp-olive); border-color: var(--exp-olive); color: #fff; }
+    /* Selects Año/Mes/Día estilo catálogo */
+    .exp-catalog .form-select-sm { border: 1px solid var(--exp-border); background: rgba(255, 255, 255, 0.45); color: var(--exp-dark); border-radius: 6px; }
+    .exp-catalog .form-select-sm:focus { border-color: var(--exp-olive); background: #fff; box-shadow: none; }
+    /* thead sobrio (crema/versalita) */
+    .exp-catalog .table > thead.table-light th { background: rgba(228, 223, 207, 0.35); border-bottom: 1px solid var(--exp-border); color: var(--exp-muted); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; vertical-align: middle; }
+    /* Barra de filtros: fecha (izq) · Año/Mes/Día (der) */
+    /* Toda la barra en UNA sola fila: pills (izq) + Año/Mes/Día (der). No envuelve;
+       si en una ventana muy angosta no cabe, hace scroll horizontal en vez de bajar. */
+    .reservations-filters { display: flex; justify-content: space-between; align-items: center; gap: 12px 16px; flex-wrap: nowrap; overflow-x: auto; margin-bottom: 18px; }
+    /* Los pills de fecha se mantienen en una sola fila (no se parten con el badge). */
+    .reservations-filters .btn-group { flex-wrap: nowrap; flex-shrink: 0; }
+    .reservations-filters .btn-group > .btn { white-space: nowrap; }
+    .reservations-filters .date-selects { display: flex; align-items: center; gap: 14px; flex-wrap: nowrap; flex-shrink: 0; }
+    .reservations-filters .date-sel { display: inline-flex; align-items: center; gap: 8px; }
+    .reservations-filters .date-sel .seglabel { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--exp-muted); font-weight: 600; }
+    .reservations-filters .date-sel .form-select-sm { min-width: 84px; font-size: 0.85rem; }
+    .reservations-filters .info-icon { color: var(--exp-olive); cursor: pointer; font-size: 1.1rem; }
 </style>
 
 <!-- Page Content -->
 <div class="page-content">
     <div class="row">
         <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-                    <div class="row align-items-center">
-                        <div class="col">
-                            <h5 class="card-title mb-0 text-white">
-                                <i class="ti ti-clipboard-list me-2"></i>Reservaciones
-                            </h5>
-                            <small class="text-white" style="opacity: 0.9;">Reservaciones creadas a partir de cotizaciones agendadas</small>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card-body">
+            <div class="exp-catalog reservations-wrap">
+                <div class="reservations-body">
                     <!-- Date Filter Pills and Date Selectors -->
-                    <div class="mb-3">
-                        <div class="row align-items-center">
-                            <div class="col-md-auto mb-2 mb-md-0">
-                                <div class="btn-group" role="group" aria-label="Filtro por fecha de reservaciones">
-                                    <input type="radio" class="btn-check" name="dateFilter" id="filterPendingCompletion" value="pending_completion">
-                                    <label class="btn btn-outline-primary position-relative" for="filterPendingCompletion">
-                                        <i class="ti ti-alert-triangle me-1"></i>PENDIENTES DE COMPLETAR
-                                        <span id="pendingCompletionCounter" class="pending-completion-badge d-none">0</span>
-                                    </label>
+                    <!-- Barra de filtros: fecha (izquierda) · Año/Mes/Día (derecha) -->
+                    <div class="reservations-filters">
+                        <div class="btn-group" role="group" aria-label="Filtro por fecha de reservaciones">
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterPendingCompletion" value="pending_completion">
+                            <label class="btn btn-outline-primary position-relative" for="filterPendingCompletion">
+                                <i class="ti ti-alert-triangle me-1"></i>Pendientes de completar
+                                <span id="pendingCompletionCounter" class="pending-completion-badge d-none">0</span>
+                            </label>
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterUpcoming" value="upcoming" checked>
+                            <label class="btn btn-outline-primary" for="filterUpcoming">
+                                <i class="ti ti-calendar-plus me-1"></i>Próximas
+                            </label>
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterOngoing" value="ongoing">
+                            <label class="btn btn-outline-primary" for="filterOngoing">
+                                <i class="ti ti-calendar-event me-1"></i>En curso
+                            </label>
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterPast" value="past">
+                            <label class="btn btn-outline-primary" for="filterPast">
+                                <i class="ti ti-calendar-time me-1"></i>Pasadas
+                            </label>
+                            <input type="radio" class="btn-check" name="dateFilter" id="filterCancelled" value="cancelled">
+                            <label class="btn btn-outline-primary" for="filterCancelled">
+                                <i class="ti ti-calendar-off me-1"></i>Canceladas
+                            </label>
+                        </div>
 
-                                    <input type="radio" class="btn-check" name="dateFilter" id="filterUpcoming" value="upcoming" checked>
-                                    <label class="btn btn-outline-primary" for="filterUpcoming">
-                                        <i class="ti ti-calendar-forward me-1"></i>PRÓXIMAS
-                                    </label>
-                                    
-                                    <input type="radio" class="btn-check" name="dateFilter" id="filterOngoing" value="ongoing">
-                                    <label class="btn btn-outline-primary" for="filterOngoing">
-                                        <i class="ti ti-calendar-event me-1"></i>EN CURSO
-                                    </label>
-                                    
-                                    <input type="radio" class="btn-check" name="dateFilter" id="filterPast" value="past">
-                                    <label class="btn btn-outline-primary" for="filterPast">
-                                        <i class="ti ti-calendar-time me-1"></i>PASADAS
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-auto">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="text-muted">|</span>
-                                    
-                                    <!-- Year Filter -->
-                                    <div class="d-flex align-items-center">
-                                        <label for="yearFilter" class="form-label mb-0 me-2 text-muted">Año:</label>
-                                        <select class="form-select form-select-sm" id="yearFilter" style="width: 100px;">
-                                            <!-- Options will be populated by JavaScript -->
-                                        </select>
-                                    </div>
-                                    
-                                    <!-- Month Filter -->
-                                    <div class="d-flex align-items-center">
-                                        <label for="monthFilter" class="form-label mb-0 me-2 text-muted">Mes:</label>
-                                        <select class="form-select form-select-sm" id="monthFilter" style="width: 130px;">
-                                            <option value="">Todos</option>
-                                            <option value="1">Enero</option>
-                                            <option value="2">Febrero</option>
-                                            <option value="3">Marzo</option>
-                                            <option value="4">Abril</option>
-                                            <option value="5">Mayo</option>
-                                            <option value="6">Junio</option>
-                                            <option value="7">Julio</option>
-                                            <option value="8">Agosto</option>
-                                            <option value="9">Septiembre</option>
-                                            <option value="10">Octubre</option>
-                                            <option value="11">Noviembre</option>
-                                            <option value="12">Diciembre</option>
-                                        </select>
-                                    </div>
-                                    
-                                    <!-- Day Filter -->
-                                    <div class="d-flex align-items-center">
-                                        <label for="dayFilter" class="form-label mb-0 me-2 text-muted">Día:</label>
-                                        <select class="form-select form-select-sm" id="dayFilter" style="width: 85px;">
-                                            <option value="">Todos</option>
-                                            <!-- Days 1-31 will be populated by JavaScript -->
-                                        </select>
-                                    </div>
-
-                                    <!-- Info: cómo funcionan los filtros de fecha -->
-                                    <i class="ti ti-info-circle text-primary"
+                        <div class="date-selects">
+                            <span class="date-sel">
+                                <span class="seglabel">Año</span>
+                                <select class="form-select form-select-sm" id="yearFilter" aria-label="Año"></select>
+                            </span>
+                            <span class="date-sel">
+                                <span class="seglabel">Mes</span>
+                                <select class="form-select form-select-sm" id="monthFilter" aria-label="Mes">
+                                    <option value="">Todos</option>
+                                    <option value="1">Enero</option>
+                                    <option value="2">Febrero</option>
+                                    <option value="3">Marzo</option>
+                                    <option value="4">Abril</option>
+                                    <option value="5">Mayo</option>
+                                    <option value="6">Junio</option>
+                                    <option value="7">Julio</option>
+                                    <option value="8">Agosto</option>
+                                    <option value="9">Septiembre</option>
+                                    <option value="10">Octubre</option>
+                                    <option value="11">Noviembre</option>
+                                    <option value="12">Diciembre</option>
+                                </select>
+                            </span>
+                            <span class="date-sel">
+                                <span class="seglabel">Día</span>
+                                <select class="form-select form-select-sm" id="dayFilter" aria-label="Día">
+                                    <option value="">Todos</option>
+                                </select>
+                            </span>
+                                    <i class="ti ti-info-circle info-icon"
                                        role="button"
                                        tabindex="0"
-                                       style="cursor: pointer; font-size: 1.15rem;"
                                        aria-label="Cómo funcionan los filtros de fecha"
                                        data-bs-toggle="popover"
                                        data-bs-html="true"
@@ -147,8 +148,6 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                                        data-bs-placement="bottom"
                                        data-bs-title="¿Cómo funcionan los filtros?"
                                        data-bs-content="<strong>Pendientes de completar:</strong> reservaciones con la cotización bloqueada (faltan datos). No usan fecha.<br><br>Los demás filtros usan el rango de fechas de los servicios (inicio y fin):<br><strong>Próximas:</strong> aún no inicia.<br><strong>En curso:</strong> ya inició y no ha terminado.<br><strong>Pasadas:</strong> ya terminó.<br><br>El Año/Mes/Día acota a ese periodo: se muestra si la reservación tiene un servicio en la fecha seleccionada."></i>
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -198,6 +197,89 @@ const canManageReservations = !!(locals && locals.canManageReservations);
 </div>
 
 <!-- Sophisticated cancel modal will be dynamically created by shared JavaScript utilities -->
+
+<!-- Generate Receipt Modal (opera sobre la cotización agendada de la reservación) -->
+<div class="modal fade" id="generateReceiptModal" tabindex="-1" aria-labelledby="generateReceiptModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title text-white" id="generateReceiptModalLabel">
+                    <i class="ti ti-receipt me-2"></i>Generar Recibo
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Desea generar el recibo para la reservación <strong id="receiptQuoteFolio"></strong>?</p>
+                <!-- "Método de Pago a Incluir" oculto por ahora: el recibo actual no imprime
+                     datos de pago. (El JS que lo cargaba hace no-op si el select no existe.) -->
+                <!-- Perfil de Facturación (datos fiscales de la agencia) — para los 3 roles -->
+                <div class="mb-3">
+                    <label for="billingProfileSelect" class="form-label">
+                        <strong>Perfil de Facturación</strong>
+                        <span id="billingProfileSpinner" class="spinner-border spinner-border-sm text-secondary ms-2 d-none" role="status" aria-hidden="true"></span>
+                    </label>
+                    <select class="form-select" id="billingProfileSelect">
+                        <option value="">Sin datos de facturación</option>
+                    </select>
+                    <div class="form-text">Datos fiscales (RFC, razón social…) que se imprimen en el recibo</div>
+                </div>
+                <div class="alert alert-info d-flex align-items-start" role="alert">
+                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <strong>Información:</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            <li>Se generará un recibo oficial</li>
+                            <li>El recibo se descargará en PDF</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-success" id="confirmGenerateReceiptBtn">
+                    <i class="ti ti-receipt me-1"></i>Generar Recibo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Request Invoice Modal -->
+<div class="modal fade" id="requestInvoiceModal" tabindex="-1" aria-labelledby="requestInvoiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-white">
+                <h5 class="modal-title text-white" id="requestInvoiceModalLabel">
+                    <i class="ti ti-file-certificate me-2"></i>Solicitar Factura
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Desea solicitar la factura para la reservación <strong id="invoiceQuoteFolio"></strong>?</p>
+                <div class="alert alert-info d-flex align-items-start" role="alert">
+                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <strong>Información:</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            <li>Se enviará una solicitud al departamento de facturación</li>
+                            <li>Recibirá confirmación por correo electrónico</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-warning" id="confirmRequestInvoiceBtn">
+                    <i class="ti ti-file-certificate me-1"></i>Solicitar Factura
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Shared cancel utilities -->
 <script src="/js/reservation-cancel-utils.js"></script>
@@ -523,6 +605,24 @@ document.addEventListener('DOMContentLoaded', function() {
                         actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-text"></i></a>`;
                         <% } %>
                     }
+                    // Recibo / Factura: operan sobre la cotización agendada (row.quoteId).
+                    // Solo cuando la cotización sigue 'scheduled' y la reservación no está
+                    // cancelada (el backend exige status 'scheduled' para ambas acciones).
+                    // Gate por rol acorde a los permisos de ruta: Recibo = los 3 roles
+                    // (generate-receipt permite nivel 4+; client=5 también); Factura =
+                    // admin/department_manager.
+                    if (row.quoteId && row.quoteStatus === 'scheduled' && row.status !== 'cancelled') {
+                        actions += `<button class="btn btn-sm btn-outline-success generate-receipt-btn me-1" data-quote-id="${row.quoteId}" data-folio="${row.quoteFolio || row.folio}" title="Generar Recibo"><i class="ti ti-receipt"></i></button>`;
+                        <% if (basePath === 'admin' || basePath === 'department_manager') { %>
+                        if (!row.hasPendingInvoiceRequest) {
+                            actions += `<button class="btn btn-sm btn-outline-warning request-invoice-btn me-1" data-quote-id="${row.quoteId}" data-folio="${row.quoteFolio || row.folio}" title="Solicitar Factura"><i class="ti ti-file-certificate"></i></button>`;
+                        } else {
+                            // Ya solicitada: NO deshabilitado (así el tooltip nativo sí se ve) y clic
+                            // muestra el estado. Ícono con check para diferenciarlo del pendiente.
+                            actions += `<button class="btn btn-sm btn-outline-secondary invoice-requested-btn me-1" data-folio="${row.quoteFolio || row.folio}" title="Factura ya solicitada — pendiente de procesar"><i class="ti ti-file-certificate"></i></button>`;
+                        }
+                        <% } %>
+                    }
                     // No mostrar "Cancelar" si ya hay una solicitud de cancelación
                     // pendiente (evita solicitudes duplicadas), ni si ya está
                     // cancelada/completada.
@@ -606,7 +706,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // En "Pendientes de completar" (filtro por estado, no por fecha) los selectores
         // de fecha no aplican: no cambiamos el pill.
         const activePill = document.querySelector('input[name="dateFilter"]:checked');
-        if (activePill && activePill.value === 'pending_completion') return false;
+        // 'pending_completion' y 'cancelled' son filtros por estado (no por fecha):
+        // no se auto-cambian al tocar los selectores de Año/Mes/Día.
+        if (activePill && (activePill.value === 'pending_completion' || activePill.value === 'cancelled')) return false;
         const period = getSelectedPeriod();
         if (!period) return;
         const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -712,6 +814,215 @@ document.addEventListener('DOMContentLoaded', function() {
         // Use shared utility with table reload callback
         openReservationCancelModal(reservationId, () => {
             table.ajax.reload();
+        });
+    });
+
+    // ===== Generar Recibo / Solicitar Factura =====
+    // Movido desde la tabla de cotizaciones. Ambas acciones operan sobre la COTIZACIÓN
+    // agendada ligada a la reservación (data-quote-id), no sobre la reservación en sí.
+    let receiptQuoteId = null;
+    let invoiceQuoteId = null;
+    const rtNotifyOk = (m) => (window.showSuccessAlert ? window.showSuccessAlert(m) : alert(m));
+    const rtNotifyErr = (m) => (window.showErrorAlert ? window.showErrorAlert(m) : alert(m));
+
+    // Cargar métodos de pago (solo admin) en el modal de recibo.
+    async function loadReceiptPaymentInfoOptions() {
+        <% if (basePath === 'admin') { %>
+        const select = document.getElementById('paymentInfoSelect');
+        if (!select) return;
+        try {
+            const response = await fetch('/api/payment-info', {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
+            select.innerHTML = '<option value="">Sin información de pago</option>';
+            if (result.success && Array.isArray(result.data) && result.data.length > 0) {
+                result.data.forEach((paymentInfo) => {
+                    const option = document.createElement('option');
+                    option.value = paymentInfo.id;
+                    option.textContent = paymentInfo.name;
+                    if (paymentInfo.isDefault) option.selected = true;
+                    select.appendChild(option);
+                });
+            } else {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No hay métodos de pago configurados';
+                option.disabled = true;
+                select.appendChild(option);
+            }
+        } catch (error) {
+            console.error('Error loading payment info options:', error);
+            select.innerHTML = '<option value="">Error al cargar métodos de pago</option>';
+        }
+        <% } %>
+    }
+
+    // Cargar los perfiles de facturación de la AGENCIA de la cotización (los 3 roles).
+    // Preselecciona el guardado en la reservación o el principal.
+    async function loadBillingProfileOptions(quoteId) {
+        const select = document.getElementById('billingProfileSelect');
+        const spinner = document.getElementById('billingProfileSpinner');
+        if (!select || !quoteId) return;
+        // Estado de carga: spinner visible + select deshabilitado mostrando "Cargando…".
+        if (spinner) spinner.classList.remove('d-none');
+        select.disabled = true;
+        select.innerHTML = '<option value="" selected>Cargando perfiles…</option>';
+        try {
+            const response = await fetch(`/api/quotes/${quoteId}/billing-profiles`, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
+            const profiles = (result.success && result.data && result.data.profiles) || [];
+            const selectedId = (result.success && result.data && result.data.selectedProfileId) || '';
+            select.innerHTML = '<option value="">Sin datos de facturación</option>';
+            if (profiles.length > 0) {
+                profiles.forEach((p) => {
+                    const option = document.createElement('option');
+                    option.value = p.id;
+                    const rfc = p.rfc ? ` — ${p.rfc}` : '';
+                    option.textContent = `${p.label}${rfc}${p.isPrimary ? ' (principal)' : ''}`;
+                    if (p.id === selectedId) option.selected = true;
+                    select.appendChild(option);
+                });
+            } else {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'La agencia no tiene perfiles de facturación';
+                option.disabled = true;
+                select.appendChild(option);
+            }
+        } catch (error) {
+            console.error('Error loading billing profiles:', error);
+            select.innerHTML = '<option value="">Error al cargar perfiles</option>';
+        } finally {
+            // Fin de carga: ocultar spinner y reactivar el select.
+            if (spinner) spinner.classList.add('d-none');
+            select.disabled = false;
+        }
+    }
+
+    // Abrir modal de recibo
+    $('#reservations-table').on('click', '.generate-receipt-btn', function() {
+        receiptQuoteId = $(this).data('quote-id');
+        $('#receiptQuoteFolio').text($(this).data('folio') || '');
+        loadReceiptPaymentInfoOptions();
+        loadBillingProfileOptions(receiptQuoteId);
+        new bootstrap.Modal(document.getElementById('generateReceiptModal')).show();
+    });
+
+    // Abrir modal de factura
+    $('#reservations-table').on('click', '.request-invoice-btn', function() {
+        invoiceQuoteId = $(this).data('quote-id');
+        $('#invoiceQuoteFolio').text($(this).data('folio') || '');
+        new bootstrap.Modal(document.getElementById('requestInvoiceModal')).show();
+    });
+
+    // Factura ya solicitada: informa el estado (pendiente de procesar por facturación).
+    $('#reservations-table').on('click', '.invoice-requested-btn', function() {
+        const folio = $(this).data('folio') || '';
+        rtNotifyOk(`La factura de ${folio} ya fue solicitada y está pendiente de procesar por el departamento de facturación.`);
+    });
+
+    // Confirmar recibo → descarga el PDF
+    $('#confirmGenerateReceiptBtn').on('click', function() {
+        if (!receiptQuoteId) return;
+        const quoteId = receiptQuoteId;
+        const confirmButton = $(this);
+        const originalText = confirmButton.html();
+        confirmButton.prop('disabled', true).html('<i class="ti ti-loader ti-spin me-1"></i>Generando...');
+
+        let includePaymentInfo = true;
+        let selectedPaymentInfoId = null;
+        <% if (basePath === 'admin') { %>
+        const select = document.getElementById('paymentInfoSelect');
+        if (select && select.value) { selectedPaymentInfoId = select.value; includePaymentInfo = true; } else { includePaymentInfo = false; }
+        <% } %>
+
+        const hideReceiptModal = () => bootstrap.Modal.getInstance(document.getElementById('generateReceiptModal'))?.hide();
+
+        // Perfil de facturación elegido (los 3 roles).
+        const billingSel = document.getElementById('billingProfileSelect');
+        const billingProfileId = (billingSel && billingSel.value) ? billingSel.value : null;
+
+        fetch(`/api/quotes/${quoteId}/generate-receipt`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ includePaymentInfo, paymentInfoId: selectedPaymentInfoId, billingProfileId })
+        })
+        .then((response) => {
+            if (!response.ok) {
+                return response.json().then((errorData) => {
+                    throw new Error(`${response.status}: ${errorData.error || errorData.message || 'Error del servidor'}`);
+                }).catch(() => { throw new Error(`HTTP error! status: ${response.status}`); });
+            }
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/pdf')) {
+                return response.blob().then((blob) => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Receipt-${quoteId}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    hideReceiptModal();
+                    // Sin alerta de éxito: la descarga del PDF ya es señal suficiente.
+                    table.ajax.reload(null, false);
+                    receiptQuoteId = null;
+                });
+            }
+            return response.json().then((data) => {
+                if (data.success) {
+                    hideReceiptModal();
+                    table.ajax.reload(null, false);
+                    receiptQuoteId = null;
+                } else {
+                    throw new Error(data.error || 'Error al generar el recibo');
+                }
+            });
+        })
+        .catch((error) => {
+            hideReceiptModal();
+            let errorMessage = 'Error al generar el recibo';
+            if (error.message) {
+                if (error.message.includes('401')) errorMessage = 'Error de autenticación. Por favor, inicia sesión de nuevo.';
+                else if (error.message.includes('403')) errorMessage = 'No tienes permisos para generar recibos.';
+                else if (error.message.includes('404')) errorMessage = 'La cotización no fue encontrada.';
+                else if (error.message.includes('500')) errorMessage = 'Error del servidor. Intenta de nuevo más tarde.';
+                else errorMessage = `Error: ${error.message}`;
+            }
+            rtNotifyErr(errorMessage);
+        })
+        .finally(() => { confirmButton.prop('disabled', false).html(originalText); });
+    });
+
+    // Confirmar solicitud de factura
+    $('#confirmRequestInvoiceBtn').on('click', function() {
+        if (!invoiceQuoteId) return;
+        const quoteId = invoiceQuoteId;
+        const hideInvoiceModal = () => bootstrap.Modal.getInstance(document.getElementById('requestInvoiceModal'))?.hide();
+        $.ajax({
+            url: `/api/quotes/${quoteId}/request-invoice`,
+            type: 'POST',
+            contentType: 'application/json',
+            headers: { 'Authorization': `Bearer ${token}` },
+            data: JSON.stringify({}),
+            success: function(response) {
+                hideInvoiceModal();
+                if (response.success) {
+                    rtNotifyOk(response.message || 'Solicitud de factura enviada exitosamente');
+                    table.ajax.reload(null, false);
+                    invoiceQuoteId = null;
+                } else {
+                    rtNotifyErr(response.error || 'Error al solicitar la factura');
+                }
+            },
+            error: function(xhr) {
+                hideInvoiceModal();
+                rtNotifyErr(xhr.responseJSON?.error || 'Error al solicitar la factura');
+            }
         });
     });
 });

@@ -184,13 +184,18 @@ class PublicExperiencesService {
           }
           if (Array.isArray(entry.times)) {
             entry.times.forEach((slot) => {
-              if (slot && slot.start) {
-                times.push(slot.start);
+              const start = slot && (slot.start || slot.start_time || slot.startTime);
+              if (start) {
+                times.push(start);
               }
             });
-          } else if (entry.startTime) {
-            // Tolerancia: formato plano por día { day, startTime, endTime }
-            times.push(entry.startTime);
+          } else {
+            // Tolerancia: formato plano por entrada { day, start_time/startTime, end_time }.
+            // La data real de ProviderExperiencia usa snake_case (`start_time`).
+            const start = entry.start_time || entry.startTime;
+            if (start) {
+              times.push(start);
+            }
           }
         });
         return { days, times };
@@ -251,18 +256,32 @@ class PublicExperiencesService {
   }
 
   /**
-   * Formatea la duración (en MINUTOS) a horas legibles (p.ej. 360 → '6 hrs.', 90 → '1.5 hrs.').
-   * @param {number} duration - Duración en minutos.
+   * Formatea la duración (en HORAS) a horas y minutos legibles (p.ej. 6 → '6 hrs.',
+   * 1.5 → '1 hr. 30 min.', 0.5 → '30 min.'). Tanto `Experience` como `ProviderExperiencia`
+   * guardan `duration` en horas (admite fracciones).
+   * @param {number} duration - Duración en horas (admite fracciones, p.ej. 1.5).
    * @returns {string} Duración formateada o 'Por definir'.
    * @example
-   * service.formatDuration(360); // '6 hrs.'
+   * service.formatDuration(1.5); // '1 hr. 30 min.'
    */
   formatDuration(duration) {
     if (!duration) {
       return 'Por definir';
     }
-    const hours = +(duration / 60).toFixed(duration % 60 === 0 ? 0 : 1);
-    return `${hours} hrs.`;
+    const totalMinutes = Math.round(+duration * 60);
+    if (!totalMinutes) {
+      return 'Por definir';
+    }
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const parts = [];
+    if (hours > 0) {
+      parts.push(`${hours} ${hours === 1 ? 'hr.' : 'hrs.'}`);
+    }
+    if (minutes > 0) {
+      parts.push(`${minutes} min.`);
+    }
+    return parts.join(' ');
   }
 
   /**
@@ -353,10 +372,10 @@ class PublicExperiencesService {
       query.limit(1000);
 
       const experiences = await query.find({ useMasterKey: true });
-      if (!experiences.length) {
-        return byCategory;
-      }
 
+      // NOTA: no cortar aquí si `experiences` viene vacío. Puede no haber experiencias de la
+      // clase `Experience` con categoría (p.ej. en prod solo hay `ProviderExperiencia`), y aun
+      // así debemos consultar y mostrar las de proveedores/establecimientos más abajo.
       await Promise.all(experiences.map(async (experience) => {
         const category = experience.get('experience_category');
         const card = await this.buildCard(experience);
@@ -395,6 +414,64 @@ class PublicExperiencesService {
     } catch (error) {
       logger.error('Error building active experiences by category', { lang, error: error.message });
       return byCategory;
+    }
+  }
+
+  /**
+   * Resuelve la URL de la imagen única de una categoría (o fallback).
+   * @param {object|null} image - Objeto imagen `{ s3Key, optimizedVariants }`.
+   * @returns {Promise<string>} URL servible o respaldo.
+   * @example
+   */
+  async resolveCategoryImageUrl(image) {
+    if (!image) return FALLBACK_IMG;
+    try {
+      const variants = image.optimizedVariants;
+      const keyFrom = (v) => (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
+      let s3Key = null;
+      if (variants && typeof variants === 'object') {
+        s3Key = ['webp', 'jpeg', 'avif'].map((fmt) => keyFrom(variants[fmt])).find(Boolean) || null;
+      }
+      if (!s3Key) {
+        s3Key = image.s3Key || null;
+      }
+      if (s3Key) {
+        const url = await this.imageService.getPresignedUrl(s3Key);
+        return url || FALLBACK_IMG;
+      }
+    } catch (error) {
+      logger.warn('Error resolving category image', { error: error.message });
+    }
+    return FALLBACK_IMG;
+  }
+
+  /**
+   * Categorías de experiencias activas para la web pública (label por idioma + imagen).
+   * @param {string} lang - Idioma ('es' | 'en').
+   * @returns {Promise<Array<object>>} Array `[{ value, label, img }]` ordenado por sortOrder.
+   * @example
+   * const cats = await service.getActiveCategories('en');
+   */
+  async getActiveCategories(lang = 'es') {
+    try {
+      const query = new Parse.Query('ExperienceCategory');
+      query.equalTo('exists', true);
+      query.equalTo('active', true);
+      query.ascending('sortOrder');
+      query.addAscending('name');
+      query.limit(500);
+
+      const cats = await query.find({ useMasterKey: true });
+      return Promise.all(
+        cats.map(async (c) => ({
+          value: c.get('code'),
+          label: lang === 'en' ? c.get('name_en') || c.get('name') : c.get('name'),
+          img: await this.resolveCategoryImageUrl(c.get('image')),
+        }))
+      );
+    } catch (error) {
+      logger.error('Error building active categories', { lang, error: error.message });
+      return [];
     }
   }
 }

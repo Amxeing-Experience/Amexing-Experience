@@ -565,7 +565,7 @@ function formatDurationMinutes(minutes) {
  * @returns {Promise<Array>} Formatted experience data.
  * @example
  */
-async function getExperienciasData() {
+async function getExperienciasData(priceOptions) {
   const [experiences, providerExperiencias] = await Promise.all([
     (async () => {
       const query = new Parse.Query('Experience');
@@ -598,7 +598,9 @@ async function getExperienciasData() {
     rows.push({
       name: exp.get('name') || '',
       description: exp.get('description') || '',
-      cost: exp.get('cost') || 0,
+      adulto: applyPriceAdjustments(exp.get('cost') || 0, priceOptions),
+      nino: applyPriceAdjustments(exp.get('price_child') || 0, priceOptions),
+      sinAlcohol: applyPriceAdjustments(exp.get('price_no_alcohol') || 0, priceOptions),
       tipo: 'Experiencia',
       provider: '-',
       duration: formatDurationMinutes(exp.get('duration') || 0),
@@ -624,7 +626,9 @@ async function getExperienciasData() {
     rows.push({
       name: pe.get('name') || '',
       description: pe.get('description') || '',
-      cost: pe.get('price') || 0,
+      adulto: applyPriceAdjustments(pe.get('price') || 0, priceOptions),
+      nino: applyPriceAdjustments(pe.get('price_child') || 0, priceOptions),
+      sinAlcohol: applyPriceAdjustments(pe.get('price_no_alcohol') || 0, priceOptions),
       tipo: pe.get('tipo') || 'Proveedor',
       provider: prov ? prov.get('name') : '-',
       duration: formatDurationMinutes(pe.get('duration') || 0),
@@ -1126,9 +1130,9 @@ async function addADisposicionSheet(workbook, priceOptions) {
  * @example
  */
 async function addExperienciasSheet(workbook, priceOptions) {
-  const data = await getExperienciasData();
+  const data = await getExperienciasData(priceOptions);
   const sheet = workbook.addWorksheet('Experiencias', { properties: { tabColor: { argb: LIGHT_GREEN } } });
-  const headers = ['Nombre', 'Descripcion', 'Costo', 'Duracion', 'Dias Sugeridos', 'Horarios', 'Anticipacion', 'Incluye', 'No Incluye', 'Idiomas'];
+  const headers = ['Nombre', 'Descripcion', 'Adulto', 'Niño', 'Sin Alcohol', 'Duracion', 'Dias Sugeridos', 'Horarios', 'Anticipacion', 'Incluye', 'No Incluye', 'Idiomas'];
   const colCount = headers.length;
 
   const dataStart = await addCompanyHeader(sheet, workbook, colCount, priceOptions);
@@ -1137,14 +1141,16 @@ async function addExperienciasSheet(workbook, priceOptions) {
 
   sheet.getColumn(1).width = 25;
   sheet.getColumn(2).width = 35;
-  sheet.getColumn(3).width = 15;
-  sheet.getColumn(4).width = 12;
-  sheet.getColumn(5).width = 18;
-  sheet.getColumn(6).width = 25;
-  sheet.getColumn(7).width = 14;
-  sheet.getColumn(8).width = 30;
-  sheet.getColumn(9).width = 30;
-  sheet.getColumn(10).width = 18;
+  sheet.getColumn(3).width = 14;
+  sheet.getColumn(4).width = 14;
+  sheet.getColumn(5).width = 14;
+  sheet.getColumn(6).width = 12;
+  sheet.getColumn(7).width = 18;
+  sheet.getColumn(8).width = 25;
+  sheet.getColumn(9).width = 14;
+  sheet.getColumn(10).width = 30;
+  sheet.getColumn(11).width = 30;
+  sheet.getColumn(12).width = 18;
 
   const headerRow = sheet.getRow(headerRowNum);
   headers.forEach((h, i) => {
@@ -1154,7 +1160,7 @@ async function addExperienciasSheet(workbook, priceOptions) {
 
   data.forEach((item) => {
     const row = sheet.addRow([
-      item.name, item.description, item.cost, item.duration,
+      item.name, item.description, item.adulto, item.nino, item.sinAlcohol, item.duration,
       item.diasSugeridos, item.horarios, item.anticipacion,
       item.incluye, item.noIncluye, item.idiomas,
     ]);
@@ -1288,19 +1294,22 @@ async function buildPDFSection(doc, section, clientId, priceOptions) {
       break;
     }
     case 'experiencias': {
-      const data = await getExperienciasData();
+      const data = await getExperienciasData(priceOptions);
+      const cur = priceOptions ? priceOptions.currency : null;
       const tableRows = data.map((d) => [
         d.name, d.description,
-        formatCurrency(d.cost, priceOptions ? priceOptions.currency : null),
+        formatCurrency(d.adulto, cur),
+        formatCurrency(d.nino, cur),
+        formatCurrency(d.sinAlcohol, cur),
         d.duration, d.diasSugeridos, d.horarios, d.anticipacion,
         d.incluye, d.noIncluye, d.idiomas,
       ]);
       await drawPDFTable({
         doc,
         title: 'Experiencias',
-        headers: ['Nombre', 'Descripcion', 'Costo', 'Duracion', 'Dias', 'Horarios', 'Anticipacion', 'Incluye', 'No Incluye', 'Idiomas'],
+        headers: ['Nombre', 'Descripcion', 'Adulto', 'Niño', 'Sin Alcohol', 'Duracion', 'Dias', 'Horarios', 'Anticipacion', 'Incluye', 'No Incluye', 'Idiomas'],
         rows: tableRows,
-        colWidths: [100, 150, 60, 50, 60, 80, 55, 100, 100, 60],
+        colWidths: [90, 130, 52, 52, 52, 46, 58, 70, 52, 90, 90, 52],
         priceOptions,
       });
       break;

@@ -1,0 +1,299 @@
+<%
+/**
+ * Tarifario Export — shared luxury UI (admin / superadmin / client / department_manager).
+ * UI only: same sections, same /api/tarifario/export contract, same download logic.
+ * Section checkboxes are hidden inside selectable cards so the export JS keeps working.
+ *
+ * Created by Denisse Maldonado.
+ */
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const rolePathMap = {
+  superadmin: '/dashboard/superadmin',
+  admin: '/dashboard/admin',
+  client: '/dashboard/client',
+  department_manager: '/dashboard/department_manager',
+};
+const basePath = rolePathMap[currentUserRole] || '/dashboard/admin';
+%>
+
+<div class="tx">
+
+    <!-- Header -->
+    <div class="tx-head">
+        <h2 class="mb-1 fw-bold"><i class="ti ti-download me-2" style="color: var(--tx-olive);"></i>Exportar Tarifario</h2>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="<%= basePath %>" class="text-decoration-none"><i class="ti ti-home me-1"></i>Dashboard</a></li>
+                <li class="breadcrumb-item active"><i class="ti ti-download me-1"></i>Exportar Tarifario</li>
+            </ol>
+        </nav>
+        <p class="tx-sub">Exporta el tarifario completo o por secciones en formato Excel o PDF.</p>
+    </div>
+
+    <div class="tx-layout">
+
+        <!-- MAIN -->
+        <div class="tx-main">
+            <div class="tx-panel">
+                <div class="tx-phead">
+                    <div>
+                        <h3 class="tx-title">Secciones a exportar</h3>
+                        <p class="tx-panelsub">Elige qué incluir en el documento del tarifario.</p>
+                    </div>
+                    <button type="button" class="tx-selall" id="selectAllBtn"><i class="ti ti-checks me-1"></i>Todas</button>
+                </div>
+
+                <div class="tx-secs" id="txSecs">
+                    <label class="tx-sec on">
+                        <input class="section-check" type="checkbox" value="vehiculos" id="chkVehiculos" checked hidden>
+                        <span class="ico"><i class="ti ti-car"></i></span>
+                        <span class="txt"><span class="nm">Vehículos</span><span class="ds">Tipos de vehículo y capacidades</span></span>
+                        <i class="ti ti-check chk"></i>
+                    </label>
+                    <label class="tx-sec on">
+                        <input class="section-check" type="checkbox" value="traslados" id="chkTraslados" checked hidden>
+                        <span class="ico"><i class="ti ti-route"></i></span>
+                        <span class="txt"><span class="nm">Traslados</span><span class="ds">Servicios de traslado con precios por tarifa</span></span>
+                        <i class="ti ti-check chk"></i>
+                    </label>
+                    <label class="tx-sec on">
+                        <input class="section-check" type="checkbox" value="a-disposicion" id="chkDisposicion" checked hidden>
+                        <span class="ico"><i class="ti ti-clock-hour-4"></i></span>
+                        <span class="txt"><span class="nm">A Disposición</span><span class="ds">Precios por hora de renta de vehículos</span></span>
+                        <i class="ti ti-check chk"></i>
+                    </label>
+                    <label class="tx-sec on">
+                        <input class="section-check" type="checkbox" value="experiencias" id="chkExperiencias" checked hidden>
+                        <span class="ico"><i class="ti ti-star"></i></span>
+                        <span class="txt"><span class="nm">Experiencias</span><span class="ds">Paquetes de experiencias y costos</span></span>
+                        <i class="ti ti-check chk"></i>
+                    </label>
+                    <label class="tx-sec on">
+                        <input class="section-check" type="checkbox" value="tours" id="chkTours" checked hidden>
+                        <span class="ico"><i class="ti ti-map-2"></i></span>
+                        <span class="txt"><span class="nm">Tours</span><span class="ds">Tours con precios por tarifa y vehículo</span></span>
+                        <i class="ti ti-check chk"></i>
+                    </label>
+                </div>
+            </div>
+
+            <div class="tx-panel">
+                <h3 class="tx-title">Opciones</h3>
+                <p class="tx-panelsub">Formato del archivo y condiciones de precio.</p>
+                <div class="tx-opts">
+                    <div class="tx-field">
+                        <label for="formatSelect">Formato</label>
+                        <select id="formatSelect">
+                            <option value="excel">Excel (.xlsx)</option>
+                            <option value="pdf">PDF</option>
+                        </select>
+                        <i class="ti ti-chevron-down caret"></i>
+                    </div>
+                    <div class="tx-field">
+                        <label for="paymentTypeSelect">Tipo de pago</label>
+                        <select id="paymentTypeSelect">
+                            <option value="efectivo" <%= (currentUserRole === 'admin' || currentUserRole === 'superadmin') ? 'selected' : '' %>>Efectivo</option>
+                            <option value="transferencia" <%= (currentUserRole === 'client' || currentUserRole === 'department_manager') ? 'selected' : '' %>>Transferencia</option>
+                            <option value="tarjeta">Tarjeta</option>
+                        </select>
+                        <i class="ti ti-chevron-down caret"></i>
+                    </div>
+                    <div class="tx-field">
+                        <label for="currencySelect">Moneda</label>
+                        <select id="currencySelect">
+                            <option value="MXN" selected>MXN</option>
+                            <option value="USD">USD</option>
+                        </select>
+                        <i class="ti ti-chevron-down caret"></i>
+                    </div>
+                </div>
+                <div class="tx-cta">
+                    <button type="button" class="tx-export" id="exportBtn"><i class="ti ti-download"></i>Exportar tarifario</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ASIDE -->
+        <div class="tx-aside">
+            <div class="tx-panel">
+                <h3 class="tx-title">Exportación rápida</h3>
+                <p class="tx-panelsub">Descarga una sección directo en Excel.</p>
+                <div class="tx-quick">
+                    <button type="button" class="tx-qbtn quick-export-btn" data-section="vehiculos" data-format="excel"><i class="ti ti-car"></i>Vehículos<span class="fmt">Excel</span></button>
+                    <button type="button" class="tx-qbtn quick-export-btn" data-section="traslados" data-format="excel"><i class="ti ti-route"></i>Traslados<span class="fmt">Excel</span></button>
+                    <button type="button" class="tx-qbtn quick-export-btn" data-section="a-disposicion" data-format="excel"><i class="ti ti-clock-hour-4"></i>A Disposición<span class="fmt">Excel</span></button>
+                    <button type="button" class="tx-qbtn quick-export-btn" data-section="experiencias" data-format="excel"><i class="ti ti-star"></i>Experiencias<span class="fmt">Excel</span></button>
+                    <button type="button" class="tx-qbtn quick-export-btn" data-section="tours" data-format="excel"><i class="ti ti-map-2"></i>Tours<span class="fmt">Excel</span></button>
+                </div>
+            </div>
+
+            <div class="tx-panel">
+                <h3 class="tx-title">Información</h3>
+                <div class="tx-info">
+                    <div class="row"><i class="ti ti-file-spreadsheet xls"></i><div><strong>Excel</strong><span class="g">Cada sección en una hoja, con formato de moneda y estilos.</span></div></div>
+                    <div class="row"><i class="ti ti-file-text pdf"></i><div><strong>PDF</strong><span class="g">Documento con branding de Amexing, ideal para compartir.</span></div></div>
+                    <div class="row"><i class="ti ti-clock muted"></i><div><span class="g">Los datos exportados reflejan el estado actual del tarifario.</span></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tx {
+    --tile:#fff; --tile2:#eef0e8; --border:#e6e2d8;
+    --tx-olive:#6E7A50; --tx-olive-d:#5c6743; --tx-olive-light:#7C8A5A; --tx-muted:#8a8f78; --tx-gold:#b8894a; --tx-dark:#2b2b2b;
+    color: var(--tx-dark);
+}
+.tx-head { margin-bottom: 24px; }
+.tx .breadcrumb-item a { color: var(--tx-muted); text-decoration: none; }
+.tx .breadcrumb-item.active { color: var(--tx-olive); }
+.tx-sub { color: var(--tx-muted); font-size: .88rem; margin: 10px 0 0; }
+
+.tx-layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+@media (max-width: 992px) { .tx-layout { grid-template-columns: 1fr; } }
+
+.tx-panel { background: var(--tile); border: 1px solid var(--border); border-radius: 8px; padding: 24px 26px; margin-bottom: 22px; }
+.tx-title { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--tx-olive); font-weight: 700; margin: 0 0 4px; }
+.tx-panelsub { font-size: .82rem; color: var(--tx-muted); margin: 0 0 18px; }
+.tx-phead { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.tx-selall { font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--tx-olive-d); font-weight: 600; cursor: pointer; border: 1px solid var(--border); border-radius: 4px; padding: 8px 13px; background: var(--tile); white-space: nowrap; }
+.tx-selall:hover { background: var(--tile2); }
+
+.tx-secs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px; }
+@media (max-width: 560px) { .tx-secs { grid-template-columns: 1fr; } }
+.tx-sec { position: relative; display: flex; gap: 14px; align-items: flex-start; border: 1px solid var(--border); background: var(--tile); border-radius: 6px; padding: 16px 18px; cursor: pointer; transition: .15s; margin: 0; }
+.tx-sec:hover { border-color: var(--tx-olive-light); }
+.tx-sec.on { border: 1.5px solid var(--tx-olive); background: var(--tile2); }
+.tx-sec .ico { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 6px; background: rgba(110,122,80,.1); color: var(--tx-olive); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; }
+.tx-sec.on .ico { background: var(--tx-olive); color: #fff; }
+.tx-sec .txt { display: flex; flex-direction: column; }
+.tx-sec .nm { font-size: .92rem; font-weight: 600; letter-spacing: .02em; }
+.tx-sec .ds { font-size: .76rem; color: var(--tx-muted); margin-top: 3px; }
+.tx-sec .chk { position: absolute; top: 14px; right: 14px; color: var(--tx-olive); font-size: 1.05rem; display: none; }
+.tx-sec.on .chk { display: block; }
+
+.tx-opts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 4px; }
+@media (max-width: 560px) { .tx-opts { grid-template-columns: 1fr; } }
+.tx-field { position: relative; }
+.tx-field label { display: block; font-size: .66rem; letter-spacing: .14em; text-transform: uppercase; color: var(--tx-muted); font-weight: 600; margin-bottom: 8px; }
+.tx-field select { width: 100%; font-size: .95rem; color: var(--tx-dark); background: var(--tile); border: 1px solid var(--border); border-radius: 5px; padding: 13px 16px; appearance: none; cursor: pointer; }
+.tx-field select:focus { outline: none; border-color: var(--tx-olive); }
+.tx-field .caret { position: absolute; right: 16px; bottom: 13px; color: var(--tx-muted); pointer-events: none; }
+
+.tx-cta { margin-top: 22px; display: flex; justify-content: flex-end; }
+.tx-export { border: none; background: var(--tx-olive); color: #fff; font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; padding: 16px 34px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 9px; transition: .15s; }
+.tx-export:hover:not(:disabled) { background: var(--tx-olive-d); }
+.tx-export:disabled { opacity: .6; cursor: default; }
+
+.tx-quick { display: flex; flex-direction: column; gap: 9px; margin-top: 6px; }
+.tx-qbtn { display: flex; align-items: center; gap: 11px; border: 1px solid var(--border); background: var(--tile); border-radius: 5px; padding: 12px 14px; cursor: pointer; text-align: left; transition: .15s; color: var(--tx-dark); font-size: .85rem; }
+.tx-qbtn:hover:not(:disabled) { border-color: var(--tx-olive); background: var(--tile2); }
+.tx-qbtn:disabled { opacity: .6; cursor: default; }
+.tx-qbtn i { color: var(--tx-olive); font-size: 1.05rem; }
+.tx-qbtn .fmt { margin-left: auto; font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; color: var(--tx-muted); border: 1px solid var(--border); border-radius: 3px; padding: 3px 7px; }
+
+.tx-info .row { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: .82rem; color: var(--tx-dark); }
+.tx-info .row:last-child { border-bottom: none; }
+.tx-info .row i { font-size: 1.1rem; margin-top: 1px; }
+.tx-info .row .g { color: var(--tx-muted); display: block; margin-top: 2px; font-size: .78rem; }
+.tx-info .xls { color: #2bb673; }
+.tx-info .pdf { color: var(--tx-gold); }
+.tx-info .muted { color: var(--tx-muted); }
+</style>
+
+<script>
+(function() {
+    // ── Section selection (cards toggle their hidden .section-check checkbox) ──
+    document.querySelectorAll('.tx-sec').forEach(function(card) {
+        var cb = card.querySelector('.section-check');
+        if (!cb) return;
+        card.classList.toggle('on', cb.checked);
+        // <label> already toggles the checkbox on click; just mirror the class
+        cb.addEventListener('change', function() {
+            card.classList.toggle('on', cb.checked);
+        });
+    });
+
+    // "Todas" — select/deselect all
+    document.getElementById('selectAllBtn').addEventListener('click', function() {
+        var cards = Array.prototype.slice.call(document.querySelectorAll('.tx-sec'));
+        var cbs = cards.map(function(c) { return c.querySelector('.section-check'); });
+        var allOn = cbs.every(function(c) { return c.checked; });
+        cbs.forEach(function(cb, i) {
+            cb.checked = !allOn;
+            cards[i].classList.toggle('on', cb.checked);
+        });
+    });
+
+    /**
+     * Download a tarifario export with loading state on the triggering button.
+     * Uses fetch + blob so we can track when the download completes.
+     */
+    function downloadTarifario(url, btn) {
+        var originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Generando...';
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(function(response) {
+                if (!response.ok) {
+                    return response.json().then(function(data) {
+                        throw new Error(data.error || 'Error al exportar');
+                    });
+                }
+                var disposition = response.headers.get('Content-Disposition') || '';
+                var filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+                var filename = filenameMatch ? filenameMatch[1] : 'tarifario-amexing.xlsx';
+                return response.blob().then(function(blob) {
+                    return { blob: blob, filename: filename };
+                });
+            })
+            .then(function(result) {
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(result.blob);
+                a.download = result.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+            })
+            .catch(function(err) {
+                alert(err.message || 'Error al generar la exportacion.');
+            })
+            .finally(function() {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            });
+    }
+
+    // Main export button
+    document.getElementById('exportBtn').addEventListener('click', function() {
+        var checks = document.querySelectorAll('.section-check:checked');
+        var sections = Array.prototype.slice.call(checks).map(function(c) { return c.value; });
+
+        if (sections.length === 0) {
+            alert('Selecciona al menos una seccion para exportar.');
+            return;
+        }
+
+        var format = document.getElementById('formatSelect').value;
+        var paymentType = document.getElementById('paymentTypeSelect').value;
+        var currency = document.getElementById('currencySelect').value;
+        var url = '/api/tarifario/export?sections=' + sections.join(',') + '&format=' + format + '&paymentType=' + paymentType + '&currency=' + currency;
+        downloadTarifario(url, this);
+    });
+
+    // Quick export buttons
+    document.querySelectorAll('.quick-export-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var section = this.getAttribute('data-section');
+            var format = this.getAttribute('data-format');
+            var paymentType = document.getElementById('paymentTypeSelect').value;
+            var currency = document.getElementById('currencySelect').value;
+            var url = '/api/tarifario/export?sections=' + section + '&format=' + format + '&paymentType=' + paymentType + '&currency=' + currency;
+            downloadTarifario(url, this);
+        });
+    });
+})();
+</script>

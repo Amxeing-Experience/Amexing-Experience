@@ -750,6 +750,10 @@ function setupPillFilters() {
                 // truly single-type tabs (Agencias, or a specific category).
                 const mixedTypes = this.value === 'all' || this.value === 'clients';
                 window.clientsTable.column(1).visible(mixedTypes, false);
+                // "Dept Manager" solo aplica a agencias; se oculta en las vistas de tipos
+                // que no son agencia (Clientes, Wedding Planner, Concierge, Home Owner).
+                const showManager = this.value === 'all' || this.value === 'agencies';
+                window.clientsTable.column(2).visible(showManager, false);
                 // Reload the DataTable with new filter
                 window.clientsTable.ajax.reload();
             }

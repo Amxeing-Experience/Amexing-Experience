@@ -739,10 +739,15 @@ class PublicQuoteController {
         return map;
       };
 
-      const [tourMap, expMap] = await Promise.all([
+      // Experiencias de catálogo (Experience) o de proveedor/establecimiento (ProviderExperiencia):
+      // el id vive en una u otra clase, así que consultamos ambas y mezclamos (Experience tiene
+      // prioridad, igual que el frontend que busca primero en su caché de catálogo).
+      const [tourMap, expCatalogMap, expProviderMap] = await Promise.all([
         fetchIncludes('Tour', tourIds),
         fetchIncludes('Experience', experienceIds),
+        fetchIncludes('ProviderExperiencia', experienceIds),
       ]);
+      const expMap = { ...expProviderMap, ...expCatalogMap };
 
       (quoteData.serviceItems?.days || []).forEach((day) => {
         (day.subconcepts || []).forEach((sc) => {

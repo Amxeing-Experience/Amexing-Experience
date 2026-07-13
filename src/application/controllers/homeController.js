@@ -204,6 +204,8 @@ class HomeController {
       // categoría temática (experience_category). Se resuelve server-side (sin auth).
       if (view === 'servicios/experiencias') {
         data.experiencesByCategory = await publicExperiencesService.getActiveExperiencesByCategory(currentLang);
+        // Categorías dinámicas (label por idioma + imagen desde la BD, con fallback).
+        data.categories = await publicExperiencesService.getActiveCategories(currentLang);
       }
 
       res.render(view, data);

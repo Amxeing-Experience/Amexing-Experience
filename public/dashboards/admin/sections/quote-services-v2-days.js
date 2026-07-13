@@ -125,6 +125,13 @@ ItineraryBuilder.prototype.refreshQuickAddDayDate = function () {
     }
 };
 
+// ¿Ya existe un día con esta fecha? (excludeId permite ignorar el propio día al editar).
+// Se usa para evitar días duplicados al agregar/editar.
+ItineraryBuilder.prototype.dayDateExists = function (date, excludeId = null) {
+    if (!date) return false;
+    return this.days.some((d) => d.date === date && d.id !== excludeId);
+};
+
 ItineraryBuilder.prototype.quickAddDay = async function () {
     if (this._addingDay) return; // guard against rapid double-clicks
     this._addingDay = true;
@@ -141,6 +148,15 @@ ItineraryBuilder.prototype.quickAddDay = async function () {
     const dateInput = document.getElementById('quickDayDate');
     const rawTitle = (titleInput?.value || '').trim();
     const date = (dateInput?.value || '').trim() || this.getNextSequentialDate();
+
+    // Evitar días duplicados: no agregar un día con una fecha que ya existe.
+    if (this.dayDateExists(date)) {
+      this.showAlert('Ya existe un día con esa fecha', 'warning');
+      this._addingDay = false;
+      if (addBtn) { addBtn.disabled = false; addBtn.innerHTML = addBtnHtml; }
+      return;
+    }
+
     const title = rawTitle || `Día ${this.days.length + 1}`;
 
     const newDay = {
@@ -197,6 +213,13 @@ ItineraryBuilder.prototype.saveDay = async function () {
 
     // Clear any previous modal alerts
     this.clearModalAlert('dayModalAlert');
+
+    // Evitar días duplicados: bloquear si ya existe otro día con la misma fecha
+    // (al editar se excluye el propio día vía currentDayId).
+    if (this.dayDateExists(date, this.currentDayId)) {
+      this.showModalAlert('dayModalAlert', 'Ya existe un día con esa fecha', 'warning');
+      return;
+    }
 
     // Auto-generate title if empty
     if (!title) {

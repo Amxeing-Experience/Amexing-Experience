@@ -236,4 +236,64 @@ async function renderUrlToPdf(url, options = {}) {
   }
 }
 
-module.exports = { renderUrlToPdf };
+/**
+ * Render an HTML string to a PDF Buffer (no URL/route needed). Ideal para documentos
+ * autocontenidos como el recibo, cuyo HTML se arma server-side con todos los datos e
+ * imágenes embebidas (base64). Reusa el mismo footer (marca + página X de Y).
+ * @param {string} html - Documento HTML completo a renderizar.
+ * @param {object} [options]
+ * @param {string} [options.format] - 'A4' | 'Letter' | 'Legal' (default 'A4').
+ * @param {string} [options.margin] - Margen (default '12mm').
+ * @param {boolean} [options.footer] - Footer con marca + paginación (default true).
+ * @returns {Promise<Buffer>} PDF buffer.
+ * @example
+ *   const buf = await renderHtmlToPdf('<html>...</html>', { format: 'A4' });
+ */
+async function renderHtmlToPdf(html, options = {}) {
+  const {
+    format = 'A4',
+    margin = '12mm',
+    footer = true,
+  } = options;
+
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30000 });
+    await page.emulateMediaType('screen');
+    try {
+      // Espera a que las fuentes @font-face terminen de cargar (corre en la página).
+      // eslint-disable-next-line no-undef
+      await page.evaluate(async () => { await document.fonts.ready; });
+    } catch (e) { /* noop */ }
+
+    const footerTemplate = `
+      <style>${getFooterFontFaceCss()}</style>
+      <div style="width:100%; box-sizing:border-box; padding:0 ${margin}; font-family:'Myriad Pro','Segoe UI',Tahoma,Geneva,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact;">
+        <div style="border-top:1px solid #d8dac9; padding-top:6px; display:flex; justify-content:space-between; align-items:flex-end;">
+          <div style="text-align:left; line-height:1.35;">
+            <div style="font-size:11px; font-weight:600; letter-spacing:2.5px; color:#969b81; text-transform:uppercase;">Amexing Experience</div>
+            <div style="font-size:7.5px; color:#9aa0a6; letter-spacing:0.5px; margin-top:2px;">amexingexperience.com</div>
+          </div>
+          <div style="font-size:8px; color:#9aa0a6; text-align:right; padding-bottom:1px;">Página <span class="pageNumber"></span> de <span class="totalPages"></span></div>
+        </div>
+      </div>`;
+    const marginObj = {
+      top: margin, bottom: footer ? '22mm' : margin, left: margin, right: margin,
+    };
+    const pdfBuffer = await page.pdf({
+      format,
+      printBackground: true,
+      preferCSSPageSize: false,
+      displayHeaderFooter: footer,
+      headerTemplate: '<span></span>',
+      footerTemplate: footer ? footerTemplate : '<span></span>',
+      margin: marginObj,
+    });
+    return pdfBuffer;
+  } finally {
+    try { await page.close(); } catch (e) { /* noop */ }
+  }
+}
+
+module.exports = { renderUrlToPdf, renderHtmlToPdf };

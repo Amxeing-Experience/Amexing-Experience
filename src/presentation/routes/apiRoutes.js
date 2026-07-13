@@ -459,8 +459,13 @@ router.post('/partner-request', partnerRequestRateLimiter, apiController.submitP
  * GET /api/vehicles/optimized/:vehicleId/:imageName
  * Serves images with format negotiation based on Accept header (AVIF/WebP/JPEG)
  * Must be public because browsers can't send Authorization headers with <img> requests.
+ *
+ * NOTE: this must stay consistent with ImageOptimizationService's `enableOptimization`
+ * gate (`ENABLE_IMAGE_OPTIMIZATION !== 'false'`). If the service emits optimized-route
+ * URLs but this route isn't mounted, every optimized image 404s. Enabled unless the
+ * env var is explicitly set to 'false'.
  */
-if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
+if (process.env.ENABLE_IMAGE_OPTIMIZATION !== 'false') {
   try {
     const { serveOptimizedImageRoute } = require('../../application/middleware/imageFormatNegotiation');
     router.get('/vehicles/optimized/:vehicleId/:imageName', serveOptimizedImageRoute);
@@ -501,6 +506,7 @@ const vehiclesRoutes = require('./api/vehiclesRoutes');
 const vehicleImagesRoutes = require('./api/vehicleImagesRoutes');
 const poisRoutes = require('./api/poisRoutes');
 const serviceTypesRoutes = require('./api/serviceTypesRoutes');
+const experienceCategoriesRoutes = require('./api/experienceCategoriesRoutes');
 const servicesRoutes = require('./api/servicesRoutes');
 const servicesNewRoutes = require('./api/servicesNewRoutes');
 const ratesRoutes = require('./api/ratesRoutes');
@@ -556,6 +562,7 @@ router.use('/vehicles', vehiclesRoutes);
 router.use('/vehicles', vehicleImagesRoutes); // Vehicle images endpoints
 router.use('/pois', poisRoutes);
 router.use('/service-types', serviceTypesRoutes);
+router.use('/experience-categories', experienceCategoriesRoutes);
 router.use('/services', servicesRoutes);
 router.use('/services-new', servicesNewRoutes);
 router.use('/rates', ratesRoutes);

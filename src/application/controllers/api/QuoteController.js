@@ -156,10 +156,15 @@ async function injectServiceIncludes(serviceItems) {
     });
   });
 
-  const [tourMap, expMap] = await Promise.all([
+  // Las experiencias pueden ser de catálogo (clase Experience) o de proveedor/establecimiento
+  // (ProviderExperiencia). El id vive en una u otra clase, así que consultamos ambas y mezclamos
+  // (Experience tiene prioridad, igual que el frontend que busca primero en su caché de catálogo).
+  const [tourMap, expCatalogMap, expProviderMap] = await Promise.all([
     batchFetchIncludes('Tour', tourIds),
     batchFetchIncludes('Experience', experienceIds),
+    batchFetchIncludes('ProviderExperiencia', experienceIds),
   ]);
+  const expMap = { ...expProviderMap, ...expCatalogMap };
 
   serviceItems.days.forEach((day) => {
     (day.subconcepts || []).forEach((sc) => {
@@ -217,9 +222,10 @@ class QuoteController {
 
       // 2. Extract fields from request body
       const {
-        client, clientId, clientType, clientFinalId, contactPerson, contactEmail, contactPhone,
-        contactFirstName, contactLastName, notes, eventType,
+        client, clientId, clientType, clientFinalId, clientFinalName, contactPerson, contactEmail, contactPhone,
+        contactFirstName, contactLastName, notes, lodging, eventType,
         leadGuestFirstName, leadGuestLastName,
+        ownerId: initialOwnerId, // Propietario inicial elegido (solo admin/superadmin; se valida)
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
       } = req.body;
 
@@ -455,7 +461,11 @@ class QuoteController {
       quote.set('contactPhone', finalContactData.contactPhone);
       quote.set('leadGuestFirstName', leadGuestFirstName || '');
       quote.set('leadGuestLastName', leadGuestLastName || '');
+      // Cliente Final tecleado (no guardado como cliente): se persiste como texto libre.
+      // Mutuamente excluyente con clientFinalId (el frontend envía solo uno con valor).
+      quote.set('clientFinalName', clientFinalName || '');
       quote.set('notes', notes || '');
+      quote.set('lodging', lodging || '');
       quote.set('eventType', eventType || '');
 
       // Set individual person counts
@@ -512,11 +522,40 @@ class QuoteController {
         },
       });
 
-      // 11a. Initialize ownership for the new quote
-      await this.ownershipService.initializeOwnership(quote.id, currentUser.id);
+      // 11a. Propietario inicial: admin/superadmin puede asignar otro usuario (validado contra los
+      // owners disponibles del cliente); si no aplica o no es válido, el creador. createdBy siempre
+      // queda como el creador real.
+      let resolvedOwnerId = currentUser.id;
+      const canAssignOwner = ['admin', 'superadmin'].includes(req.userRole);
+      if (initialOwnerId && initialOwnerId !== currentUser.id && canAssignOwner) {
+        try {
+          const avail = await this.ownershipService.getAvailableOwnersForClientId({
+            clientId: clientIdNormalized,
+            clientType,
+          });
+          const list = Array.isArray(avail) ? avail : (avail && avail.users) || [];
+          if (list.some((u) => u.id === initialOwnerId)) {
+            resolvedOwnerId = initialOwnerId;
+          } else {
+            logger.warn('QuoteController.createQuote - ownerId no válido; se usa el creador', {
+              initialOwnerId,
+              clientId: clientIdNormalized,
+            });
+          }
+        } catch (e) {
+          logger.warn('QuoteController.createQuote - no se pudo validar ownerId; se usa el creador', { error: e.message });
+        }
+      }
 
-      // 11b. Set the owner field on the quote
-      quote.set('owner', createdByObj);
+      // 11b. Inicializar ownership (owner = elegido, createdBy = creador).
+      await this.ownershipService.initializeOwnership(quote.id, resolvedOwnerId, currentUser.id);
+
+      // 11c. Reflejar el owner elegido en el campo del quote (consistente con initializeOwnership).
+      quote.set('owner', {
+        __type: 'Pointer',
+        className: 'AmexingUser',
+        objectId: resolvedOwnerId,
+      });
       await quote.save(null, { useMasterKey: true });
 
       // 12. Log success (using Pointer objects - IDs only)
@@ -735,6 +774,27 @@ class QuoteController {
         console.log('Quote client:', problemQuote.get('client')?.id);
       }
 
+      // Resolver el nombre del Cliente Final (clientFinalId es un string, no pointer) en un solo
+      // query por lote, para la columna "Cliente Final" de la tabla. Cubre AmexingUser y Client.
+      const finalClientIds = [...new Set(quotes.map((q) => q.get('clientFinalId')).filter(Boolean))];
+      const finalClientNameById = {};
+      if (finalClientIds.length) {
+        const auQ = new Parse.Query('AmexingUser');
+        auQ.containedIn('objectId', finalClientIds);
+        auQ.limit(finalClientIds.length);
+        const clQ = new Parse.Query('Client');
+        clQ.containedIn('objectId', finalClientIds);
+        clQ.limit(finalClientIds.length);
+        const [aus, cls] = await Promise.all([
+          auQ.find({ useMasterKey: true }).catch(() => []),
+          clQ.find({ useMasterKey: true }).catch(() => []),
+        ]);
+        [...aus, ...cls].forEach((u) => {
+          const fn = `${u.get('firstName') || ''} ${u.get('lastName') || ''}`.trim();
+          finalClientNameById[u.id] = u.get('companyName') || fn || u.get('email') || '';
+        });
+      }
+
       // Format data for DataTables and check for pending invoice requests
       const data = await Promise.all(
         quotes.map(async (quote) => {
@@ -885,7 +945,12 @@ class QuoteController {
             leadGuestFirstName: quote.get('leadGuestFirstName') || '',
             leadGuestLastName: quote.get('leadGuestLastName') || '',
             notes: quote.get('notes') || '',
+            lodging: quote.get('lodging') || '',
             clientFinalId: quote.get('clientFinalId') || null,
+            clientFinalName: quote.get('clientFinalName') || '',
+            // Nombre a mostrar del Cliente Final: cliente resuelto por id, o texto libre tecleado.
+            clientFinalDisplay: (quote.get('clientFinalId') && finalClientNameById[quote.get('clientFinalId')])
+              || quote.get('clientFinalName') || '',
             validUntil: quote.get('validUntil'),
             active: quote.get('active'),
             hasPendingInvoiceRequest, // Add invoice status
@@ -1118,7 +1183,9 @@ class QuoteController {
         leadGuestFirstName: quote.get('leadGuestFirstName') || '',
         leadGuestLastName: quote.get('leadGuestLastName') || '',
         notes: quote.get('notes') || '',
+        lodging: quote.get('lodging') || '',
         clientFinalId: quote.get('clientFinalId') || null,
+        clientFinalName: quote.get('clientFinalName') || '',
         status: quote.get('status') || 'quoted',
         validUntil: quote.get('validUntil'),
         serviceItems: quote.get('serviceItems') || {
@@ -3527,14 +3594,16 @@ class QuoteController {
       const quoteId = req.params.id;
 
       // Get payment info parameters from request body (for admin role)
-      const { includePaymentInfo, paymentInfoId } = req.body;
+      // billingProfileId: perfil fiscal de la agencia a imprimir en el recibo (los 3 roles).
+      const { includePaymentInfo, paymentInfoId, billingProfileId } = req.body;
 
       const result = await this.quoteService.generateReceipt(
         currentUser,
         quoteId,
         req.userRole, // Pass userRole from JWT middleware
         includePaymentInfo, // Pass the flag from request
-        paymentInfoId // Pass the specific payment info ID
+        paymentInfoId, // Pass the specific payment info ID
+        billingProfileId // Perfil de facturación elegido (o undefined)
       );
 
       // If PDF buffer is returned, send it as a downloadable file
@@ -3562,6 +3631,68 @@ class QuoteController {
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al generar el recibo',
         500
       );
+    }
+  }
+
+  /**
+   * GET /api/quotes/:id/billing-profiles — Perfiles de facturación de la AGENCIA de la
+   * cotización (quote.client = AmexingUser de la agencia), para elegir cuál se imprime en el
+   * recibo. Devuelve además el perfil ya guardado en la reservación (o el principal) para
+   * preseleccionarlo. Accesible por los roles que pueden generar el recibo (nivel 4+).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { success, data: { profiles, selectedProfileId } }.
+   * @example
+   *   GET /api/quotes/abc123/billing-profiles
+   */
+  async getQuoteBillingProfiles(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+      const quoteId = req.params.id;
+
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      query.include('client');
+      const quote = await query.get(quoteId, { useMasterKey: true });
+      if (!quote) {
+        return this.sendError(res, 'Cotización no encontrada', 404);
+      }
+
+      const agency = quote.get('client'); // AmexingUser de la agencia (o cliente directo)
+      if (!agency) {
+        return res.json({ success: true, data: { profiles: [], selectedProfileId: null } });
+      }
+
+      const bpQuery = new Parse.Query('BillingProfile');
+      bpQuery.equalTo('userPtr', agency);
+      bpQuery.equalTo('exists', true);
+      bpQuery.equalTo('active', true);
+      bpQuery.descending('isPrimary');
+      bpQuery.addAscending('label');
+      bpQuery.limit(200);
+      const bps = await bpQuery.find({ useMasterKey: true });
+
+      const profiles = bps.map((bp) => ({
+        id: bp.id,
+        label: bp.get('label') || bp.get('razonSocial') || bp.get('commercialName') || 'Perfil',
+        rfc: bp.get('rfc') || bp.get('taxId') || '',
+        razonSocial: bp.get('razonSocial') || bp.get('commercialName') || '',
+        isPrimary: bp.get('isPrimary') || false,
+      }));
+
+      // Preselección: SIEMPRE el perfil principal (o el primero si ninguno es principal).
+      const primary = profiles.find((p) => p.isPrimary);
+      const selectedProfileId = primary ? primary.id : (profiles[0]?.id || null);
+
+      return res.json({ success: true, data: { profiles, selectedProfileId } });
+    } catch (error) {
+      logger.error('Error in QuoteController.getQuoteBillingProfiles', {
+        error: error.message, quoteId: req.params.id, userId: req.user?.id,
+      });
+      return this.sendError(res, 'Error al obtener perfiles de facturación', 500);
     }
   }
 

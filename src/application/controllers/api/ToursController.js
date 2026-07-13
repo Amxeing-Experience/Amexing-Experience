@@ -1175,6 +1175,7 @@ class ToursController {
         clientPricesQuery.equalTo('itemType', 'TOUR');
         clientPricesQuery.equalTo('active', true);
         clientPricesQuery.equalTo('exists', true);
+        clientPricesQuery.doesNotExist('valid_until'); // Only current records (skip superseded prices)
         clientPricesQuery.include(['ratePtr', 'vehiclePtr']);
 
         const clientPrices = await clientPricesQuery.find({ useMasterKey: true });

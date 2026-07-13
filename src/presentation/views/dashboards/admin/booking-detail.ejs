@@ -1013,8 +1013,25 @@ document.addEventListener('DOMContentLoaded', async function() {
             otrosItems.push(detailLine('discount-2', `${sub.discountPercent}% descuento`));
         }
 
+        // UBICACIONES — direcciones de pick-up / drop-off (cuando existan).
+        const ubicacionesItems = [];
+        if (svc.type === 'transport') {
+            if (sub.tripType === 'round-trip') {
+                if (sub.pickupAddressIda) ubicacionesItems.push(detailLine('map-pin-up', sub.pickupAddressIda, 'Pick-up (ida)'));
+                if (sub.dropoffAddressIda) ubicacionesItems.push(detailLine('map-pin-down', sub.dropoffAddressIda, 'Drop-off (ida)'));
+                if (sub.pickupAddressVuelta) ubicacionesItems.push(detailLine('map-pin-up', sub.pickupAddressVuelta, 'Pick-up (regreso)'));
+                if (sub.dropoffAddressVuelta) ubicacionesItems.push(detailLine('map-pin-down', sub.dropoffAddressVuelta, 'Drop-off (regreso)'));
+            } else {
+                if (sub.pickupAddress) ubicacionesItems.push(detailLine('map-pin-up', sub.pickupAddress, 'Pick-up'));
+                if (sub.dropoffAddress) ubicacionesItems.push(detailLine('map-pin-down', sub.dropoffAddress, 'Drop-off'));
+            }
+        } else if (svc.type === 'tour' || svc.type === 'experience') {
+            if (sub.pickupAddress) ubicacionesItems.push(detailLine('map-pin-up', sub.pickupAddress, 'Pick-up'));
+        }
+
         const sectionsHtml = [
             detailSection('info-circle', 'Servicio', servicioItems),
+            detailSection('map-pin', 'Ubicaciones', ubicacionesItems),
             detailSection('clock', 'Horario', horarioItems),
             detailSection('users', 'Personas', personasItems),
             detailSection('plane', 'Vuelos', vuelosItems),
