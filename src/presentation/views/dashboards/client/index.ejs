@@ -97,10 +97,6 @@ const pendingPayments = d.pendingPayments || [];
       <h1>Buen día, <%= d.agencyName || 'Cliente' %></h1>
     </div>
     <div class="head-actions">
-      <div class="search">
-        <i class="ti ti-search"></i>
-        <input type="text" id="dashSearch" placeholder="Buscar por folio o cliente…" autocomplete="off">
-      </div>
       <a class="btn-reservar" href="/dashboard/<%= bp %>/quotes/new"><i class="ti ti-plus"></i> Reservar</a>
     </div>
   </div>
@@ -174,17 +170,3 @@ const pendingPayments = d.pendingPayments || [];
   </div>
 
 </div>
-
-<script>
-  // Búsqueda rápida: por ahora lleva a la lista de cotizaciones con el término (se afinará al wirear datos).
-  document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('dashSearch');
-    if (input) {
-      input.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && this.value.trim()) {
-          window.location.href = '/dashboard/<%= bp %>/quotes?search=' + encodeURIComponent(this.value.trim());
-        }
-      });
-    }
-  });
-</script>
