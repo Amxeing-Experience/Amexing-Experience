@@ -62,6 +62,7 @@ class DepartmentManagerController extends RoleBasedController {
     const Parse = require('parse/node');
     const QuoteController = require('../api/QuoteController');
     const ReservationController = require('../api/ReservationController');
+    const PaymentService = require('../../services/PaymentService');
 
     const role = req.userRole || req.user?.role || 'department_manager';
     const summary = {
@@ -113,22 +114,34 @@ class DepartmentManagerController extends RoleBasedController {
       payScheduledQuote.equalTo('status', 'scheduled');
       payRes.matchesQuery('quotePtr', payScheduledQuote);
       payRes.ascending('startDate');
-      payRes.limit(5);
-      const rows = await payRes.find({ useMasterKey: true });
-      summary.pendingPayments = rows.map((r) => {
+      payRes.limit(10); // candidatos: se recalcula el pago real y se descartan los ya pagados.
+      const candidates = await payRes.find({ useMasterKey: true });
+
+      // Recalcula el estado/saldo de pago reales con PaymentService (igual que la tabla),
+      // para no depender del rollup guardado (que puede quedar desactualizado). En paralelo.
+      const summaries = await Promise.all(
+        candidates.map((r) => PaymentService.summarize(r.id).catch(() => null))
+      );
+      const list = [];
+      candidates.forEach((r, i) => {
+        if (list.length >= 5) return;
+        const ps = summaries[i];
+        const paymentStatus = ps ? ps.paymentStatus : (r.get('paymentStatus') || 'pending');
+        const balance = Number(ps ? ps.balance : (r.get('balance') || 0)) || 0;
+        if (paymentStatus === 'paid' || balance <= 0) return; // ya no debe nada
         // Cliente Final = lead guest (prioritario) y, si no hay, contactPerson.
         const leadGuest = `${r.get('leadGuestFirstName') || ''} ${r.get('leadGuestLastName') || ''}`.trim();
         const contactPerson = (r.get('contactPerson') || '').trim();
-        const balance = Number(r.get('balance') || 0);
         const start = r.get('startDate');
-        return {
+        list.push({
           folio: r.get('folio') || '',
           client: leadGuest || contactPerson || '—',
           date: start ? new Date(start).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : '',
           balance: `$ ${balance.toLocaleString('es-MX')}`,
-          status: r.get('paymentStatus') || 'pending',
-        };
+          status: paymentStatus,
+        });
       });
+      summary.pendingPayments = list;
     } catch (e) {
       logger.warn('Dashboard: fallo al contar reservaciones', { error: e.message });
     }
