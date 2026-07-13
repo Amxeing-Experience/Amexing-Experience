@@ -23,8 +23,51 @@ class DepartmentManagerController extends RoleBasedController {
    */
   async index(req, res) {
     try {
-      // Redirect department managers to vehicles page as default
-      res.redirect('/dashboard/department_manager/vehicles');
+      const { user } = req;
+      const agencyName = user?.fullName
+        || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+        || 'Agente';
+
+      // TODO(datos): reemplazar por conteos/reservaciones reales.
+      //   - segments.quoted   → cotizaciones status 'quoted'  (QuoteController statusCounts)
+      //   - segments.hold     → reservaciones en hold         (ReservationController pendingCompletionCount)
+      //   - segments.scheduled→ reservaciones confirmadas      (scheduled)
+      //   - pendingPayments   → reservaciones con paymentStatus pending/partial (balance > 0)
+      // Por ahora son datos de ejemplo para ver la estructura.
+      const dashboardData = {
+        agencyName,
+        basePath: 'department_manager',
+        segments: { quoted: 12, hold: 4, scheduled: 27 },
+        pendingPayments: [
+          {
+            folio: 'AMX-1042',
+            client: 'Boda Martínez',
+            date: '18 jul 2026',
+            balance: '$ 24,500',
+            status: 'pending',
+          },
+          {
+            folio: 'AMX-1039',
+            client: 'Grupo Herrera',
+            date: '22 jul 2026',
+            balance: '$ 8,200',
+            status: 'partial',
+          },
+          {
+            folio: 'AMX-1035',
+            client: 'Aniversario López',
+            date: '30 jul 2026',
+            balance: '$ 15,000',
+            status: 'pending',
+          },
+        ],
+      };
+
+      await this.renderRoleView(req, res, 'index', {
+        title: 'Inicio',
+        breadcrumb: null,
+        dashboardData,
+      });
     } catch (error) {
       this.handleError(res, error);
     }

@@ -149,6 +149,9 @@ const navigationItems = {
         ]}
     ],
     department_manager: [
+        { section: 'Inicio', icon: 'ti-home', items: [
+            { name: 'Dashboard', icon: 'home', path: '/dashboard/department_manager', id: 'home' }
+        ]},
         // Show System Management section if admin/superadmin is viewing this dashboard
         ...(isAdminViewingOtherDashboard ? [
             { section: 'System Management', icon: 'ti-settings', items: [
