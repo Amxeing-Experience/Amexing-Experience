@@ -565,8 +565,8 @@ class PublicReservationController {
     }
     // Servicios solos (sin ajustes ni propina) para el desglose Subtotal/recargo/Total de la vista.
     const dispTotals = PaymentService.computeTotals(totalItems, paymentType, 0, 0, currency);
-    const subtotal = dispTotals.subtotal; // base (efectivo)
-    const iva = dispTotals.iva; // recargo por método (IVA, o IVA + comisión de tarjeta)
+    const { subtotal } = dispTotals; // base (efectivo)
+    const { iva } = dispTotals; // recargo por método (IVA, o IVA + comisión de tarjeta)
     const total = dispTotals.servicesTotal; // base × factor
 
     // Payment rollup (fresh, non-persisting): amount paid, balance and status.
