@@ -1516,7 +1516,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             availabilitySummary.toggle();
             availabilityContent.toggle();
         });
-        
+
+        // Reordena EN VIVO (sin guardar) las filas de horario de un día por hora de inicio,
+        // en cuanto el usuario cambia una hora de inicio.
+        function sortTimeSlotRowsLive($container) {
+            if (!$container || $container.length === 0) return;
+            const toMin = function(t) { const p = String(t || '').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); };
+            const rows = $container.children('.time-slot-row').get();
+            rows.sort(function(a, b) { return toMin($(a).find('.start-time').val()) - toMin($(b).find('.start-time').val()); });
+            rows.forEach(function(r) { $container.append(r); });
+        }
+        $(document).on('change', '.time-slots-container .time-slot-row .start-time', function() {
+            sortTimeSlotRowsLive($(this).closest('.time-slots-container'));
+        });
+
         function addNewExperienciaCard() {
             const index = providerExperiencias.length;
             const experiencia = {

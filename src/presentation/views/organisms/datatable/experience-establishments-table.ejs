@@ -1081,6 +1081,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             }
         });
 
+        // Reordena EN VIVO (sin guardar) los horarios de un día por hora de inicio.
+        function sortEstTimeSlotsLive($container) {
+            if (!$container || $container.length === 0) return;
+            const toMin = function(t) { const p = String(t || '').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); };
+            const slots = $container.children('.time-slot').get();
+            slots.sort(function(a, b) { return toMin($(a).find('.start-time').val()) - toMin($(b).find('.start-time').val()); });
+            slots.forEach(function(s) { $container.append(s); });
+        }
+        $(document).on('change', '.time-slots-container .time-slot .start-time', function() {
+            sortEstTimeSlotsLive($(this).closest('.time-slots-container'));
+        });
+
         // Remove day schedule
         $(document).on('click', '.remove-day-btn', function(e) {
             e.preventDefault();
