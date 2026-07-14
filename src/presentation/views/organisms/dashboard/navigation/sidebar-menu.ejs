@@ -59,8 +59,8 @@ const ecCaps = (typeof endClientCaps !== 'undefined' && endClientCaps)
   ? endClientCaps
   : {
       viewQuotes: ecCat !== 'home_owner',
-      createQuotes: (ecCat === 'wedding_planner' || ecCat === 'concierge'),
-      viewTarifario: ecCat === 'wedding_planner',
+      createQuotes: (ecCat === 'direct_client' || ecCat === 'wedding_planner' || ecCat === 'concierge'),
+      viewTarifario: !!ecCat && ecCat !== 'direct_client',
       dashboardQuotes: ecCat !== 'home_owner',
     };
 const endClientActivityItems = [];
@@ -69,7 +69,7 @@ if (ecCaps.viewQuotes) {
 }
 endClientActivityItems.push({ name: 'Reservaciones', icon: 'clipboard-list', path: '/dashboard/end_client/bookings', id: 'bookings' });
 
-// Sección Tarifario (catálogo completo): solo para quien tiene viewTarifario (wedding planner).
+// Sección Tarifario (catálogo completo): todos los tipos con viewTarifario (todos menos cliente directo).
 const endClientTarifarioItems = ecCaps.viewTarifario ? [
   { name: 'Vehículos', icon: 'car', path: '/dashboard/end_client/vehicles', id: 'vehicles' },
   { name: 'Traslados', icon: 'briefcase', path: '/dashboard/end_client/services', id: 'services' },

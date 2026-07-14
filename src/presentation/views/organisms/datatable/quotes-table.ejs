@@ -21,7 +21,12 @@ const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 // Si puede ver pero no crear (p. ej. cliente directo), la fila muestra "Ver" (lectura), no "Editar".
 const ecCaps = (typeof endClientCaps !== 'undefined' && endClientCaps) ? endClientCaps : null;
 const isEndClient = dtUserRole === 'end_client';
-const ecCanCreate = isEndClient && ecCaps ? !!ecCaps.createQuotes : false;
+// Preferimos endClientCaps; si no llega, derivamos de la categoría (fallback sin reinicio).
+const ecCatQT = (typeof clientCategory !== 'undefined' && clientCategory) ? clientCategory : null;
+const ecCanCreate = isEndClient
+  ? (ecCaps ? !!ecCaps.createQuotes
+    : (ecCatQT === 'direct_client' || ecCatQT === 'wedding_planner' || ecCatQT === 'concierge'))
+  : false;
 const baseEditors = ['superadmin', 'admin', 'department_manager', 'client'];
 const canEdit = isEndClient ? ecCanCreate : baseEditors.includes(dtUserRole);
 const canCreate = isEndClient ? ecCanCreate : baseEditors.includes(dtUserRole);

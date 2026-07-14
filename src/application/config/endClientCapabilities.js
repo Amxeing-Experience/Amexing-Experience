@@ -3,24 +3,27 @@
  * Todos los tipos comparten el mismo acceso (rol/rutas/vistas); esto define las variaciones:
  * - viewQuotes: ve el menú/lista de Cotizaciones.
  * - createQuotes: puede crear/editar/guardar/solicitar cotizaciones (si no, es solo lectura).
- * - viewTarifario: ve Exportar Tarifario.
+ * - viewTarifario: ve la sección Tarifario (catálogo + exportar). Todos menos cliente directo.
  * - dashboardQuotes: el dashboard de inicio incluye lo de Cotizaciones (segmentos Cotizado).
+ * - catalogScope: alcance del catálogo de Traslados (destinos) y Experiencias. 'full' = todo;
+ * 'popular' = solo destinos/experiencias populares. NOTA: el filtro de "populares" aún NO existe; se
+ * construirá más adelante y consumirá este flag (wedding_planner y home_owner = 'popular').
  * Reservaciones y dashboard base los ven todos.
  * Created by Denisse Maldonado
  */
 
 const END_CLIENT_CAPABILITIES = {
   direct_client: {
-    viewQuotes: true, createQuotes: false, viewTarifario: false, dashboardQuotes: true,
+    viewQuotes: true, createQuotes: true, viewTarifario: false, dashboardQuotes: true, catalogScope: 'full',
   },
   wedding_planner: {
-    viewQuotes: true, createQuotes: true, viewTarifario: true, dashboardQuotes: true,
+    viewQuotes: true, createQuotes: true, viewTarifario: true, dashboardQuotes: true, catalogScope: 'popular',
   },
   concierge: {
-    viewQuotes: true, createQuotes: true, viewTarifario: false, dashboardQuotes: true,
+    viewQuotes: true, createQuotes: true, viewTarifario: true, dashboardQuotes: true, catalogScope: 'full',
   },
   home_owner: {
-    viewQuotes: false, createQuotes: false, viewTarifario: false, dashboardQuotes: false,
+    viewQuotes: false, createQuotes: false, viewTarifario: true, dashboardQuotes: false, catalogScope: 'popular',
   },
 };
 
@@ -31,7 +34,8 @@ const DEFAULT_CAPABILITIES = END_CLIENT_CAPABILITIES.direct_client;
  * Devuelve las capacidades para una clientCategory dada. Cae al default (cliente directo) si la
  * categoría no se reconoce.
  * @param {string} clientCategory - direct_client | wedding_planner | concierge | home_owner.
- * @returns {object} Objeto con viewQuotes, createQuotes, viewTarifario y dashboardQuotes (booleans).
+ * @returns {object} Capacidades: viewQuotes, createQuotes, viewTarifario, dashboardQuotes (booleans)
+ * y catalogScope ('full' | 'popular').
  * @example
  * const caps = getEndClientCapabilities('wedding_planner'); // caps.viewTarifario === true
  */

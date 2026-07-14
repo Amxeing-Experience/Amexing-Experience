@@ -12,7 +12,7 @@ const ecCapsQD = (typeof endClientCaps !== 'undefined' && endClientCaps) ? endCl
 const ecCatQD = (typeof clientCategory !== 'undefined' && clientCategory)
   ? clientCategory
   : ((typeof user !== 'undefined' && user && user.clientCategory) ? user.clientCategory : null);
-const canCreateQuoteQD = ecCapsQD ? !!ecCapsQD.createQuotes : (ecCatQD === 'wedding_planner' || ecCatQD === 'concierge');
+const canCreateQuoteQD = ecCapsQD ? !!ecCapsQD.createQuotes : (ecCatQD === 'direct_client' || ecCatQD === 'wedding_planner' || ecCatQD === 'concierge');
 // Relabel a "Reservación" según el contexto con que se abrió (?context=reservation).
 const isReservationView = typeof isReservation !== 'undefined' && isReservation;
 const entityLabel = isReservationView ? 'Reservación' : 'Cotización';

@@ -17,8 +17,10 @@ const ecCat = (typeof clientCategory !== 'undefined' && clientCategory)
   : ((typeof user !== 'undefined' && user && user.clientCategory) ? user.clientCategory : null);
 // showQuotes: el dashboard incluye lo de Cotizaciones (segmento Cotizado + aviso de tarifas).
 const showQuotes = ecCaps ? !!ecCaps.dashboardQuotes : (ecCat !== 'home_owner');
-// canCreateQuote: botón Reservar (crear cotización) — solo wedding planner y concierge.
-const canCreateQuote = ecCaps ? !!ecCaps.createQuotes : (ecCat === 'wedding_planner' || ecCat === 'concierge');
+// canCreateQuote: botón Reservar (crear cotización) — todos los que ven cotizaciones menos home owner.
+const canCreateQuote = ecCaps ? !!ecCaps.createQuotes : (ecCat === 'direct_client' || ecCat === 'wedding_planner' || ecCat === 'concierge');
+// showTarifario: accesos rápidos al catálogo (Vehículos, Traslados, …) — todos menos cliente directo.
+const showTarifario = ecCaps ? !!ecCaps.viewTarifario : (!!ecCat && ecCat !== 'direct_client');
 %>
 
 <style>
@@ -174,5 +176,17 @@ const canCreateQuote = ecCaps ? !!ecCaps.createQuotes : (ecCat === 'wedding_plan
     <% } %>
   </div>
 
+  <% if (showTarifario) { %>
+  <!-- Accesos rápidos al catálogo (Tarifario) — todos los tipos menos cliente directo -->
+  <div class="section-title">Accesos rápidos <span class="rule"></span></div>
+  <div class="quick">
+    <a class="qa" href="/dashboard/<%= bp %>/vehicles"><div class="ic"><i class="ti ti-car"></i></div><div class="t">Vehículos</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/services"><div class="ic"><i class="ti ti-briefcase"></i></div><div class="t">Traslados</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/a-disposicion"><div class="ic"><i class="ti ti-calculator"></i></div><div class="t">A Disposición</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/experiences"><div class="ic"><i class="ti ti-star"></i></div><div class="t">Experiencias</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/tours"><div class="ic"><i class="ti ti-map"></i></div><div class="t">Tours</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/tarifario-export"><div class="ic"><i class="ti ti-download"></i></div><div class="t">Exportar Tarifario</div></a>
+  </div>
+  <% } %>
 
 </div>
