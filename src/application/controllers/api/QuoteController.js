@@ -628,8 +628,6 @@ class QuoteController {
 
       // Parse DataTables parameters
       const draw = parseInt(req.query.draw, 10) || 1;
-      const start = parseInt(req.query.start, 10) || 0;
-      const length = Math.min(parseInt(req.query.length, 10) || 25, 100);
       const searchValue = req.query.search?.value || '';
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'desc';
@@ -750,9 +748,14 @@ class QuoteController {
         filteredQuery.descending(sortField);
       }
 
-      // Apply pagination
-      filteredQuery.skip(start);
-      filteredQuery.limit(length);
+      // La tabla del front es client-side (serverSide:false): el navegador hace paginación,
+      // búsqueda y orden. Por eso el servidor debe devolver TODAS las cotizaciones que pasan el
+      // filtro de estado + el filtro de fecha (este último se aplica en JS más abajo porque la
+      // fecha vive dentro de serviceItems.days[].date y Parse no la puede consultar). Antes se
+      // aplicaba skip/limit ANTES del filtro de fecha, así que las cotizaciones cuya fecha caía
+      // fuera del lote paginado (p. ej. folios bajos con el orden por folio desc) desaparecían
+      // de "Actuales/Anteriores" y ni el buscador client-side las encontraba.
+      filteredQuery.limit(10000);
 
       // Execute query
       const quotes = await filteredQuery.find({ useMasterKey: true });

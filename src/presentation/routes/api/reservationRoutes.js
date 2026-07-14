@@ -204,4 +204,16 @@ router.post(
   (req, res) => ReservationController.cancelReservation(req, res)
 );
 
+/**
+ * POST /api/reservations/:id/revert-to-quote — Regresa una reservación a cotización
+ * (deshace una conversión hecha por error). SOLO admin/superadmin: acción destructiva.
+ */
+router.post(
+  '/:id/revert-to-quote',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRole(['admin', 'superadmin']),
+  (req, res) => ReservationController.revertToQuote(req, res)
+);
+
 module.exports = router;
