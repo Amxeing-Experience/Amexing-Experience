@@ -6,15 +6,16 @@
  * - viewTarifario: ve la sección Tarifario (catálogo + exportar). Todos menos cliente directo.
  * - dashboardQuotes: el dashboard de inicio incluye lo de Cotizaciones (segmentos Cotizado).
  * - catalogScope: alcance del catálogo de Traslados (destinos) y Experiencias. 'full' = todo;
- * 'popular' = solo destinos/experiencias populares. NOTA: el filtro de "populares" aún NO existe; se
- * construirá más adelante y consumirá este flag (wedding_planner y home_owner = 'popular').
+ * 'popular' = solo destinos/experiencias populares; null = no aplica (no ve tarifario). NOTA: el
+ * filtro de "populares" aún NO existe; se construirá más adelante y consumirá este flag
+ * (wedding_planner y home_owner = 'popular'; concierge = 'full'; cliente directo = null).
  * Reservaciones y dashboard base los ven todos.
  * Created by Denisse Maldonado
  */
 
 const END_CLIENT_CAPABILITIES = {
   direct_client: {
-    viewQuotes: true, createQuotes: true, viewTarifario: false, dashboardQuotes: true, catalogScope: 'full',
+    viewQuotes: true, createQuotes: true, viewTarifario: false, dashboardQuotes: true, catalogScope: null,
   },
   wedding_planner: {
     viewQuotes: true, createQuotes: true, viewTarifario: true, dashboardQuotes: true, catalogScope: 'popular',
