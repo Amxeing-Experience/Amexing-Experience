@@ -90,7 +90,22 @@ function showCancelReservationModal(reservation) {
     // Calculate hours before event
     const now = new Date();
     const hoursBeforeEvent = earliestEventDate ? Math.max(0, Math.floor((earliestEventDate.getTime() - now.getTime()) / (1000 * 60 * 60))) : 0;
-    const requiresApproval = hoursBeforeEvent < 24;
+
+    // Caso especial: si la reservación incluye experiencias con proveedor o establecimiento
+    // (terceros que muchas veces no reembolsan), la cancelación SIEMPRE requiere aprobación
+    // (solicitud), aunque falten más de 24h. Se detecta por el providerType/providerName que
+    // guarda el servicio de experiencia en su subconcept.
+    const hasProviderExperience = Array.isArray(reservation.services) && reservation.services.some((s) => {
+        if (!s || s.type !== 'experience') return false;
+        const sub = s.subconcept || {};
+        return !!(s.providerType || s.providerName || sub.providerType || sub.providerName);
+    });
+
+    const withinWindow = hoursBeforeEvent < 24;
+    const requiresApproval = withinWindow || hasProviderExperience;
+
+    // Días restantes hasta el primer servicio (se muestra en el texto del caso automático).
+    const daysBeforeEvent = Math.floor(hoursBeforeEvent / 24);
 
     // Format earliest event date
     const eventDateStr = earliestEventDate ? 
@@ -108,20 +123,12 @@ function showCancelReservationModal(reservation) {
             <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content">
                     <div class="modal-header bg-danger text-white">
-                        <h5 class="modal-title" id="cancelReservationModalLabel">
-                            <i class="ti ti-x me-2"></i>Cancelar Reservación
+                        <h5 class="modal-title text-white" id="cancelReservationModalLabel">
+                            <i class="ti ti-x me-2 text-white"></i>Cancelar Reservación
                         </h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="alert ${requiresApproval ? 'alert-warning' : 'alert-info'}">
-                            <i class="ti ${requiresApproval ? 'ti-alert-triangle' : 'ti-info-circle'} me-2"></i>
-                            ${requiresApproval ? 
-                                `<strong>¡Atención!</strong> La cancelación es con menos de 24 horas de anticipación (${hoursBeforeEvent} horas restantes). Se creará una solicitud de cancelación que requerirá aprobación administrativa.` :
-                                `La cancelación es con más de 24 horas de anticipación (${hoursBeforeEvent} horas restantes). La reservación se cancelará automáticamente.`
-                            }
-                        </div>
-
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Folio de Reservación</label>
@@ -147,17 +154,20 @@ function showCancelReservationModal(reservation) {
                         </div>
 
                         <div class="alert alert-secondary">
-                            <h6><i class="ti ti-info-circle me-2"></i>Información del Proceso:</h6>
-                            <ul class="mb-0">
-                                ${requiresApproval ? 
-                                    `<li>Se creará una solicitud de cancelación para revisión</li>
-                                     <li>Un administrador revisará y aprobará/rechazará la solicitud</li>
-                                     <li>Recibirá notificación del resultado</li>` :
-                                    `<li>La reservación se cancelará inmediatamente</li>
-                                     <li>Se enviará confirmación de cancelación</li>
-                                     <li>No se requiere aprobación adicional</li>`
-                                }
-                            </ul>
+                            <h6><i class="ti ti-info-circle me-2"></i>Información Importante:</h6>
+                            ${requiresApproval ?
+                                `<ul class="mb-0">
+                                    ${hasProviderExperience ? `<li>La reservación incluye experiencias con proveedores o establecimientos, por lo que la cancelación requiere aprobación (muchos no realizan reembolsos).</li>` : ''}
+                                    <li>Se creará una solicitud de cancelación para revisión</li>
+                                    <li>Un administrador revisará y aprobará/rechazará la solicitud</li>
+                                    <li>Recibirá notificación del resultado</li>
+                                 </ul>` :
+                                `<ol class="mb-0">
+                                    <li>Su solicitud se está realizando con más de 24 horas de anticipación, faltando ${daysBeforeEvent} ${daysBeforeEvent === 1 ? 'día' : 'días'} para la fecha programada del primer servicio. Por este motivo, la reservación quedará cancelada automáticamente conforme a nuestras políticas de cancelación.</li>
+                                    <li>Le enviaremos un correo de confirmación con esta información para su registro.</li>
+                                    <li>No se requiere ninguna acción adicional de su parte.</li>
+                                 </ol>`
+                            }
                         </div>
                     </div>
                     <div class="modal-footer">
