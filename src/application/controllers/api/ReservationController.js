@@ -13,6 +13,7 @@ const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 const FileStorageService = require('../../services/FileStorageService');
 const PaymentService = require('../../services/PaymentService');
+const { notifyReservationCancellation } = require('../../services/ReservationCancellationNotifier');
 // Models used via Parse.Query string references
 
 // Module-level FileStorageService for presigned S3 URLs (static class needs this)
@@ -1283,14 +1284,15 @@ class ReservationController {
 
       // Revert linked quote status back to 'requested'
       const quotePtr = reservation.get('quotePtr');
+      let linkedQuote = null;
       if (quotePtr) {
         const quoteQuery = new Parse.Query('Quote');
         quoteQuery.equalTo('exists', true);
-        const quote = await quoteQuery.get(quotePtr.id, { useMasterKey: true });
-        if (quote && quote.get('status') === 'scheduled') {
-          quote.set('status', 'requested');
-          await quote.save(null, { useMasterKey: true });
-          logger.info('Quote status reverted to requested', { quoteId: quote.id });
+        linkedQuote = await quoteQuery.get(quotePtr.id, { useMasterKey: true });
+        if (linkedQuote && linkedQuote.get('status') === 'scheduled') {
+          linkedQuote.set('status', 'requested');
+          await linkedQuote.save(null, { useMasterKey: true });
+          logger.info('Quote status reverted to requested', { quoteId: linkedQuote.id });
         }
       }
 
@@ -1299,6 +1301,18 @@ class ReservationController {
         servicesCancelled: services.length,
         performedBy: req.user?.id,
       });
+
+      // Correo de cancelación al owner de la cotización. Cancelación directa: automática
+      // (agencia/agente ≥24h sin proveedor) o admin. No bloquea si el correo falla.
+      if (linkedQuote) {
+        const cancellationType = ['admin', 'superadmin'].includes(req.userRole) ? 'admin' : 'automatic';
+        await notifyReservationCancellation({
+          quote: linkedQuote,
+          reservation,
+          reason: req.body?.reason,
+          cancellationType,
+        });
+      }
 
       return res.json({ success: true, message: 'Reservación cancelada exitosamente' });
     } catch (error) {
