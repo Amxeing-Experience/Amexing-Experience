@@ -32,7 +32,7 @@ const ReservationService = require('../../domain/models/ReservationService');
 class QuoteService {
   constructor() {
     this.className = 'Quote';
-    this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client'];
+    this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client', 'end_client'];
     this.validStatuses = ['quoted', 'requested', 'hold', 'scheduled', 'rejected'];
     this.pdfService = new PDFReceiptService();
   }
@@ -324,6 +324,7 @@ class QuoteService {
         'leadGuestFirstName',
         'leadGuestLastName',
         'notes',
+        'lodging',
         'validUntil',
         'eventType',
         'clientFinalId',
@@ -903,6 +904,7 @@ class QuoteService {
    * @param {string} userRole - User role (optional).
    * @param includePaymentInfoOverride
    * @param paymentInfoId
+   * @param billingProfileId
    * @returns {Promise<object>} Result with success status and receipt data.
    * @throws {Error} If validation fails or quote is not in scheduled status.
    * @example
@@ -913,7 +915,9 @@ class QuoteService {
     quoteId,
     userRole = null,
     includePaymentInfoOverride = null,
-    paymentInfoId = null
+    paymentInfoId = null,
+    billingProfileId = null,
+    force = false
   ) {
     try {
       // Validate user authentication
@@ -990,6 +994,51 @@ class QuoteService {
           });
           throw new Error(`Cannot generate receipt: ${createError.message}`);
         }
+      }
+
+      // Gate: el recibo solo se genera si la reservación está SALDADA (paymentStatus === 'paid',
+      // es decir pagado >= total). Admin/superadmin pueden forzar (force=true); agencia/agente no.
+      // Se usa el summary fresco de PaymentService (no depende del rollup persistido en la reservación).
+      const PaymentService = require('./PaymentService');
+      let paymentSummary = null;
+      try {
+        paymentSummary = await PaymentService.summarize(reservation.id);
+      } catch (payErr) {
+        logger.warn('generateReceipt: no se pudo calcular el summary de pagos', {
+          error: payErr.message,
+          reservationId: reservation.id,
+          quoteId: quote.id,
+        });
+      }
+      const paymentStatus = paymentSummary ? paymentSummary.paymentStatus : (reservation.get('paymentStatus') || 'pending');
+      const isSettled = paymentStatus === 'paid';
+      const canOverride = ['admin', 'superadmin'].includes(role) && force === true;
+      if (!isSettled && !canOverride) {
+        logger.info('generateReceipt bloqueado: reservación no saldada', {
+          reservationId: reservation.id,
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          paymentStatus,
+          role,
+        });
+        const blockErr = new Error('La reservación no está saldada: registra el pago total antes de generar el recibo.');
+        blockErr.code = 'RESERVATION_NOT_SETTLED';
+        blockErr.payment = {
+          paymentStatus,
+          paidAmount: paymentSummary ? paymentSummary.paidAmount : (reservation.get('paidAmount') || 0),
+          balance: paymentSummary ? paymentSummary.balance : (reservation.get('balance') || null),
+          total: paymentSummary ? paymentSummary.total : null,
+        };
+        throw blockErr;
+      }
+      if (!isSettled && canOverride) {
+        logger.info('generateReceipt: override de admin sobre reservación no saldada', {
+          reservationId: reservation.id,
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          paymentStatus,
+          role,
+        });
       }
 
       // Get service items if they exist
@@ -1076,6 +1125,178 @@ class QuoteService {
         }
       }
 
+      // Perfil de facturación (datos fiscales) elegido para el recibo. Debe pertenecer a la
+      // AGENCIA de la cotización (quote.client = AmexingUser de la agencia; el dueño/agente
+      // está en quote.owner). Se persiste en la reservación para recordar cuál se usó.
+      let billingProfile = null;
+      if (billingProfileId) {
+        try {
+          const agency = quote.get('client'); // AmexingUser de la agencia (o cliente directo)
+          const bpQuery = new Parse.Query('BillingProfile');
+          bpQuery.equalTo('exists', true);
+          if (agency) bpQuery.equalTo('userPtr', agency);
+          const bp = await bpQuery.get(billingProfileId, { useMasterKey: true });
+          if (bp) {
+            billingProfile = {
+              id: bp.id,
+              label: bp.get('label') || '',
+              country: bp.get('country') || '',
+              rfc: bp.get('rfc') || '',
+              razonSocial: bp.get('razonSocial') || '',
+              regimenFiscal: bp.get('regimenFiscal') || '',
+              usoCfdi: bp.get('usoCfdi') || '',
+              codigoPostal: bp.get('codigoPostal') || bp.get('postalCode') || '',
+              emailFacturacion: bp.get('emailFacturacion') || '',
+              phone: bp.get('phone') || '',
+              taxId: bp.get('taxId') || '',
+              commercialName: bp.get('commercialName') || '',
+              streetType: bp.get('streetType') || '',
+              street: bp.get('street') || '',
+              exteriorNumber: bp.get('exteriorNumber') || '',
+              interiorNumber: bp.get('interiorNumber') || '',
+              colonia: bp.get('colonia') || '',
+              city: bp.get('city') || '',
+              state: bp.get('state') || '',
+            };
+            // Persistir el perfil elegido en la reservación (recuerda el último usado).
+            try {
+              reservation.set('billingProfilePtr', bp);
+              await reservation.save(null, { useMasterKey: true });
+            } catch (persistErr) {
+              logger.warn('No se pudo guardar billingProfilePtr en la reservación', {
+                quoteId, billingProfileId, error: persistErr.message,
+              });
+            }
+          }
+        } catch (bpErr) {
+          logger.warn('No se pudo cargar el perfil de facturación para el recibo', {
+            quoteId, billingProfileId, error: bpErr.message,
+          });
+          billingProfile = null;
+        }
+      }
+
+      // Fecha base para calcular la fecha de cada día cuando el snapshot no trae dayDate:
+      // startDate de la reservación + (dayNumber - 1). En dev/prod muchas cotizaciones
+      // no persisten dayDate, así que se calcula desde la reservación.
+      const reservationStart = reservation.get('startDate') || null;
+
+      // ---- Renglones del recibo (segmento, vehículo, desglose de personas, vehículos adicionales) ----
+      // Los subconceptos "nuevos" guardan el segmento como ID de Rate (category /
+      // additionalVehicleSegment); se resuelve el nombre con un rateMap (una sola query).
+      // Los "viejos" ya traen rateName.
+      const rateIdSet = new Set();
+      (serviceItems || []).forEach((day) => (day.subconcepts || []).forEach((sc) => {
+        [sc.category, sc.rateId, sc.additionalVehicleSegment].forEach((id) => { if (id) rateIdSet.add(id); });
+        (sc.extraAdditionalVehicles || []).forEach((v) => { if (v && v.segment) rateIdSet.add(v.segment); });
+      }));
+      const rateMap = new Map();
+      if (rateIdSet.size) {
+        try {
+          const rq = new Parse.Query('Rate');
+          rq.containedIn('objectId', [...rateIdSet]);
+          rq.limit(1000);
+          const rates = await rq.find({ useMasterKey: true });
+          rates.forEach((r) => rateMap.set(r.id, r.get('name') || ''));
+        } catch (rmErr) {
+          logger.warn('No se pudo cargar rateMap para el recibo', { quoteId, error: rmErr.message });
+        }
+      }
+
+      /**
+       * Quita un sufijo " - N pax" ya embebido y los paréntesis de un nombre.
+       * @param {string} s - Texto a limpiar.
+       * @returns {string} Texto limpio.
+       * @example stripPax('SEDAN - 4 pax'); // 'SEDAN'
+       */
+      const stripPax = (s) => String(s || '').replace(/\s*[-–]\s*\d+\s*pax\s*$/i, '').replace(/\s*\([^)]*\)/g, '').trim();
+      /**
+       * Nombre del segmento/tarifa: rateName (estructura vieja) o el resuelto por ID (nueva).
+       * @param {object} sc - Subconcepto del día.
+       * @returns {string} Nombre del segmento (o '').
+       * @example segmentName({ rateName: 'Premium' }); // 'Premium'
+       */
+      const segmentName = (sc) => sc.rateName || rateMap.get(sc.category) || rateMap.get(sc.rateId)
+        || sc.categoryName || sc.segmentName || '';
+      /**
+       * Nombre del vehículo: prefiere vehicleTypeName (nueva); vehicleType es el nombre en la vieja.
+       * @param {object} sc - Subconcepto del día.
+       * @returns {string} Nombre del vehículo (o '').
+       * @example vehicleName({ vehicleTypeName: 'MODEL Y' }); // 'MODEL Y'
+       */
+      const vehicleName = (sc) => {
+        const v = (sc.vehicleTypeName || sc.vehicleType || '');
+        return v === 'N/A' ? '' : stripPax(v);
+      };
+      /**
+       * Desglose de personas (adultos/niños/infantes/sin-alcohol) o un conteo "N pax".
+       * @param {object} sc - Subconcepto del día.
+       * @returns {string} Texto del desglose (o '').
+       * @example paxText({ adultsQuantity: 2, childrenQuantity: 1 }); // '2 adultos, 1 niño'
+       */
+      const paxText = (sc) => {
+        const parts = [];
+        const groups = [
+          [sc.adultsQuantity, 'adulto', 'adultos'],
+          [sc.adultsNoAlcoholQuantity, 'adulto sin alcohol', 'adultos sin alcohol'],
+          [sc.childrenQuantity, 'niño', 'niños'],
+          [sc.infantsQuantity, 'infante', 'infantes'],
+        ];
+        groups.forEach(([n, one, many]) => {
+          const q = Number(n);
+          if (q > 0) parts.push(`${q} ${q === 1 ? one : many}`);
+        });
+        if (parts.length) return parts.join(', ');
+        const count = sc.numberOfPeople || sc.walkingTourPeopleCount || sc.persons || 0;
+        return count > 0 ? `${count} pax` : '';
+      };
+      /**
+       * Lista de vehículos adicionales (principal + extras) con su segmento resuelto.
+       * @param {object} sc - Subconcepto del día.
+       * @returns {Array<{segment: string, vehicle: string}>} Vehículos adicionales.
+       * @example additionalVehicles({ hasAdditionalVehicle: true, additionalVehicleTypeName: 'SEDAN' });
+       */
+      const additionalVehicles = (sc) => {
+        const out = [];
+        if (sc.hasAdditionalVehicle && (sc.additionalVehicleTypeName || sc.additionalVehicleSegment)) {
+          out.push({
+            segment: rateMap.get(sc.additionalVehicleSegment) || sc.additionalVehicleSegmentName || '',
+            vehicle: stripPax(sc.additionalVehicleTypeName),
+          });
+        } else if (sc.additionalVehicleForLuggage && sc.additionalVehicleTypeName) {
+          out.push({ segment: '', vehicle: stripPax(sc.additionalVehicleTypeName) });
+        }
+        (sc.extraAdditionalVehicles || []).forEach((v) => {
+          const vehicle = stripPax(v.vehicleTypeName || v.vehicleName);
+          const segment = v.segmentName || rateMap.get(v.segment) || '';
+          if (vehicle || segment) out.push({ segment, vehicle });
+        });
+        return out;
+      };
+
+      const receiptItems = (serviceItems || []).flatMap((day) => {
+        const subs = (Array.isArray(day.subconcepts) && day.subconcepts.length)
+          ? day.subconcepts
+          : [{ concept: day.dayTitle || '', total: day.dayTotal }];
+        // Fecha del día: dayDate del snapshot si es válido; si no, startDate + (dayNumber - 1) en UTC.
+        let dayIso = (typeof day.dayDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(day.dayDate))
+          ? day.dayDate.slice(0, 10) : '';
+        if (!dayIso && reservationStart && Number.isInteger(day.dayNumber)) {
+          const d = new Date(reservationStart);
+          d.setUTCDate(d.getUTCDate() + (day.dayNumber - 1));
+          dayIso = d.toISOString().slice(0, 10);
+        }
+        return subs.map((sc, idx) => ({
+          dayDate: idx === 0 ? dayIso : '',
+          concept: sc.concept,
+          segment: segmentName(sc),
+          vehicle: vehicleName(sc),
+          paxText: paxText(sc),
+          additionalVehicles: additionalVehicles(sc),
+          total: sc.total || 0,
+        }));
+      });
+
       // Prepare quote data for PDF generation
       const quoteData = {
         quote: {
@@ -1090,21 +1311,23 @@ class QuoteService {
           email: quote.get('client')?.get('email') || quote.get('contactEmail') || '',
           phone: quote.get('contactPhone') || quote.get('client')?.get('phone') || '',
         },
-        serviceItems: serviceItems.map((item) => ({
-          dayNumber: item.dayNumber,
-          concept: item.concept,
-          vehicleType: item.vehicleType,
-          hours: item.hours,
-          total: item.dayTotal || item.total || 0, // Use dayTotal first, then total, then 0 as fallback
-          notes: item.notes,
-        })),
+        // Un renglón por SERVICIO (subconcepto), ya resuelto arriba (receiptItems).
+        serviceItems: receiptItems,
         totals: {
           subtotal,
           iva,
           total,
         },
+        // Invoice No. del recibo = folio de la RESERVACIÓN (no de la cotización).
+        reservationFolio: reservation.get('folio') || '',
+        // Nombres de huéspedes bajo DESCRIPTION (Lead Guest + persona de contacto), sin vacíos ni duplicados.
+        guestNames: [
+          `${quote.get('leadGuestFirstName') || ''} ${quote.get('leadGuestLastName') || ''}`.trim(),
+          quote.get('contactPerson'),
+        ].filter((n, i, arr) => n && arr.indexOf(n) === i),
         includePaymentInfo, // Pass the flag to PDF service
         selectedPaymentInfo, // Pass the specific payment info data
+        billingProfile, // Perfil fiscal de la agencia (o null) para el bloque de facturación
       };
 
       // Generate PDF receipt
@@ -1591,6 +1814,7 @@ class QuoteService {
     reservation.set('leadGuestFirstName', quote.get('leadGuestFirstName') || '');
     reservation.set('leadGuestLastName', quote.get('leadGuestLastName') || '');
     reservation.set('notes', quote.get('notes') || '');
+    reservation.set('lodging', quote.get('lodging') || '');
 
     // 2) Service-level fields (snapshot + totals + dates) — only when serviceItems
     // are provided (i.e. called from the service-items save).
@@ -1865,6 +2089,7 @@ class QuoteService {
       reservation.set('leadGuestFirstName', quote.get('leadGuestFirstName') || '');
       reservation.set('leadGuestLastName', quote.get('leadGuestLastName') || '');
       reservation.set('notes', quote.get('notes') || '');
+      reservation.set('lodging', quote.get('lodging') || '');
       reservation.set('serviceItemsSnapshot', serviceItems);
       reservation.set('active', true);
       reservation.set('exists', true);

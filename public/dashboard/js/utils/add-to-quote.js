@@ -21,6 +21,8 @@
 
   let opts = null; // opciones del open() actual
   let selectedQuote = null; // cotización seleccionada (para el selector de día)
+  let peopleCounts = null; // conteos de personas capturados (cuando opts.people)
+  let peopleOnConfirm = null; // callback tras confirmar el paso de personas
 
   const el = (id) => document.getElementById(id);
 
@@ -92,10 +94,13 @@
   function open(options) {
     opts = options || {};
     selectedQuote = null;
+    peopleCounts = null;
+    peopleOnConfirm = null;
     el('atqItemName').innerHTML = opts.itemLabel || '';
 
     el('atqPickerList').style.display = 'none';
     el('atqDaySelector').style.display = 'none';
+    el('atqPeople').style.display = 'none';
     el('atqActionLoading').style.display = 'none';
     el('atqPickerLoading').style.display = 'block';
     el('atqSearchInput').style.display = '';
@@ -224,7 +229,7 @@
   // Envuelve el buildSubconcept de la superficie e inyecta pricesByType a partir de
   // sub.total (base efectivo), salvo que la superficie ya lo traiga.
   async function buildSub() {
-    const sub = opts.buildSubconcept();
+    const sub = opts.buildSubconcept(peopleCounts);
     if (sub && sub.pricesByType == null && sub.total != null) {
       const base = Number(sub.total) || 0;
       const rates = await getRates();
@@ -246,7 +251,70 @@
     return sub;
   }
 
+  // ── Paso de personas (opcional, cuando opts.people): steppers pre-llenados de la
+  //    cotización, precio en vivo. Se muestra como gate justo antes de guardar. ──
+  function peopleFields() { return (opts.people && opts.people.fields) || []; }
+
+  function collectPeople() {
+    const counts = {};
+    const box = el('atqPeople');
+    peopleFields().forEach((f) => {
+      const row = box.querySelector('[data-people-key="' + f.key + '"] .val');
+      const v = parseInt((row && row.textContent) || '0', 10);
+      counts[f.key] = isNaN(v) ? 0 : v;
+    });
+    return counts;
+  }
+
+  function peopleTotal(counts) {
+    return peopleFields().reduce((a, f) => a + (Number(counts[f.key]) || 0), 0);
+  }
+
+  function refreshPeople() {
+    const counts = collectPeople();
+    const box = el('atqPeople');
+    const price = (opts.people && typeof opts.people.priceFor === 'function') ? (Number(opts.people.priceFor(counts)) || 0) : 0;
+    const amt = box.querySelector('.atq-people-total .amt');
+    if (amt) amt.textContent = '$' + (Math.round(price * 100) / 100).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' MXN';
+    const min = (opts.people && opts.people.minTotal) || 1;
+    const confirmBtn = box.querySelector('.atq-people-confirm');
+    if (confirmBtn) confirmBtn.disabled = peopleTotal(counts) < min;
+  }
+
+  function showPeople(prefillQuote, onConfirm) {
+    el('atqPickerList').style.display = 'none';
+    el('atqCreateNew').style.display = 'none';
+    el('atqSearchInput').style.display = 'none';
+    el('atqDaySelector').style.display = 'none';
+    el('atqPickerLoading').style.display = 'none';
+    peopleOnConfirm = onConfirm;
+    const fields = peopleFields();
+    const counts = {};
+    fields.forEach((f) => { counts[f.key] = (prefillQuote && Number(prefillQuote[f.quoteField])) || 0; });
+    const min = (opts.people && opts.people.minTotal) || 1;
+    if (peopleTotal(counts) < min && fields.length) { counts[fields[0].key] = min; }
+    let html = '<div class="atq-people-back"><i class="ti ti-arrow-left me-1"></i>Volver a cotizaciones</div>';
+    html += '<div class="atq-people-title">' + ((opts.people && opts.people.title) || '¿Cuántas personas?') + '</div>';
+    if (opts.people && opts.people.hint) html += '<div class="atq-people-hint">' + opts.people.hint + '</div>';
+    html += fields.map((f) =>
+      '<div class="atq-people-row" data-people-key="' + f.key + '">'
+      + '<span class="lbl">' + f.label + (f.sub ? '<small>' + f.sub + '</small>' : '') + '</span>'
+      + '<span class="atq-stepper">'
+      + '<button type="button" class="atq-minus" aria-label="menos">−</button>'
+      + '<span class="val">' + (counts[f.key] || 0) + '</span>'
+      + '<button type="button" class="atq-plus" aria-label="más">+</button>'
+      + '</span></div>'
+    ).join('');
+    html += '<div class="atq-people-total"><span>Total</span><span class="amt">$0 MXN</span></div>';
+    html += '<button type="button" class="atq-people-confirm">Continuar</button>';
+    const box = el('atqPeople');
+    box.innerHTML = html;
+    box.style.display = 'block';
+    refreshPeople();
+  }
+
   async function addToDay(quoteId, dayIndex) {
+    if (opts.people && !peopleCounts) { showPeople(selectedQuote, function () { addToDay(quoteId, dayIndex); }); return; }
     const ds = el('atqDaySelector');
     if (ds) ds.style.display = 'none';
     el('atqActionLoading').style.display = 'block';
@@ -267,6 +335,7 @@
   }
 
   async function addToNewDay(quoteId, dayTitle) {
+    if (opts.people && !peopleCounts) { showPeople(selectedQuote, function () { addToNewDay(quoteId, dayTitle); }); return; }
     const ds = el('atqDaySelector');
     if (ds) ds.style.display = 'none';
     el('atqActionLoading').style.display = 'block';
@@ -289,10 +358,12 @@
   }
 
   async function createNew() {
+    if (opts.people && !peopleCounts) { showPeople(null, createNew); return; }
     el('atqPickerList').style.display = 'none';
     el('atqActionLoading').style.display = 'block';
     el('atqCreateNew').style.display = 'none';
     el('atqSearchInput').style.display = 'none';
+    el('atqPeople').style.display = 'none';
     try {
       const createRes = await fetch('/api/quotes', { method: 'POST', headers: headers(true), body: JSON.stringify({ status: 'draft' }) });
       if (!createRes.ok) throw new Error((await createRes.json()).error || 'Error al crear cotización');
@@ -359,8 +430,35 @@
 
     el('atqCreateNew').addEventListener('click', createNew);
 
+    el('atqPeople').addEventListener('click', function (e) {
+      const stepBtn = e.target.closest('.atq-plus, .atq-minus');
+      if (stepBtn) {
+        const valEl = stepBtn.parentElement.querySelector('.val');
+        let v = parseInt(valEl.textContent || '0', 10) || 0;
+        v = stepBtn.classList.contains('atq-plus') ? v + 1 : Math.max(0, v - 1);
+        valEl.textContent = v;
+        refreshPeople();
+        return;
+      }
+      if (e.target.closest('.atq-people-confirm')) {
+        if (peopleTotal(collectPeople()) < ((opts.people && opts.people.minTotal) || 1)) return;
+        peopleCounts = collectPeople();
+        el('atqPeople').style.display = 'none';
+        const cb = peopleOnConfirm; peopleOnConfirm = null;
+        if (cb) cb();
+        return;
+      }
+      if (e.target.closest('.atq-people-back')) {
+        el('atqPeople').style.display = 'none';
+        el('atqPickerList').style.display = 'block';
+        el('atqCreateNew').style.display = '';
+        el('atqSearchInput').style.display = '';
+      }
+    });
+
     modalEl.addEventListener('hidden.bs.modal', function () {
       el('atqDaySelector').style.display = 'none';
+      el('atqPeople').style.display = 'none';
       el('atqActionLoading').style.display = 'none';
     });
   }

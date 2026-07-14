@@ -1030,6 +1030,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                         data-experience-name="${experience.displayName}"
                                         data-experience-type="${experience.source}"
                                         data-experience-price="${experience.displayPrice || 0}"
+                                        data-experience-price-child="${experience.displayPriceChild || 0}"
+                                        data-experience-price-no-alcohol="${experience.displayPriceNoAlcohol || 0}"
                                         title="Agregar a cotización">
                                     <i class="ti ti-file-plus me-1"></i>Agregar
                                 </button>
@@ -1160,23 +1162,64 @@ document.addEventListener('DOMContentLoaded', function() {
     // ========== Add Experience to Quote (módulo genérico compartido: /dashboard/js/utils/add-to-quote.js) ==========
     (function() {
         // Payload específico de Experiencias (lo único propio de esta superficie)
-        function buildExperienceSubconcept(exp) {
+        function buildExperienceSubconcept(exp, counts) {
+            const c = counts || {};
+            const adults = Number(c.adults) || 0;
+            const children = Number(c.children) || 0;
+            const infants = Number(c.infants) || 0;
+            const adultPrice = Number(exp.price) || 0;
+            // Niños: su precio si existe, si no el de adulto (mismo fallback que el builder).
+            const childPrice = (Number(exp.priceChild) || 0) > 0 ? Number(exp.priceChild) : adultPrice;
+            const noAlcoholPrice = Number(exp.priceNoAlcohol) || 0;
+            // Infantes se cobran como NIÑOS (precio de niño, o adulto si no hay). Se pliegan en
+            // childrenQuantity para que el builder los cobre igual al recalcular (su fórmula no
+            // incluye infantsQuantity).
+            const childrenTotal = children + infants;
+            const total = Math.round((adults * adultPrice + childrenTotal * childPrice) * 100) / 100;
+            const persons = adults + childrenTotal;
             return {
                 type: 'experience', experienceId: exp.id, title: exp.name,
-                time: '', hours: 0, unitPrice: exp.price, total: exp.price,
-                isPerPerson: true, numberOfPeople: 1
+                time: '', hours: 0,
+                unitPrice: adultPrice, total: total,
+                isPerPerson: true, numberOfPeople: persons || 1,
+                adultsQuantity: adults, childrenQuantity: childrenTotal,
+                adultsNoAlcoholQuantity: 0, infantsQuantity: 0,
+                adultPrice: adultPrice, childPrice: childPrice, noAlcoholPrice: noAlcoholPrice
             };
         }
 
         function openExperienceAddToQuote(exp) {
             if (!exp) return;
-            // Las experiencias tienen 3 tipos de persona (adulto/niño/sin alcohol), así que
-            // no mostramos un "precio por persona" único: solo el nombre de la experiencia.
+            const adultPrice = Number(exp.price) || 0;
+            // Niños e infantes: precio de niño si existe, si no el de adulto.
+            const childPrice = (Number(exp.priceChild) || 0) > 0 ? Number(exp.priceChild) : adultPrice;
+            // Las experiencias cobran por persona: adultos a precio adulto; niños e infantes a
+            // precio de niño (o adulto si no hay). Se piden las personas en el modal, pre-llenadas.
             AddToQuote.open({
                 userRole: '<%= currentUserRole %>',
                 serviceLabel: 'Experiencia',
                 itemLabel: '<strong>' + (exp.name || 'Experiencia') + '</strong>',
-                buildSubconcept: function() { return buildExperienceSubconcept(exp); }
+                people: {
+                    title: '¿Cuántas personas?',
+                    hint: 'Se pre-llena con las personas de la cotización.',
+                    minTotal: 1,
+                    fields: [
+                        { key: 'adults', label: 'Adultos', sub: '12+', quoteField: 'numberOfAdults' },
+                        { key: 'children', label: 'Niños', sub: '3–12', quoteField: 'numberOfChildren' },
+                        { key: 'infants', label: 'Infantes', sub: '0–2', quoteField: 'numberOfInfants' }
+                    ],
+                    priceFor: function(counts) {
+                        const a = Number(counts.adults) || 0;
+                        const ch = (Number(counts.children) || 0) + (Number(counts.infants) || 0);
+                        const base = a * adultPrice + ch * childPrice;
+                        // Display con recargo del método de pago del catálogo (lo GUARDADO es base).
+                        const pt = (document.getElementById('filterPayment') || {}).value || 'efectivo';
+                        return (window.PricingUtils && typeof PricingUtils.applyPaymentRate === 'function')
+                            ? PricingUtils.applyPaymentRate(base, pt, currentTransferRate, currentAgencyRate)
+                            : base;
+                    }
+                },
+                buildSubconcept: function(counts) { return buildExperienceSubconcept(exp, counts); }
             });
         }
 
@@ -1187,7 +1230,9 @@ document.addEventListener('DOMContentLoaded', function() {
             openExperienceAddToQuote({
                 id: btn.dataset.experienceId,
                 name: btn.dataset.experienceName,
-                price: parseFloat(btn.dataset.experiencePrice) || 0
+                price: parseFloat(btn.dataset.experiencePrice) || 0,
+                priceChild: parseFloat(btn.dataset.experiencePriceChild) || 0,
+                priceNoAlcohol: parseFloat(btn.dataset.experiencePriceNoAlcohol) || 0
             });
         });
 
@@ -1331,7 +1376,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 id: experienceId,
                 name: experienceDetail.name || experienceName,
                 type: experienceType,
-                price: experienceDetail.cost || 0
+                price: experienceDetail.cost || experienceDetail.price || 0,
+                priceChild: experienceDetail.price_child || 0,
+                priceNoAlcohol: experienceDetail.price_no_alcohol || 0
             };
 
             // Debug the photo structure from API

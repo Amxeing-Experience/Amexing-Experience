@@ -6,6 +6,9 @@
  */
 %>
 
+<!-- Util del selector amigable de "Tiempo de Anticipación" (presets + Días/Horas/Min → minutos) -->
+<script src="/dashboard/js/utils/advance-time-picker.js"></script>
+
 <div id="experienceInformationCard" class="p-4">
     <!-- Alerts Container -->
     <div id="experienceInfoAlerts"></div>
@@ -86,16 +89,14 @@
                         con la "duración sugerida" (suma de tiempos de los servicios). %>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="experienceTravelDuration" class="form-label">Duracion Trayecto (min)</label>
-                            <input type="number" class="form-control" id="experienceTravelDuration" name="travel_duration" min="0" step="1" placeholder="60">
-                            <div class="form-text"><small>Tiempo traslado</small></div>
+                            <label class="form-label">Duración de Trayecto</label>
+                            <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceTravelDuration', hiddenName: 'travel_duration', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="experienceAdvanceMinutes" class="form-label">Anticipacion (min)</label>
-                            <input type="number" class="form-control" id="experienceAdvanceMinutes" name="advance_minutes" min="0" step="1" placeholder="1440">
-                            <div class="form-text"><small>Ej: 1440 = 24hrs</small></div>
+                            <label class="form-label">Tiempo de Anticipación</label>
+                            <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceAdvanceMinutes', hiddenName: 'advance_minutes' }) %>
                         </div>
                     </div>
                 </div>
@@ -1135,6 +1136,22 @@ document.addEventListener('DOMContentLoaded', function() {
         container.appendChild(col);
     }
 
+    // ===== Orden de horarios por hora de inicio (los <input type=time> dan HH:MM 24h) =====
+    function toMinExp(t) { const p = String(t || '').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); }
+    function sortExpTimes(times) { return (times || []).slice().sort(function(a, b) { return toMinExp(a.start) - toMinExp(b.start); }); }
+    // Reordena EN VIVO (sin guardar) las filas de horario de un día por hora de inicio.
+    function sortExpSlotsLive(container) {
+        if (!container) return;
+        const rows = Array.prototype.filter.call(container.children, function(el) { return el.classList && el.classList.contains('time-slot-row'); });
+        rows.sort(function(a, b) { return toMinExp((a.querySelector('.start-time') || {}).value) - toMinExp((b.querySelector('.start-time') || {}).value); });
+        rows.forEach(function(r) { container.appendChild(r); });
+    }
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('start-time') && e.target.closest('#daySchedulesContainer')) {
+            sortExpSlotsLive(e.target.closest('.time-slots-container'));
+        }
+    });
+
     function addDayScheduleRow(day, dayName, startTime = '09:00', endTime = '18:00') {
         const container = document.getElementById('daySchedulesContainer');
 
@@ -1317,8 +1334,26 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('experiencePriceChild').value = data.price_child || '';
             document.getElementById('experiencePriceInfant').value = data.price_infant || '';
             document.getElementById('experienceDuration').value = data.duration || '';
-            document.getElementById('experienceTravelDuration').value = data.travel_duration || '';
-            document.getElementById('experienceAdvanceMinutes').value = data.advance_minutes || '';
+            (function() {
+                const travelMin = parseInt(data.travel_duration, 10) || 0;
+                const tHidden = document.getElementById('experienceTravelDuration');
+                const tPicker = tHidden ? tHidden.closest('.advance-time-picker') : null;
+                if (tPicker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(tPicker, travelMin);
+                } else if (tHidden) {
+                    tHidden.value = travelMin || '';
+                }
+            })();
+            (function() {
+                const advMinutes = parseInt(data.advance_minutes, 10) || 0;
+                const advHidden = document.getElementById('experienceAdvanceMinutes');
+                const picker = advHidden ? advHidden.closest('.advance-time-picker') : null;
+                if (picker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(picker, advMinutes);
+                } else if (advHidden) {
+                    advHidden.value = advMinutes || '';
+                }
+            })();
             document.getElementById('experienceMinPeople').value = data.min_people || '';
             document.getElementById('experienceMaxPeople').value = data.max_people || '';
             document.getElementById('experienceCancellationPolicy').value = data.cancellation_policy || '';
@@ -1479,11 +1514,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         selectedDays.set(dayStr, true);
 
                         if (schedule.times && schedule.times.length > 0) {
-                            // New multi-slot format
-                            addDayScheduleRow(dayStr, dayBtn.dataset.dayName, schedule.times[0].start, schedule.times[0].end);
+                            // New multi-slot format (ordenado por hora de inicio)
+                            const sortedTimes = sortExpTimes(schedule.times);
+                            addDayScheduleRow(dayStr, dayBtn.dataset.dayName, sortedTimes[0].start, sortedTimes[0].end);
                             const dayRow = document.querySelector(`#daySchedulesContainer .day-schedule-row[data-day="${dayStr}"]`);
-                            for (let i = 1; i < schedule.times.length; i++) {
-                                addTimeSlotToDay(dayRow, schedule.times[i].start, schedule.times[i].end);
+                            for (let i = 1; i < sortedTimes.length; i++) {
+                                addTimeSlotToDay(dayRow, sortedTimes[i].start, sortedTimes[i].end);
                             }
                         } else if (schedule.startTime || schedule.endTime) {
                             // Old single-slot format
@@ -1773,6 +1809,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         daySchedule.times.push({ start, end });
                     }
                 });
+                // Ordena por hora de inicio (pueden capturarse desordenados)
+                daySchedule.times = sortExpTimes(daySchedule.times);
                 if (daySchedule.times.length > 0) {
                     availability.push(daySchedule);
                 }

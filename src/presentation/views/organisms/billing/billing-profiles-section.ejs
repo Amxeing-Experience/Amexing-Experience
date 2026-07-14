@@ -11,6 +11,8 @@
 const billingUserRole = typeof userRole !== 'undefined' ? userRole : 'department_manager';
 const billingReadOnly = typeof readOnly !== 'undefined' ? readOnly : false;
 const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId : '';
+// showHeader=false cuando la página ya provee su propio título de sección (p.ej. perfil).
+const billingShowHeader = typeof showHeader !== 'undefined' ? showHeader : true;
 %>
 
 <style>
@@ -70,42 +72,85 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
     margin-bottom: 0.25rem;
     font-size: 0.8rem;
 }
+
+/* ===== Look editorial (acordeón de perfiles) ===== */
+.bp-editorial { --bp-olive:#6E7A50; --bp-olive-d:#566040; --bp-line:#ded9cb; --bp-panel:#faf9f4; --bp-ink:#2b2b2b; --bp-muted:#8a8f78; }
+.bp-editorial .bp-header-title { text-transform:uppercase; letter-spacing:.2em; font-weight:600; color:var(--bp-ink); font-size:1rem; }
+.bp-editorial .bp-header-sub { color:var(--bp-muted); font-style:italic; font-size:.9rem; margin-top:2px; }
+.bp-accordion { display:flex; flex-direction:column; gap:14px; }
+.bp-item { border:1px solid var(--bp-line); border-radius:10px; background:#fff; overflow:hidden; }
+.bp-head { width:100%; display:flex; align-items:center; gap:12px; background:#fff; border:0; padding:14px 18px; text-align:left; }
+.bp-head:hover { background:#f6f5f0; }
+.bp-type { text-transform:uppercase; letter-spacing:.08em; font-size:.62rem; font-weight:600; color:var(--bp-muted); border:1px solid var(--bp-line); border-radius:6px; padding:.18rem .5rem; background:#fff; }
+.bp-label { text-transform:uppercase; letter-spacing:.14em; font-weight:600; font-size:1rem; color:var(--bp-ink); }
+.bp-principal { text-transform:uppercase; letter-spacing:.08em; font-size:.6rem; font-weight:700; color:#fff; background:var(--bp-olive); border-radius:6px; padding:.2rem .5rem; }
+.bp-chev { margin-left:auto; color:var(--bp-muted); transition:transform .2s ease; }
+.bp-head[aria-expanded="true"] .bp-chev { transform:rotate(180deg); }
+.bp-body { padding:20px 22px; }
+.bp-field { margin-bottom:20px; }
+.bp-field label { text-transform:uppercase; letter-spacing:.09em; font-size:.62rem; color:var(--bp-muted); font-weight:600; display:block; margin-bottom:4px; }
+.bp-field .val { color:var(--bp-ink); font-size:.92rem; }
+.bp-docs-label { text-transform:uppercase; letter-spacing:.09em; font-size:.62rem; color:var(--bp-muted); font-weight:600; margin-bottom:8px; }
+.bp-doc-chip { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--bp-line); border-radius:8px; padding:.5rem .9rem; color:var(--bp-olive-d); font-size:.88rem; text-decoration:none; margin:0 8px 8px 0; background:#fff; }
+.bp-doc-chip:hover { border-color:var(--bp-olive); background:#eef0e6; color:var(--bp-olive-d); }
+.bp-constancia-link { color:var(--bp-olive-d); text-decoration:none; font-weight:600; }
+.bp-constancia-link:hover { text-decoration:underline; }
+.bp-actions { display:flex; justify-content:space-between; align-items:center; gap:10px; border-top:1px solid var(--bp-line); margin-top:6px; padding-top:16px; flex-wrap:wrap; }
+.bp-btn { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--bp-line); background:#fff; border-radius:8px; padding:.55rem 1.1rem; font-size:.8rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; cursor:pointer; transition:background .15s ease, border-color .15s ease; }
+.bp-btn.edit, .bp-btn.primary { color:var(--bp-olive-d); }
+.bp-btn.edit:hover, .bp-btn.primary:hover { border-color:var(--bp-olive); background:#eef0e6; }
+.bp-btn.del { color:#a15b5b; border-color:#e0cdcd; }
+.bp-btn.del:hover { border-color:#b45c5c; background:#f7ecec; }
+.bp-new-btn { width:100%; border:1px dashed var(--bp-line); background:transparent; color:var(--bp-muted); border-radius:10px; padding:16px; font-size:.85rem; font-weight:600; text-transform:uppercase; letter-spacing:.14em; cursor:pointer; transition:border-color .15s ease, color .15s ease; }
+.bp-new-btn:hover { border-color:var(--bp-olive); color:var(--bp-olive-d); }
+
+/* ===== Modal Nuevo/Editar Perfil (look editorial olivo) ===== */
+#billingProfileModal .modal-content { border: 1px solid #ded9cb; border-radius: 12px; overflow: hidden; }
+#billingProfileModal .modal-header { background: #6E7A50 !important; border: none; }
+#billingProfileModal .modal-title { letter-spacing: .05em; }
+#billingProfileModal .modal-body h6 { color: #566040 !important; text-transform: uppercase; letter-spacing: .1em; font-size: .8rem; }
+#billingProfileModal .modal-body .bg-light { background: #faf9f4 !important; border: 1px solid #e7e3d8; }
+#billingProfileModal .border-success, #billingProfileModal .border-info { border-color: #e7e3d8 !important; }
+#billingProfileModal .form-label { font-weight: 600; font-size: .82rem; color: #4a4a42; }
+#billingProfileModal .form-control:focus,
+#billingProfileModal .form-select:focus { border-color: #6E7A50; box-shadow: 0 0 0 .2rem rgba(110, 122, 80, .15); }
+#billingProfileModal .form-check-input:checked { background-color: #6E7A50; border-color: #6E7A50; }
+#billingProfileModal .btn-primary { background: #6E7A50; border-color: #6E7A50; }
+#billingProfileModal .btn-primary:hover { background: #566040; border-color: #566040; }
 </style>
 
 <!-- Billing Profiles Section -->
-<div class="card border-0 shadow-sm" id="billingProfilesSection">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h5 class="mb-1 fw-bold">
-                    <i class="ti ti-file-invoice me-2"></i>Perfiles de Facturacion
-                </h5>
-                <p class="text-muted mb-0 small">Administra tus perfiles de facturacion para diferentes entidades fiscales</p>
-            </div>
-            <% if (!billingReadOnly) { %>
-            <button class="btn btn-primary btn-sm" data-action="bp-new">
-                <i class="ti ti-plus me-1"></i>Nuevo Perfil
-            </button>
-            <% } %>
-        </div>
-
-        <!-- Loading spinner -->
-        <div id="billingProfilesSpinner" class="justify-content-center align-items-center" style="display: flex;">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Cargando...</span>
-            </div>
-        </div>
-
-        <!-- Empty state -->
-        <div id="billingProfilesEmpty" class="text-center py-5" style="display:none;">
-            <i class="ti ti-file-invoice" style="font-size: 3rem; color: #ccc;"></i>
-            <p class="text-muted mt-2 mb-0">No hay perfiles de facturacion.</p>
-            <p class="text-muted small">Crea tu primer perfil para comenzar a recibir facturas.</p>
-        </div>
-
-        <!-- Profiles list -->
-        <div id="billingProfilesList" class="row g-3" style="display:none;"></div>
+<div class="bp-editorial" id="billingProfilesSection">
+    <% if (billingShowHeader) { %>
+    <div class="mb-4">
+        <div class="bp-header-title">Perfiles de Facturación</div>
+        <div class="bp-header-sub">Administra tus perfiles de facturación para diferentes entidades fiscales</div>
     </div>
+    <% } %>
+
+    <!-- Loading spinner -->
+    <div id="billingProfilesSpinner" class="justify-content-center align-items-center" style="display: flex; min-height: 120px;">
+        <div class="spinner-border" role="status" style="color: #6E7A50;">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="billingProfilesEmpty" class="text-center py-5" style="display:none;">
+        <i class="ti ti-file-invoice" style="font-size: 3rem; color: #ccc;"></i>
+        <p class="text-muted mt-2 mb-0">No hay perfiles de facturación.</p>
+        <p class="text-muted small">Crea tu primer perfil para comenzar a recibir facturas.</p>
+    </div>
+
+    <!-- Profiles list (acordeón) -->
+    <div id="billingProfilesList" class="bp-accordion" style="display:none;"></div>
+
+    <!-- Nuevo perfil (punteado) -->
+    <% if (!billingReadOnly) { %>
+    <button class="bp-new-btn mt-3" data-action="bp-new">
+        <i class="ti ti-plus me-1"></i>Nuevo Perfil de Facturación
+    </button>
+    <% } %>
 </div>
 
 <!-- Create/Edit Billing Profile Modal -->
@@ -159,7 +204,7 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
 
                     <!-- Datos Fiscales Mexico -->
                     <div class="billing-mx-fields mb-4">
-                        <div class="p-3 border rounded border-success" style="border-left: 4px solid #059669 !important;">
+                        <div class="p-3 border rounded" style="border-left: 4px solid #6E7A50 !important;">
                             <h6 class="fw-bold text-success mb-3"><i class="ti ti-building me-2"></i>Datos Fiscales (Mexico)</h6>
                             <div class="row g-3">
                                 <div class="col-md-6">
@@ -223,7 +268,7 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
 
                     <!-- Datos Fiscales Internacional -->
                     <div class="billing-intl-fields mb-4">
-                        <div class="p-3 border rounded border-info" style="border-left: 4px solid #0891b2 !important;">
+                        <div class="p-3 border rounded" style="border-left: 4px solid #6E7A50 !important;">
                             <h6 class="fw-bold text-info mb-3"><i class="ti ti-world me-2"></i>Datos Fiscales (Internacional)</h6>
                             <div class="row g-3">
                                 <div class="col-md-6">
@@ -353,8 +398,8 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
 
                     <!-- Constancia de Situacion Fiscal (Mexico) -->
                     <div class="billing-constancia-section mb-4">
-                        <div class="p-3 border rounded" style="border-left: 4px solid #f59e0b !important;">
-                            <h6 class="fw-bold mb-3" style="color: #d97706;"><i class="ti ti-certificate me-2"></i>Constancia de Situacion Fiscal</h6>
+                        <div class="p-3 border rounded" style="border-left: 4px solid #6E7A50 !important;">
+                            <h6 class="fw-bold mb-3"><i class="ti ti-certificate me-2"></i>Constancia de Situacion Fiscal</h6>
                             <div id="bp_constanciaInfo" style="display:none;" class="billing-constancia-info mb-3"></div>
                             <div>
                                 <label for="bp_constanciaFile" class="form-label small text-muted">Subir constancia (solo PDF)</label>
@@ -494,115 +539,91 @@ const billingTargetUserId = typeof targetUserId !== 'undefined' ? targetUserId :
     function renderBillingProfileCards(profiles) {
         const container = document.getElementById('billingProfilesList');
         container.innerHTML = '';
+        const esc = function(s) { return String(s == null ? '' : s); };
 
-        profiles.forEach(function(profile) {
+        profiles.forEach(function(profile, idx) {
             const isMX = profile.country === 'MX';
-            const flag = getCountryFlag(profile.country);
-            const primaryBadge = profile.isPrimary
-                ? '<span class="badge bg-warning text-dark card-badge-primary ms-2">Principal</span>'
-                : '';
+            const typeLabel = isMX ? 'Local' : 'Extranjero';
+            const bodyId = 'bpBody_' + (profile.objectId || idx);
+            const expanded = idx === 0; // primer perfil abierto por defecto
+            const principal = profile.isPrimary ? '<span class="bp-principal">Principal</span>' : '';
 
-            // Fiscal info
-            let fiscalHtml = '';
-            if (isMX) {
-                fiscalHtml = '' +
-                    '<div class="mb-1"><span class="profile-detail-label">RFC:</span> <span class="profile-detail-value">' + (profile.rfc || 'N/A') + '</span></div>' +
-                    '<div class="mb-1"><span class="profile-detail-label">Razon Social:</span> <span class="profile-detail-value">' + (profile.razonSocial || 'N/A') + '</span></div>' +
-                    '<div class="mb-1"><span class="profile-detail-label">Regimen Fiscal:</span> <span class="profile-detail-value">' + (profile.regimenFiscal || 'N/A') + '</span></div>';
-            } else {
-                fiscalHtml = '' +
-                    '<div class="mb-1"><span class="profile-detail-label">TAX ID:</span> <span class="profile-detail-value">' + (profile.taxId || 'N/A') + '</span></div>' +
-                    '<div class="mb-1"><span class="profile-detail-label">Nombre Comercial:</span> <span class="profile-detail-value">' + (profile.commercialName || 'N/A') + '</span></div>';
-            }
+            // Campos fiscales (MX vs internacional)
+            const fRfcLabel = isMX ? 'RFC' : 'TAX ID';
+            const fRfc = isMX ? (profile.rfc || 'N/A') : (profile.taxId || 'N/A');
+            const fRazonLabel = isMX ? 'Razón Social' : 'Nombre Comercial';
+            const fRazon = isMX ? (profile.razonSocial || 'N/A') : (profile.commercialName || 'N/A');
+            const fRegimen = isMX ? (profile.regimenFiscal || 'N/A') : '—';
 
-            // Address
-            let addressParts = [];
-            if (profile.streetType && profile.street) {
-                addressParts.push(profile.streetType + ' ' + profile.street);
-            }
-            if (profile.exteriorNumber) {
-                addressParts.push('#' + profile.exteriorNumber);
-            }
-            if (profile.interiorNumber) {
-                addressParts.push('Int. ' + profile.interiorNumber);
-            }
-            let addressLine2 = [];
-            if (isMX && profile.colonia) {
-                addressLine2.push('Col. ' + profile.colonia);
-            }
-            if (profile.city) addressLine2.push(profile.city);
-            if (profile.state) addressLine2.push(profile.state);
-            let postalDisplay = isMX ? (profile.codigoPostal || '') : (profile.postalCode || '');
-            if (postalDisplay) addressLine2.push('C.P. ' + postalDisplay);
+            // Dirección (una línea)
+            let addr = [];
+            if (profile.streetType && profile.street) addr.push(profile.streetType + ' ' + profile.street);
+            else if (profile.street) addr.push(profile.street);
+            if (profile.exteriorNumber) addr.push('#' + profile.exteriorNumber);
+            if (profile.interiorNumber) addr.push('Int. ' + profile.interiorNumber);
+            if (isMX && profile.colonia) addr.push(profile.colonia);
+            const addrStr = addr.join(', ') || 'N/A';
+            const cp = (isMX ? (profile.codigoPostal || '') : (profile.postalCode || '')) || 'N/A';
+            const contactName = ((profile.firstName || '') + ' ' + (profile.lastName || '')).trim() || 'N/A';
 
-            const addressHtml = '<div class="mb-1"><span class="profile-detail-label">Direccion:</span> <span class="profile-detail-value">' +
-                (addressParts.join(' ') || 'N/A') +
-                (addressLine2.length > 0 ? '<br>' + addressLine2.join(', ') : '') +
-                '</span></div>';
-
-            // Contact information
-            let contactHtml = '';
-            if (profile.firstName || profile.lastName) {
-                const fullName = (profile.firstName || '') + ' ' + (profile.lastName || '');
-                contactHtml += '<div class="mb-1"><span class="profile-detail-label">Contacto:</span> <span class="profile-detail-value">' + fullName.trim() + '</span></div>';
-            }
-            if (profile.phone) {
-                contactHtml += '<div class="mb-1"><span class="profile-detail-label">Teléfono:</span> <span class="profile-detail-value">' + profile.phone + '</span></div>';
-            }
-            const emailHtml = '<div class="mb-1"><span class="profile-detail-label">Email de Facturacion:</span> <span class="profile-detail-value">' + (profile.billingEmail || 'N/A') + '</span></div>';
-
-            // Constancia (MX only)
-            let constanciaHtml = '';
-            if (isMX && profile.constancia) {
-                const constDate = profile.constancia.uploadDate ? new Date(profile.constancia.uploadDate).toLocaleDateString('es-MX') : '';
-                constanciaHtml = '<div class="mb-1"><span class="profile-detail-label">Constancia Fiscal:</span> ' +
-                    '<a href="#" class="small text-primary" data-action="bp-download-doc" data-doc-url="' + (profile.constancia.url || '') + '" data-doc-name="constancia_fiscal.pdf">Ver</a>' +
-                    (constDate ? ' <span class="text-muted small">(' + constDate + ')</span>' : '') +
-                    '</div>';
+            // Constancia fiscal (MX)
+            let constanciaHtml = 'N/A';
+            if (isMX && profile.constancia && profile.constancia.url) {
+                const cd = profile.constancia.uploadDate ? new Date(profile.constancia.uploadDate).toLocaleDateString('es-MX') : '';
+                constanciaHtml = '<a href="#" class="bp-constancia-link" data-action="bp-download-doc" data-doc-url="' + esc(profile.constancia.url) + '" data-doc-name="constancia_fiscal.pdf"><i class="ti ti-file-text me-1"></i>Ver' + (cd ? ' — ' + cd : '') + '</a>';
             }
 
-            // Additional documents with download links
+            // Documentos adicionales (chips)
             let docsHtml = '';
             if (profile.additionalDocuments && profile.additionalDocuments.length > 0) {
-                docsHtml = '<div class="mt-2"><span class="profile-detail-label">Documentos Adicionales:</span>';
+                docsHtml = '<div class="bp-docs-label">Documentos Adicionales</div><div>';
                 profile.additionalDocuments.forEach(function(doc) {
-                    docsHtml += '<div class="ms-2 mb-1"><a href="#" class="small text-primary" data-action="bp-download-doc" data-doc-url="' + (doc.url || '') + '" data-doc-name="' + (doc.fileName || 'documento') + '"><i class="ti ti-download me-1"></i>' + (doc.fileName || 'Documento') + '</a></div>';
+                    docsHtml += '<a href="#" class="bp-doc-chip" data-action="bp-download-doc" data-doc-url="' + esc(doc.url) + '" data-doc-name="' + esc(doc.fileName || 'documento') + '"><i class="ti ti-file"></i>' + esc(doc.fileName || 'Documento') + '</a>';
                 });
                 docsHtml += '</div>';
             }
 
-            // Action buttons (hidden in read-only mode)
+            // Acciones (ocultas en modo solo lectura)
             let actionsHtml = '';
             if (!billingIsReadOnly) {
-                actionsHtml = '<div class="profile-actions mt-3 d-flex gap-2 flex-wrap">';
-                actionsHtml += '<button class="btn btn-outline-primary btn-sm" data-action="bp-edit" data-profile-id="' + profile.objectId + '"><i class="ti ti-edit me-1"></i>Editar</button>';
+                let left = '<button class="bp-btn edit" data-action="bp-edit" data-profile-id="' + esc(profile.objectId) + '"><i class="ti ti-pencil"></i>Editar</button>';
                 if (!profile.isPrimary) {
-                    actionsHtml += '<button class="btn btn-outline-success btn-sm" data-action="bp-set-primary" data-profile-id="' + profile.objectId + '"><i class="ti ti-star me-1"></i>Hacer Principal</button>';
+                    left += '<button class="bp-btn primary" data-action="bp-set-primary" data-profile-id="' + esc(profile.objectId) + '"><i class="ti ti-star"></i>Hacer Principal</button>';
                 }
-                actionsHtml += '<button class="btn btn-outline-danger btn-sm" data-action="bp-delete" data-profile-id="' + profile.objectId + '"><i class="ti ti-trash me-1"></i>Eliminar</button>';
-                actionsHtml += '</div>';
+                actionsHtml = '<div class="bp-actions">' +
+                    '<div class="d-flex gap-2 flex-wrap">' + left + '</div>' +
+                    '<button class="bp-btn del" data-action="bp-delete" data-profile-id="' + esc(profile.objectId) + '"><i class="ti ti-trash"></i>Eliminar</button>' +
+                    '</div>';
             }
 
-            const cardHtml = '' +
-                '<div class="col-12 col-md-6">' +
-                '  <div class="card border-0 shadow-sm billing-profile-card h-100">' +
-                '    <div class="card-body">' +
-                '      <div class="d-flex align-items-center mb-3">' +
-                '        <span class="profile-country-flag me-2">' + flag + '</span>' +
-                '        <h6 class="mb-0 fw-bold">' + (profile.label || 'Perfil sin nombre') + primaryBadge + '</h6>' +
+            const item = '' +
+                '<div class="bp-item">' +
+                '  <button class="bp-head" type="button" data-bs-toggle="collapse" data-bs-target="#' + bodyId + '" aria-expanded="' + (expanded ? 'true' : 'false') + '" aria-controls="' + bodyId + '">' +
+                '    <span class="bp-type">' + typeLabel + '</span>' +
+                '    <span class="bp-label">' + esc(profile.label || 'Perfil sin nombre') + '</span>' +
+                principal +
+                '    <i class="ti ti-chevron-down bp-chev"></i>' +
+                '  </button>' +
+                '  <div id="' + bodyId + '" class="collapse' + (expanded ? ' show' : '') + '">' +
+                '    <div class="bp-body">' +
+                '      <div class="row">' +
+                '        <div class="col-md-4 bp-field"><label>' + fRfcLabel + '</label><div class="val">' + esc(fRfc) + '</div></div>' +
+                '        <div class="col-md-4 bp-field"><label>' + fRazonLabel + '</label><div class="val">' + esc(fRazon) + '</div></div>' +
+                '        <div class="col-md-4 bp-field"><label>Régimen Fiscal</label><div class="val">' + esc(fRegimen) + '</div></div>' +
+                '        <div class="col-md-4 bp-field"><label>Dirección</label><div class="val">' + esc(addrStr) + '</div></div>' +
+                '        <div class="col-md-4 bp-field"><label>C.P.</label><div class="val">' + esc(cp) + '</div></div>' +
+                '        <div class="col-md-4 bp-field"><label>Contacto</label><div class="val">' + esc(contactName) + '</div></div>' +
+                '        <div class="col-md-4 bp-field"><label>Teléfono</label><div class="val">' + esc(profile.phone || 'N/A') + '</div></div>' +
+                '        <div class="col-md-4 bp-field"><label>Email de Facturación</label><div class="val">' + esc(profile.billingEmail || 'N/A') + '</div></div>' +
+                '        <div class="col-md-4 bp-field"><label>Constancia Fiscal</label><div class="val">' + constanciaHtml + '</div></div>' +
                 '      </div>' +
-                fiscalHtml +
-                addressHtml +
-                contactHtml +
-                emailHtml +
-                constanciaHtml +
-                '      <div class="mt-2">' + docsHtml + '</div>' +
+                (docsHtml ? '<div class="mb-3">' + docsHtml + '</div>' : '') +
                 actionsHtml +
                 '    </div>' +
                 '  </div>' +
                 '</div>';
 
-            container.insertAdjacentHTML('beforeend', cardHtml);
+            container.insertAdjacentHTML('beforeend', item);
         });
     }
 

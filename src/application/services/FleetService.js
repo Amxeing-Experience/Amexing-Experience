@@ -5,7 +5,6 @@
  * vehículos ACTIVOS (misma fuente que el admin: Vehicle + VehicleType + VehicleImage con
  * variantes optimizadas) y los agrupa por su tipo de vehículo, resolviendo la presigned
  * URL de sus imágenes en el formato óptimo/compatible.
- *
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0

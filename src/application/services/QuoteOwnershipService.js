@@ -39,6 +39,7 @@ class QuoteOwnershipService {
    * Initialize ownership for a new quote.
    * @param {string} quoteId - Quote ID.
    * @param {string} ownerId - Owner user ID.
+   * @param createdById
    * @returns {Promise<object>} Ownership record.
    * @example
    */

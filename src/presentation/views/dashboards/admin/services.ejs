@@ -21,7 +21,7 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
         <div class="d-flex justify-content-between align-items-start mb-3">
             <div>
                 <h2 class="mb-1 fw-bold">
-                    Gestión de Traslados
+                    Traslados
                     <% if (typeof isDevelopment !== 'undefined' && isDevelopment) { %>
                         <span class="badge bg-warning text-dark ms-2" style="font-size: 12px; vertical-align: middle;">
                             <i class="ti ti-bug"></i> DEV MODE
@@ -41,6 +41,11 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
                     </ol>
                 </nav>
             </div>
+            <% if (['superadmin', 'admin'].includes(currentUserRole)) { %>
+            <button type="button" class="traslados-new-btn" id="createServiceBtn">
+                <i class="ti ti-plus"></i>Nuevo Traslado
+            </button>
+            <% } %>
         </div>
     </div>
 </div>

@@ -22,6 +22,9 @@ const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 %>
 
+<!-- Util del selector amigable de "Tiempo de Anticipación" (presets + Días/Horas/Min → minutos) -->
+<script src="/dashboard/js/utils/advance-time-picker.js"></script>
+
 <!-- El botón "Nuevo Proveedor" vive en la fila de pills del contenedor (experiences.ejs) -->
 
 <!-- Bandeja master-detail: lista de proveedores (izquierda) + detalle inline (derecha) -->
@@ -157,28 +160,16 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <!-- Campos de tiempo -->
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Duración (hrs)</label>
-                            <input type="number" class="form-control" id="quickExperienciaDuration" min="0" step="0.5" 
-                                   placeholder="2.5">
-                            <div class="form-text">
-                                <small>Tiempo total experiencia</small>
-                            </div>
+                            <label class="form-label form-label-sm fw-medium text-success">Duración total</label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'quickExperienciaDuration', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Duración Trayecto (min)</label>
-                            <input type="number" class="form-control" id="quickExperienciaTravelDuration" min="0" step="1" 
-                                   placeholder="60">
-                            <div class="form-text">
-                                <small>Tiempo traslado</small>
-                            </div>
+                            <label class="form-label form-label-sm fw-medium text-success">Duración de Trayecto</label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'quickExperienciaTravelDuration', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación (min)</label>
-                            <input type="number" class="form-control" id="quickExperienciaAdvanceTime" min="0" step="1" 
-                                   placeholder="1440">
-                            <div class="form-text">
-                                <small>Ej: 1440 = 24hrs</small>
-                            </div>
+                            <label class="form-label form-label-sm fw-medium text-success">Tiempo de Anticipación</label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'quickExperienciaAdvanceTime' }) %>
                         </div>
                     </div>
 
@@ -617,28 +608,16 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <!-- Campos de tiempo en una fila -->
             <div class="row mb-2">
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium text-success">Duración (hrs)</label>
-                    <input type="number" class="form-control experiencia-duration-input" min="0" step="0.5" 
-                           placeholder="2.5">
-                    <div class="form-text">
-                        <small>Tiempo total experiencia</small>
-                    </div>
+                    <label class="form-label form-label-sm fw-medium text-success">Duración total</label>
+                    <%- include('../../molecules/forms/advance-time-picker', { hiddenClass: 'experiencia-duration-input', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium text-success">Duración Trayecto (min)</label>
-                    <input type="number" class="form-control experiencia-travel-duration-input" min="0" step="1" 
-                           placeholder="60">
-                    <div class="form-text">
-                        <small>Tiempo traslado</small>
-                    </div>
+                    <label class="form-label form-label-sm fw-medium text-success">Duración de Trayecto</label>
+                    <%- include('../../molecules/forms/advance-time-picker', { hiddenClass: 'experiencia-travel-duration-input', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación (min)</label>
-                    <input type="number" class="form-control experiencia-advance-minutes-input" 
-                           min="0" step="1" placeholder="1440">
-                    <div class="form-text">
-                        <small>Ej: 1440 = 24hrs</small>
-                    </div>
+                    <label class="form-label form-label-sm fw-medium text-success">Tiempo de Anticipación</label>
+                    <%- include('../../molecules/forms/advance-time-picker', { hiddenClass: 'experiencia-advance-minutes-input' }) %>
                 </div>
             </div>
             
@@ -1208,7 +1187,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#quickAddProviderId').val(providerId);
             $('#quickAddProviderName').text(providerName);
             $('#quickAddExperienceForm')[0].reset();
-            
+
+            // Reset de los selectores de tiempo (anticipación + trayecto);
+            // form.reset() nativo no limpia presets/personalizado.
+            if (window.AdvanceTimePicker) {
+                document.querySelectorAll('#quickAddExperienceModal .advance-time-picker')
+                    .forEach(p => window.AdvanceTimePicker.set(p, 0));
+            }
+
             // Reset availability
             resetQuickAddAvailability();
             
@@ -1530,7 +1516,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             availabilitySummary.toggle();
             availabilityContent.toggle();
         });
-        
+
+        // Reordena EN VIVO (sin guardar) las filas de horario de un día por hora de inicio,
+        // en cuanto el usuario cambia una hora de inicio.
+        function sortTimeSlotRowsLive($container) {
+            if (!$container || $container.length === 0) return;
+            const toMin = function(t) { const p = String(t || '').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); };
+            const rows = $container.children('.time-slot-row').get();
+            rows.sort(function(a, b) { return toMin($(a).find('.start-time').val()) - toMin($(b).find('.start-time').val()); });
+            rows.forEach(function(r) { $container.append(r); });
+        }
+        $(document).on('change', '.time-slots-container .time-slot-row .start-time', function() {
+            sortTimeSlotRowsLive($(this).closest('.time-slots-container'));
+        });
+
         function addNewExperienciaCard() {
             const index = providerExperiencias.length;
             const experiencia = {
@@ -1598,18 +1597,27 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-price-input').value = experiencia.price || '';
             card.querySelector('.experiencia-price-no-alcohol-input').value = experiencia.price_no_alcohol || '';
             card.querySelector('.experiencia-price-child-input').value = experiencia.price_child || '';
-            // Handle duration - keep as hours, convert from minutes if needed
-            if (experiencia.duration) {
-                const duration = parseFloat(experiencia.duration);
-                if (duration > 24) {
-                    // Likely stored in minutes, convert to hours
-                    card.querySelector('.experiencia-duration-input').value = (duration / 60).toFixed(1);
+            // Duración total: se guarda en MINUTOS (ej. 1440 = 24 h); el picker la muestra en H/M.
+            (function() {
+                const durMin = parseInt(experiencia.duration, 10) || 0;
+                const dPicker = card.querySelector('.experiencia-duration-input')?.closest('.advance-time-picker');
+                if (dPicker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(dPicker, durMin);
                 } else {
-                    // Already in hours or reasonable hour value
-                    card.querySelector('.experiencia-duration-input').value = duration;
+                    const el = card.querySelector('.experiencia-duration-input');
+                    if (el) el.value = durMin || '';
                 }
-            }
-            card.querySelector('.experiencia-travel-duration-input').value = experiencia.travel_duration || '';
+            })();
+            (function() {
+                const travelMin = parseInt(experiencia.travel_duration, 10) || 0;
+                const tPicker = card.querySelector('.experiencia-travel-duration-input')?.closest('.advance-time-picker');
+                if (tPicker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(tPicker, travelMin);
+                } else {
+                    const el = card.querySelector('.experiencia-travel-duration-input');
+                    if (el) el.value = travelMin || '';
+                }
+            })();
             card.querySelector('.experiencia-min-people-input').value = experiencia.min_people || '';
             card.querySelector('.experiencia-max-people-input').value = experiencia.max_people || '';
             card.querySelector('.experiencia-cancellation-policy-input').value = experiencia.cancellation_policy || '';
@@ -1633,16 +1641,23 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 experiencia.notincludes.join('\n') : '';
             card.querySelector('.experiencia-notincludes-input').value = notIncludesText;
             
-            // Populate advance booking time field (minutes only)
-            if (experiencia.advance_booking_time) {
-                // If it's the old format with hours/minutes, convert to total minutes
-                if (typeof experiencia.advance_booking_time === 'object' && experiencia.advance_booking_time.total_minutes) {
-                    card.querySelector('.experiencia-advance-minutes-input').value = experiencia.advance_booking_time.total_minutes;
-                } else if (typeof experiencia.advance_booking_time === 'number') {
-                    // If it's already just minutes
-                    card.querySelector('.experiencia-advance-minutes-input').value = experiencia.advance_booking_time;
+            // Populate advance booking time (minutes) en el selector amigable (presets/personalizado)
+            (function() {
+                let advMinutes = 0;
+                const abt = experiencia.advance_booking_time;
+                if (abt) {
+                    if (typeof abt === 'object' && abt.total_minutes) advMinutes = abt.total_minutes;
+                    else if (typeof abt === 'number') advMinutes = abt;
+                    else if (typeof abt === 'string') advMinutes = parseInt(abt, 10) || 0;
                 }
-            }
+                const hidden = card.querySelector('.experiencia-advance-minutes-input');
+                const picker = hidden ? hidden.closest('.advance-time-picker') : null;
+                if (picker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(picker, advMinutes);
+                } else if (hidden) {
+                    hidden.value = advMinutes || '';
+                }
+            })();
             
             // Populate notes fields
             card.querySelector('.experiencia-internal-notes-input').value = experiencia.internal_notes || '';
@@ -1809,6 +1824,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             }
         }
 
+        // Ordena una lista de horarios [{start,end}] por hora de inicio.
+        // Los <input type="time"> devuelven "HH:MM" 24h, así que basta convertir a minutos.
+        function sortTimesByStart(times) {
+            const toMinutes = function(t) {
+                const parts = String(t || '').split(':');
+                return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+            };
+            return (times || []).slice().sort(function(a, b) {
+                return toMinutes(a.start) - toMinutes(b.start);
+            });
+        }
+
         function collectAvailabilityFromCard(card) {
             const availability = [];
             
@@ -1836,12 +1863,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     }
                 });
                 
+                // Ordena por hora de inicio (el usuario puede capturarlos desordenados).
+                daySchedule.times = sortTimesByStart(daySchedule.times);
                 // Only add if there are times or if the day is selected without specific times
                 if (daySchedule.times.length > 0) {
                     availability.push(daySchedule);
                 }
             });
-            
+
             return availability.length > 0 ? availability : null;
         }
 
@@ -1859,14 +1888,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 if (dayButton.length > 0) {
                     dayButton.removeClass('btn-outline-primary').addClass('active btn-primary');
                     
-                    // Create day schedule with existing times
-                    if (daySchedule.times && daySchedule.times.length > 0) {
+                    // Create day schedule with existing times (ordenados por hora de inicio)
+                    const sortedTimes = sortTimesByStart(daySchedule.times);
+                    if (sortedTimes && sortedTimes.length > 0) {
                         // Add day schedule with the first time slot
-                        addProviderExperienciaDaySchedule(card, dayCode, dayName, daySchedule.times[0].start, daySchedule.times[0].end);
-                        
+                        addProviderExperienciaDaySchedule(card, dayCode, dayName, sortedTimes[0].start, sortedTimes[0].end);
+
                         // Add any additional time slots
-                        for (let i = 1; i < daySchedule.times.length; i++) {
-                            const timeSlot = daySchedule.times[i];
+                        for (let i = 1; i < sortedTimes.length; i++) {
+                            const timeSlot = sortedTimes[i];
                             const dayScheduleRow = card.find(`.experiencia-selected-schedule-days .day-schedule-row[data-day="${dayCode}"]`);
                             const timeSlotsContainer = dayScheduleRow.find('.time-slots-container');
                             
@@ -2615,11 +2645,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     }
                 });
                 
+                daySchedule.times = sortTimesByStart(daySchedule.times);
                 if (daySchedule.times.length > 0) {
                     availability.push(daySchedule);
                 }
             });
-            
+
             return availability.length > 0 ? availability : null;
         }
 

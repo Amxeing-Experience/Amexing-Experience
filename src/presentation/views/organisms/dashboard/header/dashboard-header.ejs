@@ -12,6 +12,8 @@
 const headerUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
 const headerUser = (typeof user !== 'undefined' && user !== null) ? user : {};
 const headerTitle = typeof title !== 'undefined' ? title : 'Dashboard';
+// Categoría del cliente directo (solo dev); se propaga al user-menu para mostrar el tipo de cliente.
+const headerClientCategory = typeof clientCategory !== 'undefined' ? clientCategory : null;
 
 // User data extraction with null safety - use the userName parameter passed from controller
 const displayUserName = (typeof userName !== 'undefined' && userName) || 
@@ -121,7 +123,8 @@ const colors = roleColors[headerUserRole] || roleColors.guest;
                     userName: displayUserName,
                     userEmail: userEmail,
                     userAvatar: userAvatar,
-                    userInitials: userInitials
+                    userInitials: userInitials,
+                    clientCategory: headerClientCategory
                 }) %>
             </div>
         </div>

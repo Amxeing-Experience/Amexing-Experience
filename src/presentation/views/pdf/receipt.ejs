@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    font-family: 'Helvetica Neue', 'Segoe UI', Arial, sans-serif;
+    color: #333;
+    font-size: 11px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .wrap { padding: 4px 2px; }
+
+  /* Cabecera de marca (solo página 1) */
+  .brand { text-align: center; margin-bottom: 10px; }
+  .brand img { width: 200px; height: auto; }
+  .brand-fallback { font-size: 30px; letter-spacing: 6px; font-weight: 700; color: #333; }
+  .brand-fallback small { display: block; font-size: 11px; letter-spacing: 6px; margin-top: 2px; }
+
+  .invoice-band {
+    background: <%= brand %>;
+    color: #fff;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 12px;
+    padding: 7px 0 7px 12px;
+    margin-bottom: 22px;
+  }
+
+  /* Fila ISSUED TO / meta */
+  .meta { display: flex; justify-content: space-between; margin-bottom: 28px; }
+  .meta .label { font-size: 11px; letter-spacing: 1px; color: #777; }
+  .issued .name { font-weight: 700; font-size: 12px; margin: 4px 0 3px; }
+  .issued .line { color: #555; line-height: 1.5; }
+  .inv-meta { text-align: right; }
+  .inv-meta .label { margin-top: 2px; }
+  .inv-meta .val { font-size: 13px; margin: 1px 0 8px; color: #333; }
+
+  /* Tabla de conceptos con header repetible por página */
+  table.items { width: 100%; border-collapse: collapse; }
+  table.items thead { display: table-header-group; }
+  table.items tr { break-inside: avoid; }
+  table.items thead th {
+    font-size: 12px; letter-spacing: 4px; font-weight: 700; color: #333;
+    text-align: left; padding: 0 0 10px; border-bottom: 0;
+  }
+  table.items thead th.total { text-align: right; }
+  .guests td { padding: 6px 0 10px; font-weight: 700; font-size: 12px; line-height: 1.5; }
+  table.items tbody td {
+    padding: 12px 0; vertical-align: top;
+  }
+  /* La línea separadora (verde olivo, gruesa) va ENTRE días: se dibuja arriba del primer
+     servicio de cada día, excepto el primero. Así los servicios del mismo día quedan
+     juntos sin línea, no hay línea después del último día, ni arriba del subtotal. */
+  table.items tbody tr.day-sep td { border-top: 2px solid #969b81; }
+  /* Línea de cierre olivo después del último servicio del último día. */
+  table.items tbody tr.last-row td { border-bottom: 2px solid #969b81; }
+  td.desc .date { font-weight: 700; margin-bottom: 3px; }
+  td.desc .sub { color: #555; line-height: 1.45; }
+  td.amount { text-align: right; white-space: nowrap; vertical-align: bottom; color: #333; }
+
+  /* Totales — a todo lo ancho, sin línea arriba del subtotal. */
+  .totals { margin-top: 18px; width: 100%; }
+  .totals table { width: 100%; border-collapse: collapse; }
+  .totals td { padding: 8px 0; }
+  .totals td.k { letter-spacing: 2px; font-size: 12px; color: #333; }
+  .totals td.v { text-align: right; font-size: 12px; }
+  /* Caja del TOTAL: borde verde olivo arriba/abajo + extremos, SIN división vertical interna. */
+  .totals tr.grand td { border-top: 2px solid #969b81; border-bottom: 2px solid #969b81; padding: 10px 0; font-weight: 700; }
+  .totals tr.grand td.k { letter-spacing: 2px; border-left: 2px solid #969b81; padding-left: 10px; }
+  .totals tr.grand td.v { border-right: 2px solid #969b81; padding-right: 10px; }
+
+  .thankyou { text-align: center; margin-top: 46px; }
+  .thankyou .ty { letter-spacing: 3px; font-size: 12px; color: #333; }
+  .thankyou .site { letter-spacing: 1px; font-size: 11px; color: #333; margin-top: 16px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand">
+    <% if (logoDataUri) { %>
+      <img src="<%= logoDataUri %>" alt="Amexing Experience">
+    <% } else { %>
+      <div class="brand-fallback">AMEXING<small>E X P E R I E N C E</small></div>
+    <% } %>
+  </div>
+
+  <div class="invoice-band">INVOICE</div>
+
+  <div class="meta">
+    <div class="issued">
+      <div class="label">ISSUED TO:</div>
+      <div class="name"><%= issuedTo.name %></div>
+      <% issuedTo.lines.forEach(function(l) { %><div class="line"><%= l %></div><% }); %>
+    </div>
+    <div class="inv-meta">
+      <div class="label">INVOICE No.</div>
+      <div class="val"><%= invoiceNo %></div>
+      <div class="label">DATE:</div>
+      <div class="val"><%= date %></div>
+    </div>
+  </div>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th>D E S C R I P T I O N</th>
+        <th class="total">T O T A L</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (guestNames && guestNames.length) { %>
+      <tr class="guests">
+        <td colspan="2"><% guestNames.forEach(function(g) { %><%= g %><br><% }); %></td>
+      </tr>
+      <% } %>
+      <% var seenDay = false; %>
+      <% items.forEach(function(it, idx) { %>
+      <% var daySep = it.date && seenDay; if (it.date) seenDay = true; %>
+      <tr class="<%= [daySep ? 'day-sep' : '', (idx === items.length - 1) ? 'last-row' : ''].filter(Boolean).join(' ') %>">
+        <td class="desc">
+          <% if (it.date) { %><div class="date"><%= it.date %></div><% } %>
+          <div class="sub"><%- it.desc %></div>
+        </td>
+        <td class="amount"><%= it.amount %></td>
+      </tr>
+      <% }); %>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <table>
+      <tr><td class="k">SUBTOTAL</td><td class="v"><%= subtotal %></td></tr>
+      <tr><td class="k">TAXES</td><td class="v"><%= taxes %></td></tr>
+      <tr class="grand"><td class="k">TOTAL</td><td class="v"><%= total %></td></tr>
+    </table>
+  </div>
+
+  <div class="thankyou">
+    <div class="ty">THANK YOU FOR YOUR PREFERENCE!</div>
+    <div class="site">amexingexperience.com</div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -26,50 +26,46 @@ const canDelete = true;
 const canCreate = true;
 %>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-        <div class="row align-items-center">
-            <div class="col">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-building me-2"></i>
-                    Mis Clientes
-                </h5>
-                <small class="text-white" style="opacity: 0.9;">Administra tus clientes y sus configuraciones</small>
-            </div>
-            <div class="col-auto">
-                <% if (canCreate) { %>
-                    <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#createClientModal">
-                        <i class="ti ti-plus me-1"></i>
-                        Nuevo Cliente
-                    </button>
-                <% } %>
-            </div>
-        </div>
-    </div>
+<style>
+/* Rediseño limpio (sin card blanca), consistente con traslados. Solo UI: se conservan
+   los ids/hooks del DataTable y las acciones. */
+.exp-catalog {
+    --exp-border: #d6d1c4; --exp-olive: #6E7A50; --exp-muted: #8a8f78; --exp-dark: #2b2b2b;
+}
+.clients-table-wrap .table { margin-bottom: 0; }
+.clients-table-wrap .table > thead.table-light th {
+    background: rgba(228, 223, 207, 0.35);
+    border-bottom: 1px solid var(--exp-border);
+    color: var(--exp-muted);
+    font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600;
+}
+/* Botón "Nuevo Cliente" (va en el header de página, fuera del scope .exp-catalog → hex) */
+.clientes-new-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #6E7A50; background: #6E7A50; color: #fff; border-radius: 8px; font-size: 0.82rem; font-weight: 600; padding: 9px 16px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.clientes-new-btn:hover { background: #7C8A5A; border-color: #7C8A5A; color: #fff; }
+</style>
 
-    <div class="card-body">
-        <!-- DataTable Container -->
-        <div class="table-responsive">
-            <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
-                <thead class="table-light">
-                    <tr>
-                        <th>Nombre</th>
-                        <th>Email</th>
-                        <th>Teléfono</th>
-                        <th>Contacto</th>
-                        <th>Tipo</th>
-                        <th>Estado</th>
-                        <th>Registro</th>
-                        <% if (dtShowActions) { %>
-                            <th>Acciones</th>
-                        <% } %>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Data will be loaded via JavaScript -->
-                </tbody>
-            </table>
-        </div>
+<div class="exp-catalog clients-table-wrap">
+    <!-- Tabla de clientes (sin card blanca) -->
+    <div class="table-responsive">
+        <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
+            <thead class="table-light">
+                <tr>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>Contacto</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                    <th>Registro</th>
+                    <% if (dtShowActions) { %>
+                        <th>Acciones</th>
+                    <% } %>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Data will be loaded via JavaScript -->
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -279,8 +275,8 @@ function showErrorAlert(message) {
         </div>
     `;
     
-    // Insert alert at the top of the card body
-    const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
+    // Insert alert at the top of the contenedor (rediseño limpio: .exp-catalog)
+    const cardBody = document.querySelector('#<%= dtTableId %>').closest('.exp-catalog');
     if (cardBody) {
         cardBody.insertAdjacentHTML('afterbegin', alertHtml);
     }

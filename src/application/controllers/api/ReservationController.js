@@ -13,6 +13,7 @@ const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 const FileStorageService = require('../../services/FileStorageService');
 const PaymentService = require('../../services/PaymentService');
+const { notifyReservationCancellation } = require('../../services/ReservationCancellationNotifier');
 // Models used via Parse.Query string references
 
 // Module-level FileStorageService for presigned S3 URLs (static class needs this)
@@ -101,12 +102,12 @@ class ReservationController {
       };
     }
 
-    // Clients are scoped by quote ownership, which lives on the quote (quotePtr), not on the
-    // reservation. That scoping is applied via the quote subquery inside applyQuoteConstraint
-    // (see getClientEligibleQuoteIds) so it composes with the hold/type filter through a
-    // SINGLE matchesQuery on quotePtr (two separate constraints on quotePtr overwrite each
-    // other). Therefore no clientPtr filter is returned here.
-    if (userRole === 'client') {
+    // Clients (y clientes directos end_client) are scoped by quote ownership, which lives on the
+    // quote (quotePtr), not on the reservation. That scoping is applied via the quote subquery
+    // inside applyQuoteConstraint (see getClientEligibleQuoteIds) so it composes with the hold/type
+    // filter through a SINGLE matchesQuery on quotePtr (two separate constraints on quotePtr
+    // overwrite each other). Therefore no clientPtr filter is returned here.
+    if (userRole === 'client' || userRole === 'end_client') {
       return null;
     }
 
@@ -129,7 +130,8 @@ class ReservationController {
   static async getClientEligibleQuoteIds(req) {
     const { userRole } = req;
     const currentUser = req.user;
-    if (userRole !== 'client') {
+    // client y end_client (cliente directo) se acotan por propiedad de la cotización.
+    if (userRole !== 'client' && userRole !== 'end_client') {
       return null;
     }
 
@@ -284,9 +286,10 @@ class ReservationController {
        *   applyDateConstraints(query, 'ongoing', today, 2026, 5, null);
        */
       const applyDateConstraints = (q, filter, today, yearVal, monthVal, dayVal) => {
-        // 'pending_completion' no es un filtro por fecha sino por estado de cotización
-        // (hold) → no aplica ninguna restricción de fecha/periodo.
+        // 'pending_completion' (estado de cotización hold) y 'cancelled' (estado de la
+        // reservación) no son filtros por fecha → no aplican restricción de periodo.
         if (filter === 'pending_completion') return;
+        if (filter === 'cancelled') return;
         /**
          * Return the later of two dates, treating a falsy value as unbounded.
          * @param {Date|null} a - First date, or null if unbounded.
@@ -356,6 +359,23 @@ class ReservationController {
         if (startLt) q.lessThan('startDate', startLt);
         if (endGte) q.greaterThanOrEqualTo('endDate', endGte);
         if (endLt) q.lessThan('endDate', endLt);
+      };
+
+      /**
+       * Visibilidad de reservaciones canceladas: viven SOLO en el filtro 'cancelled'.
+       * - dateFilter === 'cancelled' → solo status = 'cancelled'.
+       * - cualquier otro filtro (sin statusFilter explícito) → se excluyen las canceladas.
+       * @param {Parse.Query} q - Query de Reservation a restringir.
+       * @returns {void}
+       * @example
+       *   applyCancelledVisibility(query);
+       */
+      const applyCancelledVisibility = (q) => {
+        if (dateFilter === 'cancelled') {
+          q.equalTo('status', 'cancelled');
+        } else if (!statusFilter) {
+          q.notEqualTo('status', 'cancelled');
+        }
       };
 
       /**
@@ -465,6 +485,7 @@ class ReservationController {
       // Apply the same combined date constraints to the total count
       applyDateConstraints(totalQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
       applyQuoteConstraint(totalQuery, clientTypeFilter, clientIdFilter, holdMode);
+      applyCancelledVisibility(totalQuery);
 
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
@@ -477,6 +498,8 @@ class ReservationController {
         pendingCountQuery.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
       }
       applyQuoteConstraint(pendingCountQuery, clientTypeFilter, clientIdFilter, 'only');
+      // El badge de pendientes siempre excluye canceladas (viven solo en su propio filtro).
+      pendingCountQuery.notEqualTo('status', 'cancelled');
       const pendingCompletionCount = await pendingCountQuery.count({ useMasterKey: true });
 
       // Apply search filter
@@ -532,6 +555,7 @@ class ReservationController {
         if (statusFilter) {
           compoundQuery.equalTo('status', statusFilter);
         }
+        applyCancelledVisibility(compoundQuery);
 
         // Sort
         if (orderDir === 'descending') {
@@ -548,10 +572,16 @@ class ReservationController {
 
         // Get service counts for each reservation
         const pendingCancelQuoteIds = await ReservationController.getPendingCancellationQuoteIds(results);
+        const pendingInvoiceQuoteIds = await ReservationController.getPendingInvoiceQuoteIds(results);
         const data = await Promise.all(results.map(async (reservation) => {
           const serviceCount = await ReservationController.getServiceCounts(reservation.id);
-          const hasPendingCancellation = pendingCancelQuoteIds.has(reservation.get('quotePtr')?.id);
-          return ReservationController.formatReservationRow(reservation, serviceCount, hasPendingCancellation);
+          const qid = reservation.get('quotePtr')?.id;
+          return ReservationController.formatReservationRow(
+            reservation,
+            serviceCount,
+            pendingCancelQuoteIds.has(qid),
+            pendingInvoiceQuoteIds.has(qid)
+          );
         }));
 
         return res.json({
@@ -563,6 +593,7 @@ class ReservationController {
       if (statusFilter) {
         query.equalTo('status', statusFilter);
       }
+      applyCancelledVisibility(query);
 
       // Count filtered
       const countQuery = new Parse.Query('Reservation');
@@ -574,6 +605,7 @@ class ReservationController {
       if (statusFilter) {
         countQuery.equalTo('status', statusFilter);
       }
+      applyCancelledVisibility(countQuery);
 
       // Apply the same combined date constraints to the count query
       applyDateConstraints(countQuery, dateFilter, today, yearFilter, monthFilter, dayFilter);
@@ -594,10 +626,16 @@ class ReservationController {
 
       // Get service counts for each reservation
       const pendingCancelQuoteIds = await ReservationController.getPendingCancellationQuoteIds(results);
+      const pendingInvoiceQuoteIds = await ReservationController.getPendingInvoiceQuoteIds(results);
       const data = await Promise.all(results.map(async (reservation) => {
         const serviceCount = await ReservationController.getServiceCounts(reservation.id);
-        const hasPendingCancellation = pendingCancelQuoteIds.has(reservation.get('quotePtr')?.id);
-        return ReservationController.formatReservationRow(reservation, serviceCount, hasPendingCancellation);
+        const qid = reservation.get('quotePtr')?.id;
+        return ReservationController.formatReservationRow(
+          reservation,
+          serviceCount,
+          pendingCancelQuoteIds.has(qid),
+          pendingInvoiceQuoteIds.has(qid)
+        );
       }));
 
       return res.json({
@@ -1196,6 +1234,35 @@ class ReservationController {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
 
+      // Gate: si la reservación incluye experiencias con proveedor/establecimiento, NO se permite
+      // la cancelación DIRECTA (muchos terceros no reembolsan) — debe pasar por una solicitud de
+      // cancelación para aprobación. El flujo de aprobación usa su propio cascade
+      // (CancellationRequestsController.cascadeCancelReservation), no este endpoint, así que
+      // aprobar una solicitud no se ve afectado por este gate.
+      const provExpQuery = new Parse.Query('ReservationService');
+      provExpQuery.equalTo('reservationPtr', reservation);
+      provExpQuery.equalTo('type', 'experience');
+      provExpQuery.equalTo('active', true);
+      provExpQuery.equalTo('exists', true);
+      provExpQuery.limit(1000);
+      const expServices = await provExpQuery.find({ useMasterKey: true });
+      const hasProviderExperience = expServices.some((svc) => {
+        const sub = svc.get('subconcept') || {};
+        return !!(sub.providerType || sub.providerName);
+      });
+      if (hasProviderExperience) {
+        logger.info('Cancelación directa bloqueada: reservación con experiencias de proveedor/establecimiento', {
+          reservationId: id,
+          experienceServices: expServices.length,
+          performedBy: req.user?.id,
+        });
+        return res.status(409).json({
+          success: false,
+          code: 'REQUIRES_PROVIDER_APPROVAL',
+          error: 'La reservación incluye experiencias con proveedores o establecimientos. La cancelación requiere aprobación: crea una solicitud de cancelación.',
+        });
+      }
+
       // Cancel reservation
       reservation.set('status', 'cancelled');
       await reservation.save(null, { useMasterKey: true });
@@ -1217,14 +1284,15 @@ class ReservationController {
 
       // Revert linked quote status back to 'requested'
       const quotePtr = reservation.get('quotePtr');
+      let linkedQuote = null;
       if (quotePtr) {
         const quoteQuery = new Parse.Query('Quote');
         quoteQuery.equalTo('exists', true);
-        const quote = await quoteQuery.get(quotePtr.id, { useMasterKey: true });
-        if (quote && quote.get('status') === 'scheduled') {
-          quote.set('status', 'requested');
-          await quote.save(null, { useMasterKey: true });
-          logger.info('Quote status reverted to requested', { quoteId: quote.id });
+        linkedQuote = await quoteQuery.get(quotePtr.id, { useMasterKey: true });
+        if (linkedQuote && linkedQuote.get('status') === 'scheduled') {
+          linkedQuote.set('status', 'requested');
+          await linkedQuote.save(null, { useMasterKey: true });
+          logger.info('Quote status reverted to requested', { quoteId: linkedQuote.id });
         }
       }
 
@@ -1233,6 +1301,18 @@ class ReservationController {
         servicesCancelled: services.length,
         performedBy: req.user?.id,
       });
+
+      // Correo de cancelación al owner de la cotización. Cancelación directa: automática
+      // (agencia/agente ≥24h sin proveedor) o admin. No bloquea si el correo falla.
+      if (linkedQuote) {
+        const cancellationType = ['admin', 'superadmin'].includes(req.userRole) ? 'admin' : 'automatic';
+        await notifyReservationCancellation({
+          quote: linkedQuote,
+          reservation,
+          reason: req.body?.reason,
+          cancellationType,
+        });
+      }
 
       return res.json({ success: true, message: 'Reservación cancelada exitosamente' });
     } catch (error) {
@@ -1770,7 +1850,33 @@ class ReservationController {
     return new Set(requests.map((req) => req.get('quote')?.id).filter(Boolean));
   }
 
-  static formatReservationRow(reservation, serviceCount, hasPendingCancellation = false) {
+  /**
+   * For a page of reservations, return the Set of quote objectIds that have a
+   * pending Invoice request. One batched query instead of N per-row lookups, so
+   * the table can disable "Solicitar Factura" when a request is already pending.
+   * @param {Array<Parse.Object>} reservations - Reservation page results.
+   * @returns {Promise<Set<string>>} Set of quoteId strings with a pending request.
+   * @example
+   */
+  static async getPendingInvoiceQuoteIds(reservations) {
+    const quotes = reservations.map((r) => r.get('quotePtr')).filter(Boolean);
+    if (quotes.length === 0) return new Set();
+    const query = new Parse.Query('Invoice');
+    query.containedIn('quote', quotes);
+    query.equalTo('status', 'pending');
+    query.equalTo('exists', true);
+    query.select('quote');
+    query.limit(1000);
+    const requests = await query.find({ useMasterKey: true });
+    return new Set(requests.map((req) => req.get('quote')?.id).filter(Boolean));
+  }
+
+  static formatReservationRow(
+    reservation,
+    serviceCount,
+    hasPendingCancellation = false,
+    hasPendingInvoiceRequest = false
+  ) {
     // Cliente mostrado: se resuelve desde la cotización para reflejar el modelo real.
     // En una cotización 'direct' la persona es el cliente: nuevas llevan un AmexingUser
     // end_client en quotePtr.client; las legadas un Client en quotePtr.companyClientPtr.
@@ -1864,6 +1970,9 @@ class ReservationController {
       // A <24h cancellation creates a pending request while the reservation stays
       // in its real status; flag it so the table shows "Pendiente de cancelación".
       hasPendingCancellation: !!hasPendingCancellation && status !== 'cancelled',
+      // Flag para deshabilitar "Solicitar Factura" cuando ya hay una solicitud pendiente
+      // para la cotización de esta reservación.
+      hasPendingInvoiceRequest: !!hasPendingInvoiceRequest,
       owner: ownerName,
       ownerIsCreator: !hasUsableOwner, // true cuando se usó el creador como fallback
       createdAt: reservation.createdAt,

@@ -126,7 +126,6 @@ table.dataTable thead .sorting_desc::after {
 }
 
 #greeterLabel-<%= dtTableId %> {
-    font-size: 0.875rem;
     font-weight: 500;
     transition: color 0.15s ease-in-out;
 }
@@ -217,128 +216,115 @@ table.dataTable thead th:nth-child(2) select {
 }
 </style>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-        <div class="row align-items-center">
-            <div class="col">
-                <h5 class="card-title mb-0 text-white">
-                    Traslados
-                </h5>
+<style>
+/* Rediseño de header/filtros estilo catálogo (limpio, sin card blanca). Solo UI: se conservan
+   todos los ids/clases/handlers (.filter-pill+data-filter, driverToggle/greeterToggle, selects). */
+.exp-catalog {
+    --exp-border: #d6d1c4; --exp-olive: #6E7A50; --exp-olive-light: #7C8A5A;
+    --exp-muted: #8a8f78; --exp-dark: #2b2b2b;
+}
+.traslados-new-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--exp-olive); background: var(--exp-olive); color: #fff; border-radius: 8px; font-size: 0.82rem; font-weight: 600; padding: 9px 16px; cursor: pointer; transition: all 0.15s; }
+.traslados-new-btn:hover { background: var(--exp-olive-light); border-color: var(--exp-olive-light); color: #fff; }
+.exp-catalog .segbar { display: flex; justify-content: space-between; align-items: center; gap: 18px 28px; flex-wrap: wrap; margin-bottom: 18px; }
+.exp-catalog .segbar__left { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+.exp-catalog .segbar__right { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+/* thead sobrio (crema/versalita), igual que la tabla de clientes */
+.exp-catalog .table > thead.table-light th { background: rgba(228, 223, 207, 0.35); border-bottom: 1px solid var(--exp-border); color: var(--exp-muted); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; vertical-align: middle; }
+.exp-catalog .table > thead.table-light th .form-select { text-transform: none; letter-spacing: normal; font-size: 0.9rem; color: var(--exp-dark); font-weight: 400; }
+.exp-catalog .segwrap { display: flex; align-items: center; gap: 10px; }
+.exp-catalog .seglabel { font-size: 0.64rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--exp-muted); font-weight: 600; }
+.exp-catalog .seg { display: inline-flex; border: 1px solid var(--exp-border); border-radius: 6px; overflow: hidden; background: rgba(255,255,255,0.4); }
+.exp-catalog .seg .filter-pill { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; border: none; background: transparent; color: var(--exp-dark); padding: 9px 16px; cursor: pointer; transition: all 0.15s; }
+.exp-catalog .seg .filter-pill + .filter-pill { border-left: 1px solid var(--exp-border); }
+.exp-catalog .seg .filter-pill:hover:not(.active) { background: rgba(110,122,80,0.08); }
+.exp-catalog .seg .filter-pill.active { background: var(--exp-olive); color: #fff; }
+.exp-catalog .segwrap .form-check { margin: 0; min-height: auto; }
+.exp-catalog .segwrap .form-check-label { font-size: 0.78rem; color: var(--exp-dark); }
+.exp-catalog .exp-field { position: relative; min-width: 150px; }
+.exp-catalog .exp-field select { width: 100%; font-size: 0.9rem; color: var(--exp-dark); background: rgba(255,255,255,0.45); border: 1px solid var(--exp-border); border-radius: 6px; padding: 11px 38px 11px 14px; appearance: none; -webkit-appearance: none; outline: none; }
+.exp-catalog .exp-field select:focus { border-color: var(--exp-olive); background: #fff; }
+.exp-catalog .exp-field__caret { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--exp-muted); pointer-events: none; font-size: 0.9rem; }
+</style>
+
+<div class="exp-catalog">
+    <!-- Barra de filtros: Tipo + Guía/Greeter (izquierda) · Moneda + Pago (derecha) -->
+    <div class="segbar">
+        <div class="segbar__left">
+            <div class="segwrap">
+                <span class="seglabel">Tipo</span>
+                <div class="seg">
+                    <button type="button" class="filter-pill active" data-filter="airport">Aeropuerto</button>
+                    <button type="button" class="filter-pill" data-filter="p2p">Punto a Punto</button>
+                    <button type="button" class="filter-pill" data-filter="local">Local</button>
+                </div>
             </div>
-            <div class="col-auto">
-                <% if (canCreate) { %>
-                    <button type="button" class="btn btn-light btn-sm" id="createServiceBtn">
-                        <i class="ti ti-plus me-1"></i>Nuevo Traslado
-                    </button>
-                <% } %>
+            <div class="segwrap">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="driverToggle-<%= dtTableId %>">
+                    <label class="form-check-label" for="driverToggle-<%= dtTableId %>" id="driverLabel-<%= dtTableId %>">Sin Guía</label>
+                </div>
+            </div>
+            <div class="segwrap">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="greeterToggle-<%= dtTableId %>">
+                    <label class="form-check-label" for="greeterToggle-<%= dtTableId %>" id="greeterLabel-<%= dtTableId %>">Sin Greeter</label>
+                </div>
+            </div>
+        </div>
+        <div class="segbar__right">
+            <div class="exp-field exp-field--select">
+                <select id="currencyFilter-<%= dtTableId %>">
+                    <option value="MXN" selected>MXN</option>
+                    <option value="USD">USD</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
+            </div>
+            <div class="exp-field exp-field--select">
+                <select id="paymentTypeFilter-<%= dtTableId %>">
+                    <% if (isDepartmentManager || isClient) { %>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia" selected>Transferencia</option>
+                    <% } else { %>
+                        <option value="efectivo" selected>Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                    <% } %>
+                    <option value="tarjeta">Tarjeta Débito/Crédito</option>
+                </select>
+                <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
         </div>
     </div>
 
-    <div class="card-body" id="services-content">
-        <!-- Filter Controls -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <!-- Leading Pills (Segmented Control) -->
-            <ul class="nav nav-pills" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active filter-pill" data-filter="airport" type="button" role="tab">
-                        Aeropuerto
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link filter-pill" data-filter="p2p" type="button" role="tab">
-                        Punto a Punto
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link filter-pill" data-filter="local" type="button" role="tab">
-                        Local
-                    </button>
-                </li>
-            </ul>
+    <!-- Include Generic Guide Formula Evaluator -->
+    <script src="/js/guide-formula-evaluator.js"></script>
 
-            <!-- Trailing Dropdowns and Controls -->
-            <div class="d-flex gap-3 align-items-center">
-
-                <!-- Guide Toggle -->
-                <div class="d-flex align-items-center gap-2">
-                    <label class="form-label mb-0 text-muted">Guía:</label>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="driverToggle-<%= dtTableId %>">
-                        <label class="form-check-label text-muted" for="driverToggle-<%= dtTableId %>" id="driverLabel-<%= dtTableId %>">
-                            Sin Guía
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Greeter Toggle -->
-                <div class="d-flex align-items-center gap-2">
-                    <label class="form-label mb-0 text-muted">Greeter:</label>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="greeterToggle-<%= dtTableId %>">
-                        <label class="form-check-label text-muted" for="greeterToggle-<%= dtTableId %>" id="greeterLabel-<%= dtTableId %>">
-                            Sin Greeter
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Currency Dropdown -->
-                <div class="d-flex align-items-center gap-1">
-                    <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
-                    <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
-                        <option value="MXN" selected>MXN</option>
-                        <option value="USD">USD</option>
-                    </select>
-                </div>
-
-                <!-- Payment Type Dropdown -->
-                <div class="d-flex align-items-center gap-1">
-                    <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
-                    <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
-                        <% if (isDepartmentManager || isClient) { %>
-                            <option value="efectivo">Efectivo</option>
-                            <option value="transferencia" selected>Transferencia</option>
-                        <% } else { %>
-                            <option value="efectivo" selected>Efectivo</option>
-                            <option value="transferencia">Transferencia</option>
-                        <% } %>
-                        <option value="tarjeta">Tarjeta Débito/Crédito</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <!-- Include Generic Guide Formula Evaluator -->
-        <script src="/js/guide-formula-evaluator.js"></script>
-        
-        <div class="table-responsive">
-            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width: 25%;">Ruta (One-way trip)</th>
-                        <th style="width: 30%; min-width: 250px;">
-                            <div class="text-center mb-1" style="font-size: 0.875rem; font-weight: 500;">
-                                Seleccionar categoría...
-                            </div>
-                            <select class="form-select" id="headerRateFilter-<%= dtTableId %>" style="min-width: 120px; width: 100%;">
-                            </select>
-                        </th>
-                        <th style="width: 15%;">Duración de Trayecto</th>
-                        <th style="width: 20%;">Notas</th>
-                        <% if (!isDepartmentManager && !isClient) { %>
-                        <th style="width: 15%;">Estado</th>
-                        <% } %>
-                        <% if (dtShowClientPricing) { %>
-                            <th class="text-center" style="width: 15%;">Precio Cliente</th>
-                        <% } %>
-                        <% if (dtShowActions) { %>
-                            <th class="text-center" style="width: 15%;">Acciones</th>
-                        <% } %>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+    <div class="table-responsive" id="services-content">
+        <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 25%;">Ruta (One-way trip)</th>
+                    <th style="width: 30%; min-width: 250px;">
+                        <div class="text-center mb-1" style="font-size: 0.875rem; font-weight: 500;">
+                            Seleccionar categoría...
+                        </div>
+                        <select class="form-select" id="headerRateFilter-<%= dtTableId %>" style="min-width: 120px; width: 100%;">
+                        </select>
+                    </th>
+                    <th style="width: 15%;">Duración de Trayecto</th>
+                    <th style="width: 20%;">Notas</th>
+                    <% if (!isDepartmentManager && !isClient) { %>
+                    <th style="width: 15%;">Estado</th>
+                    <% } %>
+                    <% if (dtShowClientPricing) { %>
+                        <th class="text-center" style="width: 15%;">Precio Cliente</th>
+                    <% } %>
+                    <% if (dtShowActions) { %>
+                        <th class="text-center" style="width: 15%;">Acciones</th>
+                    <% } %>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
     </div>
 </div>
 

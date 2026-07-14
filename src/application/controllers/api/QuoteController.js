@@ -223,7 +223,7 @@ class QuoteController {
       // 2. Extract fields from request body
       const {
         client, clientId, clientType, clientFinalId, clientFinalName, contactPerson, contactEmail, contactPhone,
-        contactFirstName, contactLastName, notes, eventType,
+        contactFirstName, contactLastName, notes, lodging, eventType,
         leadGuestFirstName, leadGuestLastName,
         ownerId: initialOwnerId, // Propietario inicial elegido (solo admin/superadmin; se valida)
         numberOfAdults, numberOfChildren, numberOfInfants, preferredLanguage,
@@ -465,6 +465,7 @@ class QuoteController {
       // Mutuamente excluyente con clientFinalId (el frontend envía solo uno con valor).
       quote.set('clientFinalName', clientFinalName || '');
       quote.set('notes', notes || '');
+      quote.set('lodging', lodging || '');
       quote.set('eventType', eventType || '');
 
       // Set individual person counts
@@ -944,6 +945,7 @@ class QuoteController {
             leadGuestFirstName: quote.get('leadGuestFirstName') || '',
             leadGuestLastName: quote.get('leadGuestLastName') || '',
             notes: quote.get('notes') || '',
+            lodging: quote.get('lodging') || '',
             clientFinalId: quote.get('clientFinalId') || null,
             clientFinalName: quote.get('clientFinalName') || '',
             // Nombre a mostrar del Cliente Final: cliente resuelto por id, o texto libre tecleado.
@@ -1181,6 +1183,7 @@ class QuoteController {
         leadGuestFirstName: quote.get('leadGuestFirstName') || '',
         leadGuestLastName: quote.get('leadGuestLastName') || '',
         notes: quote.get('notes') || '',
+        lodging: quote.get('lodging') || '',
         clientFinalId: quote.get('clientFinalId') || null,
         clientFinalName: quote.get('clientFinalName') || '',
         status: quote.get('status') || 'quoted',
@@ -3488,7 +3491,8 @@ class QuoteController {
       // transfer via the denormalized `owner` pointer) PLUS quotes explicitly shared with
       // them via collaboration (QuoteAccess editor/viewer). No org-wide visibility.
       const userClientId = currentUser.clientId || currentUser.get('clientId');
-      if (userRole === 'client' || userClientId) {
+      // client y end_client (cliente directo) ven SOLO sus cotizaciones (propias/compartidas).
+      if (userRole === 'client' || userRole === 'end_client' || userClientId) {
         const currentUserPointer = {
           __type: 'Pointer',
           className: 'AmexingUser',
@@ -3591,14 +3595,23 @@ class QuoteController {
       const quoteId = req.params.id;
 
       // Get payment info parameters from request body (for admin role)
-      const { includePaymentInfo, paymentInfoId } = req.body;
+      // billingProfileId: perfil fiscal de la agencia a imprimir en el recibo (los 3 roles).
+      // force: solo admin/superadmin puede saltarse el bloqueo de "reservación no saldada".
+      const {
+        includePaymentInfo,
+        paymentInfoId,
+        billingProfileId,
+        force,
+      } = req.body;
 
       const result = await this.quoteService.generateReceipt(
         currentUser,
         quoteId,
         req.userRole, // Pass userRole from JWT middleware
         includePaymentInfo, // Pass the flag from request
-        paymentInfoId // Pass the specific payment info ID
+        paymentInfoId, // Pass the specific payment info ID
+        billingProfileId, // Perfil de facturación elegido (o undefined)
+        force === true // Override admin del bloqueo de reservación no saldada
       );
 
       // If PDF buffer is returned, send it as a downloadable file
@@ -3614,6 +3627,17 @@ class QuoteController {
 
       return res.json(result);
     } catch (error) {
+      // Reservación no saldada: 409 estructurado para que el front muestre el saldo pendiente
+      // y (solo a admin/superadmin) ofrezca "Generar de todos modos".
+      if (error && error.code === 'RESERVATION_NOT_SETTLED') {
+        return res.status(409).json({
+          success: false,
+          code: 'RESERVATION_NOT_SETTLED',
+          error: error.message,
+          data: error.payment || null,
+        });
+      }
+
       logger.error('Error in QuoteController.generateReceipt', {
         error: error.message,
         stack: error.stack,
@@ -3626,6 +3650,68 @@ class QuoteController {
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al generar el recibo',
         500
       );
+    }
+  }
+
+  /**
+   * GET /api/quotes/:id/billing-profiles — Perfiles de facturación de la AGENCIA de la
+   * cotización (quote.client = AmexingUser de la agencia), para elegir cuál se imprime en el
+   * recibo. Devuelve además el perfil ya guardado en la reservación (o el principal) para
+   * preseleccionarlo. Accesible por los roles que pueden generar el recibo (nivel 4+).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { success, data: { profiles, selectedProfileId } }.
+   * @example
+   *   GET /api/quotes/abc123/billing-profiles
+   */
+  async getQuoteBillingProfiles(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+      const quoteId = req.params.id;
+
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      query.include('client');
+      const quote = await query.get(quoteId, { useMasterKey: true });
+      if (!quote) {
+        return this.sendError(res, 'Cotización no encontrada', 404);
+      }
+
+      const agency = quote.get('client'); // AmexingUser de la agencia (o cliente directo)
+      if (!agency) {
+        return res.json({ success: true, data: { profiles: [], selectedProfileId: null } });
+      }
+
+      const bpQuery = new Parse.Query('BillingProfile');
+      bpQuery.equalTo('userPtr', agency);
+      bpQuery.equalTo('exists', true);
+      bpQuery.equalTo('active', true);
+      bpQuery.descending('isPrimary');
+      bpQuery.addAscending('label');
+      bpQuery.limit(200);
+      const bps = await bpQuery.find({ useMasterKey: true });
+
+      const profiles = bps.map((bp) => ({
+        id: bp.id,
+        label: bp.get('label') || bp.get('razonSocial') || bp.get('commercialName') || 'Perfil',
+        rfc: bp.get('rfc') || bp.get('taxId') || '',
+        razonSocial: bp.get('razonSocial') || bp.get('commercialName') || '',
+        isPrimary: bp.get('isPrimary') || false,
+      }));
+
+      // Preselección: SIEMPRE el perfil principal (o el primero si ninguno es principal).
+      const primary = profiles.find((p) => p.isPrimary);
+      const selectedProfileId = primary ? primary.id : (profiles[0]?.id || null);
+
+      return res.json({ success: true, data: { profiles, selectedProfileId } });
+    } catch (error) {
+      logger.error('Error in QuoteController.getQuoteBillingProfiles', {
+        error: error.message, quoteId: req.params.id, userId: req.user?.id,
+      });
+      return this.sendError(res, 'Error al obtener perfiles de facturación', 500);
     }
   }
 
