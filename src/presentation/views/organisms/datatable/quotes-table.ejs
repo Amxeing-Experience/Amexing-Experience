@@ -17,9 +17,11 @@ const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/q
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
-const canEdit = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
+const canEdit = ['superadmin', 'admin', 'department_manager', 'client', 'end_client'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
-const canCreate = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
+// Duplicar: como client, pero NO el cliente directo (end_client) — solo puede editar la suya.
+const canDuplicate = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin', 'department_manager', 'client', 'end_client'].includes(dtUserRole);
 const canConvertToReservation = ['superadmin', 'admin'].includes(dtUserRole);
 const canViewSummary = ['department_manager', 'client'].includes(dtUserRole);
 const showClientColumn = ['superadmin', 'admin'].includes(dtUserRole);
@@ -27,6 +29,7 @@ const showClientColumn = ['superadmin', 'admin'].includes(dtUserRole);
 // Dynamic base path based on user role
 const rolePaths = {
     client: '/dashboard/client',
+    end_client: '/dashboard/end_client',
     department_manager: '/dashboard/department_manager',
     admin: '/dashboard/admin',
     superadmin: '/dashboard/superadmin'
@@ -401,6 +404,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+        const canDuplicate = <%= canDuplicate %>;
         const canConvertToReservation = <%= canConvertToReservation %>;
         const basePath = '<%= baseDashboardPath %>';
 
@@ -849,6 +853,9 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                                             <i class="ti ti-edit"></i>
                                         </a>`;
 
+                        }
+
+                        if (canDuplicate) {
                             // Copy button (duplicate)
                             actions += `<button type="button"
                                             class="btn btn-info copy-quote-btn"

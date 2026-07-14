@@ -3491,7 +3491,8 @@ class QuoteController {
       // transfer via the denormalized `owner` pointer) PLUS quotes explicitly shared with
       // them via collaboration (QuoteAccess editor/viewer). No org-wide visibility.
       const userClientId = currentUser.clientId || currentUser.get('clientId');
-      if (userRole === 'client' || userClientId) {
+      // client y end_client (cliente directo) ven SOLO sus cotizaciones (propias/compartidas).
+      if (userRole === 'client' || userRole === 'end_client' || userClientId) {
         const currentUserPointer = {
           __type: 'Pointer',
           className: 'AmexingUser',

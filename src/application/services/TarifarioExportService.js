@@ -562,6 +562,7 @@ function formatDurationMinutes(minutes) {
 
 /**
  * Get experiences data for export.
+ * @param priceOptions
  * @returns {Promise<Array>} Formatted experience data.
  * @example
  */
