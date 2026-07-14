@@ -898,7 +898,12 @@
             html += `<span class="service-badge secondary me-2">${transportLabel}</span>`;
 
             if (service.directionType) {
-                const dirLabel = directionLabels[service.directionType];
+                // Local con tiempo de espera (lleva, espera y regresa) → se separa en dos piernas:
+                // "Llevar" es la IDA y "Recoger" el REGRESO. (Round-trip sin espera queda igual.)
+                const isLocalWaiting = service.transportType === 'local' && service.waitingTimeHours > 0;
+                const dirLabel = isLocalWaiting
+                    ? (service.directionType === 'arrival' ? 'Ida' : 'Regreso')
+                    : directionLabels[service.directionType];
                 const badgeClass = service.directionType === 'arrival' ? 'service-badge info' : 'service-badge warning';
                 html += `<span class="${badgeClass} me-2">${dirLabel}</span>`;
             }
