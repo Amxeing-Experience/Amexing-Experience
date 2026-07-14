@@ -6,6 +6,7 @@ const router = express.Router();
 const superAdminController = require('../../application/controllers/dashboard/SuperAdminController');
 const adminController = require('../../application/controllers/dashboard/AdminController');
 const clientController = require('../../application/controllers/dashboard/ClientController');
+const endClientController = require('../../application/controllers/dashboard/EndClientController');
 const departmentManagerController = require('../../application/controllers/dashboard/DepartmentManagerController');
 const employeeController = require('../../application/controllers/dashboard/EmployeeController');
 const driverController = require('../../application/controllers/dashboard/DriverController');
@@ -16,6 +17,22 @@ const dashboardAuth = require('../../application/middleware/dashboardAuthMiddlew
 
 // Apply only basic authentication - role checks handled per route to avoid conflicts
 router.use(dashboardAuth.requireAuth);
+
+// Solo en dev: expone la categoría del cliente directo (direct_client/wedding_planner/concierge/
+// home_owner) a la vista, para mostrarla como referencia interna en el header. En producción no se
+// consulta ni se muestra (el cliente final no ve su categorización interna).
+router.use('/end_client', async (req, res, next) => {
+  if (process.env.NODE_ENV === 'development' && req.user && req.user.id) {
+    try {
+      const Parse = require('parse/node');
+      const u = await new Parse.Query('AmexingUser').get(req.user.id, { useMasterKey: true });
+      res.locals.clientCategory = u.get('clientCategory') || null;
+    } catch (e) {
+      res.locals.clientCategory = null; // el header cae a ocultar/genérico
+    }
+  }
+  next();
+});
 
 // SuperAdmin Routes
 router.get('/superadmin', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.index(req, res));
@@ -109,6 +126,15 @@ router.get('/client/greeter', dashboardAuth.requireRole('client'), (req, res) =>
 router.get('/client/quotes', dashboardAuth.requireRole('client'), (req, res) => clientController.quotes(req, res));
 router.get('/client/quotes/:id', dashboardAuth.requireRole('client'), (req, res) => clientController.quoteDetail(req, res));
 router.get('/client/tarifario-export', dashboardAuth.requireRole('client'), (req, res) => clientController.tarifarioExport(req, res));
+
+// End Client Routes (cliente directo: solo lo suyo — inicio, reservaciones, cotizaciones + cotizar)
+router.get('/end_client', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.index(req, res));
+router.get('/end_client/profile', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.profile(req, res));
+router.get('/end_client/change-password', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.changePassword(req, res));
+router.get('/end_client/bookings', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.bookings(req, res));
+router.get('/end_client/bookings/:id', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.bookingDetail(req, res));
+router.get('/end_client/quotes', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.quotes(req, res));
+router.get('/end_client/quotes/:id', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.quoteDetail(req, res));
 
 // Department Manager Routes
 router.get('/department_manager', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.index(req, res));

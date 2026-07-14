@@ -15,17 +15,21 @@ class DashboardAuthMiddleware {
       client: 5,
       department_manager: 4,
       employee: 3,
+      // Cliente directo (end_client): cliente final sin agencia. Nivel por debajo de client
+      // para que NO pueda alcanzar por URL las rutas de agencia (/dashboard/client/*).
+      end_client: 3,
       driver: 2,
       guest: 1,
     };
 
     // Define role-based dashboard access permissions
     this.dashboardPermissions = {
-      superadmin: ['superadmin', 'admin', 'client', 'department_manager', 'employee', 'driver', 'guest'],
-      admin: ['admin', 'client', 'department_manager', 'employee', 'driver'],
+      superadmin: ['superadmin', 'admin', 'client', 'department_manager', 'employee', 'end_client', 'driver', 'guest'],
+      admin: ['admin', 'client', 'department_manager', 'employee', 'end_client', 'driver'],
       client: ['client', 'department_manager', 'employee'],
       department_manager: ['department_manager', 'employee'],
       employee: ['employee'],
+      end_client: ['end_client'],
       driver: ['driver'],
       guest: ['guest'],
     };

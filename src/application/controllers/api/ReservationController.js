@@ -101,12 +101,12 @@ class ReservationController {
       };
     }
 
-    // Clients are scoped by quote ownership, which lives on the quote (quotePtr), not on the
-    // reservation. That scoping is applied via the quote subquery inside applyQuoteConstraint
-    // (see getClientEligibleQuoteIds) so it composes with the hold/type filter through a
-    // SINGLE matchesQuery on quotePtr (two separate constraints on quotePtr overwrite each
-    // other). Therefore no clientPtr filter is returned here.
-    if (userRole === 'client') {
+    // Clients (y clientes directos end_client) are scoped by quote ownership, which lives on the
+    // quote (quotePtr), not on the reservation. That scoping is applied via the quote subquery
+    // inside applyQuoteConstraint (see getClientEligibleQuoteIds) so it composes with the hold/type
+    // filter through a SINGLE matchesQuery on quotePtr (two separate constraints on quotePtr
+    // overwrite each other). Therefore no clientPtr filter is returned here.
+    if (userRole === 'client' || userRole === 'end_client') {
       return null;
     }
 
@@ -129,7 +129,8 @@ class ReservationController {
   static async getClientEligibleQuoteIds(req) {
     const { userRole } = req;
     const currentUser = req.user;
-    if (userRole !== 'client') {
+    // client y end_client (cliente directo) se acotan por propiedad de la cotización.
+    if (userRole !== 'client' && userRole !== 'end_client') {
       return null;
     }
 

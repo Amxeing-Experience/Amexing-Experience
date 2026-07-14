@@ -32,7 +32,7 @@ const ReservationService = require('../../domain/models/ReservationService');
 class QuoteService {
   constructor() {
     this.className = 'Quote';
-    this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client'];
+    this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client', 'end_client'];
     this.validStatuses = ['quoted', 'requested', 'hold', 'scheduled', 'rejected'];
     this.pdfService = new PDFReceiptService();
   }
@@ -904,6 +904,7 @@ class QuoteService {
    * @param {string} userRole - User role (optional).
    * @param includePaymentInfoOverride
    * @param paymentInfoId
+   * @param billingProfileId
    * @returns {Promise<object>} Result with success status and receipt data.
    * @throws {Error} If validation fails or quote is not in scheduled status.
    * @example

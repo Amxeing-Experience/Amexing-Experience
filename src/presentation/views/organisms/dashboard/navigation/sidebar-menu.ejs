@@ -151,6 +151,16 @@ const navigationItems = {
             // { name: 'Greeter', icon: 'user-plus', path: '/dashboard/client/greeter', id: 'greeter' }
         ]}
     ],
+    // Cliente directo (end_client): menú acotado a lo suyo (sin gestión de agencia).
+    end_client: [
+        { section: 'Inicio', icon: 'ti-home', items: [
+            { name: 'Dashboard', icon: 'home', path: '/dashboard/end_client', id: 'home' }
+        ]},
+        { section: 'Mi Actividad', icon: 'ti-briefcase', items: [
+            { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/end_client/quotes', id: 'quotes' },
+            { name: 'Reservaciones', icon: 'clipboard-list', path: '/dashboard/end_client/bookings', id: 'bookings' }
+        ]}
+    ],
     department_manager: [
         { section: 'Inicio', icon: 'ti-home', items: [
             { name: 'Dashboard', icon: 'home', path: '/dashboard/department_manager', id: 'home' }

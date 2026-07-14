@@ -90,7 +90,7 @@ class POIService {
 
   /**
    * Devuelve los destinos ACTIVOS de un tipo de traslado dado, con su imagen resuelta.
-   * Pensado para render público (p.ej. el strip de la página de Tours).
+   * Pensado para render público (p.ej. El strip de la página de Tours).
    * @param {string} serviceTypeName - Nombre del ServiceType (p.ej. 'Tours').
    * @returns {Promise<Array<{id:string,name:string,imageUrl:string|null}>>} Destinos.
    * @example

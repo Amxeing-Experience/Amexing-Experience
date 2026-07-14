@@ -48,7 +48,7 @@ class PDFReceiptService {
 
   /**
    * Lee (y cachea) el logo horizontal como data URI base64 (o '' si no existe).
-   * @returns {string} data:image/png;base64,... o ''.
+   * @returns {string} Data:image/png;base64,... O ''.
    * @example
    */
   getLogoDataUri() {

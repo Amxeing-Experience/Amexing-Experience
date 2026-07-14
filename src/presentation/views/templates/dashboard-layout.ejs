@@ -287,7 +287,8 @@
                 <%- include('../organisms/dashboard/header/dashboard-header', {
                     userRole: typeof userRole !== 'undefined' ? userRole : 'guest',
                     user: typeof user !== 'undefined' ? user : {},
-                    title: typeof title !== 'undefined' ? title : 'Dashboard'
+                    title: typeof title !== 'undefined' ? title : 'Dashboard',
+                    clientCategory: typeof clientCategory !== 'undefined' ? clientCategory : null
                 }) %>
             </header>
 
