@@ -8,6 +8,17 @@ const d = (typeof dashboardData !== 'undefined' && dashboardData) ? dashboardDat
 const bp = d.basePath || 'end_client';
 const seg = d.segments || { quoted: 0, hold: 0, scheduled: 0 };
 const pendingPayments = d.pendingPayments || [];
+
+// Capacidades por tipo de cliente. Preferimos endClientCaps (renderDashboard); si no llega, lo
+// derivamos de la categoría (clientCategory o user.clientCategory). Refleja endClientCapabilities.js.
+const ecCaps = (typeof endClientCaps !== 'undefined' && endClientCaps) ? endClientCaps : null;
+const ecCat = (typeof clientCategory !== 'undefined' && clientCategory)
+  ? clientCategory
+  : ((typeof user !== 'undefined' && user && user.clientCategory) ? user.clientCategory : null);
+// showQuotes: el dashboard incluye lo de Cotizaciones (segmento Cotizado + aviso de tarifas).
+const showQuotes = ecCaps ? !!ecCaps.dashboardQuotes : (ecCat !== 'home_owner');
+// canCreateQuote: botón Reservar (crear cotización) — solo wedding planner y concierge.
+const canCreateQuote = ecCaps ? !!ecCaps.createQuotes : (ecCat === 'wedding_planner' || ecCat === 'concierge');
 %>
 
 <style>
@@ -39,6 +50,7 @@ const pendingPayments = d.pendingPayments || [];
 
   /* 3 segmentos */
   .dash-wrap .segments{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .dash-wrap .segments.two{grid-template-columns:repeat(2,1fr);}
   .dash-wrap .seg{display:block;background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px 24px;position:relative;
     overflow:hidden;text-decoration:none;color:inherit;transition:box-shadow .15s;}
   .dash-wrap .seg:hover{box-shadow:0 .4rem 1rem rgba(0,0,0,.06);}
@@ -97,18 +109,22 @@ const pendingPayments = d.pendingPayments || [];
       <h1>Buen día, <%= d.agencyName || 'Cliente' %></h1>
     </div>
     <div class="head-actions">
+      <% if (canCreateQuote) { %>
       <a class="btn-reservar" href="/dashboard/<%= bp %>/quotes/new"><i class="ti ti-plus"></i> Reservar</a>
+      <% } %>
     </div>
   </div>
 
-  <!-- 3 segmentos -->
-  <div class="segments">
+  <!-- Segmentos por estatus (Cotizado solo si el tipo de cliente ve cotizaciones) -->
+  <div class="segments<%= showQuotes ? '' : ' two' %>">
+    <% if (showQuotes) { %>
     <a class="seg cot" href="/dashboard/<%= bp %>/quotes">
       <div class="lbl">Cotizado</div>
       <div class="sub">&nbsp;</div>
       <div class="num"><%= seg.quoted %></div>
       <div class="foot"><span class="ver">Ver todas &rarr;</span></div>
     </a>
+    <% } %>
     <a class="seg blo" href="/dashboard/<%= bp %>/bookings?dateFilter=pending_completion">
       <div class="lbl">Agendado</div>
       <div class="sub">Pendiente por completar información</div>
@@ -123,11 +139,13 @@ const pendingPayments = d.pendingPayments || [];
     </a>
   </div>
 
-  <!-- Aviso de actualización de tarifas -->
+  <% if (showQuotes) { %>
+  <!-- Aviso de actualización de tarifas (solo para quienes ven cotizaciones) -->
   <div class="dash-notice">
     <i class="ti ti-info-circle"></i>
     <div>Las cotizaciones correspondientes a servicios programados para 2027 en adelante están sujetas a actualización de tarifas. Para garantizar el precio cotizado, será necesario realizar durante 2026 un pago anticipado mínimo del 50% del total de los servicios confirmados. De lo contrario, aplicarán las tarifas vigentes al momento de la confirmación.</div>
   </div>
+  <% } %>
 
   <!-- Pendientes de pago -->
   <div class="section-title">Reservaciones pendientes de pago <span class="rule"></span></div>

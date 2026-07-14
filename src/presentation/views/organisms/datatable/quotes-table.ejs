@@ -17,11 +17,19 @@ const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/q
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
-const canEdit = ['superadmin', 'admin', 'department_manager', 'client', 'end_client'].includes(dtUserRole);
-const canDelete = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
-// Duplicar: como client, pero NO el cliente directo (end_client) — solo puede editar la suya.
-const canDuplicate = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
-const canCreate = ['superadmin', 'admin', 'department_manager', 'client', 'end_client'].includes(dtUserRole);
+// Cliente directo (end_client): crear/editar depende del tipo de cliente (capacidad createQuotes).
+// Si puede ver pero no crear (p. ej. cliente directo), la fila muestra "Ver" (lectura), no "Editar".
+const ecCaps = (typeof endClientCaps !== 'undefined' && endClientCaps) ? endClientCaps : null;
+const isEndClient = dtUserRole === 'end_client';
+const ecCanCreate = isEndClient && ecCaps ? !!ecCaps.createQuotes : false;
+const baseEditors = ['superadmin', 'admin', 'department_manager', 'client'];
+const canEdit = isEndClient ? ecCanCreate : baseEditors.includes(dtUserRole);
+const canCreate = isEndClient ? ecCanCreate : baseEditors.includes(dtUserRole);
+// Ver (solo lectura): end_client que ve cotizaciones pero no puede crearlas/editarlas.
+const canViewOnly = isEndClient && !!(ecCaps && ecCaps.viewQuotes) && !ecCanCreate;
+const canDelete = baseEditors.includes(dtUserRole);
+// Duplicar: como los editores base, pero NO el cliente directo (end_client).
+const canDuplicate = baseEditors.includes(dtUserRole);
 const canConvertToReservation = ['superadmin', 'admin'].includes(dtUserRole);
 const canViewSummary = ['department_manager', 'client'].includes(dtUserRole);
 const showClientColumn = ['superadmin', 'admin'].includes(dtUserRole);
@@ -405,6 +413,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
         const canDuplicate = <%= canDuplicate %>;
+        const canViewOnly = <%= canViewOnly %>;
         const canConvertToReservation = <%= canConvertToReservation %>;
         const basePath = '<%= baseDashboardPath %>';
 
@@ -853,6 +862,17 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                                             <i class="ti ti-edit"></i>
                                         </a>`;
 
+                        }
+
+                        if (canViewOnly) {
+                            // View button (read-only): abre el detalle en modo lectura.
+                            actions += `<a href="<%= baseDashboardPath %>/quotes/${data.objectId || data.id}"
+                                            class="btn btn-outline-primary"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Ver Cotización">
+                                            <i class="ti ti-eye"></i>
+                                        </a>`;
                         }
 
                         if (canDuplicate) {

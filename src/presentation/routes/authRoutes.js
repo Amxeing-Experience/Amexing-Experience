@@ -351,6 +351,9 @@ router.post('/login', async (req, res) => {
           role: roleName,
           roleId: rolePointer,
           clientId: user.get('clientId'),
+          // Tipo de cliente directo (direct_client/wedding_planner/concierge/home_owner). Decide
+          // capacidades del end_client (ver/crear cotizaciones, tarifario). null para otros roles.
+          clientCategory: user.get('clientCategory') || null,
           organizationId: user.get('organizationId'),
           name:
             typeof user.getDisplayName === 'function'
@@ -401,6 +404,7 @@ router.post('/login', async (req, res) => {
           role: authenticatedUser.role,
           roleId: authenticatedUser.roleId,
           clientId: authenticatedUser.clientId,
+          clientCategory: authenticatedUser.clientCategory,
           organizationId: authenticatedUser.organizationId,
           iat: Math.floor(Date.now() / 1000),
         },
@@ -417,6 +421,7 @@ router.post('/login', async (req, res) => {
           role: authenticatedUser.role,
           roleId: authenticatedUser.roleId,
           clientId: authenticatedUser.clientId,
+          clientCategory: authenticatedUser.clientCategory,
           organizationId: authenticatedUser.organizationId,
           iat: Math.floor(Date.now() / 1000),
           type: 'refresh',

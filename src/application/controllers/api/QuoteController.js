@@ -220,6 +220,23 @@ class QuoteController {
         return this.sendError(res, 'Usuario no autenticado', 401);
       }
 
+      // 1b. Cliente directo/home owner (end_client de solo lectura) no pueden crear cotizaciones.
+      if (req.userRole === 'end_client') {
+        // eslint-disable-next-line global-require
+        const { getEndClientCapabilities } = require('../../config/endClientCapabilities');
+        let clientCategory = currentUser.clientCategory
+          || (typeof currentUser.get === 'function' ? currentUser.get('clientCategory') : null) || null;
+        if (!clientCategory && (currentUser.id || currentUser.objectId)) {
+          try {
+            const u = await new Parse.Query('AmexingUser').get(currentUser.id || currentUser.objectId, { useMasterKey: true });
+            clientCategory = u.get('clientCategory') || null;
+          } catch (e) { /* cae al default (solo lectura) */ }
+        }
+        if (!getEndClientCapabilities(clientCategory).createQuotes) {
+          return this.sendError(res, 'Este tipo de cliente no puede crear cotizaciones', 403);
+        }
+      }
+
       // 2. Extract fields from request body
       const {
         client, clientId, clientType, clientFinalId, clientFinalName, contactPerson, contactEmail, contactPhone,

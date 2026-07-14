@@ -45,7 +45,8 @@ function isActiveMenuItem(itemPath, currentPath) {
                 userRole: sidebarUserRole,
                 currentPath: sidebarCurrentPath,
                 isActiveMenuItem: isActiveMenuItem,
-                user: sidebarUser
+                user: sidebarUser,
+                endClientCaps: typeof endClientCaps !== 'undefined' ? endClientCaps : null
             }) %>
         </nav>
         <!-- End Sidebar navigation -->

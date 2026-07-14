@@ -25,6 +25,7 @@ const PDFReceiptService = require('./PDFReceiptService');
 const Invoice = require('../../domain/models/Invoice');
 const Reservation = require('../../domain/models/Reservation');
 const ReservationService = require('../../domain/models/ReservationService');
+const { getEndClientCapabilities } = require('../config/endClientCapabilities');
 
 /**
  * QuoteService class implementing Quote business logic.
@@ -35,6 +36,32 @@ class QuoteService {
     this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client', 'end_client'];
     this.validStatuses = ['quoted', 'requested', 'hold', 'scheduled', 'rejected'];
     this.pdfService = new PDFReceiptService();
+  }
+
+  /**
+   * Para el rol end_client (cliente directo), valida que su tipo (clientCategory) permita
+   * crear/editar cotizaciones. Cliente directo y home owner son de solo lectura → lanza error.
+   * Otros roles no se ven afectados.
+   * @param {object} currentUser - Usuario autenticado (POJO del JWT o Parse.Object).
+   * @param {string} role - Rol resuelto del usuario.
+   * @returns {Promise<void>} Resuelve si puede escribir; lanza Error si su tipo es de solo lectura.
+   * @example
+   * await this.assertEndClientCanWrite(currentUser, 'end_client');
+   */
+  async assertEndClientCanWrite(currentUser, role) {
+    if (role !== 'end_client') return;
+    let clientCategory = (currentUser && (currentUser.clientCategory
+      || (typeof currentUser.get === 'function' ? currentUser.get('clientCategory') : null))) || null;
+    // Fallback: si el token/objeto no trae la categoría, la resolvemos por id (escrituras son raras).
+    if (!clientCategory && currentUser && (currentUser.id || currentUser.objectId)) {
+      try {
+        const u = await new Parse.Query('AmexingUser').get(currentUser.id || currentUser.objectId, { useMasterKey: true });
+        clientCategory = u.get('clientCategory') || null;
+      } catch (e) { /* si falla, cae al default (solo lectura) */ }
+    }
+    if (!getEndClientCapabilities(clientCategory).createQuotes) {
+      throw new Error('Unauthorized: este tipo de cliente no puede crear ni editar cotizaciones');
+    }
   }
 
   /**
@@ -80,6 +107,8 @@ class QuoteService {
         if (!this.allowedRoles.includes(role)) {
           throw new Error(`Unauthorized: Role '${role}' cannot update Quote status`);
         }
+        // Cliente directo/home owner (end_client de solo lectura) no pueden solicitar servicios.
+        await this.assertEndClientCanWrite(currentUser, role);
       } else if (newStatus === 'quoted') {
         // Only admin can revert to quoted status (allow in development for testing)
         if (!['admin', 'superadmin'].includes(role) && process.env.NODE_ENV !== 'development') {
@@ -257,6 +286,8 @@ class QuoteService {
       if (!this.allowedRoles.includes(role)) {
         throw new Error(`Unauthorized: Role '${role}' cannot update Quotes`);
       }
+      // Cliente directo/home owner (end_client de solo lectura) no pueden editar cotizaciones.
+      await this.assertEndClientCanWrite(currentUser, role);
 
       // Validate Quote ID
       if (!quoteId) {

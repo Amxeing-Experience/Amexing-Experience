@@ -301,6 +301,11 @@ class DepartmentManagerController extends RoleBasedController {
 
       const isNewQuote = quoteId === 'new';
 
+      // El relabel a "Reservación" lo decide el CONTEXTO con que se abrió (abierto desde
+      // Reservaciones llega ?context=reservation), no si existe una reservación. Igual que admin.
+      const isReservation = req.query.context === 'reservation';
+      const entityLabel = isReservation ? 'Reservación' : 'Cotización';
+
       // Traer estado + total de la cotización para pintar el panel (timeline + botón
       // "Solicitar Servicios") server-side y que no espere al fetch del cliente.
       let quoteStatus = '';
@@ -319,10 +324,11 @@ class DepartmentManagerController extends RoleBasedController {
       }
 
       await this.renderRoleView(req, res, 'quote-detail', {
-        title: isNewQuote ? 'Nueva Cotización' : `Cotización ${quoteId}`,
+        title: isNewQuote ? `Nueva ${entityLabel}` : `${entityLabel} ${quoteId}`,
         breadcrumb: null,
         quoteId,
         isNewQuote,
+        isReservation,
         quoteStatus,
         quoteTotal,
         currentSection: section,
