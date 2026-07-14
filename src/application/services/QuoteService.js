@@ -916,7 +916,8 @@ class QuoteService {
     userRole = null,
     includePaymentInfoOverride = null,
     paymentInfoId = null,
-    billingProfileId = null
+    billingProfileId = null,
+    force = false
   ) {
     try {
       // Validate user authentication
@@ -993,6 +994,51 @@ class QuoteService {
           });
           throw new Error(`Cannot generate receipt: ${createError.message}`);
         }
+      }
+
+      // Gate: el recibo solo se genera si la reservación está SALDADA (paymentStatus === 'paid',
+      // es decir pagado >= total). Admin/superadmin pueden forzar (force=true); agencia/agente no.
+      // Se usa el summary fresco de PaymentService (no depende del rollup persistido en la reservación).
+      const PaymentService = require('./PaymentService');
+      let paymentSummary = null;
+      try {
+        paymentSummary = await PaymentService.summarize(reservation.id);
+      } catch (payErr) {
+        logger.warn('generateReceipt: no se pudo calcular el summary de pagos', {
+          error: payErr.message,
+          reservationId: reservation.id,
+          quoteId: quote.id,
+        });
+      }
+      const paymentStatus = paymentSummary ? paymentSummary.paymentStatus : (reservation.get('paymentStatus') || 'pending');
+      const isSettled = paymentStatus === 'paid';
+      const canOverride = ['admin', 'superadmin'].includes(role) && force === true;
+      if (!isSettled && !canOverride) {
+        logger.info('generateReceipt bloqueado: reservación no saldada', {
+          reservationId: reservation.id,
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          paymentStatus,
+          role,
+        });
+        const blockErr = new Error('La reservación no está saldada: registra el pago total antes de generar el recibo.');
+        blockErr.code = 'RESERVATION_NOT_SETTLED';
+        blockErr.payment = {
+          paymentStatus,
+          paidAmount: paymentSummary ? paymentSummary.paidAmount : (reservation.get('paidAmount') || 0),
+          balance: paymentSummary ? paymentSummary.balance : (reservation.get('balance') || null),
+          total: paymentSummary ? paymentSummary.total : null,
+        };
+        throw blockErr;
+      }
+      if (!isSettled && canOverride) {
+        logger.info('generateReceipt: override de admin sobre reservación no saldada', {
+          reservationId: reservation.id,
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          paymentStatus,
+          role,
+        });
       }
 
       // Get service items if they exist
