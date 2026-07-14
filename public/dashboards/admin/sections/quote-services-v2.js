@@ -4807,6 +4807,12 @@ class ItineraryBuilder {
     // Display-only flag for the admin "Precio personalizado" label (does not affect pricing).
     data.isCustomPrice = this.computeServiceIsCustomPrice(data, basePrice);
 
+    // Bloqueo por-servicio: cualquier servicio que un admin/superadmin agrega o edita queda
+    // "adminLocked". Para los demás (aunque sean owners) queda solo lectura (no editar/borrar);
+    // podrán solicitar su borrado (Fase 2). El backend refuerza esto (locks sticky por id) para
+    // que no se pueda saltar manipulando el request.
+    data.adminLocked = ['admin', 'superadmin'].includes(this.userRole);
+
     return data;
   }
 
@@ -7911,6 +7917,7 @@ class ItineraryBuilder {
                     </div>
                     <div class="d-flex flex-column align-items-end">
                         <div class="service-actions mb-2">
+                            ${(['admin', 'superadmin'].includes(this.userRole) || !service.adminLocked) ? `
                             <div class="btn-group btn-group-sm">
                                 <button type="button" class="btn btn-light edit-service-btn"
                                         data-day-id="${service.dayId}" data-service-id="${service.id}" title="Editar">
@@ -7925,6 +7932,7 @@ class ItineraryBuilder {
                                     <i class="ti ti-trash"></i>
                                 </button>
                             </div>
+                            ` : ''}
                         </div>
                         ${!(service.type === 'concepto' && this.getServiceDisplayPrice(service) <= 0) ? `
                             ${service.includeInTotal === false ? `
@@ -7934,11 +7942,13 @@ class ItineraryBuilder {
                                 ${this.formatCurrency(this.getServiceDisplayPrice(service))}
                                 ${this.getPriceTypeLabel()}
                             </div>
+                            ${(['admin', 'superadmin'].includes(this.userRole) || !service.adminLocked) ? `
                             <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
                                     data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
                                 <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
                                 <small class="${service.includeInTotal === false ? 'text-success' : 'text-muted'}" style="font-size: 0.7rem;">${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}</small>
                             </button>
+                            ` : ''}
                         ` : ''}
                     </div>
                 </div>
@@ -12175,6 +12185,8 @@ class ItineraryBuilder {
           const serviceData = {
             id: serviceId,
             dayId: dayData.id,
+            // Bloqueo por-servicio (Fase 1): restaura el candado guardado para el render.
+            adminLocked: subconcept.adminLocked || false,
             type: subconcept.type || 'other',
             concept: subconcept.concept,
             startTime: subconcept.time || subconcept.startTime, // Backend sends 'time'
@@ -20206,6 +20218,9 @@ class ItineraryBuilder {
             // time/price/type) get stripped on save and vanish on reload.
             id: serviceId,
             type: service.type || 'regular',
+            // Bloqueo por-servicio (Fase 1): true si un admin lo agregó/editó → solo lectura
+            // para no-admins. Se persiste en el subconcepto para restaurarlo al recargar.
+            adminLocked: service.adminLocked || false,
             concept: this.getServiceTitle(service),
             time: normalizeTimeHHMM(service.startTime), // Backend expects 'time' not 'startTime'
             endTime: normalizeTimeHHMM(service.endTime),
@@ -20607,9 +20622,21 @@ class ItineraryBuilder {
     this.showAlert('Día duplicado exitosamente', 'success');
   }
 
+  // Bloqueo por-servicio (Fase 1): un servicio adminLocked solo lo pueden gestionar
+  // (editar/duplicar/borrar) admin/superadmin. Los demás lo ven en solo lectura.
+  canManageService(service) {
+    if (!service) return false;
+    if (['admin', 'superadmin'].includes(this.userRole)) return true;
+    return !service.adminLocked;
+  }
+
   duplicateService(serviceId) {
     const originalService = this.services.get(serviceId);
     if (!originalService) return;
+    if (!this.canManageService(originalService)) {
+      this.showAlert('Este servicio fue agregado por un administrador y no puedes modificarlo.', 'warning');
+      return;
+    }
 
     const newServiceId = this.generateId('service');
     // Deep copy so the duplicate doesn't share nested arrays/objects with the original
@@ -20639,6 +20666,13 @@ class ItineraryBuilder {
     const service = this.services.get(serviceId);
 
     if (!service) return;
+
+    // Bloqueo por-servicio: no-admin no puede borrar un servicio agregado por admin
+    // (en Fase 2 aquí irá "Solicitar borrado" con aprobación del admin).
+    if (!this.canManageService(service)) {
+      this.showAlert('Este servicio fue agregado por un administrador. No puedes borrarlo; pronto podrás solicitar su borrado.', 'warning');
+      return;
+    }
 
     const message = '¿Estás seguro de que deseas eliminar este servicio?';
     document.getElementById('deleteConfirmMessage').textContent = message;
@@ -21466,6 +21500,11 @@ class ItineraryBuilder {
       btn.addEventListener('click', (e) => {
         const { dayId } = btn.dataset;
         const { serviceId } = btn.dataset;
+        // Bloqueo por-servicio: no-admin no puede abrir a editar un servicio de admin.
+        if (!this.canManageService(this.services.get(serviceId))) {
+          this.showAlert('Este servicio fue agregado por un administrador y no puedes editarlo.', 'warning');
+          return;
+        }
         this.openServiceModal(dayId, serviceId);
       });
     });

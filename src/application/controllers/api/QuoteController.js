@@ -2303,6 +2303,70 @@ class QuoteController {
         paymentType,
       };
 
+      // Bloqueo por-servicio (Fase 1): los subconceptos marcados adminLocked (agregados/editados
+      // por un admin) NO pueden ser editados, movidos ni eliminados por no-admins, y solo
+      // admin/superadmin pueden marcar un servicio como bloqueado. Los locks son "sticky" por id.
+      // Esto refuerza en el servidor lo que la UI ya impide (a prueba de bypass del request).
+      const isAdminUser = ['admin', 'superadmin'].includes(req.userRole);
+      const storedServiceItems = quote.get('serviceItems') || {};
+      const storedLockedById = new Map();
+      (Array.isArray(storedServiceItems.days) ? storedServiceItems.days : []).forEach((d) => {
+        (d.subconcepts || []).forEach((sc) => {
+          if (sc && sc.id && sc.adminLocked) {
+            storedLockedById.set(sc.id, { sub: sc, dayNumber: d.dayNumber });
+          }
+        });
+      });
+
+      if (storedLockedById.size > 0) {
+        const seenLockedIds = new Set();
+        const enforcedDays = serviceItems.days.map((d) => ({
+          ...d,
+          subconcepts: (d.subconcepts || []).map((sc) => {
+            if (!sc || !sc.id) return sc;
+            const locked = storedLockedById.get(sc.id);
+            if (locked) {
+              seenLockedIds.add(sc.id);
+              // Sticky: siempre queda bloqueado. Para no-admin se restaura el contenido guardado
+              // (no puede editar el servicio del admin); admin conserva sus cambios.
+              return isAdminUser ? { ...sc, adminLocked: true } : { ...locked.sub, adminLocked: true };
+            }
+            // Un no-admin no puede marcar como bloqueado un servicio nuevo.
+            if (!isAdminUser && sc.adminLocked) {
+              return { ...sc, adminLocked: false };
+            }
+            return sc;
+          }),
+        }));
+
+        // No-admin: re-insertar los servicios bloqueados que se hayan quitado del payload
+        // (intento de borrado no permitido).
+        if (!isAdminUser) {
+          storedLockedById.forEach((locked, id) => {
+            if (seenLockedIds.has(id)) return;
+            const restored = { ...locked.sub, adminLocked: true };
+            let idx = enforcedDays.findIndex((d) => d.dayNumber === locked.dayNumber);
+            if (idx < 0) idx = enforcedDays.length > 0 ? 0 : -1;
+            if (idx >= 0) {
+              enforcedDays[idx] = {
+                ...enforcedDays[idx],
+                subconcepts: [...(enforcedDays[idx].subconcepts || []), restored],
+              };
+            } else {
+              enforcedDays.push({ dayNumber: locked.dayNumber || 1, dayTitle: '', subconcepts: [restored] });
+            }
+          });
+          logger.info('updateServiceItems: enforced admin-locked services for non-admin', {
+            quoteId: quote.id,
+            userRole: req.userRole,
+            lockedCount: storedLockedById.size,
+            reinserted: storedLockedById.size - seenLockedIds.size,
+          });
+        }
+
+        serviceItems.days = enforcedDays;
+      }
+
       quote.set('serviceItems', serviceItems);
 
       // Save with user context
