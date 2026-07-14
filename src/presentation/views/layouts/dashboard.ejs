@@ -286,7 +286,8 @@
         <%- include('../organisms/dashboard/navigation/sidebar-nav', {
             userRole: typeof userRole !== 'undefined' ? userRole : 'guest',
             currentPath: typeof currentPath !== 'undefined' ? currentPath : '',
-            user: typeof user !== 'undefined' ? user : {}
+            user: typeof user !== 'undefined' ? user : {},
+            endClientCaps: typeof endClientCaps !== 'undefined' ? endClientCaps : null
         }) %>
 
         <!-- Main Content Area -->

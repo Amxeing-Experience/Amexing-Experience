@@ -6,12 +6,24 @@
  */
 
 const activeSection = typeof currentSection !== 'undefined' ? currentSection : 'information';
-const quoteTitle = isNewQuote ? 'Nueva Cotización' : `Cotización`;
+// Capacidad de crear/editar cotizaciones (wedding planner/concierge). Si no, el detalle es de
+// SOLO LECTURA (cliente directo): se ocultan Solicitar/Guardar y se deshabilita la edición.
+const ecCapsQD = (typeof endClientCaps !== 'undefined' && endClientCaps) ? endClientCaps : null;
+const ecCatQD = (typeof clientCategory !== 'undefined' && clientCategory)
+  ? clientCategory
+  : ((typeof user !== 'undefined' && user && user.clientCategory) ? user.clientCategory : null);
+const canCreateQuoteQD = ecCapsQD ? !!ecCapsQD.createQuotes : (ecCatQD === 'direct_client' || ecCatQD === 'wedding_planner' || ecCatQD === 'concierge');
+// Relabel a "Reservación" según el contexto con que se abrió (?context=reservation).
+const isReservationView = typeof isReservation !== 'undefined' && isReservation;
+const entityLabel = isReservationView ? 'Reservación' : 'Cotización';
+const quoteTitle = isNewQuote ? `Nueva ${entityLabel}` : entityLabel;
+// Preservar el contexto al navegar entre secciones del stepper.
+const ctxNext = isReservationView ? '&context=reservation' : '';
 
 const steps = [
-    { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/end_client/quotes/${quoteId}`, number: 1 },
-    { label: 'Servicios', icon: 'list', section: 'services', href: `/dashboard/end_client/quotes/${quoteId}?section=services`, number: 2 },
-    { label: 'Resumen', icon: 'calculator', section: 'summary', href: `/dashboard/end_client/quotes/${quoteId}?section=summary`, number: 3 }
+    { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/end_client/quotes/${quoteId}?section=information${ctxNext}`, number: 1 },
+    { label: 'Servicios', icon: 'list', section: 'services', href: `/dashboard/end_client/quotes/${quoteId}?section=services${ctxNext}`, number: 2 },
+    { label: 'Resumen', icon: 'calculator', section: 'summary', href: `/dashboard/end_client/quotes/${quoteId}?section=summary${ctxNext}`, number: 3 }
 ];
 %>
 
@@ -23,6 +35,8 @@ window.currentUser = {
     role: 'client',
     id: '<%= typeof userId !== "undefined" ? userId : "" %>'
 };
+// Contexto reservación: las secciones incluidas usan esta bandera para relabelar a "Reservación".
+window.__isReservation = <%= isReservationView ? 'true' : 'false' %>;
 </script>
 
 <!-- Page Header -->
@@ -41,7 +55,7 @@ window.currentUser = {
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item"><a href="/dashboard/end_client"><i class="ti ti-home me-1"></i>Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="/dashboard/end_client/quotes"><i class="ti ti-file-invoice me-1"></i>Cotizaciones</a></li>
+                    <li class="breadcrumb-item"><a href="/dashboard/end_client/<%= isReservationView ? 'bookings' : 'quotes' %>"><i class="ti <%= isReservationView ? 'ti-clipboard-list' : 'ti-file-invoice' %> me-1"></i><%= isReservationView ? 'Reservaciones' : 'Cotizaciones' %></a></li>
                     <li class="breadcrumb-item active" id="breadcrumbQuoteTitle"><%= quoteTitle %></li>
                 </ol>
             </nav>
@@ -88,7 +102,7 @@ window.currentUser = {
 
             <!-- CTA debajo del timeline -->
             <div class="status-action text-center" id="statusAction">
-                <button type="button" class="btn w-100 <%= (typeof quoteTotal !== 'undefined' && Number(quoteTotal) > 0) ? 'btn-primary' : 'btn-outline-warning' %>" id="requestServiceBtn" <%= (typeof quoteStatus !== 'undefined' && quoteStatus === 'quoted') ? '' : 'style="display:none;"' %> <%= (typeof quoteTotal !== 'undefined' && Number(quoteTotal) > 0) ? '' : 'disabled' %>>
+                <button type="button" class="btn w-100 <%= (typeof quoteTotal !== 'undefined' && Number(quoteTotal) > 0) ? 'btn-primary' : 'btn-outline-warning' %>" id="requestServiceBtn" <%= (canCreateQuoteQD && typeof quoteStatus !== 'undefined' && quoteStatus === 'quoted') ? '' : 'style="display:none;"' %> <%= (typeof quoteTotal !== 'undefined' && Number(quoteTotal) > 0) ? '' : 'disabled' %>>
                     <i class="ti <%= (typeof quoteTotal !== 'undefined' && Number(quoteTotal) > 0) ? 'ti-send' : 'ti-alert-triangle' %> me-1"></i><%= (typeof quoteTotal !== 'undefined' && Number(quoteTotal) > 0) ? 'Solicitar Servicios' : 'Completar Cotización' %>
                 </button>
                 <small class="text-muted d-block mt-1" id="actionHint" <%= (typeof quoteStatus !== 'undefined' && quoteStatus === 'quoted') ? '' : 'style="display:none;"' %>>Confirma para crear tu reservación</small>
@@ -195,7 +209,7 @@ window.currentUser = {
 
 <!-- Full-Width Content Area -->
 <div class="row">
-    <div class="col-12">
+    <div class="col-12" id="endClientSectionContent">
         <% if (activeSection === 'information') { %>
             <%- include('../admin/sections/quote-information', { quoteId: quoteId, userRole: 'client' }) %>
             <%- include('../admin/sections/quote-ownership', { quoteId: quoteId, userRole: 'client' }) %>
@@ -211,6 +225,74 @@ window.currentUser = {
         <% } %>
     </div>
 </div>
+
+<% if (!canCreateQuoteQD) { %>
+<!-- SOLO LECTURA: cliente que puede ver cotizaciones pero no crear/editar (p. ej. cliente directo).
+     El servidor ya bloquea guardar; esto deshabilita la edición y oculta acciones en el detalle. -->
+<style>
+  /* Botones de crear/editar/eliminar del builder — ocultos en solo lectura, sin depender del JS
+     (varios son de ícono sin texto y se renderizan async). El servidor igual bloquea guardar. */
+  #addNewDayBtn, #addDaySidebarBtn, #addDayInline, #addDayConfirmBtn, .add-service-btn,
+  #toggleCatalogBtn,
+  .edit-day-btn, .duplicate-day-btn, .delete-day-btn,
+  .service-actions, .edit-service-btn, .duplicate-service-btn, .delete-service-btn { display: none !important; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Navegación del stepper (con contexto preservado) para reemplazar el "guardar y continuar".
+  var roSteps = <%- JSON.stringify(steps.map(function (s) { return { section: s.section, href: s.href }; })) %>;
+  var roActive = '<%= activeSection %>';
+  var roIdx = roSteps.findIndex(function (s) { return s.section === roActive; });
+  var roNextHref = (roIdx >= 0 && roSteps[roIdx + 1]) ? roSteps[roIdx + 1].href : '';
+  var roPrevHref = (roIdx > 0) ? roSteps[roIdx - 1].href : '';
+  var roListHref = '/dashboard/end_client/quotes';
+
+  function enforceReadOnly() {
+    var reqBtn = document.getElementById('requestServiceBtn');
+    if (reqBtn) reqBtn.style.display = 'none';
+    var scope = document.getElementById('endClientSectionContent');
+    if (scope) {
+      scope.querySelectorAll('input, select, textarea').forEach(function (el) {
+        el.setAttribute('disabled', 'disabled');
+      });
+      scope.querySelectorAll('button, a.btn').forEach(function (btn) {
+        var t = (btn.textContent || '').toLowerCase();
+        if (/agregar|añadir|guardar|eliminar|borrar|solicitar|nuevo|nueva|editar|quitar/.test(t)) {
+          btn.style.display = 'none';
+        }
+      });
+    }
+    // Botones de navegación (Siguiente/Anterior/Cancelar): navegan sin intentar guardar. Se
+    // interceptan en fase de captura para evitar el handler original de "guardar y continuar".
+    document.querySelectorAll('button, a').forEach(function (btn) {
+      if (btn.__roNav) return;
+      var t = (btn.textContent || '').toLowerCase().trim();
+      var go = null;
+      if (t.indexOf('siguiente') !== -1 || t.indexOf('continuar') !== -1) go = roNextHref;
+      else if (t.indexOf('anterior') !== -1 || t.indexOf('atrás') !== -1 || t.indexOf('atras') !== -1) go = roPrevHref;
+      else if (t.indexOf('cancelar') !== -1) go = roListHref;
+      if (go === null) return;
+      btn.__roNav = true;
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (go) window.location.href = go;
+      }, true);
+    });
+  }
+  enforceReadOnly();
+  // Reaplicar tras la carga asíncrona de las secciones.
+  setTimeout(enforceReadOnly, 800);
+  setTimeout(enforceReadOnly, 2000);
+  // Y ante cualquier cambio del DOM (días/servicios se renderizan async), re-aplicar. Observa
+  // childList/subtree (no atributos), así que ocultar botones no dispara el observer en bucle.
+  var roScope = document.getElementById('endClientSectionContent');
+  if (roScope && window.MutationObserver) {
+    new MutationObserver(function () { enforceReadOnly(); }).observe(roScope, { childList: true, subtree: true });
+  }
+});
+</script>
+<% } %>
 
 <!-- Confirm Request Services Modal -->
 <% if (!isNewQuote) { %>
@@ -1028,7 +1110,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (result.success && result.data) {
                 const folio = result.data.folio || quoteId;
-                const quoteTitleWithFolio = `Cotización ${folio}`;
+                const entityWord = window.__isReservation ? 'Reservación' : 'Cotización';
+                const quoteTitleWithFolio = `${entityWord} ${folio}`;
 
                 const quoteFolioSpan = document.getElementById('quoteFolioSpan');
                 if (quoteFolioSpan) {
