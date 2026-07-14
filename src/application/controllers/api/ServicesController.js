@@ -3602,6 +3602,7 @@ class ServicesController {
        * Busca POIs por nombre exacto (case-insensitive), solo los que existen.
        * @param {string} name - Nombre del POI a resolver.
        * @returns {Promise<Parse.Object[]>} POIs que coinciden con ese nombre.
+       * @example
        */
       const resolvePOIs = async (name) => {
         const q = new Parse.Query('POI');
@@ -3623,6 +3624,7 @@ class ServicesController {
        * @param {Parse.Object[]} originSet - POIs de origen.
        * @param {Parse.Object[]} destSet - POIs de destino.
        * @returns {Parse.Query} Query de Services para esa dirección.
+       * @example
        */
       const buildDirQuery = (originSet, destSet) => {
         const q = new Parse.Query('Services');
@@ -3886,6 +3888,7 @@ class ServicesController {
        * Obtiene la primera routeDuration válida (>0) de un set de rate prices.
        * @param {Parse.Object[]} rps - Rate prices con su `service` incluido.
        * @returns {number|null} La duración de ruta encontrada, o null.
+       * @example
        */
       const durationFrom = (rps) => rps
         .map((rp) => rp.get('service')?.get('routeDuration'))

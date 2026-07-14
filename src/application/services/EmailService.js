@@ -1039,6 +1039,89 @@ This is an automated message from Amexing Experience. Please do not reply to thi
   }
 
   /**
+   * Send a reservation cancellation notice to the quote owner.
+   * En modo development el destinatario se fuerza a un correo de pruebas para no
+   * notificar a owners reales mientras se prueba.
+   * @param {object} data - Cancellation email data.
+   * @param {string} data.recipientEmail - Owner email (destinatario real en prod).
+   * @param {string} data.recipientName - Owner display name.
+   * @param {string} data.reservationFolio - Reservation folio.
+   * @param {string} data.quoteFolio - Quote folio.
+   * @param {string} data.cancelledAt - Formatted cancellation date/time.
+   * @param {string} [data.reason] - Cancellation reason.
+   * @param {string} [data.cancellationType] - 'automatic' | 'admin' | 'approved'.
+   * @param {object} [data.recipientUser] - Parse AmexingUser pointer (optional).
+   * @param {object} [data.metadata] - Extra metadata for logging.
+   * @returns {Promise<object>} Send result.
+   * @example
+   *   await emailService.sendReservationCancellation({ recipientEmail, recipientName, reservationFolio, quoteFolio, cancelledAt });
+   */
+  async sendReservationCancellation(data) {
+    try {
+      const {
+        recipientEmail, recipientName, reservationFolio, quoteFolio,
+        cancelledAt, reason, cancellationType, recipientUser, metadata,
+      } = data || {};
+
+      // Override de dev: en development se manda a un correo de pruebas para no
+      // notificar owners reales. En prod va al owner real.
+      const DEV_TEST_RECIPIENT = 'denisse@meeplab.com';
+      const isDev = process.env.NODE_ENV === 'development';
+      const to = isDev ? DEV_TEST_RECIPIENT : recipientEmail;
+
+      if (!to) {
+        logger.warn('sendReservationCancellation: sin destinatario (owner sin email)', {
+          reservationFolio, quoteFolio,
+        });
+        return { success: false, skipped: true, error: 'No recipient email' };
+      }
+
+      const templateVariables = {
+        ...TemplateService.getCommonVariables(),
+        ASUNTO: 'Reservación cancelada',
+        TITULO_PRINCIPAL: 'Reservación cancelada',
+        NOMBRE_CLIENTE: recipientName || 'cliente',
+        CONTENIDO_MENSAJE: `
+          <p>Le informamos que la siguiente reservación ha sido <strong>cancelada</strong>. A continuación encontrará los detalles:</p>
+        `,
+        FOLIO_RESERVACION: reservationFolio || '—',
+        FOLIO_COTIZACION: quoteFolio || '—',
+        FECHA_CANCELACION: cancelledAt || '—',
+        MOTIVO: reason && String(reason).trim() ? reason : 'No especificado',
+        MENSAJE_ADICIONAL: 'Si tiene alguna duda sobre esta cancelación, no dude en contactarnos.',
+      };
+
+      const { html, text } = TemplateService.render('reservation_cancellation', templateVariables, { includeText: true });
+
+      return await this.sendEmail({
+        to,
+        toName: recipientName,
+        subject: `Reservación cancelada ${reservationFolio || ''} - Amexing Experience`.trim(),
+        html,
+        text,
+        tags: ['reservation', 'cancellation', 'transactional'],
+        notificationType: 'reservation_cancellation',
+        recipientUser,
+        metadata: {
+          ...metadata,
+          reservationFolio,
+          quoteFolio,
+          cancellationType: cancellationType || 'automatic',
+          devOverride: isDev ? DEV_TEST_RECIPIENT : undefined,
+          intendedRecipient: isDev ? this.maskEmail(recipientEmail || '') : undefined,
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to send reservation cancellation email', {
+        error: error.message,
+        reservationFolio: data?.reservationFolio,
+        quoteFolio: data?.quoteFolio,
+      });
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Send quote confirmation email with PDF attachment.
    * @param {object} quoteEmailData - Quote confirmation data.
    * @param {string} quoteEmailData.recipientEmail - Recipient email address.

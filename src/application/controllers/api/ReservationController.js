@@ -13,6 +13,7 @@ const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 const FileStorageService = require('../../services/FileStorageService');
 const PaymentService = require('../../services/PaymentService');
+const { notifyReservationCancellation } = require('../../services/ReservationCancellationNotifier');
 // Models used via Parse.Query string references
 
 // Module-level FileStorageService for presigned S3 URLs (static class needs this)
@@ -101,12 +102,12 @@ class ReservationController {
       };
     }
 
-    // Clients are scoped by quote ownership, which lives on the quote (quotePtr), not on the
-    // reservation. That scoping is applied via the quote subquery inside applyQuoteConstraint
-    // (see getClientEligibleQuoteIds) so it composes with the hold/type filter through a
-    // SINGLE matchesQuery on quotePtr (two separate constraints on quotePtr overwrite each
-    // other). Therefore no clientPtr filter is returned here.
-    if (userRole === 'client') {
+    // Clients (y clientes directos end_client) are scoped by quote ownership, which lives on the
+    // quote (quotePtr), not on the reservation. That scoping is applied via the quote subquery
+    // inside applyQuoteConstraint (see getClientEligibleQuoteIds) so it composes with the hold/type
+    // filter through a SINGLE matchesQuery on quotePtr (two separate constraints on quotePtr
+    // overwrite each other). Therefore no clientPtr filter is returned here.
+    if (userRole === 'client' || userRole === 'end_client') {
       return null;
     }
 
@@ -129,7 +130,8 @@ class ReservationController {
   static async getClientEligibleQuoteIds(req) {
     const { userRole } = req;
     const currentUser = req.user;
-    if (userRole !== 'client') {
+    // client y end_client (cliente directo) se acotan por propiedad de la cotización.
+    if (userRole !== 'client' && userRole !== 'end_client') {
       return null;
     }
 
@@ -1232,6 +1234,35 @@ class ReservationController {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
 
+      // Gate: si la reservación incluye experiencias con proveedor/establecimiento, NO se permite
+      // la cancelación DIRECTA (muchos terceros no reembolsan) — debe pasar por una solicitud de
+      // cancelación para aprobación. El flujo de aprobación usa su propio cascade
+      // (CancellationRequestsController.cascadeCancelReservation), no este endpoint, así que
+      // aprobar una solicitud no se ve afectado por este gate.
+      const provExpQuery = new Parse.Query('ReservationService');
+      provExpQuery.equalTo('reservationPtr', reservation);
+      provExpQuery.equalTo('type', 'experience');
+      provExpQuery.equalTo('active', true);
+      provExpQuery.equalTo('exists', true);
+      provExpQuery.limit(1000);
+      const expServices = await provExpQuery.find({ useMasterKey: true });
+      const hasProviderExperience = expServices.some((svc) => {
+        const sub = svc.get('subconcept') || {};
+        return !!(sub.providerType || sub.providerName);
+      });
+      if (hasProviderExperience) {
+        logger.info('Cancelación directa bloqueada: reservación con experiencias de proveedor/establecimiento', {
+          reservationId: id,
+          experienceServices: expServices.length,
+          performedBy: req.user?.id,
+        });
+        return res.status(409).json({
+          success: false,
+          code: 'REQUIRES_PROVIDER_APPROVAL',
+          error: 'La reservación incluye experiencias con proveedores o establecimientos. La cancelación requiere aprobación: crea una solicitud de cancelación.',
+        });
+      }
+
       // Cancel reservation
       reservation.set('status', 'cancelled');
       await reservation.save(null, { useMasterKey: true });
@@ -1253,14 +1284,15 @@ class ReservationController {
 
       // Revert linked quote status back to 'requested'
       const quotePtr = reservation.get('quotePtr');
+      let linkedQuote = null;
       if (quotePtr) {
         const quoteQuery = new Parse.Query('Quote');
         quoteQuery.equalTo('exists', true);
-        const quote = await quoteQuery.get(quotePtr.id, { useMasterKey: true });
-        if (quote && quote.get('status') === 'scheduled') {
-          quote.set('status', 'requested');
-          await quote.save(null, { useMasterKey: true });
-          logger.info('Quote status reverted to requested', { quoteId: quote.id });
+        linkedQuote = await quoteQuery.get(quotePtr.id, { useMasterKey: true });
+        if (linkedQuote && linkedQuote.get('status') === 'scheduled') {
+          linkedQuote.set('status', 'requested');
+          await linkedQuote.save(null, { useMasterKey: true });
+          logger.info('Quote status reverted to requested', { quoteId: linkedQuote.id });
         }
       }
 
@@ -1270,10 +1302,126 @@ class ReservationController {
         performedBy: req.user?.id,
       });
 
+      // Correo de cancelación al owner de la cotización. Cancelación directa: automática
+      // (agencia/agente ≥24h sin proveedor) o admin. No bloquea si el correo falla.
+      if (linkedQuote) {
+        const cancellationType = ['admin', 'superadmin'].includes(req.userRole) ? 'admin' : 'automatic';
+        await notifyReservationCancellation({
+          quote: linkedQuote,
+          reservation,
+          reason: req.body?.reason,
+          cancellationType,
+        });
+      }
+
       return res.json({ success: true, message: 'Reservación cancelada exitosamente' });
     } catch (error) {
       logger.error('Error cancelling reservation', { error: error.message });
       return res.status(500).json({ success: false, error: 'Error al cancelar reservación' });
+    }
+  }
+
+  /**
+   * POST /api/reservations/:id/revert-to-quote — Regresa una reservación a cotización
+   * (deshace una conversión hecha por error). SOLO admin/superadmin (gate en la ruta).
+   *
+   * Hace soft-delete (active=false, exists=false) de la reservación y de sus
+   * ReservationService, y regresa el status de la cotización a 'quoted' (o 'requested').
+   * Aborta si hay pagos registrados. NO es una cancelación: no manda correo ni deja la
+   * reservación en 'cancelled', simplemente la retira para que la cotización vuelva a serlo.
+   * @param {object} req - Express request; body: { targetStatus? } ('quoted' | 'requested').
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON con el resultado.
+   * @example
+   *   POST /api/reservations/abc123/revert-to-quote { "targetStatus": "quoted" }
+   */
+  static async revertToQuote(req, res) {
+    try {
+      const { id } = req.params;
+      const targetStatus = ['quoted', 'requested'].includes(req.body?.targetStatus)
+        ? req.body.targetStatus
+        : 'quoted';
+
+      const query = new Parse.Query('Reservation');
+      query.equalTo('exists', true);
+      const reservation = await ReservationController.safeGet(query, id);
+      if (!reservation) {
+        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      }
+
+      // Cotización ligada
+      const quotePtr = reservation.get('quotePtr');
+      let quote = null;
+      if (quotePtr) {
+        const quoteQuery = new Parse.Query('Quote');
+        quoteQuery.equalTo('exists', true);
+        quote = await quoteQuery.get(quotePtr.id, { useMasterKey: true });
+      }
+      if (!quote) {
+        return res.status(400).json({ success: false, error: 'La reservación no tiene una cotización ligada' });
+      }
+
+      // Seguridad: si hay pagos registrados, no revertir desde la UI (evita perder registros de pago).
+      const payQuery = new Parse.Query('Payment');
+      payQuery.equalTo('reservationPtr', reservation);
+      payQuery.equalTo('exists', true);
+      const paymentsCount = await payQuery.count({ useMasterKey: true });
+      if (paymentsCount > 0) {
+        return res.status(409).json({
+          success: false,
+          code: 'REVERT_HAS_PAYMENTS',
+          error: `La reservación tiene ${paymentsCount} pago(s) registrados. Elimina o reasigna los pagos antes de regresarla a cotización.`,
+        });
+      }
+
+      // Soft-delete de los ReservationService
+      const svcQuery = new Parse.Query('ReservationService');
+      svcQuery.equalTo('reservationPtr', reservation);
+      svcQuery.equalTo('exists', true);
+      svcQuery.limit(1000);
+      const services = await svcQuery.find({ useMasterKey: true });
+      for (const svc of services) {
+        svc.set('active', false);
+        svc.set('exists', false);
+      }
+      if (services.length > 0) {
+        await Parse.Object.saveAll(services, { useMasterKey: true });
+      }
+
+      // Soft-delete de la reservación
+      reservation.set('active', false);
+      reservation.set('exists', false);
+      await reservation.save(null, { useMasterKey: true });
+
+      // Regresar el status de la cotización (queda como cotización de nuevo)
+      const previousStatus = quote.get('status');
+      quote.set('status', targetStatus);
+      await quote.save(null, { useMasterKey: true });
+
+      logger.info('Reservación revertida a cotización', {
+        reservationId: id,
+        reservationFolio: reservation.get('folio'),
+        quoteId: quote.id,
+        quoteFolio: quote.get('folio'),
+        previousQuoteStatus: previousStatus,
+        targetStatus,
+        servicesReverted: services.length,
+        performedBy: req.user?.id,
+      });
+
+      return res.json({
+        success: true,
+        message: 'Reservación regresada a cotización',
+        data: {
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          quoteStatus: targetStatus,
+          servicesReverted: services.length,
+        },
+      });
+    } catch (error) {
+      logger.error('Error reverting reservation to quote', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Error al regresar la reservación a cotización' });
     }
   }
 

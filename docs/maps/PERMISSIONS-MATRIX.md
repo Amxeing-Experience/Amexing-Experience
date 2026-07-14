@@ -172,6 +172,20 @@ delegatable: true
 maxDelegationLevel: 4
 ```
 
+### End Client / Cliente Directo (`end_client`)
+Cliente final (no agencia). **Mismo acceso** (rol/rutas/vistas `dashboards/end_client/`), variando por su **tipo** (`clientCategory`) según el mapa de capacidades en `src/application/config/endClientCapabilities.js`.
+
+| `clientCategory` | Cotizaciones | Crear/editar | Reservaciones | Tarifario (catálogo) | `catalogScope` |
+|------------------|:--:|:--:|:--:|:--:|:--:|
+| `direct_client` (Cliente directo) | ✓ | ✓ | ✓ | ✗ | `null` |
+| `wedding_planner` | ✓ | ✓ | ✓ | ✓ | `popular` \* |
+| `concierge` | ✓ | ✓ | ✓ | ✓ | `full` |
+| `home_owner` | ✗ | ✗ | ✓ | ✓ | `popular` \* |
+
+- Capacidades por tipo: `viewQuotes`, `createQuotes`, `viewTarifario`, `dashboardQuotes`, `catalogScope`.
+- `catalogScope` (alcance de **Traslados**/destinos y **Experiencias**): `full` = todo · `popular` = solo populares · `null` = no aplica (no ve tarifario). **\*** El filtro de "populares" **aún no existe** (pendiente de construir); el flag ya está wireado.
+- `clientCategory` viaja en el **JWT** y se expone a las vistas en `renderDashboard`. Gates en cliente (menú/botones) y **servidor** (`QuoteService.assertEndClientCanWrite`, `QuoteController.createQuote`, rutas con `requireEndClientCap`).
+
 ### Department Manager (Level 4)
 ```javascript
 conditions: { 

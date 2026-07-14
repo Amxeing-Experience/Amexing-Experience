@@ -220,6 +220,23 @@ class QuoteController {
         return this.sendError(res, 'Usuario no autenticado', 401);
       }
 
+      // 1b. Cliente directo/home owner (end_client de solo lectura) no pueden crear cotizaciones.
+      if (req.userRole === 'end_client') {
+        // eslint-disable-next-line global-require
+        const { getEndClientCapabilities } = require('../../config/endClientCapabilities');
+        let clientCategory = currentUser.clientCategory
+          || (typeof currentUser.get === 'function' ? currentUser.get('clientCategory') : null) || null;
+        if (!clientCategory && (currentUser.id || currentUser.objectId)) {
+          try {
+            const u = await new Parse.Query('AmexingUser').get(currentUser.id || currentUser.objectId, { useMasterKey: true });
+            clientCategory = u.get('clientCategory') || null;
+          } catch (e) { /* cae al default (solo lectura) */ }
+        }
+        if (!getEndClientCapabilities(clientCategory).createQuotes) {
+          return this.sendError(res, 'Este tipo de cliente no puede crear cotizaciones', 403);
+        }
+      }
+
       // 2. Extract fields from request body
       const {
         client, clientId, clientType, clientFinalId, clientFinalName, contactPerson, contactEmail, contactPhone,
@@ -628,8 +645,6 @@ class QuoteController {
 
       // Parse DataTables parameters
       const draw = parseInt(req.query.draw, 10) || 1;
-      const start = parseInt(req.query.start, 10) || 0;
-      const length = Math.min(parseInt(req.query.length, 10) || 25, 100);
       const searchValue = req.query.search?.value || '';
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'desc';
@@ -750,9 +765,14 @@ class QuoteController {
         filteredQuery.descending(sortField);
       }
 
-      // Apply pagination
-      filteredQuery.skip(start);
-      filteredQuery.limit(length);
+      // La tabla del front es client-side (serverSide:false): el navegador hace paginación,
+      // búsqueda y orden. Por eso el servidor debe devolver TODAS las cotizaciones que pasan el
+      // filtro de estado + el filtro de fecha (este último se aplica en JS más abajo porque la
+      // fecha vive dentro de serviceItems.days[].date y Parse no la puede consultar). Antes se
+      // aplicaba skip/limit ANTES del filtro de fecha, así que las cotizaciones cuya fecha caía
+      // fuera del lote paginado (p. ej. folios bajos con el orden por folio desc) desaparecían
+      // de "Actuales/Anteriores" y ni el buscador client-side las encontraba.
+      filteredQuery.limit(10000);
 
       // Execute query
       const quotes = await filteredQuery.find({ useMasterKey: true });
@@ -3491,7 +3511,8 @@ class QuoteController {
       // transfer via the denormalized `owner` pointer) PLUS quotes explicitly shared with
       // them via collaboration (QuoteAccess editor/viewer). No org-wide visibility.
       const userClientId = currentUser.clientId || currentUser.get('clientId');
-      if (userRole === 'client' || userClientId) {
+      // client y end_client (cliente directo) ven SOLO sus cotizaciones (propias/compartidas).
+      if (userRole === 'client' || userRole === 'end_client' || userClientId) {
         const currentUserPointer = {
           __type: 'Pointer',
           className: 'AmexingUser',
@@ -3595,7 +3616,13 @@ class QuoteController {
 
       // Get payment info parameters from request body (for admin role)
       // billingProfileId: perfil fiscal de la agencia a imprimir en el recibo (los 3 roles).
-      const { includePaymentInfo, paymentInfoId, billingProfileId } = req.body;
+      // force: solo admin/superadmin puede saltarse el bloqueo de "reservación no saldada".
+      const {
+        includePaymentInfo,
+        paymentInfoId,
+        billingProfileId,
+        force,
+      } = req.body;
 
       const result = await this.quoteService.generateReceipt(
         currentUser,
@@ -3603,7 +3630,8 @@ class QuoteController {
         req.userRole, // Pass userRole from JWT middleware
         includePaymentInfo, // Pass the flag from request
         paymentInfoId, // Pass the specific payment info ID
-        billingProfileId // Perfil de facturación elegido (o undefined)
+        billingProfileId, // Perfil de facturación elegido (o undefined)
+        force === true // Override admin del bloqueo de reservación no saldada
       );
 
       // If PDF buffer is returned, send it as a downloadable file
@@ -3619,6 +3647,17 @@ class QuoteController {
 
       return res.json(result);
     } catch (error) {
+      // Reservación no saldada: 409 estructurado para que el front muestre el saldo pendiente
+      // y (solo a admin/superadmin) ofrezca "Generar de todos modos".
+      if (error && error.code === 'RESERVATION_NOT_SETTLED') {
+        return res.status(409).json({
+          success: false,
+          code: 'RESERVATION_NOT_SETTLED',
+          error: error.message,
+          data: error.payment || null,
+        });
+      }
+
       logger.error('Error in QuoteController.generateReceipt', {
         error: error.message,
         stack: error.stack,

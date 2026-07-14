@@ -133,7 +133,28 @@ function formatRoleName(role) {
   return safeRole.charAt(0).toUpperCase() + safeRole.slice(1);
 }
 
-const formattedRole = formatRoleName(headerNavUserRole);
+// Cliente directo (end_client): NO mostramos etiqueta de rol al cliente final. Solo en dev
+// mostramos su categoría (tipo de cliente) como referencia interna del equipo.
+const isDevEnv = process.env.NODE_ENV === 'development';
+const clientCategoryLabels = {
+  direct_client: 'Cliente Directo',
+  wedding_planner: 'Wedding Planner',
+  concierge: 'Concierge',
+  home_owner: 'Home Owner',
+};
+const rawClientCategory = (typeof clientCategory !== 'undefined' && clientCategory) ? clientCategory : null;
+let formattedRole = formatRoleName(headerNavUserRole);
+let showHeaderRoleBadge = true;
+if (headerNavUserRole === 'end_client') {
+  if (isDevEnv) {
+    formattedRole = Object.prototype.hasOwnProperty.call(clientCategoryLabels, rawClientCategory)
+      // eslint-disable-next-line security/detect-object-injection
+      ? clientCategoryLabels[rawClientCategory]
+      : 'Cliente';
+  } else {
+    showHeaderRoleBadge = false; // en producción, sin etiqueta para el cliente directo
+  }
+}
 %>
 
 <!-- Header Navigation Start -->
@@ -148,13 +169,15 @@ const formattedRole = formatRoleName(headerNavUserRole);
                     <img src="/dashboard/images/logos/amexing-logo.svg" width="120" alt="Amexing Logo" class="img-fluid" />
                 </a>
 
-                <!-- Role Badge -->
+                <!-- Role Badge (oculto para cliente directo en producción) -->
+                <% if (showHeaderRoleBadge) { %>
                 <div class="role-badge-header px-3 py-1 rounded-pill"
                      style="background: linear-gradient(135deg, <%= headerColors.primary %>, <%= headerColors.secondary %>);">
                     <small class="text-white fw-bold">
                         <%= formattedRole %>
                     </small>
                 </div>
+                <% } %>
             </div>
 
             <!-- Center Section: Main Navigation (Desktop) -->

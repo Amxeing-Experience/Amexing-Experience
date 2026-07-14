@@ -332,6 +332,9 @@ const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
         admin: 6,
         client: 5,
         department_manager: 4,
+        // Cliente directo: nivel 4 = mínimo para su scope (ver reservaciones/cotizaciones y
+        // cotizar). Los datos van acotados a lo suyo por el scoping de los controllers.
+        end_client: 4,
         manager: 4,
         sales: 3,
         agent: 2,

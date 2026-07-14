@@ -42,7 +42,30 @@ function formatRoleName(role) {
   return safeRole.charAt(0).toUpperCase() + safeRole.slice(1);
 }
 
-const formattedRole = formatRoleName(menuUserRole);
+// Cliente directo (end_client): NO mostramos etiqueta de rol al cliente final. Solo en dev
+// mostramos su categoría (tipo de cliente) como referencia interna del equipo.
+const menuIsDevEnv = process.env.NODE_ENV === 'development';
+const menuClientCategoryLabels = {
+  direct_client: 'Cliente Directo',
+  wedding_planner: 'Wedding Planner',
+  concierge: 'Concierge',
+  home_owner: 'Home Owner',
+};
+const menuRawClientCategory = (typeof clientCategory !== 'undefined' && clientCategory)
+  ? clientCategory
+  : (menuUser && menuUser.clientCategory ? menuUser.clientCategory : null);
+let formattedRole = formatRoleName(menuUserRole);
+let showMenuRole = true;
+if (menuUserRole === 'end_client') {
+  if (menuIsDevEnv) {
+    formattedRole = Object.prototype.hasOwnProperty.call(menuClientCategoryLabels, menuRawClientCategory)
+      // eslint-disable-next-line security/detect-object-injection
+      ? menuClientCategoryLabels[menuRawClientCategory]
+      : 'Cliente';
+  } else {
+    showMenuRole = false; // en producción, sin etiqueta para el cliente directo
+  }
+}
 %>
 
 <!-- User Menu Dropdown -->
@@ -58,9 +81,11 @@ const formattedRole = formatRoleName(menuUserRole);
       <div class="fw-semibold text-dark" style="font-size: 0.875rem;">
         <%= menuUserName %>
       </div>
+      <% if (showMenuRole) { %>
       <div class="text-muted" style="font-size: 0.75rem;">
         <%= formattedRole %>
       </div>
+      <% } %>
     </div>
 
     <!-- User Avatar (Second Position - Clickable) -->

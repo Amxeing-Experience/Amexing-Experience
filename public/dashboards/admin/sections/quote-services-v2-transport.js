@@ -320,7 +320,7 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                             <div class="d-flex align-items-center mb-2 flex-wrap gap-1">
                                 <span class="badge bg-light text-dark me-2">Transporte</span>
                                 <span class="badge bg-primary-subtle text-primary">${transportLabel}</span>
-                                ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${service.transportType === 'local' ? (service.directionType === 'arrival' ? 'Llevar' : 'Recoger') : (service.directionType === 'arrival' ? 'Llegada' : 'Salida')}</span>` : ''}
+                                ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${(service.transportType === 'local' && service.waitingTimeHours > 0) ? (service.directionType === 'arrival' ? 'Ida' : 'Regreso') : (service.transportType === 'local' ? (service.directionType === 'arrival' ? 'Llevar' : 'Recoger') : (service.directionType === 'arrival' ? 'Llegada' : 'Salida'))}</span>` : ''}
                                 ${service.tripType === 'round-trip' ? '<span class="badge bg-info-subtle text-info"><i class="ti ti-arrows-left-right me-1"></i>Ida y Vuelta</span>' : ''}
                                 ${service.returnOrigin || service.returnDestination ? '<span class="badge bg-secondary-subtle text-secondary"><i class="ti ti-link me-1"></i>Conexión</span>' : ''}
                             </div>

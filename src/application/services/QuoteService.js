@@ -25,6 +25,7 @@ const PDFReceiptService = require('./PDFReceiptService');
 const Invoice = require('../../domain/models/Invoice');
 const Reservation = require('../../domain/models/Reservation');
 const ReservationService = require('../../domain/models/ReservationService');
+const { getEndClientCapabilities } = require('../config/endClientCapabilities');
 
 /**
  * QuoteService class implementing Quote business logic.
@@ -32,9 +33,35 @@ const ReservationService = require('../../domain/models/ReservationService');
 class QuoteService {
   constructor() {
     this.className = 'Quote';
-    this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client'];
+    this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client', 'end_client'];
     this.validStatuses = ['quoted', 'requested', 'hold', 'scheduled', 'rejected'];
     this.pdfService = new PDFReceiptService();
+  }
+
+  /**
+   * Para el rol end_client (cliente directo), valida que su tipo (clientCategory) permita
+   * crear/editar cotizaciones. Cliente directo y home owner son de solo lectura → lanza error.
+   * Otros roles no se ven afectados.
+   * @param {object} currentUser - Usuario autenticado (POJO del JWT o Parse.Object).
+   * @param {string} role - Rol resuelto del usuario.
+   * @returns {Promise<void>} Resuelve si puede escribir; lanza Error si su tipo es de solo lectura.
+   * @example
+   * await this.assertEndClientCanWrite(currentUser, 'end_client');
+   */
+  async assertEndClientCanWrite(currentUser, role) {
+    if (role !== 'end_client') return;
+    let clientCategory = (currentUser && (currentUser.clientCategory
+      || (typeof currentUser.get === 'function' ? currentUser.get('clientCategory') : null))) || null;
+    // Fallback: si el token/objeto no trae la categoría, la resolvemos por id (escrituras son raras).
+    if (!clientCategory && currentUser && (currentUser.id || currentUser.objectId)) {
+      try {
+        const u = await new Parse.Query('AmexingUser').get(currentUser.id || currentUser.objectId, { useMasterKey: true });
+        clientCategory = u.get('clientCategory') || null;
+      } catch (e) { /* si falla, cae al default (solo lectura) */ }
+    }
+    if (!getEndClientCapabilities(clientCategory).createQuotes) {
+      throw new Error('Unauthorized: este tipo de cliente no puede crear ni editar cotizaciones');
+    }
   }
 
   /**
@@ -80,6 +107,8 @@ class QuoteService {
         if (!this.allowedRoles.includes(role)) {
           throw new Error(`Unauthorized: Role '${role}' cannot update Quote status`);
         }
+        // Cliente directo/home owner (end_client de solo lectura) no pueden solicitar servicios.
+        await this.assertEndClientCanWrite(currentUser, role);
       } else if (newStatus === 'quoted') {
         // Only admin can revert to quoted status (allow in development for testing)
         if (!['admin', 'superadmin'].includes(role) && process.env.NODE_ENV !== 'development') {
@@ -257,6 +286,8 @@ class QuoteService {
       if (!this.allowedRoles.includes(role)) {
         throw new Error(`Unauthorized: Role '${role}' cannot update Quotes`);
       }
+      // Cliente directo/home owner (end_client de solo lectura) no pueden editar cotizaciones.
+      await this.assertEndClientCanWrite(currentUser, role);
 
       // Validate Quote ID
       if (!quoteId) {
@@ -904,6 +935,7 @@ class QuoteService {
    * @param {string} userRole - User role (optional).
    * @param includePaymentInfoOverride
    * @param paymentInfoId
+   * @param billingProfileId
    * @returns {Promise<object>} Result with success status and receipt data.
    * @throws {Error} If validation fails or quote is not in scheduled status.
    * @example
@@ -915,7 +947,8 @@ class QuoteService {
     userRole = null,
     includePaymentInfoOverride = null,
     paymentInfoId = null,
-    billingProfileId = null
+    billingProfileId = null,
+    force = false
   ) {
     try {
       // Validate user authentication
@@ -992,6 +1025,51 @@ class QuoteService {
           });
           throw new Error(`Cannot generate receipt: ${createError.message}`);
         }
+      }
+
+      // Gate: el recibo solo se genera si la reservación está SALDADA (paymentStatus === 'paid',
+      // es decir pagado >= total). Admin/superadmin pueden forzar (force=true); agencia/agente no.
+      // Se usa el summary fresco de PaymentService (no depende del rollup persistido en la reservación).
+      const PaymentService = require('./PaymentService');
+      let paymentSummary = null;
+      try {
+        paymentSummary = await PaymentService.summarize(reservation.id);
+      } catch (payErr) {
+        logger.warn('generateReceipt: no se pudo calcular el summary de pagos', {
+          error: payErr.message,
+          reservationId: reservation.id,
+          quoteId: quote.id,
+        });
+      }
+      const paymentStatus = paymentSummary ? paymentSummary.paymentStatus : (reservation.get('paymentStatus') || 'pending');
+      const isSettled = paymentStatus === 'paid';
+      const canOverride = ['admin', 'superadmin'].includes(role) && force === true;
+      if (!isSettled && !canOverride) {
+        logger.info('generateReceipt bloqueado: reservación no saldada', {
+          reservationId: reservation.id,
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          paymentStatus,
+          role,
+        });
+        const blockErr = new Error('La reservación no está saldada: registra el pago total antes de generar el recibo.');
+        blockErr.code = 'RESERVATION_NOT_SETTLED';
+        blockErr.payment = {
+          paymentStatus,
+          paidAmount: paymentSummary ? paymentSummary.paidAmount : (reservation.get('paidAmount') || 0),
+          balance: paymentSummary ? paymentSummary.balance : (reservation.get('balance') || null),
+          total: paymentSummary ? paymentSummary.total : null,
+        };
+        throw blockErr;
+      }
+      if (!isSettled && canOverride) {
+        logger.info('generateReceipt: override de admin sobre reservación no saldada', {
+          reservationId: reservation.id,
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          paymentStatus,
+          role,
+        });
       }
 
       // Get service items if they exist

@@ -21,6 +21,7 @@ const CancellationRequest = require('../../../domain/models/CancellationRequest'
 const Quote = require('../../../domain/models/Quote');
 const logger = require('../../../infrastructure/logger');
 const { logReadAccess, logBulkReadAccess } = require('../../utils/auditHelper');
+const { notifyReservationCancellation } = require('../../services/ReservationCancellationNotifier');
 
 /**
  * CancellationRequestsController class implementing RESTful API for cancellation request management.
@@ -878,6 +879,15 @@ class CancellationRequestsController {
         quoteId: quote.id,
         reservationId: reservation.id,
         servicesCancelled: services.length,
+      });
+
+      // Correo de cancelación al owner de la cotización (flujo de aprobación de solicitud o
+      // cancelación directa de cotización a 24+h). No bloquea si el correo falla.
+      await notifyReservationCancellation({
+        quote,
+        reservation,
+        reason: quote.get('cancellationReason') || null,
+        cancellationType: quote.get('cancellationType') || 'approved',
       });
     } catch (error) {
       logger.error('Error cascading reservation cancellation', {

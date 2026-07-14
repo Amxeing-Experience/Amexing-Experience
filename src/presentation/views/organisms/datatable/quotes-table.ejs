@@ -17,9 +17,24 @@ const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/q
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
-const canEdit = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
-const canDelete = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
-const canCreate = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
+// Cliente directo (end_client): crear/editar depende del tipo de cliente (capacidad createQuotes).
+// Si puede ver pero no crear (p. ej. cliente directo), la fila muestra "Ver" (lectura), no "Editar".
+const ecCaps = (typeof endClientCaps !== 'undefined' && endClientCaps) ? endClientCaps : null;
+const isEndClient = dtUserRole === 'end_client';
+// Preferimos endClientCaps; si no llega, derivamos de la categoría (fallback sin reinicio).
+const ecCatQT = (typeof clientCategory !== 'undefined' && clientCategory) ? clientCategory : null;
+const ecCanCreate = isEndClient
+  ? (ecCaps ? !!ecCaps.createQuotes
+    : (ecCatQT === 'direct_client' || ecCatQT === 'wedding_planner' || ecCatQT === 'concierge'))
+  : false;
+const baseEditors = ['superadmin', 'admin', 'department_manager', 'client'];
+const canEdit = isEndClient ? ecCanCreate : baseEditors.includes(dtUserRole);
+const canCreate = isEndClient ? ecCanCreate : baseEditors.includes(dtUserRole);
+// Ver (solo lectura): end_client que ve cotizaciones pero no puede crearlas/editarlas.
+const canViewOnly = isEndClient && !!(ecCaps && ecCaps.viewQuotes) && !ecCanCreate;
+const canDelete = baseEditors.includes(dtUserRole);
+// Duplicar: como los editores base, pero NO el cliente directo (end_client).
+const canDuplicate = baseEditors.includes(dtUserRole);
 const canConvertToReservation = ['superadmin', 'admin'].includes(dtUserRole);
 const canViewSummary = ['department_manager', 'client'].includes(dtUserRole);
 const showClientColumn = ['superadmin', 'admin'].includes(dtUserRole);
@@ -27,6 +42,7 @@ const showClientColumn = ['superadmin', 'admin'].includes(dtUserRole);
 // Dynamic base path based on user role
 const rolePaths = {
     client: '/dashboard/client',
+    end_client: '/dashboard/end_client',
     department_manager: '/dashboard/department_manager',
     admin: '/dashboard/admin',
     superadmin: '/dashboard/superadmin'
@@ -401,6 +417,8 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+        const canDuplicate = <%= canDuplicate %>;
+        const canViewOnly = <%= canViewOnly %>;
         const canConvertToReservation = <%= canConvertToReservation %>;
         const basePath = '<%= baseDashboardPath %>';
 
@@ -849,6 +867,20 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                                             <i class="ti ti-edit"></i>
                                         </a>`;
 
+                        }
+
+                        if (canViewOnly) {
+                            // View button (read-only): abre el detalle en modo lectura.
+                            actions += `<a href="<%= baseDashboardPath %>/quotes/${data.objectId || data.id}"
+                                            class="btn btn-outline-primary"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Ver Cotización">
+                                            <i class="ti ti-eye"></i>
+                                        </a>`;
+                        }
+
+                        if (canDuplicate) {
                             // Copy button (duplicate)
                             actions += `<button type="button"
                                             class="btn btn-info copy-quote-btn"
@@ -1730,7 +1762,7 @@ const baseDashboardPath = rolePaths[dtUserRole] || '/dashboard/admin';
                                 </div>
 
                                 <div class="alert alert-secondary">
-                                    <h6><i class="ti ti-info-circle me-2"></i>Información del Proceso:</h6>
+                                    <h6><i class="ti ti-info-circle me-2"></i>Información Importante:</h6>
                                     <ul class="mb-0">
                                         ${requiresApproval ? 
                                             `<li>Se creará una solicitud de cancelación para revisión</li>
