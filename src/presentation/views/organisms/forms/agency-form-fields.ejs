@@ -42,18 +42,15 @@
 
     <p class="cff-hint-optional"><i class="ti ti-chevron-down me-1"></i>Información opcional — ábrela solo si la necesitas</p>
 
-    <!-- ===== Opcional: Datos fiscales y adicionales ===== -->
+    <!-- ===== Opcional: Datos adicionales (lo fiscal va por perfiles de facturación) ===== -->
     <div class="cff-acc">
         <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
-            <span class="cff-t"><i class="ti ti-file-invoice"></i>Datos fiscales y adicionales</span>
+            <span class="cff-t"><i class="ti ti-notes"></i>Datos adicionales</span>
             <span class="cff-badge">Opcional</span>
             <span class="cff-chev"><i class="ti ti-chevron-right"></i></span>
         </button>
         <div class="cff-acc-body">
             <div class="row">
-                <div class="col-md-6">
-                    <%- include('../../atoms/common/rfc-input', { name: 'taxId', id: 'agencyTaxId', label: 'RFC', required: false }) %>
-                </div>
                 <div class="col-md-6">
                     <%- include('../../atoms/common/url-input', { name: 'website', id: 'agencyWebsite', label: 'Sitio Web', required: false }) %>
                 </div>

@@ -201,10 +201,10 @@
                             </div>
                         </div>
 
-                        <!-- ===== Opcional: Empresa y Fiscal ===== -->
+                        <!-- ===== Opcional: Empresa (lo fiscal va por perfiles de facturación) ===== -->
                         <div class="cff-acc">
                             <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
-                                <span class="cff-t"><i class="ti ti-building"></i>Empresa y Fiscal</span>
+                                <span class="cff-t"><i class="ti ti-building"></i>Empresa</span>
                                 <span class="cff-badge">Opcional</span>
                                 <span class="cff-chev"><i class="ti ti-chevron-right"></i></span>
                             </button>
@@ -228,18 +228,6 @@
                                             helpText: 'Tipo de organización'
                                         }) %>
                                     </div>
-                                    <div class="col-md-6">
-                                        <%- include('../../atoms/common/rfc-input', {
-                                            name: 'taxId',
-                                            id: 'directClientTaxId',
-                                            label: 'RFC / ID Fiscal',
-                                            required: false,
-                                            placeholder: 'ABC123456789 o ABCD123456ABC',
-                                            helpText: 'Registro Federal de Contribuyentes'
-                                        }) %>
-                                    </div>
-                                </div>
-                                <div class="row">
                                     <div class="col-md-6">
                                         <%- include('../../atoms/common/url-input', {
                                             name: 'website',
