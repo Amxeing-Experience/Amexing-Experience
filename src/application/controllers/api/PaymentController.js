@@ -195,7 +195,25 @@ class PaymentController {
         }
       }
 
+      // Reconcile reservation.paymentType against this payment's real method (Fase 0): updates
+      // paymentType cleanly when nothing to reconcile, or writes a single tagged adjustment when a
+      // prior payment used a different tier. Non-fatal: the payment is already saved.
+      let methodWarning = null;
+      try {
+        const decision = await PaymentService.resolvePaymentMethodChange(id, {
+          method: payment.getMethod(),
+          amountMXN: payment.getAmount(),
+          currentPaymentId: payment.id,
+        });
+        methodWarning = decision.warning;
+      } catch (reconErr) {
+        logger.warn('Payment saved but method reconciliation failed', {
+          reservationId: id, paymentId: payment.id, error: reconErr.message,
+        });
+      }
+
       const summary = await PaymentService.recalculate(id);
+      const warning = [methodWarning, receiptWarning].filter(Boolean).join(' ') || null;
 
       logger.info('Payment registered', {
         reservationId: id,
@@ -208,7 +226,7 @@ class PaymentController {
       return res.json({
         success: true,
         message: receiptWarning || 'Pago registrado',
-        warning: receiptWarning,
+        warning,
         data: { payment: await PaymentController.formatPaymentWithReceipt(payment), summary },
       });
     } catch (error) {
@@ -311,14 +329,32 @@ class PaymentController {
       payment.set('modifiedBy', req.user);
       await payment.save(null, { useMasterKey: true });
 
+      // Reconcile against the (possibly changed) method/amount. Runs on every edit — including an
+      // amount-only change — so the tagged adjustment stays correct and never leaves a phantom
+      // balance against money already collected. Non-fatal: the payment edit is already saved.
+      let methodWarning = null;
+      try {
+        const decision = await PaymentService.resolvePaymentMethodChange(id, {
+          method: payment.getMethod(),
+          amountMXN: payment.getAmount(),
+          currentPaymentId: payment.id,
+        });
+        methodWarning = decision.warning;
+      } catch (reconErr) {
+        logger.warn('Payment updated but method reconciliation failed', {
+          reservationId: id, paymentId, error: reconErr.message,
+        });
+      }
+
       const summary = await PaymentService.recalculate(id);
+      const warning = [methodWarning, receiptWarning].filter(Boolean).join(' ') || null;
 
       logger.info('Payment updated', { reservationId: id, paymentId, performedBy: req.userId });
 
       return res.json({
         success: true,
         message: receiptWarning || 'Pago actualizado',
-        warning: receiptWarning,
+        warning,
         data: { payment: await PaymentController.formatPaymentWithReceipt(payment), summary },
       });
     } catch (error) {
@@ -359,6 +395,17 @@ class PaymentController {
         } catch (e) {
           logger.warn('Failed to delete receipt file from S3', { s3Key: receiptKey, error: e.message });
         }
+      }
+
+      // Reconcile over the remaining payments (no current payment): recomputes the tagged adjustment
+      // from scratch and removes it when the reservation is consistent again, so deleting a
+      // cross-tier payment never leaves a phantom balance. Non-fatal: the payment is already deleted.
+      try {
+        await PaymentService.resolvePaymentMethodChange(id, {});
+      } catch (reconErr) {
+        logger.warn('Payment deleted but method reconciliation failed', {
+          reservationId: id, paymentId, error: reconErr.message,
+        });
       }
 
       const summary = await PaymentService.recalculate(id);

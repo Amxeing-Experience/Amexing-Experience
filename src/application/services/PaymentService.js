@@ -30,6 +30,11 @@ const logger = require('../../infrastructure/logger');
 // Solo se importa el redondeo a efectivo (múltiplo de 5). No se modifica el motor.
 const { applyCashRounding } = require('../../domain/pricing/pricingEngine');
 
+// Tag del único ajuste que este servicio crea/reemplaza al reconciliar el método de pago.
+// Distingue el ajuste automático de los ajustes que el staff agrega a mano (sin `source`),
+// para poder encontrarlo y reemplazarlo sin tocar los manuales.
+const RECON_SOURCE = 'payment-method-reconciliation';
+
 /**
  * Round to 2 decimals (currency precision).
  * @param {number} n - Value to round.
@@ -299,6 +304,251 @@ class PaymentService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Pure decision logic that reconciles reservation.paymentType against the real
+   * method of the payments being registered. No Parse I/O — trivially unit-testable.
+   *
+   * WHY the tier ratio is derived from THIS reservation's own pricesByType/computeTotals
+   * and never from fixed 1.00/1.16/1.21 constants: pricesByType can carry a negotiated
+   * ("dirty") price that does NOT follow base×1.16/×1.21, and AgencyRate/TransferRate are
+   * configurable rates that may have changed since the quote was frozen. The only correct
+   * cross-tier ratio is the real per-method total of this reservation.
+   *
+   * WHY the adjustment is recomputed in full from the whole payment history and REPLACES a
+   * single tagged adjustment (never stacks): computing an incremental delta per payment
+   * over-counts partial payments (each delta wrongly assumed the payment settled the entire
+   * remaining base), leaving a phantom balance. Recomputing the total target adjustment from
+   * scratch every call is idempotent by construction and self-corrects any inconsistent state.
+   * @param {object} input - Plain inputs (no Parse objects).
+   * @param {Array<object>} input.serviceItems - Plain service items for computeTotals.
+   * @param {string} [input.currency] - Reservation currency (MXN applies cash rounding).
+   * @param {string} [input.anchoredMethod] - Current reservation.paymentType.
+   * @param {Array<object>} [input.priorPayments] - Existing payments { method, amount }, excluding the current one.
+   * @param {object|null} [input.currentPayment] - Payment being registered { method, amount }, or null (delete/recalc).
+   * @param {object|null} [input.existingReconciliationAdjustment] - The current tagged adjustment, or null.
+   * @param {Array<string>} [input.validMethods] - Accepted method tokens (Payment.METHODS).
+   * @param {string} [input.reconciliationDescription] - Base text for the auto adjustment description.
+   * @returns {object} Decision { scenario, expectedCeiling, warning, paymentTypeUpdate, reconciliationAdjustment }.
+   * @example
+   * PaymentService.decidePaymentMethodChange({ serviceItems, anchoredMethod: 'efectivo', currentPayment: { method: 'tarjeta', amount: 121 } });
+   */
+  static decidePaymentMethodChange(input) {
+    const {
+      serviceItems = [],
+      currency = 'MXN',
+      anchoredMethod = 'efectivo',
+      priorPayments = [],
+      currentPayment = null,
+      existingReconciliationAdjustment = null,
+      validMethods = ['efectivo', 'transferencia', 'tarjeta'],
+      reconciliationDescription = 'Ajuste por método de pago',
+    } = input || {};
+
+    const isValid = (m) => validMethods.includes(m);
+    const totalForMethod = (m) => this.computeTotals(serviceItems, m, 0, 0, currency).servicesTotal;
+    const baseTotal = totalForMethod('efectivo');
+
+    // Escenario: comparar el método del pago actual contra TODOS los pagos previos. Un pago previo
+    // con método corrupto/legacy (null/vacío/inválido) fuerza el camino conservador 'complex'.
+    const currentMethod = currentPayment ? currentPayment.method : anchoredMethod;
+    const corruptPrior = priorPayments.filter((p) => !isValid(p.method));
+    const hasDifferentValidPrior = priorPayments.some((p) => isValid(p.method) && p.method !== currentMethod);
+    const scenario = (corruptPrior.length > 0 || hasDifferentValidPrior) ? 'complex' : 'none';
+
+    // El paymentType solo se reescribe en el caso simple, cuando llega un pago real con método distinto.
+    let paymentTypeUpdate = null;
+    if (scenario === 'none' && currentPayment && isValid(currentMethod) && currentMethod !== anchoredMethod) {
+      paymentTypeUpdate = currentMethod;
+    }
+    // El ancla contra la que se mide la reconciliación: el método ya actualizado en el caso simple.
+    const reconAnchor = paymentTypeUpdate || anchoredMethod;
+
+    const warnings = [];
+    if (corruptPrior.length > 0) {
+      warnings.push(`${corruptPrior.length} pago(s) con método inválido forzaron la reconciliación; revisar manualmente.`);
+    }
+
+    const remove = () => (existingReconciliationAdjustment
+      ? {
+        action: 'remove', type: null, amount: null, description: null, source: RECON_SOURCE,
+      }
+      : {
+        action: 'noop', type: null, amount: null, description: null, source: RECON_SOURCE,
+      });
+
+    // Guarda de división entre cero: reservación sin servicios cobrables (todo es propina/ajustes).
+    // Sin base no hay relación entre tiers que reconciliar; se limpia cualquier ajuste taggeado viejo.
+    if (!Number.isFinite(baseTotal) || baseTotal <= 0) {
+      return {
+        scenario,
+        expectedCeiling: 0,
+        warning: warnings.length ? warnings.join(' ') : null,
+        paymentTypeUpdate,
+        reconciliationAdjustment: remove(),
+      };
+    }
+
+    const anchorTotal = totalForMethod(reconAnchor);
+    // baseEquivalente(p) = p.amount × (T(efectivo) / T(p.method)). Un método corrupto se trata con el
+    // tier del ancla, de modo que no aporta ni resta al ajuste (ni penaliza ni beneficia).
+    const baseEquivalente = (row) => {
+      const amt = Number(row.amount) || 0;
+      const tierTotal = isValid(row.method) ? totalForMethod(row.method) : anchorTotal;
+      if (!Number.isFinite(tierTotal) || tierTotal <= 0) return amt;
+      return amt * (baseTotal / tierTotal);
+    };
+
+    // Mecanismo (a): techo esperado SOLO para el pago que se está registrando. Advierte, no bloquea.
+    let expectedCeiling = 0;
+    if (currentPayment) {
+      const sumBaseBefore = priorPayments.reduce((s, p) => s + baseEquivalente(p), 0);
+      const remainingBaseBefore = baseTotal - sumBaseBefore;
+      const ratioCurrent = totalForMethod(currentMethod) / baseTotal;
+      expectedCeiling = round2(remainingBaseBefore * ratioCurrent);
+      const captured = Number(currentPayment.amount) || 0;
+      const overage = round2(captured - expectedCeiling);
+      // Efectivo tolera hasta $5 (redondeo físico a múltiplo de 5); tarjeta/transferencia solo $0.01.
+      const tolerance = currentMethod === 'efectivo' ? 5 : 0.01;
+      if (overage > tolerance) {
+        warnings.push(`El monto capturado (${captured}) excede el máximo esperado (${expectedCeiling}) para saldar en ${currentMethod}.`);
+      }
+    }
+
+    // Reconciliación (7.5): recalcular el ajuste TOTAL desde el historial completo (incluyendo el pago
+    // actual) y reemplazar el único ajuste taggeado. Idempotente: dos llamadas seguidas dan lo mismo.
+    const allPayments = currentPayment ? priorPayments.concat([currentPayment]) : priorPayments;
+    const sumAmount = allPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const sumBaseEquivalente = allPayments.reduce((s, p) => s + baseEquivalente(p), 0);
+    const ratioAnchor = anchorTotal / baseTotal;
+    const targetAdjustment = round2(sumAmount - sumBaseEquivalente * ratioAnchor);
+
+    let reconciliationAdjustment;
+    if (Math.abs(targetAdjustment) < 0.005) {
+      reconciliationAdjustment = remove();
+    } else {
+      reconciliationAdjustment = {
+        action: existingReconciliationAdjustment ? 'replace' : 'create',
+        type: targetAdjustment > 0 ? 'charge' : 'discount',
+        amount: Math.abs(targetAdjustment),
+        description: `${reconciliationDescription} (${reconAnchor})`.slice(0, 150),
+        source: RECON_SOURCE,
+      };
+    }
+
+    return {
+      scenario,
+      expectedCeiling,
+      warning: warnings.length ? warnings.join(' ') : null,
+      paymentTypeUpdate,
+      reconciliationAdjustment,
+    };
+  }
+
+  /**
+   * Reconcile reservation.paymentType against the real payment method: load the
+   * reservation/services/payments, compute the pure decision, then persist the
+   * paymentType update and/or the single tagged reconciliation adjustment. The
+   * balance rollup itself is recomputed separately by recalculate(). Non-persisting
+   * for the balance — only paymentType and the adjustments array are written here.
+   * @param {string} reservationId - Reservation objectId.
+   * @param {object} [options] - { method, amountMXN, currentPaymentId }.
+   * @param {string} [options.method] - Method of the payment being registered/edited (omit for delete).
+   * @param {number} [options.amountMXN] - Amount (MXN) of that payment, already converted from its currency.
+   * @param {string} [options.currentPaymentId] - Id of the payment being edited/added, excluded from priors.
+   * @returns {Promise<object>} The decision returned by decidePaymentMethodChange.
+   * @example
+   * await PaymentService.resolvePaymentMethodChange(id, { method: 'tarjeta', amountMXN: 4840, currentPaymentId });
+   */
+  static async resolvePaymentMethodChange(reservationId, options = {}) {
+    const { method, amountMXN, currentPaymentId } = options;
+    const Reservation = require('../../domain/models/Reservation');
+    const Payment = require('../../domain/models/Payment');
+
+    const reservation = await new Parse.Query(Reservation).get(reservationId, { useMasterKey: true });
+
+    const reservationPtr = new Reservation();
+    reservationPtr.id = reservationId;
+    const servicesQuery = BaseModel.queryExisting('ReservationService');
+    servicesQuery.equalTo('reservationPtr', reservationPtr);
+    servicesQuery.limit(1000);
+    const services = await servicesQuery.find({ useMasterKey: true });
+    const serviceItems = this.toServiceItems(services);
+
+    const currency = reservation.get('currency') || 'MXN';
+    const anchoredMethod = reservation.get('paymentType') || 'efectivo';
+
+    const payments = await Payment.getExistingForReservation(reservationId);
+    const priorPayments = payments
+      .filter((p) => p.id !== currentPaymentId)
+      .map((p) => ({ method: p.get('method'), amount: p.get('amount') }));
+
+    const currentPayment = (method !== undefined && method !== null)
+      ? { method, amount: Number(amountMXN) || 0 }
+      : null;
+
+    const adjustments = reservation.get('adjustments') || [];
+    const existingIdx = adjustments.findIndex((a) => a && a.source === RECON_SOURCE);
+    const existing = existingIdx >= 0 ? adjustments[existingIdx] : null;
+
+    const decision = this.decidePaymentMethodChange({
+      serviceItems,
+      currency,
+      anchoredMethod,
+      priorPayments,
+      currentPayment,
+      existingReconciliationAdjustment: existing,
+      validMethods: Payment.METHODS,
+    });
+
+    let mutated = false;
+    if (decision.paymentTypeUpdate) {
+      reservation.set('paymentType', decision.paymentTypeUpdate);
+      mutated = true;
+    }
+
+    const recon = decision.reconciliationAdjustment;
+    // NOTA (7.7, sub-pregunta 2): este ajuste automático se crea sin importar el nivel RBAC del actor
+    // que registró el pago (agencia/agente nivel 4+ incluido), a diferencia de POST /adjustments que es
+    // admin-only. Es un ajuste calculado por el sistema, no discrecional, atado a dinero que ese actor ya
+    // está autorizado a cobrar. Marcado como decisión de seguridad pendiente del visto bueno del dueño.
+    if (recon.action === 'remove' && existingIdx >= 0) {
+      adjustments.splice(existingIdx, 1);
+      reservation.set('adjustments', adjustments);
+      mutated = true;
+    } else if (recon.action === 'create' || recon.action === 'replace') {
+      const entry = {
+        id: existing ? existing.id : `adj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        type: recon.type,
+        description: recon.description,
+        amount: recon.amount,
+        percentage: null,
+        createdAt: existing ? existing.createdAt : new Date().toISOString(),
+        source: RECON_SOURCE,
+      };
+      if (existingIdx >= 0) {
+        adjustments[existingIdx] = entry;
+      } else {
+        adjustments.push(entry);
+      }
+      reservation.set('adjustments', adjustments);
+      mutated = true;
+    }
+
+    if (mutated) {
+      await reservation.save(null, { useMasterKey: true });
+    }
+
+    logger.info('Payment method reconciliation resolved', {
+      reservationId,
+      scenario: decision.scenario,
+      action: recon.action,
+      paymentTypeUpdate: decision.paymentTypeUpdate,
+      hasWarning: !!decision.warning,
+    });
+
+    return decision;
   }
 }
 

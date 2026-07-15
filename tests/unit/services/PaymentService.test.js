@@ -272,4 +272,327 @@ describe('PaymentService pure helpers', () => {
       expect(over.balance).toBe(-68);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Fase 0 — reconciliación de reservation.paymentType vs. método real de pago.
+  // Ratio derivado del pricesByType REAL de la reservación (Bug 1); ajuste único
+  // recalculado desde el historial completo y REEMPLAZADO, nunca apilado (Bug 2).
+  // ---------------------------------------------------------------------------
+  describe('decidePaymentMethodChange (pure decision)', () => {
+    // Precio "limpio" (base × 1.16 / × 1.21). T(efectivo)=10000, T(transferencia)=11600, T(tarjeta)=12100.
+    const clean = [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 } }];
+    // Precio negociado ("sucio"): servicio A con tarjeta en 120 (no 121) + servicio B plano 50.
+    // T(efectivo)=150, T(transferencia)=166, T(tarjeta)=170.
+    const negotiated = [
+      { pricesByType: { efectivo: 100, transferencia: 116, tarjeta: 120 } },
+      { total: 50 },
+    ];
+
+    describe('frontera escenario simple / complejo', () => {
+      it('un pago previo con el MISMO método que el nuevo -> none, sin ajuste, sin tocar paymentType', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'efectivo',
+          priorPayments: [{ method: 'efectivo', amount: 5000 }],
+          currentPayment: { method: 'efectivo', amount: 5000 },
+        });
+        expect(d.scenario).toBe('none');
+        expect(d.paymentTypeUpdate).toBeNull();
+        expect(d.reconciliationAdjustment.action).toBe('noop');
+      });
+
+      it('un pago previo con método DISTINTO -> complex, no toca paymentType', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'transferencia',
+          priorPayments: [{ method: 'transferencia', amount: 2320 }],
+          currentPayment: { method: 'tarjeta', amount: 4840 },
+        });
+        expect(d.scenario).toBe('complex');
+        expect(d.paymentTypeUpdate).toBeNull();
+      });
+
+      it('sin pagos previos, primer pago en método distinto al de la cotización -> actualiza paymentType, sin ajuste', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'efectivo',
+          priorPayments: [],
+          currentPayment: { method: 'transferencia', amount: 2320 },
+        });
+        expect(d.scenario).toBe('none');
+        expect(d.paymentTypeUpdate).toBe('transferencia');
+        expect(d.reconciliationAdjustment.action).toBe('noop');
+      });
+    });
+
+    describe('regla de tres — ejemplo numérico del documento', () => {
+      it('liquidación completa: techo $9,680, ajuste cargo $400 (fórmula vieja y corregida coinciden aquí)', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'transferencia',
+          priorPayments: [{ method: 'transferencia', amount: 2320 }],
+          currentPayment: { method: 'tarjeta', amount: 9680 },
+          existingReconciliationAdjustment: null,
+        });
+        expect(d.scenario).toBe('complex');
+        expect(d.expectedCeiling).toBe(9680);
+        expect(d.reconciliationAdjustment.action).toBe('create');
+        expect(d.reconciliationAdjustment.type).toBe('charge');
+        expect(d.reconciliationAdjustment.amount).toBe(400);
+        expect(d.paymentTypeUpdate).toBeNull();
+      });
+
+      it('generaliza a TRES tiers distintos sin cambios a la fórmula (Σ baseEquivalente)', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'efectivo',
+          priorPayments: [
+            { method: 'efectivo', amount: 3000 }, // base 3000
+            { method: 'transferencia', amount: 3480 }, // base 3000
+          ],
+          currentPayment: { method: 'tarjeta', amount: 4840 }, // base 4000
+        });
+        expect(d.scenario).toBe('complex');
+        expect(d.reconciliationAdjustment.amount).toBe(1320); // 11320 − 10000
+        // Convergencia: total anclado a efectivo + ajuste == dinero cobrado.
+        const total = PaymentService.computeTotals(clean, 'efectivo', 0, 1320).total;
+        expect(total - (3000 + 3480 + 4840)).toBe(0);
+      });
+    });
+
+    describe('Bug 2 — 3 cruces secuenciales convergen a balance $0, ajuste reemplaza (no apila)', () => {
+      it('secuencia $2,320 transferencia -> $4,840 tarjeta -> $4,640 transferencia = balance 0, un solo ajuste $200', () => {
+        // Paso 1: primer pago, sin previos. Cotización en efectivo, pago en transferencia.
+        const s1 = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'efectivo',
+          priorPayments: [],
+          currentPayment: { method: 'transferencia', amount: 2320 },
+          existingReconciliationAdjustment: null,
+        });
+        expect(s1.scenario).toBe('none');
+        expect(s1.paymentTypeUpdate).toBe('transferencia');
+        expect(s1.reconciliationAdjustment.action).toBe('noop');
+
+        // Paso 2: pago en tarjeta (parcial). paymentType queda en transferencia (el ancla).
+        const s2 = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'transferencia',
+          priorPayments: [{ method: 'transferencia', amount: 2320 }],
+          currentPayment: { method: 'tarjeta', amount: 4840 },
+          existingReconciliationAdjustment: null,
+        });
+        expect(s2.scenario).toBe('complex');
+        expect(s2.reconciliationAdjustment.action).toBe('create');
+        expect(s2.reconciliationAdjustment.amount).toBe(200); // NO 400 (fórmula vieja/defectuosa)
+
+        // Paso 3: pago en transferencia que salda el resto. Recalcula desde cero -> mismo $200 -> replace.
+        const s3 = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'transferencia',
+          priorPayments: [
+            { method: 'transferencia', amount: 2320 },
+            { method: 'tarjeta', amount: 4840 },
+          ],
+          currentPayment: { method: 'transferencia', amount: 4640 },
+          existingReconciliationAdjustment: { id: 'x', type: 'charge', amount: 200 },
+        });
+        expect(s3.scenario).toBe('complex');
+        expect(s3.reconciliationAdjustment.action).toBe('replace'); // reemplaza, NO crea un segundo
+        expect(s3.reconciliationAdjustment.amount).toBe(200);
+
+        // Verificación end-to-end: total (transferencia + $200) == dinero cobrado -> balance 0 exacto.
+        const total = PaymentService.computeTotals(clean, 'transferencia', 0, 200).total;
+        const paid = 2320 + 4840 + 4640;
+        expect(total).toBe(11800);
+        expect(total - paid).toBe(0);
+      });
+    });
+
+    describe('Bug 1 — el techo deriva del pricesByType real, nunca de constantes 1.16/1.21 fijas', () => {
+      it('precio negociado: techo $67.59 (real), NUNCA $77.19 (constantes fijas)', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: negotiated,
+          anchoredMethod: 'transferencia',
+          priorPayments: [{ method: 'transferencia', amount: 100 }],
+          currentPayment: { method: 'tarjeta', amount: 67.59 },
+          existingReconciliationAdjustment: null,
+        });
+        expect(d.expectedCeiling).toBe(67.59);
+        expect(d.expectedCeiling).not.toBe(77.19); // regresión contra hardcodear factores
+      });
+
+      it('para el caso limpio da el mismo número que la fórmula con constantes (superconjunto estricto)', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'transferencia',
+          priorPayments: [{ method: 'transferencia', amount: 2320 }],
+          currentPayment: { method: 'tarjeta', amount: 100 },
+        });
+        // remainingBaseBefore = 10000 − 2000 = 8000; techo = 8000 × 1.21 = 9680.
+        expect(d.expectedCeiling).toBe(9680);
+      });
+    });
+
+    describe('mecanismo (a) — tolerancia diferenciada efectivo vs. tarjeta/transferencia (warn, no bloquea)', () => {
+      const tol = [{ pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } }];
+
+      it('efectivo dentro de $5 del techo NO advierte', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: tol, anchoredMethod: 'efectivo', priorPayments: [], currentPayment: { method: 'efectivo', amount: 1005 },
+        });
+        expect(d.expectedCeiling).toBe(1000);
+        expect(d.warning).toBeNull();
+      });
+
+      it('efectivo más de $5 sobre el techo SÍ advierte (sin bloquear)', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: tol, anchoredMethod: 'efectivo', priorPayments: [], currentPayment: { method: 'efectivo', amount: 1006 },
+        });
+        expect(d.warning).toBeTruthy();
+        // sigue devolviendo una decisión válida (nunca lanza / bloquea)
+        expect(d.scenario).toBe('none');
+      });
+
+      it('tarjeta dentro de $0.01 NO advierte; más de $0.01 SÍ', () => {
+        const ok = PaymentService.decidePaymentMethodChange({
+          serviceItems: tol, anchoredMethod: 'tarjeta', priorPayments: [], currentPayment: { method: 'tarjeta', amount: 1210.01 },
+        });
+        expect(ok.warning).toBeNull();
+        const warn = PaymentService.decidePaymentMethodChange({
+          serviceItems: tol, anchoredMethod: 'tarjeta', priorPayments: [], currentPayment: { method: 'tarjeta', amount: 1210.02 },
+        });
+        expect(warn.warning).toBeTruthy();
+      });
+
+      it('transferencia con más de $0.01 de diferencia advierte', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: tol, anchoredMethod: 'transferencia', priorPayments: [], currentPayment: { method: 'transferencia', amount: 1160.05 },
+        });
+        expect(d.warning).toBeTruthy();
+      });
+    });
+
+    describe('reglas de creación de ajuste — delta 0 / remove / replace', () => {
+      it('delta 0 sin ajuste previo -> noop', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean, anchoredMethod: 'efectivo', priorPayments: [], currentPayment: { method: 'efectivo', amount: 10000 }, existingReconciliationAdjustment: null,
+        });
+        expect(d.reconciliationAdjustment.action).toBe('noop');
+      });
+
+      it('delta 0 con ajuste previo (estado vuelve a consistente) -> remove', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean, anchoredMethod: 'efectivo', priorPayments: [], currentPayment: { method: 'efectivo', amount: 10000 }, existingReconciliationAdjustment: { id: 'x', type: 'charge', amount: 400 },
+        });
+        expect(d.reconciliationAdjustment.action).toBe('remove');
+      });
+
+      it('idempotencia: recalcular sobre el mismo estado converge al mismo monto (in-place replace, no duplica)', () => {
+        const first = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean, anchoredMethod: 'transferencia', priorPayments: [{ method: 'transferencia', amount: 2320 }], currentPayment: { method: 'tarjeta', amount: 4840 }, existingReconciliationAdjustment: null,
+        });
+        expect(first.reconciliationAdjustment.action).toBe('create');
+        const second = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean, anchoredMethod: 'transferencia', priorPayments: [{ method: 'transferencia', amount: 2320 }], currentPayment: { method: 'tarjeta', amount: 4840 }, existingReconciliationAdjustment: { id: 'x', type: 'charge', amount: 200 },
+        });
+        expect(second.reconciliationAdjustment.action).toBe('replace');
+        expect(second.reconciliationAdjustment.amount).toBe(first.reconciliationAdjustment.amount);
+      });
+
+      it('el ajuste negativo se registra como discount', () => {
+        // Ancla a tarjeta; un pago previo en tarjeta ya cubrió el total y además entró un pago en efectivo
+        // (tier más barata) -> cobrar el total tarjeta completo sobrestima, el ajuste baja como discount.
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean, anchoredMethod: 'tarjeta', priorPayments: [{ method: 'tarjeta', amount: 12100 }], currentPayment: { method: 'efectivo', amount: 1000 }, existingReconciliationAdjustment: null,
+        });
+        expect(d.scenario).toBe('complex'); // tarjeta previo != efectivo actual
+        expect(d.reconciliationAdjustment.type).toBe('discount');
+        expect(d.reconciliationAdjustment.amount).toBe(210); // |13100 − 11000×1.21|
+      });
+
+      it('la descripción del ajuste respeta el maxlength de 150 caracteres', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean, anchoredMethod: 'transferencia', priorPayments: [{ method: 'transferencia', amount: 2320 }], currentPayment: { method: 'tarjeta', amount: 4840 }, reconciliationDescription: 'X'.repeat(200),
+        });
+        expect(d.reconciliationAdjustment.description.length).toBeLessThanOrEqual(150);
+      });
+    });
+
+    describe('delete / recálculo sin pago actual (currentPayment null)', () => {
+      it('al quedar un solo método consistente, elimina el ajuste taggeado (remove)', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'transferencia',
+          priorPayments: [{ method: 'transferencia', amount: 2320 }],
+          currentPayment: null,
+          existingReconciliationAdjustment: { id: 'x', type: 'charge', amount: 200 },
+        });
+        expect(d.scenario).toBe('none');
+        expect(d.paymentTypeUpdate).toBeNull();
+        expect(d.expectedCeiling).toBe(0);
+        expect(d.reconciliationAdjustment.action).toBe('remove');
+      });
+    });
+
+    describe('moneda USD — el efectivo no se redondea a múltiplo de 5', () => {
+      it('techo en USD refleja el efectivo sin redondear (101), no el redondeo MXN (100)', () => {
+        const usd = PaymentService.decidePaymentMethodChange({
+          serviceItems: [{ pricesByType: { efectivo: 101, tarjeta: 120 } }], currency: 'USD', anchoredMethod: 'efectivo', priorPayments: [], currentPayment: { method: 'efectivo', amount: 101 },
+        });
+        expect(usd.expectedCeiling).toBe(101);
+        const mxn = PaymentService.decidePaymentMethodChange({
+          serviceItems: [{ pricesByType: { efectivo: 101, tarjeta: 120 } }], currency: 'MXN', anchoredMethod: 'efectivo', priorPayments: [], currentPayment: { method: 'efectivo', amount: 101 },
+        });
+        expect(mxn.expectedCeiling).toBe(100);
+      });
+    });
+
+    describe('entradas corruptas / adversariales', () => {
+      it('método corrupto (null) en un pago previo fuerza complex + warning, sin lanzar, tratado con el tier del ancla (aporta 0)', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'transferencia',
+          priorPayments: [{ method: null, amount: 2320 }],
+          currentPayment: { method: 'transferencia', amount: 4640 },
+          existingReconciliationAdjustment: null,
+        });
+        expect(d.scenario).toBe('complex');
+        expect(d.warning).toBeTruthy();
+        expect(d.warning).toMatch(/inválido/);
+        expect(d.reconciliationAdjustment.action).toBe('noop'); // el corrupto no aporta ni resta
+      });
+
+      it('método corrupto (cadena vacía) también fuerza complex', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean, anchoredMethod: 'efectivo', priorPayments: [{ method: '', amount: 100 }], currentPayment: { method: 'efectivo', amount: 100 },
+        });
+        expect(d.scenario).toBe('complex');
+        expect(d.warning).toBeTruthy();
+      });
+
+      it('monto no numérico en un pago previo se trata como 0 (no NaN)', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean, anchoredMethod: 'efectivo', priorPayments: [{ method: 'efectivo', amount: 'abc' }], currentPayment: { method: 'efectivo', amount: 10000 },
+        });
+        expect(Number.isNaN(d.expectedCeiling)).toBe(false);
+        expect(d.reconciliationAdjustment.action).toBe('noop');
+      });
+
+      it('reservación sin servicios cobrables (base 0) no truena por división entre cero', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: [{ includeInTotal: false, total: 999 }], anchoredMethod: 'efectivo', priorPayments: [], currentPayment: { method: 'tarjeta', amount: 100 },
+        });
+        expect(d.expectedCeiling).toBe(0);
+        expect(d.reconciliationAdjustment.action).toBe('noop');
+      });
+
+      it('input vacío {} devuelve una decisión válida sin lanzar', () => {
+        const d = PaymentService.decidePaymentMethodChange({});
+        expect(d.scenario).toBe('none');
+        expect(d.reconciliationAdjustment.action).toBe('noop');
+        expect(d.paymentTypeUpdate).toBeNull();
+      });
+    });
+  });
 });
