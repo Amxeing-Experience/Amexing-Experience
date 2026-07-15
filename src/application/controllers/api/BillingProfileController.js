@@ -164,10 +164,41 @@ class BillingProfileController {
    */
   async create(req, res) {
     try {
-      const userId = req.user?.id;
+      const currentUserId = req.user?.id;
 
-      if (!userId) {
+      if (!currentUserId) {
         return this.sendError(res, 'User not authenticated', 401);
+      }
+
+      // Dueño del perfil: por defecto el usuario autenticado. Si viene :userId en la ruta
+      // (admin/dept_manager creando a nombre de una agencia), se resuelve el destino y se valida.
+      let userId = currentUserId;
+      if (req.params.userId) {
+        const effectiveRole = req.userRole || req.user?.role;
+        const allowedRoles = [...this.adminRoles, 'department_manager', 'client'];
+        if (!allowedRoles.includes(effectiveRole)) {
+          return this.sendError(res, 'Insufficient permissions', 403);
+        }
+        let targetId = req.params.userId;
+        // Si el id es un registro Client, resolver al department_manager dueño.
+        const clientRecord = await new Parse.Query('Client')
+          .include('createdBy')
+          .get(targetId, { useMasterKey: true })
+          .catch(() => null);
+        if (clientRecord) {
+          const createdBy = clientRecord.get('createdBy');
+          if (createdBy) targetId = createdBy.id;
+        }
+        // Verificar que el usuario destino existe y está activo.
+        const targetQuery = new Parse.Query('AmexingUser');
+        targetQuery.equalTo('objectId', targetId);
+        targetQuery.equalTo('active', true);
+        targetQuery.equalTo('exists', true);
+        const targetUser = await targetQuery.first({ useMasterKey: true });
+        if (!targetUser) {
+          return this.sendError(res, 'Target user not found', 404);
+        }
+        userId = targetId;
       }
 
       const validation = this.validateProfileData(req.body);

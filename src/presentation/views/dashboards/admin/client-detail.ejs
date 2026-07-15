@@ -710,7 +710,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="mt-3">
                 <%- include('../../organisms/billing/billing-profiles-section', {
                     userRole: typeof userRole !== 'undefined' ? userRole : 'admin',
-                    readOnly: true,
+                    readOnly: false,
                     targetUserId: clientId
                 }) %>
             </div>

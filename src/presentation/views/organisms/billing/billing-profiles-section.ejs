@@ -833,7 +833,11 @@ const billingShowHeader = typeof showHeader !== 'undefined' ? showHeader : true;
         try {
             const token = getBillingToken();
             const isUpdate = !!profileId;
-            const url = isUpdate ? '/api/billing-profiles/' + profileId : '/api/billing-profiles';
+            // Crear a nombre del target (agencia) si el componente se abrió con billingTargetUserId
+            // (p. ej. el admin desde el detalle); si no, crea para el usuario autenticado.
+            const url = isUpdate
+                ? '/api/billing-profiles/' + profileId
+                : (billingTargetUserId ? '/api/billing-profiles/user/' + billingTargetUserId : '/api/billing-profiles');
             const method = isUpdate ? 'PUT' : 'POST';
 
             var fetchHeaders = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
