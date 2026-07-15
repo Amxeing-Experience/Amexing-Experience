@@ -57,4 +57,13 @@
     .client-form-editorial .cff-segmented{flex-wrap:wrap;}
     .client-form-editorial .cff-segmented .btn{flex:1 1 45%;}
   }
+  /* Validación: feedback OCULTO hasta que el campo tenga estado (no mostrar todo al cargar/prefill).
+     Anula la regla global .invalid-feedback/.valid-feedback{display:block} del detalle sin tocarla.
+     Cubre inputs directos y los que van en .input-group (teléfono, sitio web) vía :has(). */
+  .client-form-editorial .invalid-feedback,
+  .client-form-editorial .valid-feedback{display:none !important;}
+  .client-form-editorial .is-invalid ~ .invalid-feedback,
+  .client-form-editorial .is-valid ~ .valid-feedback,
+  .client-form-editorial .input-group:has(.is-invalid) ~ .invalid-feedback,
+  .client-form-editorial .input-group:has(.is-valid) ~ .valid-feedback{display:block !important;}
 </style>
