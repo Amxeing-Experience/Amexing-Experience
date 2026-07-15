@@ -20949,6 +20949,11 @@ class ItineraryBuilder {
       change_requested: '#b8894a',
       change_approved: '#2e7d32',
       change_rejected: '#c62828',
+      converted_to_reservation: '#6E7A50',
+      reservation_cancelled: '#c62828',
+      reverted_to_quote: '#b8894a',
+      ownership_transferred: '#1565c0',
+      quote_edited: '#6b7280',
     };
     const ICONS = {
       service_added: 'ti-plus',
@@ -20958,6 +20963,11 @@ class ItineraryBuilder {
       change_requested: 'ti-message-2',
       change_approved: 'ti-check',
       change_rejected: 'ti-x',
+      converted_to_reservation: 'ti-calendar-check',
+      reservation_cancelled: 'ti-calendar-off',
+      reverted_to_quote: 'ti-arrow-back-up',
+      ownership_transferred: 'ti-user-share',
+      quote_edited: 'ti-edit',
     };
     const dayLabel = (d) => {
       const dt = new Date(d);

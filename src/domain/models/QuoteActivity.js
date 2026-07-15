@@ -51,6 +51,12 @@ class QuoteActivity extends BaseModel {
       CHANGE_REQUESTED: 'change_requested',
       CHANGE_APPROVED: 'change_approved',
       CHANGE_REJECTED: 'change_rejected',
+      // Fase B1: más eventos.
+      CONVERTED_TO_RESERVATION: 'converted_to_reservation',
+      RESERVATION_CANCELLED: 'reservation_cancelled',
+      REVERTED_TO_QUOTE: 'reverted_to_quote',
+      OWNERSHIP_TRANSFERRED: 'ownership_transferred',
+      QUOTE_EDITED: 'quote_edited',
     };
   }
 

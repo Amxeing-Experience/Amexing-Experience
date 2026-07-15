@@ -1656,6 +1656,32 @@ class QuoteController {
       result.version = editRecord.version;
       result.requiresApproval = editRecord.approvalStatus === 'pending';
 
+      // Timeline (Fase B1): edición de datos generales (personas/fechas/cliente/notas).
+      const FIELD_LABELS = {
+        numberOfPeople: 'personas',
+        eventType: 'tipo de evento',
+        startDate: 'fechas',
+        endDate: 'fechas',
+        eventDate: 'fechas',
+        clientFinalId: 'cliente final',
+        clientFinalName: 'cliente final',
+        clientType: 'tipo de cliente',
+        notes: 'notas',
+        clientNotes: 'notas',
+      };
+      const changedKeys = Object.keys(updates).filter((k) => k !== 'reason' && k !== 'status');
+      const changedLabels = [...new Set(changedKeys.map((k) => FIELD_LABELS[k]).filter(Boolean))];
+      if (changedLabels.length) {
+        await QuoteActivityService.log({
+          quoteId,
+          actor: currentUser,
+          actorRole: req.userRole,
+          action: 'quote_edited',
+          summary: `editó la cotización (${changedLabels.join(', ')})`,
+          meta: { fields: Object.keys(updates).filter((k) => k !== 'reason') },
+        });
+      }
+
       return res.json(result);
     } catch (error) {
       logger.error('Error in QuoteController.updateQuote', {
@@ -2069,6 +2095,18 @@ class QuoteController {
         statusChanged,
         response: response.data,
       });
+
+      // Timeline (Fase B1): registrar la conversión a reservación.
+      if (reservationData) {
+        await QuoteActivityService.log({
+          quoteId,
+          actor: currentUser,
+          actorRole: req.userRole,
+          action: 'converted_to_reservation',
+          summary: `convirtió la cotización en reservación${reservationData.folio ? ` (${reservationData.folio})` : ''}`,
+          meta: { reservationId: reservationData.id, reservationFolio: reservationData.folio },
+        });
+      }
 
       return res.json(response);
     } catch (error) {
