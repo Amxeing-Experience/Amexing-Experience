@@ -472,6 +472,18 @@ router.post(
 );
 
 /**
+ * GET /api/quotes/:id/activity — Timeline de actividades legible de la cotización (Fase A).
+ * Nivel 4+ (admin y owner/agencia).
+ */
+router.get(
+  '/:id/activity',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.getQuoteActivity(req, res)
+);
+
+/**
  * GET /api/quotes/:id/available-services - Get available services filtered by quote's rate.
  * Private access (Department Manager, Admin and SuperAdmin).
  *

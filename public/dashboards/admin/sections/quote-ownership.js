@@ -784,11 +784,8 @@ class QuoteOwnershipManager {
             manageBtn.addEventListener('click', () => this.showCollaboratorsModal());
         }
 
-        // View history button
-        const historyBtn = document.getElementById('btnViewHistory');
-        if (historyBtn) {
-            historyBtn.addEventListener('click', () => this.showEditHistory());
-        }
+        // "Ver historial de cambios" (QuoteEdit) retirado — reemplazado por el timeline
+        // de actividades ("Actividad") en la sección de servicios (QuoteActivity).
 
         // Review edits button
         const reviewBtn = document.getElementById('btnReviewEdits');

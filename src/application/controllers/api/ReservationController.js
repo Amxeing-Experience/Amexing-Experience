@@ -14,6 +14,7 @@ const logger = require('../../../infrastructure/logger');
 const FileStorageService = require('../../services/FileStorageService');
 const PaymentService = require('../../services/PaymentService');
 const { notifyReservationCancellation } = require('../../services/ReservationCancellationNotifier');
+const QuoteActivityService = require('../../services/QuoteActivityService');
 // Models used via Parse.Query string references
 
 // Module-level FileStorageService for presigned S3 URLs (static class needs this)
@@ -1312,6 +1313,15 @@ class ReservationController {
           reason: req.body?.reason,
           cancellationType,
         });
+        // Timeline (Fase B1): registrar la cancelación en la cotización.
+        await QuoteActivityService.log({
+          quoteId: linkedQuote.id,
+          actor: req.user,
+          actorRole: req.userRole,
+          action: 'reservation_cancelled',
+          summary: `canceló la reservación${reservation.get('folio') ? ` (${reservation.get('folio')})` : ''}`,
+          meta: { reservationId: reservation.id, reservationFolio: reservation.get('folio') },
+        });
       }
 
       return res.json({ success: true, message: 'Reservación cancelada exitosamente' });
@@ -1407,6 +1417,16 @@ class ReservationController {
         targetStatus,
         servicesReverted: services.length,
         performedBy: req.user?.id,
+      });
+
+      // Timeline (Fase B1): registrar el regreso de reservación a cotización.
+      await QuoteActivityService.log({
+        quoteId: quote.id,
+        actor: req.user,
+        actorRole: req.userRole,
+        action: 'reverted_to_quote',
+        summary: `regresó la reservación${reservation.get('folio') ? ` (${reservation.get('folio')})` : ''} a cotización`,
+        meta: { reservationId: reservation.id, reservationFolio: reservation.get('folio') },
       });
 
       return res.json({
