@@ -569,6 +569,38 @@ class PublicReservationController {
     const { iva } = dispTotals; // recargo por método (IVA, o IVA + comisión de tarjeta)
     const total = dispTotals.servicesTotal; // base × factor
 
+    // Framing por tipo de cliente DUEÑO de la reservación (no de quién ve la página: la vista
+    // pública se sirve por folio, sin sesión). Señal primaria = rol department_manager, con el
+    // que ClientsController crea las agencias; clientCategory casi nunca queda seteado en el
+    // registro real, así que solo suma como condición OR. Se lee el rol string barato del pointer
+    // (mismo patrón que dashboard/AdminController), sin un fetch extra de Role en esta página.
+    const clientRole = (client && typeof client.get === 'function') ? (client.get('role') || '') : '';
+    const clientCategory = (client && typeof client.get === 'function') ? (client.get('clientCategory') || '') : '';
+    const isAgency = clientRole === 'department_manager' || clientCategory === 'agency';
+
+    // Totales por los TRES métodos a nivel reservación (mismo motor), para la línea de
+    // descuento/IVA. Se computa junto a dispTotals (FUERA del try/catch de summarize) para que
+    // el desglose/framing siga renderizando aunque summarize() falle.
+    const methodTotals = {
+      efectivo: PaymentService.computeTotals(totalItems, 'efectivo', 0, 0, currency).servicesTotal,
+      transferencia: PaymentService.computeTotals(totalItems, 'transferencia', 0, 0, currency).servicesTotal,
+      tarjeta: PaymentService.computeTotals(totalItems, 'tarjeta', 0, 0, currency).servicesTotal,
+    };
+    // Sin ningún pricesByType no se puede armar el desglose por método: se cae al render legado.
+    const hasPricesByType = totalItems.some((it) => it.pricesByType && typeof it.pricesByType === 'object');
+
+    // Ajustes de la reservación (cargos/descuentos), itemizados en la vista. El ajuste automático
+    // de reconciliación (source payment-method-reconciliation) ya trae descripción neutral: se
+    // renderiza verbatim. Se normaliza fuera del try/catch para que sobreviva a un fallo de summarize.
+    const rawAdjustments = reservation.get('adjustments');
+    const adjustments = (Array.isArray(rawAdjustments) ? rawAdjustments : []).map((a) => ({
+      id: (a && a.id) ? a.id : '',
+      type: (a && a.type === 'discount') ? 'discount' : 'charge',
+      description: (a && typeof a.description === 'string') ? a.description : '',
+      amount: Number(a && a.amount) || 0,
+      source: (a && a.source) ? a.source : null,
+    }));
+
     // Payment rollup (fresh, non-persisting): amount paid, balance and status.
     // payment.total includes the reservation tip (the full amount due); serviceItems.total does not.
     let payment = {
@@ -613,6 +645,8 @@ class PublicReservationController {
       leadGuestFirstName: reservation.get('leadGuestFirstName') || snapshot.leadGuestFirstName || '',
       leadGuestLastName: reservation.get('leadGuestLastName') || snapshot.leadGuestLastName || '',
       rate: this.formatRateData(rate),
+      isAgency,
+      adjustments,
       serviceItems: {
         days,
         subtotal,
@@ -620,6 +654,8 @@ class PublicReservationController {
         total,
         paymentType,
         currency,
+        methodTotals,
+        hasPricesByType,
       },
       payment,
       createdAt: reservation.get('createdAt') || null,

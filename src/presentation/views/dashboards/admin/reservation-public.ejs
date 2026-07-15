@@ -70,6 +70,21 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
         .resv-conf .rc-pay-row.rc-pay-total .v{font-weight:700;font-size:16px;color:#111}
         /* Outstanding balance: emphasize the amount due. */
         .resv-conf .rc-pay-row.rc-pay-balance .v{font-weight:700;color:#b8860b}
+        /* Adjustment sign tokens — scoped (no Bootstrap here). Sign is ALSO in the text, never
+           color alone. Both >= 4.5:1 contrast on white (#b02a37 ~7:1, #146c43 ~5.8:1). */
+        .resv-conf .rc-adj-charge{color:#b02a37}
+        .resv-conf .rc-adj-discount{color:#146c43}
+        .resv-conf .rc-pay-row .l i{font-size:12px;vertical-align:-1px;margin-right:2px}
+        /* Per-service breakdown by method (native <details>, keyboard-operable, no JS). */
+        .resv-conf .rc-mini{margin-top:4px}
+        .resv-conf .rc-mini>summary{cursor:pointer;color:#4b5bdc;font-size:11px;letter-spacing:.3px;list-style:none}
+        .resv-conf .rc-mini>summary::-webkit-details-marker{display:none}
+        .resv-conf .rc-mini>summary::before{content:'\25B8';margin-right:5px;font-size:10px}
+        .resv-conf .rc-mini[open]>summary::before{content:'\25BE'}
+        .resv-conf .rc-mini-body{border:1px solid #d8d7cd;border-radius:4px;margin-top:5px}
+        .resv-conf .rc-mini-row{display:flex;justify-content:space-between;gap:12px;padding:3px 10px;border-bottom:1px solid #e6e5db;font-size:12px}
+        .resv-conf .rc-mini-row:last-child{border-bottom:none}
+        .resv-conf .rc-mini-active{color:#4b5bdc;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
         /* Status pill (scoped — no Bootstrap badges on this standalone page). */
         .resv-conf .rc-pay-status{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;line-height:1.5;color:#fff;background:#8a8a8a}
         .resv-conf .rc-pay-status-paid{background:#2bb673}
@@ -163,6 +178,20 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
             var payTip = Number(pay.tip) || 0;
             var PAY_STATUS_LABELS = { pending: 'Pendiente de pago', partial: 'Pago parcial', paid: 'Pagado', refunded: 'Reembolsado' };
             var payStatusLabel = PAY_STATUS_LABELS[payStatus] || PAY_STATUS_LABELS.pending;
+            // Framing por tipo de cliente. isAgency sin resolver (undefined) se trata como false
+            // (framing de descuento), nunca de recargo.
+            var isAgency = quote.isAgency === true;
+            var methodTotals = svc.methodTotals || {};
+            var hasPricesByType = svc.hasPricesByType === true;
+            var tarjetaTotal = Number(methodTotals.tarjeta);
+            // Descuento (cliente directo) = precio de lista (tarjeta) − total del método activo.
+            var discountAmount = (isFinite(tarjetaTotal) && isFinite(Number(sumTotal))) ? (tarjetaTotal - Number(sumTotal)) : 0;
+            var adjustments = Array.isArray(quote.adjustments) ? quote.adjustments : [];
+            // Total a pagar EXACTO = payment.total (servicios + ajustes + propina), la misma cifra
+            // que PaymentService.summarize; si no vino, cae al total de servicios activo.
+            var payTotalDue = (pay.total === null || pay.total === undefined || !isFinite(Number(pay.total)))
+                ? (isFinite(Number(sumTotal)) ? Number(sumTotal) : null)
+                : Number(pay.total);
             function fmtMoney(n) {
                 if (n === null || n === undefined || n === '') return '';
                 var num = Number(n);
@@ -177,7 +206,31 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
             <% (day.subconcepts || []).forEach(function(sc){ %>
                 <% counter++; %>
                 <%
-                    var payTotal = (sc.pricesByType && paymentType && sc.pricesByType[paymentType]) || sc.total;
+                    // Precio del método activo con el MISMO chequeo de finitud que PaymentService.chargeAmount:
+                    // un precio legítimo de 0 se muestra, no cae al fallback item.total (bug del `||` anterior).
+                    var payTotal;
+                    var pbt = sc.pricesByType;
+                    if (pbt && typeof pbt === 'object' && paymentType && isFinite(Number(pbt[paymentType]))) {
+                        payTotal = Number(pbt[paymentType]);
+                    } else {
+                        var scTotalNum = Number(sc.total);
+                        payTotal = isFinite(scTotalNum) ? scTotalNum : null;
+                    }
+                    // Mini-tabla por método: solo con >= 2 claves finitas. Una clave ausente/no-finita se
+                    // OMITE (nunca $0/NaN); un 0 explícito SÍ se muestra. Método activo marcado con texto+símbolo.
+                    var miniMethods = [{ k: 'efectivo', l: 'Efectivo' }, { k: 'transferencia', l: 'Transferencia' }, { k: 'tarjeta', l: 'Tarjeta' }];
+                    var miniRows = [];
+                    if (pbt && typeof pbt === 'object') {
+                        miniMethods.forEach(function(m){ var v = Number(pbt[m.k]); if (isFinite(v)) { miniRows.push({ k: m.k, l: m.l, v: v }); } });
+                    }
+                    var miniTableHtml = '';
+                    if (miniRows.length >= 2) {
+                        var miniRowsHtml = miniRows.map(function(r){
+                            var mark = (r.k === paymentType) ? ' <span class="rc-mini-active"><i class="ti ti-point-filled" aria-hidden="true"></i> Método actual</span>' : '';
+                            return '<div class="rc-mini-row"><span>' + r.l + mark + '</span><span>' + fmtMoney(r.v) + '</span></div>';
+                        }).join('');
+                        miniTableHtml = '<details class="rc-mini"><summary>Ver desglose por método de pago</summary><div class="rc-mini-body">' + miniRowsHtml + '</div></details>';
+                    }
                     var includes = (sc.includedExperiences && sc.includedExperiences.length) ? sc.includedExperiences.join(', ') : '';
                     var payDisplay;
                     if (payTotal === 0) { payDisplay = 'Sin costo'; }
@@ -238,7 +291,7 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                                 <% if (paxStr) { %>
                                 <div class="rc-tc rc-c6"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
                                 <% } %>
-                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span><%- miniTableHtml %></div>
                             </div>
                         <% } else if (sc.type === 'tour') { %>
                             <% var duracion = sc.duration || sc.hours; %>
@@ -258,7 +311,7 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                                 <% if (paxStr) { %>
                                 <div class="rc-tc rc-c6"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
                                 <% } %>
-                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span><%- miniTableHtml %></div>
                             </div>
                         <% } else if (sc.type === 'experience' || sc.type === 'experiencia') { %>
                             <div class="rc-tbl">
@@ -271,7 +324,7 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                                 <% if (paxStr) { %>
                                 <div class="rc-tc rc-c6"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
                                 <% } %>
-                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span><%- miniTableHtml %></div>
                             </div>
                         <% } else if (sc.type === 'a-disposicion') { %>
                             <div class="rc-tbl">
@@ -286,7 +339,7 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                                 <% if (paxStr) { %>
                                 <div class="rc-tc rc-c6"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
                                 <% } %>
-                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span><%- miniTableHtml %></div>
                             </div>
                         <% } else if (sc.type === 'concepto') { %>
                             <div class="rc-tbl">
@@ -294,10 +347,10 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                                 <% if (paxStr) { %>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
-                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span><%- miniTableHtml %></div>
                                 <% } else { %>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
-                                <div class="rc-tc rc-c3"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span><%- miniTableHtml %></div>
                                 <% } %>
                             </div>
                         <% } else { %>
@@ -307,10 +360,10 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                                 <% if (paxStr) { %>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
-                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <div class="rc-tc rc-c6"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span><%- miniTableHtml %></div>
                                 <% } else { %>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
-                                <div class="rc-tc rc-c3"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Pago Total</span><span class="rc-value"><%= payDisplay %></span><%- miniTableHtml %></div>
                                 <% } %>
                             </div>
                         <% } %>
@@ -319,20 +372,59 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
             <% }); %>
         <% }); %>
 
-        <% if (paymentLabel || sumTotal) { %>
+        <% if (paymentLabel || sumTotal || payTotalDue !== null) { %>
         <div class="rc-section-title">Resumen de pago:</div>
         <div class="rc-pay">
-            <% if (sumSubtotal) { %>
-            <div class="rc-pay-row"><span class="l">Subtotal</span><span class="v"><%= fmtMoney(sumSubtotal) %></span></div>
+            <% if (hasPricesByType) { %>
+                <% if (isAgency) { %>
+                    <%
+                        // Agencia: nunca "descuento". Subtotal + IVA (transferencia) / IVA + comisión (tarjeta).
+                        // La fila de IVA se decide SOLO por el método (paymentType !== 'efectivo'), NUNCA por un
+                        // recargo calculado != 0: el redondeo a efectivo puede dejar un delta que NO debe abrirla.
+                        var showIva = paymentType !== 'efectivo';
+                        var agencySubtotal = showIva ? sumSubtotal : sumTotal;
+                        var ivaLabel = (paymentType === 'tarjeta') ? 'IVA + comisión de tarjeta' : 'IVA';
+                    %>
+                    <div class="rc-pay-row"><span class="l">Subtotal</span><span class="v"><%= fmtMoney(agencySubtotal) %></span></div>
+                    <% if (showIva) { %>
+                    <div class="rc-pay-row"><span class="l"><%= ivaLabel %></span><span class="v"><%= fmtMoney(sumIva) %></span></div>
+                    <% } %>
+                <% } else { %>
+                    <%
+                        // Cliente directo: tarjeta = precio de lista; método más barato = descuento (nunca recargo).
+                        var listPrice = isFinite(tarjetaTotal) ? tarjetaTotal : Number(sumTotal);
+                        var showDiscount = paymentType !== 'tarjeta' && discountAmount > 0;
+                        var discLabel = (paymentType === 'transferencia') ? 'Descuento pago transferencia' : 'Descuento pago efectivo';
+                    %>
+                    <div class="rc-pay-row"><span class="l">Precio de lista</span><span class="v"><%= fmtMoney(listPrice) %></span></div>
+                    <% if (showDiscount) { %>
+                    <div class="rc-pay-row"><span class="l"><%= discLabel %></span><span class="v rc-adj-discount">-<%= fmtMoney(discountAmount) %></span></div>
+                    <% } %>
+                <% } %>
+            <% } else { %>
+                <%# Sin pricesByType: fallback exacto al comportamiento previo (Subtotal / Recargo / ...). %>
+                <% if (sumSubtotal) { %>
+                <div class="rc-pay-row"><span class="l">Subtotal</span><span class="v"><%= fmtMoney(sumSubtotal) %></span></div>
+                <% } %>
+                <% if (sumIva) { %>
+                <div class="rc-pay-row"><span class="l">Recargo <%= paymentLabel ? ('(' + paymentLabel + ')') : '' %></span><span class="v"><%= fmtMoney(sumIva) %></span></div>
+                <% } %>
             <% } %>
-            <% if (sumIva) { %>
-            <div class="rc-pay-row"><span class="l">Recargo <%= paymentLabel ? ('(' + paymentLabel + ')') : '' %></span><span class="v"><%= fmtMoney(sumIva) %></span></div>
-            <% } %>
-            <% if (sumTotal) { %>
-            <div class="rc-pay-row rc-pay-total"><span class="l">Total</span><span class="v"><%= fmtMoney(sumTotal) %></span></div>
+            <% if (adjustments.length) { %>
+            <div class="rc-pay-row"><span class="l">Subtotal servicios</span><span class="v"><%= fmtMoney(sumTotal) %></span></div>
+                <% adjustments.forEach(function(adj){ %>
+                    <% if (adj.type === 'charge') { %>
+                    <div class="rc-pay-row"><span class="l"><i class="ti ti-plus rc-adj-charge" aria-hidden="true"></i><%= adj.description || 'Ajuste' %></span><span class="v rc-adj-charge">+<%= fmtMoney(adj.amount) %></span></div>
+                    <% } else { %>
+                    <div class="rc-pay-row"><span class="l"><i class="ti ti-discount-2 rc-adj-discount" aria-hidden="true"></i><%= adj.description || 'Ajuste' %></span><span class="v rc-adj-discount">-<%= fmtMoney(adj.amount) %></span></div>
+                    <% } %>
+                <% }); %>
             <% } %>
             <% if (payTip > 0) { %>
             <div class="rc-pay-row"><span class="l">Propina</span><span class="v"><%= fmtMoney(payTip) %></span></div>
+            <% } %>
+            <% if (payTotalDue !== null) { %>
+            <div class="rc-pay-row rc-pay-total"><span class="l">Total a pagar</span><span class="v"><%= fmtMoney(payTotalDue) %></span></div>
             <% } %>
             <div class="rc-pay-row"><span class="l">Pagado</span><span class="v"><%= fmtMoney(payPaid) %></span></div>
             <div class="rc-pay-row<%= (payBalance !== null && payBalance > 0) ? ' rc-pay-balance' : '' %>">
