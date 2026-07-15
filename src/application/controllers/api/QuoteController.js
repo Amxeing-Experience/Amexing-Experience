@@ -2432,16 +2432,21 @@ class QuoteController {
         paymentType,
       };
 
-      // Bloqueo por-servicio (Fase 1): los subconceptos marcados adminLocked (agregados/editados
-      // por un admin) NO pueden ser editados, movidos ni eliminados por no-admins, y solo
-      // admin/superadmin pueden marcar un servicio como bloqueado. Los locks son "sticky" por id.
-      // Esto refuerza en el servidor lo que la UI ya impide (a prueba de bypass del request).
+      // Bloqueo por-servicio: los subconceptos PROTEGIDOS no pueden ser editados, movidos ni
+      // eliminados por no-admins (el servidor los restaura), reforzando lo que la UI ya impide.
+      // Un subconcepto está protegido si:
+      //  - es adminLocked (agregado/editado por un admin), o
+      //  - la cotización ya es reservación (scheduled/hold) y toca proveedor/establecimiento
+      //    (providerType): cualquier cambio debe pasar por una solicitud aprobada por admin.
+      // Los locks son "sticky" por id. Solo admin/superadmin pueden editar directo.
       const isAdminUser = ['admin', 'superadmin'].includes(req.userRole);
+      const isReservation = ['scheduled', 'hold'].includes(quote.get('status'));
       const storedServiceItems = quote.get('serviceItems') || {};
       const storedLockedById = new Map();
       (Array.isArray(storedServiceItems.days) ? storedServiceItems.days : []).forEach((d) => {
         (d.subconcepts || []).forEach((sc) => {
-          if (sc && sc.id && sc.adminLocked) {
+          // Protegido: adminLocked, o reservación (scheduled/hold) que toca proveedor/establecimiento.
+          if (sc && sc.id && (sc.adminLocked || (isReservation && !!sc.providerType))) {
             storedLockedById.set(sc.id, { sub: sc, dayNumber: d.dayNumber });
           }
         });
@@ -2456,9 +2461,13 @@ class QuoteController {
             const locked = storedLockedById.get(sc.id);
             if (locked) {
               seenLockedIds.add(sc.id);
-              // Sticky: siempre queda bloqueado. Para no-admin se restaura el contenido guardado
-              // (no puede editar el servicio del admin); admin conserva sus cambios.
-              return isAdminUser ? { ...sc, adminLocked: true } : { ...locked.sub, adminLocked: true };
+              // Sticky: para no-admin se restaura el contenido guardado (no puede editar un
+              // servicio protegido); admin conserva sus cambios. Se PRESERVA el adminLocked
+              // original: un servicio de proveedor del owner (adminLocked=false) sigue sin
+              // marcarse como admin-locked; solo queda protegido por la regla de reservación.
+              return isAdminUser
+                ? { ...sc, adminLocked: true }
+                : { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
             }
             // Un no-admin no puede marcar como bloqueado un servicio nuevo.
             if (!isAdminUser && sc.adminLocked) {
@@ -2473,7 +2482,7 @@ class QuoteController {
         if (!isAdminUser) {
           storedLockedById.forEach((locked, id) => {
             if (seenLockedIds.has(id)) return;
-            const restored = { ...locked.sub, adminLocked: true };
+            const restored = { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
             let idx = enforcedDays.findIndex((d) => d.dayNumber === locked.dayNumber);
             if (idx < 0) idx = enforcedDays.length > 0 ? 0 : -1;
             if (idx >= 0) {
@@ -2485,7 +2494,7 @@ class QuoteController {
               enforcedDays.push({ dayNumber: locked.dayNumber || 1, dayTitle: '', subconcepts: [restored] });
             }
           });
-          logger.info('updateServiceItems: enforced admin-locked services for non-admin', {
+          logger.info('updateServiceItems: enforced protected services for non-admin', {
             quoteId: quote.id,
             userRole: req.userRole,
             lockedCount: storedLockedById.size,
@@ -2600,7 +2609,10 @@ class QuoteController {
         if (sc && sc.id === serviceId) target = sc;
       }));
       if (!target) return this.sendError(res, 'Servicio no encontrado en la cotización', 404);
-      if (!target.adminLocked) {
+      // Se permite solicitar cambio si el servicio está protegido: adminLocked, o bien la
+      // cotización ya es reservación (scheduled/hold) y el servicio toca proveedor/establecimiento.
+      const isReservation = ['scheduled', 'hold'].includes(quote.get('status'));
+      if (!target.adminLocked && !(isReservation && !!target.providerType)) {
         return this.sendError(res, 'Este servicio no está bloqueado; puedes editarlo directamente', 400);
       }
       if (target.changeRequest && target.changeRequest.status === 'pending') {
