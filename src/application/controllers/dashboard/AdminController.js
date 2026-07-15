@@ -185,6 +185,17 @@ class AdminController extends RoleBasedController {
         anniversary: client.anniversary || client.get?.('anniversary') || null,
         createdAt: client.createdAt || client.get?.('createdAt'),
         updatedAt: client.updatedAt || client.get?.('updatedAt'),
+        // Campos de persona (Cliente Directo / end_client) para prefill del form de edición unificado.
+        companyType: client.companyType || client.get?.('companyType') || null,
+        contactFirstName: client.contactFirstName || client.get?.('contactFirstName') || '',
+        contactLastName: client.contactLastName || client.get?.('contactLastName') || '',
+        emergencyContactName: client.emergencyContactName || client.get?.('emergencyContactName') || '',
+        emergencyContactPhone: client.emergencyContactPhone || client.get?.('emergencyContactPhone') || '',
+        preferredLanguage: client.preferredLanguage || client.get?.('preferredLanguage') || 'es',
+        accessibilityRequirements:
+          client.accessibilityRequirements || client.get?.('accessibilityRequirements') || '',
+        allergies: client.allergies || client.get?.('allergies') || [],
+        dietaryRestrictions: client.dietaryRestrictions || client.get?.('dietaryRestrictions') || [],
       };
 
       // Determine active section (default: information)

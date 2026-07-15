@@ -10,6 +10,7 @@
  */
 %>
 <%- include('form-editorial-styles') %>
+<% var showPwd = (typeof showPassword === 'undefined') ? true : !!showPassword; %>
 <div class="client-form-editorial">
                         <!-- ===== Bloque esencial: lo mínimo para crear (requeridos agrupados) ===== -->
                         <div class="mb-4">
@@ -74,7 +75,8 @@
                                         helpText: 'Requerido si defines contraseña'
                                     }) %>
                                 </div>
-                                <!-- Contraseña (opcional): mismo componente que el form de agencia -->
+                                <!-- Contraseña (opcional): mismo componente que el form de agencia. Oculta en edición (reset aparte) -->
+                                <% if (showPwd) { %>
                                 <div class="col-md-6">
                                     <%- include('../../molecules/common/password-field', {
                                         id: 'directClientPassword',
@@ -84,6 +86,7 @@
                                         helpText: ''
                                     }) %>
                                 </div>
+                                <% } %>
                             </div>
 
                             <div class="row">
@@ -459,5 +462,47 @@
     window.cffSyncCategory = sync;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', sync);
     else sync();
+})();
+</script>
+<script>
+(function () {
+    // Prefill de edición (server-side JSON → setea #directClient*). En alta el objeto va vacío → no hace nada.
+    var d = <%- JSON.stringify((typeof client !== 'undefined' && client) ? client : {}).replace(/</g, '\\u003c') %>;
+    if (!d || !Object.keys(d).length) return;
+    function set(id, val) { var el = document.getElementById(id); if (el && val != null && val !== '') el.value = val; }
+    function run() {
+        set('directClientFirstName', d.firstName);
+        set('directClientLastName', d.lastName);
+        set('directClientEmail', d.email);
+        set('directClientPhone', d.phone);
+        if (d.birthDate) { var bd = new Date(d.birthDate); if (!isNaN(bd)) set('directClientBirthDate', bd.toISOString().split('T')[0]); }
+        set('directClientCompanyName', d.companyName);
+        set('directClientCompanyType', d.companyType);
+        set('directClientWebsite', d.website);
+        set('directClientContactFirstName', d.contactFirstName);
+        set('directClientContactLastName', d.contactLastName);
+        set('directClientEmergencyContactName', d.emergencyContactName);
+        set('directClientEmergencyContactPhone', d.emergencyContactPhone);
+        set('directClientStreetType', d.streetType);
+        set('directClientStreetName', d.streetName);
+        set('directClientExteriorNumber', d.exteriorNumber);
+        set('directClientInteriorNumber', d.interiorNumber);
+        set('directClientColonia', d.colonia);
+        set('directClientCity', d.city);
+        set('directClientState', d.state);
+        set('directClientPostalCode', d.postalCode);
+        set('directClientPreferredLanguage', d.preferredLanguage);
+        set('directClientAccessibilityRequirements', d.accessibilityRequirements);
+        set('directClientAllergies', d.allergies);
+        set('directClientDietaryRestrictions', d.dietaryRestrictions);
+        set('directClientNotes', d.notes);
+        // Categoría (segmented): setear hidden y reflejar en el segmento
+        if (d.clientCategory) { var hid = document.getElementById('directClientCategory'); if (hid) hid.value = d.clientCategory; }
+        if (typeof window.cffSyncCategory === 'function') window.cffSyncCategory();
+        // Abrir los acordeones que ahora tienen datos
+        if (typeof window.cffRefreshAccordions === 'function') window.cffRefreshAccordions();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+    else run();
 })();
 </script>

@@ -38,7 +38,27 @@ const clientData = {
     birthDate: client.birthDate || null,
     anniversary: client.anniversary || null,
     createdAt: client.createdAt || null,
-    updatedAt: client.updatedAt || null
+    updatedAt: client.updatedAt || null,
+    // Campos de persona (Cliente Directo) para el form de edición unificado (prefill).
+    companyType: client.companyType || null,
+    contactFirstName: client.contactFirstName || '',
+    contactLastName: client.contactLastName || '',
+    emergencyContactName: client.emergencyContactName || '',
+    emergencyContactPhone: client.emergencyContactPhone || '',
+    preferredLanguage: client.preferredLanguage || 'es',
+    accessibilityRequirements: client.accessibilityRequirements || '',
+    allergies: Array.isArray(client.allergies) ? client.allergies.join('\n') : (client.allergies || ''),
+    dietaryRestrictions: Array.isArray(client.dietaryRestrictions)
+        ? client.dietaryRestrictions.join('\n') : (client.dietaryRestrictions || ''),
+    // Dirección estructurada (end_client la guarda así; fallback a legacy street/zipCode).
+    streetType: getNestedProperty(client, 'address.streetType', 'Calle'),
+    streetName: getNestedProperty(client, 'address.streetName', '') || getNestedProperty(client, 'address.street', ''),
+    exteriorNumber: getNestedProperty(client, 'address.exteriorNumber', ''),
+    interiorNumber: getNestedProperty(client, 'address.interiorNumber', ''),
+    colonia: getNestedProperty(client, 'address.colonia', ''),
+    city: getNestedProperty(client, 'address.city', ''),
+    state: getNestedProperty(client, 'address.state', ''),
+    postalCode: getNestedProperty(client, 'address.postalCode', '') || getNestedProperty(client, 'address.zipCode', '')
 };
 
 const clientId = clientData.id;
@@ -429,9 +449,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 <% } else { %>
                     <span class="badge bg-danger fs-6"><i class="ti ti-x-circle me-1"></i>Inactivo</span>
                 <% } %>
-                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editClientModal">
-                    <i class="ti ti-edit me-1"></i>Editar
-                </button>
                 <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#resetPasswordModal">
                     <i class="ti ti-key me-1"></i>Restablecer Contraseña
                 </button>
@@ -647,55 +664,42 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-white"><h5 class="mb-0"><i class="ti ti-info-circle me-2 text-primary"></i>Información del Cliente</h5></div>
                 <div class="card-body">
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-user me-1"></i><%= isAgency ? 'Datos del Agente Admin' : 'Información Básica' %></h6>
-                        <div class="row">
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Nombre</label><p class="fw-semibold mb-0"><%= clientData.firstName || 'N/A' %></p></div>
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Apellido</label><p class="fw-semibold mb-0"><%= clientData.lastName || 'N/A' %></p></div>
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Email</label><p class="mb-0"><a href="mailto:<%= clientData.email %>"><i class="ti ti-mail me-1"></i><%= clientData.email %></a></p></div>
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Teléfono</label><p class="mb-0"><% if (clientData.phone) { %><a href="tel:<%= clientData.phone %>"><i class="ti ti-phone me-1"></i><%= clientData.phone %></a><% } else { %>N/A<% } %></p></div>
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Fecha de nacimiento</label><p class="mb-0"><% if (clientData.birthDate && !isNaN(new Date(clientData.birthDate))) { %><i class="ti ti-cake me-1"></i><%= new Date(clientData.birthDate).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }) %><% } else { %>N/A<% } %></p></div>
+                    <!-- ===== Información editable inline (form unificado prefilled; sin modal) ===== -->
+                    <form id="editClientForm" novalidate>
+                        <%- include('../../organisms/forms/form-editorial-styles') %>
+<% if (isAgency) { %>
+                        <%- include('../../organisms/forms/agency-form-fields', { client: clientData, showPassword: false }) %>
+<% } else { %>
+                        <%- include('../../organisms/forms/client-form-fields', { client: clientData, showPassword: false }) %>
+<% } %>
+                        <div class="client-form-editorial">
+                            <div class="mb-3">
+                                <%- include('../../atoms/form/select', {
+                                    id: 'editActive',
+                                    name: 'active',
+                                    label: 'Estado',
+                                    value: (clientData.active === false ? 'false' : 'true'),
+                                    options: [
+                                        { value: 'true', label: 'Activo' },
+                                        { value: 'false', label: 'Inactivo' }
+                                    ],
+                                    required: false,
+                                    helpText: 'Cambiar a inactivo deshabilitará el acceso al sistema'
+                                }) %>
+                            </div>
                         </div>
-                    </div>
-                    <%
-                    // Empresa/Dirección Fiscal: las agencias siempre las muestran; los demás
-                    // clientes solo si capturaron algún dato (si no, se ocultan ambas secciones).
-                    const hasCompanyData = !!(clientData.companyName || clientData.taxId || clientData.website
-                        || clientData.addressStreet || clientData.addressCity || clientData.addressState
-                        || clientData.addressZipCode || clientData.addressCountry);
-                    %>
-                    <% if (isAgency || hasCompanyData) { %>
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-building me-1"></i>Información de la Empresa</h6>
-                        <div class="row">
-                            <div class="col-md-12 mb-3"><label class="form-label text-muted small">Nombre de la Empresa</label><p class="fw-semibold mb-0"><%= clientData.companyName || 'N/A' %></p></div>
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">RFC</label><p class="mb-0"><%= clientData.taxId || 'N/A' %></p></div>
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Sitio Web</label><p class="mb-0"><% if (clientData.website) { %><a href="<%= clientData.website %>" target="_blank"><i class="ti ti-external-link me-1"></i><%= clientData.website %></a><% } else { %>N/A<% } %></p></div>
-                        </div>
-                    </div>
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-map-pin me-1"></i>Dirección Fiscal</h6>
-                        <div class="row">
-                            <div class="col-md-12 mb-3"><label class="form-label text-muted small">Calle</label><p class="mb-0"><%= clientData.addressStreet || 'N/A' %></p></div>
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Ciudad</label><p class="mb-0"><%= clientData.addressCity || 'N/A' %></p></div>
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Estado</label><p class="mb-0"><%= clientData.addressState || 'N/A' %></p></div>
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">CP</label><p class="mb-0"><%= clientData.addressZipCode || 'N/A' %></p></div>
-                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">País</label><p class="mb-0"><%= clientData.addressCountry || 'N/A' %></p></div>
-                        </div>
-                    </div>
-                    <% } %>
-                    <% if (clientData.notes) { %>
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-notes me-1"></i>Notas</h6>
-                        <p class="text-muted mb-0"><%= clientData.notes %></p>
-                    </div>
-                    <% } %>
+                        <input type="hidden" id="editClientId" name="clientId" value="<%= clientData.id %>">
+                    </form>
                     <div class="mb-0">
                         <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-clock me-1"></i>Registro</h6>
                         <div class="row">
                             <div class="col-md-6 mb-3"><label class="form-label text-muted small">Fecha de Registro</label><p class="mb-0"><% if (clientData.createdAt) { %><%= new Date(clientData.createdAt).toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' }) %><% } else { %>N/A<% } %></p></div>
                             <div class="col-md-6 mb-3"><label class="form-label text-muted small">Actualización</label><p class="mb-0"><% if (clientData.updatedAt) { %><%= new Date(clientData.updatedAt).toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' }) %><% } else { %>N/A<% } %></p></div>
                         </div>
+                    </div>
+                    <!-- Guardar cambios (edición inline; reemplaza al modal viejo) -->
+                    <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+                        <button type="button" class="btn btn-primary" id="saveClientChanges"><i class="ti ti-device-floppy me-1"></i>Guardar cambios</button>
                     </div>
                 </div>
             </div>
@@ -3714,10 +3718,10 @@ function setupExperienceFilters() {
     document.addEventListener('editClient', function(event) {
         const { clientId, clientData } = event.detail;
         
-        // The editClientModal should already be populated with current client data
-        // since this is the client detail page. Just show the modal.
-        const editClientModal = new bootstrap.Modal(document.getElementById('editClientModal'));
-        editClientModal.show();
+        // Edición ahora es inline en el tab de Información (sin modal). Guard por si el evento
+        // 'editClient' llega desde una tabla: si no existe el modal, no hace nada.
+        const editClientModalEl = document.getElementById('editClientModal');
+        if (editClientModalEl) { new bootstrap.Modal(editClientModalEl).show(); }
     });
 
     // Initialize create employee modal on DOM ready
@@ -3804,7 +3808,14 @@ function setupExperienceFilters() {
                 }
             });
         }
-        
+
+        // Edición inline (sin modal): cablea el botón Guardar directamente.
+        const inlineSaveBtn = document.getElementById('saveClientChanges');
+        if (inlineSaveBtn) {
+            inlineSaveBtn.removeEventListener('click', updateClient);
+            inlineSaveBtn.addEventListener('click', updateClient);
+        }
+
         // Initialize validation cleanup for employee modal
         const editEmployeeModal = document.getElementById('editEmployeeModal');
         if (editEmployeeModal) {
@@ -4108,6 +4119,7 @@ function setupExperienceFilters() {
         // Gather form data — bifurca según el form renderizado (agencia unificada vs cliente viejo)
         const gv = function (id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
         const isAgencyEdit = !!document.getElementById('agencyFirstName');
+        const activeVal = document.getElementById('editActive') ? document.getElementById('editActive').value === 'true' : undefined;
         let formData;
         if (isAgencyEdit) {
             formData = {
@@ -4119,37 +4131,47 @@ function setupExperienceFilters() {
                 companyName: gv('agencyCompanyName') || undefined,
                 website: gv('agencyWebsite') || undefined,
                 notes: gv('agencyNotes') || undefined,
-                active: document.getElementById('editAgencyActive') ? document.getElementById('editAgencyActive').value === 'true' : undefined
+                active: activeVal
             };
         } else {
             formData = {
-                firstName: document.getElementById('editFirstName').value.trim(),
-                lastName: document.getElementById('editLastName').value.trim(),
-                email: document.getElementById('editEmail').value.trim(),
-                phone: document.getElementById('editPhone').value.trim() || undefined,
-                // Date input value is already YYYY-MM-DD; omit when empty so it doesn't clear an existing date.
-                birthDate: document.getElementById('editBirthDate').value || undefined,
-                companyName: document.getElementById('editCompanyName').value.trim(),
-                taxId: document.getElementById('editTaxId').value.trim() || undefined,
-                website: document.getElementById('editWebsite').value.trim() || undefined,
-                address: {
-                    street: document.getElementById('editStreet').value.trim() || undefined,
-                    city: document.getElementById('editCity').value.trim() || undefined,
-                    state: document.getElementById('editState').value.trim() || undefined,
-                    zipCode: document.getElementById('editZipCode').value.trim() || undefined,
-                    country: document.getElementById('editCountry').value.trim() || undefined
-                },
-                notes: document.getElementById('editNotes').value.trim() || undefined,
-                active: document.getElementById('editActive').value === 'true'
+                clientCategory: gv('directClientCategory') || undefined,
+                firstName: gv('directClientFirstName'),
+                lastName: gv('directClientLastName'),
+                email: gv('directClientEmail') || undefined,
+                phone: gv('directClientPhone') || undefined,
+                birthDate: gv('directClientBirthDate') || undefined,
+                contactFirstName: gv('directClientContactFirstName') || undefined,
+                contactLastName: gv('directClientContactLastName') || undefined,
+                emergencyContactName: gv('directClientEmergencyContactName') || undefined,
+                emergencyContactPhone: gv('directClientEmergencyContactPhone') || undefined,
+                companyName: gv('directClientCompanyName') || undefined,
+                companyType: gv('directClientCompanyType') || undefined,
+                website: gv('directClientWebsite') || undefined,
+                streetType: gv('directClientStreetType') || undefined,
+                streetName: gv('directClientStreetName') || undefined,
+                exteriorNumber: gv('directClientExteriorNumber') || undefined,
+                interiorNumber: gv('directClientInteriorNumber') || undefined,
+                colonia: gv('directClientColonia') || undefined,
+                city: gv('directClientCity') || undefined,
+                state: gv('directClientState') || undefined,
+                postalCode: gv('directClientPostalCode') || undefined,
+                preferredLanguage: gv('directClientPreferredLanguage') || undefined,
+                accessibilityRequirements: gv('directClientAccessibilityRequirements') || undefined,
+                allergies: gv('directClientAllergies') || undefined,
+                dietaryRestrictions: gv('directClientDietaryRestrictions') || undefined,
+                notes: gv('directClientNotes') || undefined,
+                active: activeVal
             };
         }
         
         // Get client ID
         const clientId = document.getElementById('editClientId').value;
-        
-        
+        // Endpoint por tipo: agencia → clients; cliente directo → owned-clients (endpoint rico).
+        const endpoint = isAgencyEdit ? `/api/clients/${clientId}` : `/api/owned-clients/${clientId}`;
+
         try {
-            const response = await fetch(`/api/clients/${clientId}`, {
+            const response = await fetch(endpoint, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -4172,12 +4194,8 @@ function setupExperienceFilters() {
                 throw new Error(result.error || 'Error al actualizar el cliente');
             }
             
-            // Close modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('editClientModal'));
-            modal.hide();
-            
             // Show success message
-            showSuccessMessage('Cliente actualizado exitosamente');
+            showSuccessMessage('Cambios guardados exitosamente');
             
             // Reload page after a short delay to show updated data
             setTimeout(() => {
@@ -4582,241 +4600,6 @@ function setupExperienceFilters() {
         }, hideDelay);
     }
 </script>
-
-<!-- Edit Client Modal -->
-<div class="modal fade" id="editClientModal" tabindex="-1" aria-labelledby="editClientModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title text-white" id="editClientModalLabel">
-                    <i class="ti ti-edit me-2"></i><%= isAgency ? 'Editar Agencia' : 'Editar Cliente' %>
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editClientForm">
-<% if (isAgency) { %>
-                    <!-- ===== Edición unificada de AGENCIA (form nuevo prefilled, sin password) ===== -->
-                    <%- include('../../organisms/forms/form-editorial-styles') %>
-                    <%- include('../../organisms/forms/agency-form-fields', { client: clientData, showPassword: false }) %>
-                    <div class="client-form-editorial">
-                        <div class="mb-3">
-                            <%- include('../../atoms/form/select', {
-                                id: 'editAgencyActive',
-                                name: 'active',
-                                label: 'Estado',
-                                value: (clientData.active === false ? 'false' : 'true'),
-                                options: [
-                                    { value: 'true', label: 'Activo' },
-                                    { value: 'false', label: 'Inactivo' }
-                                ],
-                                required: false,
-                                helpText: 'Cambiar a inactivo deshabilitará el acceso de la agencia al sistema'
-                            }) %>
-                        </div>
-                    </div>
-<% } else { %>
-                    <!-- Personal Information Section -->
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                            <i class="ti ti-user me-1"></i><%= isAgency ? 'Datos del Agente Admin' : 'Información Básica' %>
-                        </h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <%- include('../../atoms/common/first-name-input', {
-                                    id: 'editFirstName',
-                                    name: 'firstName',
-                                    value: clientData.firstName || '',
-                                    required: true,
-                                    label: 'Nombre'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../atoms/common/last-name-input', {
-                                    id: 'editLastName',
-                                    name: 'lastName',
-                                    value: clientData.lastName || '',
-                                    required: true,
-                                    label: 'Apellido'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../atoms/common/email-input', {
-                                    id: 'editEmail',
-                                    name: 'email',
-                                    value: clientData.email || '',
-                                    required: true,
-                                    label: 'Email'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../atoms/common/phone-input', {
-                                    id: 'editPhone',
-                                    name: 'phone',
-                                    value: clientData.phone || '',
-                                    required: false,
-                                    label: 'Teléfono'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../atoms/form/datepicker', {
-                                    id: 'editBirthDate',
-                                    name: 'birthDate',
-                                    label: 'Fecha de nacimiento',
-                                    value: (clientData.birthDate && !isNaN(new Date(clientData.birthDate))) ? new Date(clientData.birthDate).toISOString().split('T')[0] : '',
-                                    required: false,
-                                    min: '1900-01-01',
-                                    max: new Date().toISOString().split('T')[0]
-                                }) %>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Company Information Section -->
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                            <i class="ti ti-building me-1"></i>Información de la Empresa
-                        </h6>
-                        <div class="row">
-                            <div class="col-md-12">
-                                <%- include('../../atoms/form/input-text', {
-                                    id: 'editCompanyName',
-                                    name: 'companyName',
-                                    label: 'Nombre de la Empresa',
-                                    value: clientData.companyName || '',
-                                    required: true,
-                                    placeholder: 'Ej: Empresa SA de CV'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../atoms/common/rfc-input', {
-                                    id: 'editTaxId',
-                                    name: 'taxId',
-                                    value: clientData.taxId || '',
-                                    required: false,
-                                    label: 'RFC'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../atoms/common/url-input', {
-                                    id: 'editWebsite',
-                                    name: 'website',
-                                    value: clientData.website || '',
-                                    required: false,
-                                    label: 'Sitio Web'
-                                }) %>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Fiscal Address Section -->
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                            <i class="ti ti-map-pin me-1"></i>Dirección Fiscal
-                        </h6>
-                        <div class="row">
-                            <div class="col-md-12">
-                                <%- include('../../atoms/form/input-text', {
-                                    id: 'editStreet',
-                                    name: 'addressStreet',
-                                    label: 'Calle',
-                                    value: clientData.addressStreet || '',
-                                    required: false,
-                                    placeholder: 'Ej: Av. Revolución 123'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../atoms/form/input-text', {
-                                    id: 'editCity',
-                                    name: 'addressCity',
-                                    label: 'Ciudad',
-                                    value: clientData.addressCity || '',
-                                    required: false,
-                                    placeholder: 'Ej: Ciudad de México'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../atoms/form/input-text', {
-                                    id: 'editState',
-                                    name: 'addressState',
-                                    label: 'Estado',
-                                    value: clientData.addressState || '',
-                                    required: false,
-                                    placeholder: 'Ej: Ciudad de México'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../atoms/common/postal-code-input', {
-                                    id: 'editZipCode',
-                                    name: 'addressZipCode',
-                                    value: clientData.addressZipCode || '',
-                                    required: false,
-                                    label: 'Código Postal'
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../atoms/form/input-text', {
-                                    id: 'editCountry',
-                                    name: 'addressCountry',
-                                    label: 'País',
-                                    value: clientData.addressCountry || '',
-                                    required: false,
-                                    placeholder: 'México'
-                                }) %>
-                            </div>
-                        </div>
-                    </div>
-
-
-                    <!-- Additional Information Section -->
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                            <i class="ti ti-notes me-1"></i>Información Adicional
-                        </h6>
-                        <div class="row">
-                            <div class="col-md-12">
-                                <%- include('../../atoms/common/textarea', {
-                                    id: 'editNotes',
-                                    name: 'notes',
-                                    value: clientData.notes || '',
-                                    placeholder: 'Información adicional sobre el cliente...',
-                                    rows: 3,
-                                    required: false
-                                }) %>
-                            </div>
-                            <div class="col-md-12">
-                                <%- include('../../atoms/form/select', {
-                                    id: 'editActive',
-                                    name: 'active',
-                                    label: 'Estado',
-                                    value: clientData.active?.toString() || 'true',
-                                    options: [
-                                        {value: 'true', label: 'Activo'},
-                                        {value: 'false', label: 'Inactivo'}
-                                    ],
-                                    required: false,
-                                    helpText: 'Cambiar a inactivo deshabilitará el acceso del cliente al sistema'
-                                }) %>
-                            </div>
-                        </div>
-                    </div>
-
-<% } %>
-                    <!-- Hidden input for client ID -->
-                    <input type="hidden" id="editClientId" name="clientId" value="<%= clientData.id %>">
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="ti ti-x me-1"></i>Cancelar
-                </button>
-                <button type="button" class="btn btn-primary" id="saveClientChanges">
-                    <i class="ti ti-device-floppy me-1"></i>Guardar Cambios
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Reset Password Modal -->
 <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
