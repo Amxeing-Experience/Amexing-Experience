@@ -77,9 +77,10 @@ class OwnedClientsController {
 
   /**
    * Create a people-type client as an AmexingUser (role 'end_client') so they can log in.
-   * Username derives from email, or a placeholder when none is given; a random password is
-   * set (these accounts don't log in until invited). Mirrors the migration script.
-   * @param {object} data - Profile fields (firstName, lastName, email, clientCategory, ...).
+   * Username derives from email, or a placeholder when none is given. Si data.password viene, se
+   * usa esa contraseña (mustChangePassword=false, ya puede entrar); si no, una aleatoria y la cuenta
+   * no puede entrar hasta que se le invite/resetee. Mirrors the migration script.
+   * @param {object} data - Profile fields (firstName, lastName, email, clientCategory, password, ...).
    * @returns {Promise<AmexingUser>} The saved user.
    * @example
    */
@@ -117,8 +118,15 @@ class OwnedClientsController {
     });
 
     const crypto = require('crypto');
-    await user.setPassword(crypto.randomBytes(24).toString('base64'), false);
-    user.set('mustChangePassword', true);
+    if (data.password) {
+      // El admin definió una contraseña: el cliente puede iniciar sesión de inmediato con su email.
+      await user.setPassword(data.password, false);
+      user.set('mustChangePassword', false);
+    } else {
+      // Sin contraseña: aleatoria; la cuenta no puede entrar hasta que se le invite/resetee.
+      await user.setPassword(crypto.randomBytes(24).toString('base64'), false);
+      user.set('mustChangePassword', true);
+    }
 
     await user.save(null, { useMasterKey: true });
     return user;
@@ -512,6 +520,8 @@ class OwnedClientsController {
         birthDate,
         // Direct-client category (direct_client | wedding_planner | concierge | home_owner)
         clientCategory,
+        // Contraseña opcional para que el cliente directo pueda iniciar sesión (requiere email).
+        password,
         // Legacy address field for backward compatibility
         address,
       } = req.body;
@@ -519,6 +529,11 @@ class OwnedClientsController {
       // Validate required fields
       if (!firstName || !lastName) {
         return this.sendError(res, 'First name and last name are required', 400);
+      }
+
+      // Si se define contraseña, se necesita email (el login es por email).
+      if (password && !(email || '').trim()) {
+        return this.sendError(res, 'Para asignar una contraseña, el cliente debe tener email.', 400);
       }
 
       // Birth date — shared standard: past-only (1900..hoy). Clients are people, so no future.
@@ -578,6 +593,7 @@ class OwnedClientsController {
           dietaryRestrictions: processedDietaryRestrictions,
           clientCategory: finalCategory,
           birthDate,
+          password, // opcional: si viene, el cliente puede iniciar sesión de una vez
           createdBy: currentUser.id,
         });
         logger.info('End-client user created', { userId: created.id, category: finalCategory });

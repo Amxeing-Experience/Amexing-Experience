@@ -102,6 +102,19 @@ class AdminController extends RoleBasedController {
         return this.handleError(res, new Error('Autenticación requerida'), 401);
       }
 
+      // Modo "nuevo": la misma página sirve para crear (como quoteDetail con id 'new'). No hay
+      // fetch; la vista muestra solo el form de Información (vacío) y oculta los demás tabs.
+      if (clientId === 'new') {
+        return await this.renderRoleView(req, res, 'client-detail', {
+          title: 'Nuevo Cliente',
+          client: {},
+          isNewClient: true,
+          section: 'information',
+          subsection: null,
+          breadcrumb: null,
+        });
+      }
+
       // Use UserManagementService directly instead of HTTP call
       const UserManagementService = require('../../services/UserManagementService');
       const userService = new UserManagementService();
@@ -196,6 +209,7 @@ class AdminController extends RoleBasedController {
       const viewData = {
         title: `Cliente: ${displayName}`,
         client: clientData,
+        isNewClient: false,
         section,
         subsection,
         breadcrumb: null, // Disable automatic breadcrumb generation

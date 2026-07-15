@@ -37,30 +37,10 @@ const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 %>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-        <div class="row align-items-center">
-            <div class="col">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-building me-2"></i>
-                    Gestión de Clientes
-                </h5>
-                <small class="text-white" style="opacity: 0.9;">Administra empresas clientes y sus configuraciones</small>
-            </div>
-            <div class="col-auto">
-                <% if (canCreate) { %>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createClientModal">
-                            <i class="ti ti-plus me-1"></i>
-                            Nuevo Cliente
-                        </button>
-                    </div>
-                <% } %>
-            </div>
-        </div>
-    </div>
-
-    <div class="card-body">
+<!-- Look editorial "sin card blanca": el contenido va directo sobre el fondo de la página
+     (el título/acciones viven en el header de la página, no aquí). -->
+<div class="clients-table-area">
+    <div class="pt-1">
         <!-- Client Type Pills Filter -->
         <div class="row mb-3">
             <div class="col-12">

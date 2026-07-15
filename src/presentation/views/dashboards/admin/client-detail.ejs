@@ -81,6 +81,167 @@ const tarifarioTabs = [
 ];
 %>
 
+<% if (isNewClient) { %>
+<!-- ===== MODO NUEVO: crear cliente (misma página, sin controlador nuevo) ===== -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="mb-1 fw-bold">Nuevo Cliente</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="/dashboard/admin/clients"><i class="ti ti-building me-1"></i>Clientes</a></li>
+                        <li class="breadcrumb-item active">Nuevo</li>
+                    </ol>
+                </nav>
+            </div>
+            <a href="/dashboard/admin/clients" class="btn btn-sm btn-outline-secondary"><i class="ti ti-arrow-left me-1"></i>Volver</a>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-12">
+        <div style="max-width:880px;">
+            <!-- Toggle: Agencia / Cliente -->
+            <div class="client-form-editorial mb-4">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-users me-1"></i>Tipo de Cliente</h6>
+                <div class="btn-group w-100" role="group" aria-label="Tipo de cliente">
+                    <input type="radio" class="btn-check" name="pageClientType" id="pageTypeAgency" value="agency" checked>
+                    <label class="btn btn-outline-primary" for="pageTypeAgency"><i class="ti ti-building me-2"></i>Agencia</label>
+                    <input type="radio" class="btn-check" name="pageClientType" id="pageTypeClient" value="client">
+                    <label class="btn btn-outline-primary" for="pageTypeClient"><i class="ti ti-user me-2"></i>Cliente</label>
+                </div>
+                <div class="form-text mt-2" id="pageTypeHelp"><strong>Agencia:</strong> usuario con acceso al sistema para gestionar sus propios clientes y reservas.</div>
+            </div>
+
+            <!-- Formulario AGENCIA -->
+            <form id="createAgencyPageForm" novalidate>
+                <%- include('../../organisms/forms/agency-form-fields') %>
+                <div class="d-flex justify-content-end gap-2 mt-2 mb-4">
+                    <a href="/dashboard/admin/clients" class="btn btn-outline-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-primary" id="createAgencyPageSubmit"><i class="ti ti-plus me-1"></i>Crear Agencia</button>
+                </div>
+            </form>
+
+            <!-- Formulario CLIENTE (oculto por defecto) -->
+            <form id="createClientPageForm" novalidate style="display:none;">
+                <%- include('../../organisms/forms/client-form-fields', { client: {} }) %>
+                <div class="d-flex justify-content-end gap-2 mt-2 mb-4">
+                    <a href="/dashboard/admin/clients" class="btn btn-outline-secondary">Cancelar</a>
+                    <button type="submit" class="btn btn-primary" id="createClientPageSubmit"><i class="ti ti-plus me-1"></i>Crear Cliente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var agencyForm = document.getElementById('createAgencyPageForm');
+    var clientForm = document.getElementById('createClientPageForm');
+    var typeHelp = document.getElementById('pageTypeHelp');
+    if (!agencyForm || !clientForm) return;
+    var g = function (id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+    var pass = function (id) { var el = document.getElementById(id); return el && el.value ? el.value : undefined; };
+    var token = function () { return (document.cookie.match(/clientAccessToken=([^;]+)/) || [])[1] || ''; };
+
+    // Toggle mostrar/ocultar
+    document.querySelectorAll('input[name="pageClientType"]').forEach(function (r) {
+        r.addEventListener('change', function () {
+            var isAgency = document.getElementById('pageTypeAgency').checked;
+            agencyForm.style.display = isAgency ? '' : 'none';
+            clientForm.style.display = isAgency ? 'none' : '';
+            if (typeHelp) {
+                typeHelp.innerHTML = isAgency
+                    ? '<strong>Agencia:</strong> usuario con acceso al sistema para gestionar sus propios clientes y reservas.'
+                    : '<strong>Cliente:</strong> cliente final. Puede tener contraseña para ver sus cotizaciones y reservaciones.';
+            }
+        });
+    });
+
+    async function submitClient(endpoint, payload, btn) {
+        btn.disabled = true;
+        try {
+            var resp = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+            });
+            var data = await resp.json().catch(function () { return {}; });
+            if (resp.ok && data && data.success) {
+                var d = data.data || {};
+                var id = d.id || (d.client && (d.client.id || d.client.objectId)) || null;
+                window.location.href = id ? ('/dashboard/admin/clients/' + id) : '/dashboard/admin/clients';
+            } else {
+                alert((data && (data.error || data.message)) || 'No se pudo crear el registro');
+                btn.disabled = false;
+            }
+        } catch (err) {
+            alert('Error al crear el registro');
+            btn.disabled = false;
+        }
+    }
+
+    // AGENCIA → /api/clients
+    agencyForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var payload = {
+            firstName: g('agencyFirstName'),
+            lastName: g('agencyLastName'),
+            email: g('agencyEmail'),
+            password: pass('agencyPassword'),
+            phone: g('agencyPhone') || undefined,
+            companyName: g('agencyCompanyName') || undefined,
+            taxId: g('agencyTaxId') || undefined,
+            website: g('agencyWebsite') || undefined,
+            notes: g('agencyNotes') || undefined
+        };
+        if (!payload.firstName || !payload.lastName || !payload.email) { alert('Nombre, apellido y email del representante son obligatorios'); return; }
+        if (!payload.companyName) { alert('El nombre de la empresa es obligatorio'); return; }
+        if (!payload.password) { alert('La contraseña de la agencia es obligatoria'); return; }
+        submitClient('/api/clients', payload, document.getElementById('createAgencyPageSubmit'));
+    });
+
+    // CLIENTE → /api/owned-clients
+    clientForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var payload = {
+            clientCategory: g('directClientCategory') || undefined,
+            firstName: g('directClientFirstName'),
+            lastName: g('directClientLastName'),
+            email: g('directClientEmail') || undefined,
+            password: pass('directClientPassword'),
+            phone: g('directClientPhone') || undefined,
+            birthDate: g('directClientBirthDate') || undefined,
+            contactFirstName: g('directClientContactFirstName') || undefined,
+            contactLastName: g('directClientContactLastName') || undefined,
+            emergencyContactName: g('directClientEmergencyContactName') || undefined,
+            emergencyContactPhone: g('directClientEmergencyContactPhone') || undefined,
+            companyType: g('directClientCompanyType') || undefined,
+            taxId: g('directClientTaxId') || undefined,
+            website: g('directClientWebsite') || undefined,
+            streetType: g('directClientStreetType') || undefined,
+            streetName: g('directClientStreetName') || undefined,
+            exteriorNumber: g('directClientExteriorNumber') || undefined,
+            interiorNumber: g('directClientInteriorNumber') || undefined,
+            colonia: g('directClientColonia') || undefined,
+            city: g('directClientCity') || undefined,
+            state: g('directClientState') || undefined,
+            postalCode: g('directClientPostalCode') || undefined,
+            preferredLanguage: g('directClientPreferredLanguage') || 'es',
+            accessibilityRequirements: g('directClientAccessibilityRequirements') || undefined,
+            allergies: g('directClientAllergies') || undefined,
+            dietaryRestrictions: g('directClientDietaryRestrictions') || undefined,
+            notes: g('directClientNotes') || undefined
+        };
+        if (!payload.firstName || !payload.lastName) { alert('Nombre y apellido son obligatorios'); return; }
+        if (payload.password && !payload.email) { alert('Para asignar contraseña, el cliente necesita email'); return; }
+        submitClient('/api/owned-clients', payload, document.getElementById('createClientPageSubmit'));
+    });
+});
+</script>
+<% } else { %>
 <div class="row mb-4">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-start mb-3">
@@ -4522,3 +4683,5 @@ function setupExperienceFilters() {
         </div>
     </div>
 </div>
+
+<% } %>

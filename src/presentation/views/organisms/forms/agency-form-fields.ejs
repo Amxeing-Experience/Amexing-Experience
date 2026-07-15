@@ -1,0 +1,68 @@
+<%
+/**
+ * Campos del formulario de AGENCIA. Bloque esencial arriba (representante + empresa + contraseña,
+ * requeridos agrupados para alta rápida) + acordeón opcional (RFC, sitio web, notas). SIN dirección
+ * fiscal: lo fiscal se maneja por perfiles de facturación. Usa el estilo/JS de acordeón de
+ * client-form-fields (siempre co-presente en la página de crear). IDs con prefijo agency*.
+ * Created by Denisse Maldonado
+ */
+%>
+<div class="client-form-editorial">
+    <div class="mb-4">
+        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-user me-1"></i>Representante</h6>
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../atoms/common/first-name-input', { name: 'firstName', id: 'agencyFirstName', label: 'Nombre del Representante', required: true, placeholder: 'Ej: Juan', helpText: 'Contacto principal de la agencia' }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/common/last-name-input', { name: 'lastName', id: 'agencyLastName', label: 'Apellido del Representante', required: true, placeholder: 'Ej: Pérez García' }) %>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../atoms/common/email-input', { name: 'email', id: 'agencyEmail', label: 'Email Corporativo', required: true, placeholder: 'contacto@empresa.com', helpText: 'Email del representante para acceso al sistema' }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/common/phone-input', { name: 'phone', id: 'agencyPhone', label: 'Teléfono', required: false, countryCode: 'MX', placeholder: '999 123 4567' }) %>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-building me-1"></i>Empresa y Acceso</h6>
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../molecules/common/form-field', { type: 'text', name: 'companyName', id: 'agencyCompanyName', label: 'Nombre de la Empresa', required: true, placeholder: 'Ej: Viajes ABC', inputAttributes: { maxlength: '200' } }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../molecules/common/password-field', { id: 'agencyPassword', name: 'password', label: 'Contraseña', required: true, helpText: 'La agencia inicia sesión con su email y esta contraseña.' }) %>
+            </div>
+        </div>
+    </div>
+
+    <p class="cff-hint-optional"><i class="ti ti-chevron-down me-1"></i>Información opcional — ábrela solo si la necesitas</p>
+
+    <!-- ===== Opcional: Datos fiscales y adicionales ===== -->
+    <div class="cff-acc">
+        <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
+            <span class="cff-t"><i class="ti ti-file-invoice"></i>Datos fiscales y adicionales</span>
+            <span class="cff-badge">Opcional</span>
+            <span class="cff-chev"><i class="ti ti-chevron-right"></i></span>
+        </button>
+        <div class="cff-acc-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <%- include('../../atoms/common/rfc-input', { name: 'taxId', id: 'agencyTaxId', label: 'RFC', required: false }) %>
+                </div>
+                <div class="col-md-6">
+                    <%- include('../../atoms/common/url-input', { name: 'website', id: 'agencyWebsite', label: 'Sitio Web', required: false }) %>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    <%- include('../../molecules/common/form-field', { type: 'textarea', name: 'notes', id: 'agencyNotes', label: 'Notas', required: false, placeholder: 'Información general adicional', helpText: 'Información adicional', inputAttributes: { rows: '3' } }) %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

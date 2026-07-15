@@ -936,6 +936,7 @@ class QuoteService {
    * @param includePaymentInfoOverride
    * @param paymentInfoId
    * @param billingProfileId
+   * @param force
    * @returns {Promise<object>} Result with success status and receipt data.
    * @throws {Error} If validation fails or quote is not in scheduled status.
    * @example
