@@ -93,6 +93,36 @@ describe('Payment tip aggregation (integration)', () => {
     });
   });
 
+  describe('pago solo-propina (amount 0) NO re-ancla el paymentType de la reservación', () => {
+    it('primer pago tip-only con método distinto deja paymentType intacto y agrega la propina', async () => {
+      // Reservación con servicios reales (base > 0) cotizada en efectivo. Sin el fix, el primer pago
+      // tip-only en tarjeta (amount 0) re-anclaría paymentType a tarjeta, recotizando todo a otro tier.
+      const { id } = await createReservation(CLEAN, 'efectivo');
+
+      const res = await postPayment(id, { amount: 0, tip: 50, method: 'tarjeta' });
+      expect(res.status).toBe(200);
+      const { summary } = res.body.data;
+      expect(summary.tip).toBe(50); // la propina sí se agrega
+      expect(summary.balance).toBe(10000); // servicios (efectivo) sin pagar; la propina es neutral
+
+      const reservation = await fetchReservation(id);
+      expect(reservation.get('paymentType')).toBe('efectivo'); // <-- SIN cambiar: no re-anclado por $0 de servicios
+      expect(reconAdjustments(reservation)).toHaveLength(0); // ningún ajuste espurio
+    });
+
+    it('primer pago tip-only con el MISMO método que el ancla también deja paymentType intacto (no-op)', async () => {
+      const { id } = await createReservation(CLEAN, 'efectivo');
+
+      const res = await postPayment(id, { amount: 0, tip: 50, method: 'efectivo' });
+      expect(res.status).toBe(200);
+      expect(res.body.data.summary.tip).toBe(50);
+
+      const reservation = await fetchReservation(id);
+      expect(reservation.get('paymentType')).toBe('efectivo'); // nada que actualizar en cualquier caso
+      expect(reconAdjustments(reservation)).toHaveLength(0);
+    });
+  });
+
   describe('fuente de verdad — Reservation.tip (campo muerto) se ignora', () => {
     it('un Reservation.tip legacy = 999 no afecta el agregado; la propina viene de Payment.tip', async () => {
       const { id } = await createReservation([{ total: 400 }], 'efectivo', { legacyTip: 999 });

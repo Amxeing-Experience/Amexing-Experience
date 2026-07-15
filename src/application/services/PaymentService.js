@@ -417,9 +417,12 @@ class PaymentService {
     const hasDifferentValidPrior = priorPayments.some((p) => isValid(p.method) && p.method !== currentMethod);
     const scenario = (corruptPrior.length > 0 || hasDifferentValidPrior) ? 'complex' : 'none';
 
-    // El paymentType solo se reescribe en el caso simple, cuando llega un pago real con método distinto.
+    // El paymentType solo se reescribe en el caso simple, cuando llega un pago REAL de servicios con
+    // método distinto. Un pago solo-propina (amount 0) NUNCA ancla el tier: no tiene dinero de servicios
+    // sobre el cual decidir el método de precio de la reservación, así que dejaría el paymentType intacto.
     let paymentTypeUpdate = null;
-    if (scenario === 'none' && currentPayment && isValid(currentMethod) && currentMethod !== anchoredMethod) {
+    const currentAmount = currentPayment ? (Number(currentPayment.amount) || 0) : 0;
+    if (scenario === 'none' && currentPayment && currentAmount > 0 && isValid(currentMethod) && currentMethod !== anchoredMethod) {
       paymentTypeUpdate = currentMethod;
     }
     // El ancla contra la que se mide la reconciliación: el método ya actualizado en el caso simple.

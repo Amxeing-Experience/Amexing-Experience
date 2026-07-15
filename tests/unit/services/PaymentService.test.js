@@ -474,6 +474,32 @@ describe('PaymentService pure helpers', () => {
         expect(d.paymentTypeUpdate).toBe('transferencia');
         expect(d.reconciliationAdjustment.action).toBe('noop');
       });
+
+      it('primer pago solo-propina (amount 0) en método distinto NO re-ancla paymentType (sin dinero de servicios)', () => {
+        // El pago solo-propina llega con amount 0 (la propina va aparte, no en amount). No representa
+        // dinero de servicios, así que no puede "establecer" el tier de precio de la reservación.
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'efectivo',
+          priorPayments: [],
+          currentPayment: { method: 'tarjeta', amount: 0 },
+        });
+        expect(d.scenario).toBe('none');
+        expect(d.paymentTypeUpdate).toBeNull(); // NO 'tarjeta': un $0 de servicios no ancla nada
+        expect(d.reconciliationAdjustment.action).toBe('noop'); // 0 aporta 0 al delta -> sin ajuste
+      });
+
+      it('primer pago solo-propina (amount 0) con el MISMO método que el ancla también es no-op en paymentType', () => {
+        const d = PaymentService.decidePaymentMethodChange({
+          serviceItems: clean,
+          anchoredMethod: 'efectivo',
+          priorPayments: [],
+          currentPayment: { method: 'efectivo', amount: 0 },
+        });
+        expect(d.scenario).toBe('none');
+        expect(d.paymentTypeUpdate).toBeNull(); // nada que actualizar en cualquier caso
+        expect(d.reconciliationAdjustment.action).toBe('noop');
+      });
     });
 
     describe('regla de tres — ejemplo numérico del documento', () => {
