@@ -101,6 +101,111 @@ const tarifarioTabs = [
 ];
 %>
 
+<!-- ===== Helpers compartidos del form cliente/agencia (alta + edición): gather de payload,
+     validación inline y guardia de cambios. Fuera del if(isNewClient) → disponible en ambos flujos. ===== -->
+<script>
+window.cffForms = (function () {
+    function gv(id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
+    function pass(id) { var el = document.getElementById(id); return el && el.value ? el.value : undefined; }
+
+    // Gather de campos base (SIN password/active — cada caller los agrega según cree o edite).
+    function gatherAgency() {
+        return {
+            firstName: gv('agencyFirstName'),
+            lastName: gv('agencyLastName'),
+            email: gv('agencyEmail'),
+            phone: gv('agencyPhone') || undefined,
+            birthDate: gv('agencyBirthDate') || undefined,
+            companyName: gv('agencyCompanyName') || undefined,
+            website: gv('agencyWebsite') || undefined,
+            notes: gv('agencyNotes') || undefined
+        };
+    }
+    function gatherClient() {
+        return {
+            clientCategory: gv('directClientCategory') || undefined,
+            firstName: gv('directClientFirstName'),
+            lastName: gv('directClientLastName'),
+            email: gv('directClientEmail') || undefined,
+            phone: gv('directClientPhone') || undefined,
+            birthDate: gv('directClientBirthDate') || undefined,
+            contactFirstName: gv('directClientContactFirstName') || undefined,
+            contactLastName: gv('directClientContactLastName') || undefined,
+            emergencyContactName: gv('directClientEmergencyContactName') || undefined,
+            emergencyContactPhone: gv('directClientEmergencyContactPhone') || undefined,
+            preferredLanguage: gv('directClientPreferredLanguage') || undefined,
+            accessibilityRequirements: gv('directClientAccessibilityRequirements') || undefined,
+            allergies: gv('directClientAllergies') || undefined,
+            dietaryRestrictions: gv('directClientDietaryRestrictions') || undefined,
+            notes: gv('directClientNotes') || undefined
+        };
+    }
+
+    // Validación inline: error rojo bajo el campo, scroll + focus al primero, abre su acordeón.
+    function clearErrors(form) {
+        form.querySelectorAll('.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
+        form.querySelectorAll('.cff-error').forEach(function (el) { el.remove(); });
+    }
+    function setError(id, msg) {
+        var el = document.getElementById(id);
+        if (!el) return null;
+        el.classList.add('is-invalid');
+        var anchor = el.closest('.input-group') || el;
+        var err = document.createElement('div');
+        err.className = 'cff-error';
+        err.textContent = msg;
+        anchor.parentNode.insertBefore(err, anchor.nextSibling);
+        var clear = function () {
+            el.classList.remove('is-invalid');
+            if (err.parentNode) err.remove();
+            el.removeEventListener('input', clear);
+            el.removeEventListener('change', clear);
+        };
+        el.addEventListener('input', clear);
+        el.addEventListener('change', clear);
+        return el;
+    }
+    function focusFirst(el) {
+        if (!el) return;
+        var acc = el.closest('.cff-acc');
+        if (acc && !acc.classList.contains('open')) {
+            acc.classList.add('open');
+            var h = acc.querySelector('.js-cff-acc');
+            if (h) h.setAttribute('aria-expanded', 'true');
+        }
+        try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { el.scrollIntoView(); }
+        setTimeout(function () { try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); } }, 140);
+    }
+    function validate(form, rules) {
+        clearErrors(form);
+        var first = null;
+        rules.forEach(function (r) { if (r.when) { var el = setError(r.id, r.msg); if (!first) first = el; } });
+        return first;
+    }
+
+    // Guardia de cambios sin guardar. Devuelve un estado {dirty,leave} para que el submit ponga
+    // leave=true antes de navegar y no dispare el aviso.
+    function attachDirtyGuard(forms) {
+        var state = { dirty: false, leave: false };
+        forms.forEach(function (f) {
+            if (!f) return;
+            f.addEventListener('input', function () { state.dirty = true; });
+            f.addEventListener('change', function () { state.dirty = true; });
+        });
+        window.addEventListener('beforeunload', function (e) {
+            if (state.dirty && !state.leave) { e.preventDefault(); e.returnValue = ''; }
+        });
+        return state;
+    }
+
+    return {
+        gv: gv, pass: pass, gatherAgency: gatherAgency, gatherClient: gatherClient,
+        clearErrors: clearErrors, setError: setError, focusFirst: focusFirst, validate: validate,
+        attachDirtyGuard: attachDirtyGuard
+    };
+})();
+</script>
+
 <% if (isNewClient) { %>
 <!-- ===== MODO NUEVO: crear cliente (misma página, sin controlador nuevo) ===== -->
 <div class="row mb-2">
@@ -251,53 +356,8 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ---------- Errores inline ----------
-    function clearErrors(form) {
-        form.querySelectorAll('.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
-        form.querySelectorAll('.cff-error').forEach(function (el) { el.remove(); });
-    }
-    function setError(id, msg) {
-        var el = document.getElementById(id);
-        if (!el) return null;
-        el.classList.add('is-invalid');
-        var anchor = el.closest('.input-group') || el;
-        var err = document.createElement('div');
-        err.className = 'cff-error';
-        err.textContent = msg;
-        anchor.parentNode.insertBefore(err, anchor.nextSibling);
-        var clear = function () {
-            el.classList.remove('is-invalid');
-            if (err.parentNode) err.remove();
-            el.removeEventListener('input', clear);
-            el.removeEventListener('change', clear);
-        };
-        el.addEventListener('input', clear);
-        el.addEventListener('change', clear);
-        return el;
-    }
-    function focusFirst(el) {
-        if (!el) return;
-        var acc = el.closest('.cff-acc');
-        if (acc && !acc.classList.contains('open')) {
-            acc.classList.add('open');
-            var h = acc.querySelector('.js-cff-acc');
-            if (h) h.setAttribute('aria-expanded', 'true');
-        }
-        try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { el.scrollIntoView(); }
-        setTimeout(function () { try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); } }, 140);
-    }
-    // rules: [{id, msg, when}] → resalta todas las inválidas, devuelve la primera
-    function validate(form, rules) {
-        clearErrors(form);
-        var first = null;
-        rules.forEach(function (r) {
-            if (r.when) {
-                var el = setError(r.id, r.msg);
-                if (!first) first = el;
-            }
-        });
-        return first;
-    }
+    // ---------- Errores inline (compartidos con la edición vía window.cffForms) ----------
+    var validate = cffForms.validate, focusFirst = cffForms.focusFirst;
 
     // ---------- Error de servidor (barra) ----------
     var errBox = document.getElementById('createPageError');
@@ -358,17 +418,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ---------- Submit AGENCIA → /api/clients ----------
     agencyForm.addEventListener('submit', function (e) {
         e.preventDefault();
-        var payload = {
-            firstName: g('agencyFirstName'),
-            lastName: g('agencyLastName'),
-            email: g('agencyEmail'),
-            password: pass('agencyPassword'),
-            phone: g('agencyPhone') || undefined,
-            birthDate: g('agencyBirthDate') || undefined,
-            companyName: g('agencyCompanyName') || undefined,
-            website: g('agencyWebsite') || undefined,
-            notes: g('agencyNotes') || undefined
-        };
+        var payload = Object.assign(cffForms.gatherAgency(), { password: pass('agencyPassword') });
         var bad = validate(agencyForm, [
             { id: 'agencyFirstName', msg: 'El nombre es obligatorio', when: !payload.firstName },
             { id: 'agencyLastName', msg: 'El apellido es obligatorio', when: !payload.lastName },
@@ -383,24 +433,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ---------- Submit CLIENTE → /api/owned-clients ----------
     clientForm.addEventListener('submit', function (e) {
         e.preventDefault();
-        var payload = {
-            clientCategory: g('directClientCategory') || undefined,
-            firstName: g('directClientFirstName'),
-            lastName: g('directClientLastName'),
-            email: g('directClientEmail') || undefined,
-            password: pass('directClientPassword'),
-            phone: g('directClientPhone') || undefined,
-            birthDate: g('directClientBirthDate') || undefined,
-            contactFirstName: g('directClientContactFirstName') || undefined,
-            contactLastName: g('directClientContactLastName') || undefined,
-            emergencyContactName: g('directClientEmergencyContactName') || undefined,
-            emergencyContactPhone: g('directClientEmergencyContactPhone') || undefined,
-            preferredLanguage: g('directClientPreferredLanguage') || 'es',
-            accessibilityRequirements: g('directClientAccessibilityRequirements') || undefined,
-            allergies: g('directClientAllergies') || undefined,
-            dietaryRestrictions: g('directClientDietaryRestrictions') || undefined,
-            notes: g('directClientNotes') || undefined
-        };
+        var payload = Object.assign(cffForms.gatherClient(), { password: pass('directClientPassword') });
         var bad = validate(clientForm, [
             { id: 'directClientFirstName', msg: 'El nombre es obligatorio', when: !payload.firstName },
             { id: 'directClientLastName', msg: 'El apellido es obligatorio', when: !payload.lastName },
@@ -683,10 +716,6 @@ document.addEventListener('DOMContentLoaded', function () {
                             <div class="col-md-6 mb-3"><label class="form-label text-muted small">Actualización</label><p class="mb-0"><% if (clientData.updatedAt) { %><%= new Date(clientData.updatedAt).toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' }) %><% } else { %>N/A<% } %></p></div>
                         </div>
                     </div>
-                    <!-- Guardar cambios (edición inline; reemplaza al modal viejo) -->
-                    <div class="d-flex justify-content-end mt-4 pt-3 border-top">
-                        <button type="button" class="btn btn-primary" id="saveClientChanges"><i class="ti ti-device-floppy me-1"></i>Guardar cambios</button>
-                    </div>
                 </div>
             </div>
             <!-- Perfiles de Facturación, embebidos en Información — para agencias y clientes directos.
@@ -699,6 +728,22 @@ document.addEventListener('DOMContentLoaded', function () {
                     readOnly: false,
                     targetUserId: clientId
                 }) %>
+            </div>
+            <!-- Espaciador para que la barra fija no tape el contenido -->
+            <div style="height:84px"></div>
+            <!-- Barra de acción fija (Guardar) — misma UX que el alta; sigue al sidebar -->
+            <style>
+                .edit-sticky{position:fixed;left:270px;right:0;bottom:0;z-index:1010;background:rgba(255,255,255,.96);
+                    backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);
+                    border-top:1px solid #ded9cb;box-shadow:0 -2px 12px rgba(0,0,0,.06);padding:.75rem 2rem;display:flex;justify-content:center;}
+                .edit-sticky .edit-sticky-inner{width:100%;max-width:1100px;display:flex;align-items:center;justify-content:flex-end;gap:.6rem;}
+                @media (min-width:992px){ .main-content.sidebar-collapsed .edit-sticky{left:80px;} }
+                @media (max-width:991.98px){ .edit-sticky{left:0;padding-left:1rem;padding-right:1rem;} }
+            </style>
+            <div class="edit-sticky">
+                <div class="edit-sticky-inner">
+                    <button type="button" class="btn btn-primary" id="saveClientChanges"><i class="ti ti-device-floppy me-1"></i>Guardar cambios</button>
+                </div>
             </div>
         <% } else if (activeSection === 'profile') { %>
             <% /* Agencies are entities — no personal profile. Guard against a forced ?section=profile URL. */ %>
@@ -3799,6 +3844,9 @@ function setupExperienceFilters() {
         if (inlineSaveBtn) {
             inlineSaveBtn.removeEventListener('click', updateClient);
             inlineSaveBtn.addEventListener('click', updateClient);
+            // Guardia de cambios sin guardar en el form de edición (misma UX que el alta)
+            var editFormEl = document.getElementById('editClientForm');
+            if (editFormEl && window.cffForms) { window.__editGuard = cffForms.attachDirtyGuard([editFormEl]); }
         }
 
         // Initialize validation cleanup for employee modal
@@ -4088,64 +4136,40 @@ function setupExperienceFilters() {
         }
         
         
-        // Basic validation
-        if (!form.checkValidity()) {
-            console.warn('⚠️ Form validation failed');
-            form.reportValidity();
-            return;
-        }
-        
-        
+        // Tipo de form + datos (gather compartido con el alta vía window.cffForms)
+        const isAgencyEdit = !!document.getElementById('agencyFirstName');
+        const activeVal = document.getElementById('editActive') ? document.getElementById('editActive').value === 'true' : undefined;
+        const pwdField = document.getElementById(isAgencyEdit ? 'agencyPassword' : 'directClientPassword');
+        const typedPwd = pwdField ? pwdField.value.trim() : '';
+        const formData = isAgencyEdit
+            ? Object.assign(cffForms.gatherAgency(), { active: activeVal })
+            : Object.assign(cffForms.gatherClient(), { active: activeVal });
+
+        // Validación inline (misma UX que el alta: error bajo el campo + scroll/focus)
+        const rules = isAgencyEdit ? [
+            { id: 'agencyFirstName', msg: 'El nombre es obligatorio', when: !formData.firstName },
+            { id: 'agencyLastName', msg: 'El apellido es obligatorio', when: !formData.lastName },
+            { id: 'agencyEmail', msg: 'El email es obligatorio', when: !formData.email },
+            { id: 'agencyCompanyName', msg: 'El nombre de la empresa es obligatorio', when: !formData.companyName }
+        ] : [
+            { id: 'directClientFirstName', msg: 'El nombre es obligatorio', when: !formData.firstName },
+            { id: 'directClientLastName', msg: 'El apellido es obligatorio', when: !formData.lastName },
+            { id: 'directClientEmail', msg: 'Agrega un email para poder cambiar la contraseña', when: !!typedPwd && !formData.email }
+        ];
+        const badField = cffForms.validate(form, rules);
+        if (badField) { cffForms.focusFirst(badField); return; }
+
         // Disable button and show loading state
         saveButton.disabled = true;
         const originalContent = saveButton.innerHTML;
         saveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Guardando...';
-        
-        // Gather form data — bifurca según el form renderizado (agencia unificada vs cliente viejo)
-        const gv = function (id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-        const isAgencyEdit = !!document.getElementById('agencyFirstName');
-        const activeVal = document.getElementById('editActive') ? document.getElementById('editActive').value === 'true' : undefined;
-        let formData;
-        if (isAgencyEdit) {
-            formData = {
-                firstName: gv('agencyFirstName'),
-                lastName: gv('agencyLastName'),
-                email: gv('agencyEmail'),
-                phone: gv('agencyPhone') || undefined,
-                birthDate: gv('agencyBirthDate') || undefined,
-                companyName: gv('agencyCompanyName') || undefined,
-                website: gv('agencyWebsite') || undefined,
-                notes: gv('agencyNotes') || undefined,
-                active: activeVal
-            };
-        } else {
-            formData = {
-                clientCategory: gv('directClientCategory') || undefined,
-                firstName: gv('directClientFirstName'),
-                lastName: gv('directClientLastName'),
-                email: gv('directClientEmail') || undefined,
-                phone: gv('directClientPhone') || undefined,
-                birthDate: gv('directClientBirthDate') || undefined,
-                contactFirstName: gv('directClientContactFirstName') || undefined,
-                contactLastName: gv('directClientContactLastName') || undefined,
-                emergencyContactName: gv('directClientEmergencyContactName') || undefined,
-                emergencyContactPhone: gv('directClientEmergencyContactPhone') || undefined,
-                preferredLanguage: gv('directClientPreferredLanguage') || undefined,
-                accessibilityRequirements: gv('directClientAccessibilityRequirements') || undefined,
-                allergies: gv('directClientAllergies') || undefined,
-                dietaryRestrictions: gv('directClientDietaryRestrictions') || undefined,
-                notes: gv('directClientNotes') || undefined,
-                active: activeVal
-            };
-        }
         
         // Get client ID
         const clientId = document.getElementById('editClientId').value;
         // Endpoint por tipo: agencia → clients; cliente directo → owned-clients (endpoint rico).
         const endpoint = isAgencyEdit ? `/api/clients/${clientId}` : `/api/owned-clients/${clientId}`;
         // Contraseña opcional escrita en el form (agencia o cliente): si viene, se cambia tras guardar.
-        const pwdEl = document.getElementById(isAgencyEdit ? 'agencyPassword' : 'directClientPassword');
-        const newPwd = pwdEl ? pwdEl.value.trim() : '';
+        const newPwd = typedPwd; // ya leída arriba para la validación
 
         try {
             const response = await fetch(endpoint, {
@@ -4185,9 +4209,12 @@ function setupExperienceFilters() {
                 }
             }
 
+            // Guardado OK: libera la guardia para que el reload no dispare el aviso de "cambios sin guardar".
+            if (window.__editGuard) window.__editGuard.leave = true;
+
             // Show success message
             showSuccessMessage(newPwd ? 'Cambios y contraseña guardados exitosamente' : 'Cambios guardados exitosamente');
-            
+
             // Reload page after a short delay to show updated data
             setTimeout(() => {
                 window.location.reload();

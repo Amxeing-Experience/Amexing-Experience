@@ -66,4 +66,8 @@
   .client-form-editorial .is-valid ~ .valid-feedback,
   .client-form-editorial .input-group:has(.is-invalid) ~ .invalid-feedback,
   .client-form-editorial .input-group:has(.is-valid) ~ .valid-feedback{display:block !important;}
+  /* Errores inline de la validación propia (cffForms.setError) — alta y edición */
+  .client-form-editorial .cff-error{color:#c0392b;font-size:.74rem;margin-top:.3rem;}
+  .client-form-editorial .form-control.is-invalid,
+  .client-form-editorial .form-select.is-invalid{border-color:#c0392b;box-shadow:0 0 0 .18rem rgba(192,57,43,.10);}
 </style>
