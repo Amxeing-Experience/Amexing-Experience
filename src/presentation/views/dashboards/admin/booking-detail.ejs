@@ -1938,14 +1938,56 @@ document.addEventListener('DOMContentLoaded', async function() {
         const receiptLink = existing?.receiptUrl
             ? `<a href="${existing.receiptUrl}" target="_blank" class="small d-block mt-1"><i class="ti ti-file-invoice me-1"></i>Ver comprobante actual</a>` : '';
 
+        // Fase 4: se captura en el mismo orden mental "total recibido = servicios + propina". La
+        // propina se persiste en MXN; se reconstruye a la moneda original con exchangeRate (sin campo
+        // nuevo en el modelo). "Monto total recibido" prellena = servicios + propina en moneda original.
+        const round2 = PaymentBreakdownHelpers.round2;
+        const tipOrig = existing
+            ? (existing.exchangeRate ? (existing.tip || 0) / existing.exchangeRate : (existing.tip || 0))
+            : 0;
+        const svcOrig = existing ? Number(existing.origAmount ?? existing.amount ?? 0) : 0;
+        const totalReceivedInit = existing ? round2(svcOrig + tipOrig) : '';
+        const tipInit = existing ? round2(tipOrig) : '';
+
+        // Selector de servicio: undefined = creación; en edición pasa el pointer existente (null =
+        // general). buildServiceSelectorOptions decide visibilidad, orden y preselección; getDisplayConcept
+        // (única copia de la plantilla) resuelve las etiquetas de servicio, sin duplicar esa lógica.
+        const svcSelector = PaymentBreakdownHelpers.buildServiceSelectorOptions(
+            reservationData.services, existing ? existing.reservationServiceId : undefined, getDisplayConcept
+        );
+        const serviceSelectorHtml = svcSelector.visible ? `
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small" for="paymentService">Servicio de la reservación</label>
+                    <select class="form-select form-select-sm" id="paymentService">${svcSelector.options.map((o) => {
+                        const label = o.isGeneral ? 'Propina general (se reparte entre todo el personal)' : o.label;
+                        return `<option value="${o.value}" ${o.selected ? 'selected' : ''}>${label}</option>`;
+                    }).join('')}</select>
+                </div>` : '';
+
         wrap.innerHTML = `
             <h6 class="fw-bold mb-2">${existing ? '<i class="ti ti-edit me-1"></i>Editar pago' : '<i class="ti ti-cash me-1"></i>Registrar pago'}</h6>
             <input type="hidden" id="paymentId" value="${existing ? existing.id : ''}">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentAmount">Monto</label>
-                    <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentAmount" placeholder="0.00" value="${existing ? (existing.origAmount ?? existing.amount ?? '') : ''}">
+            <div class="border rounded p-2 mb-2 bg-white">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small" for="paymentAmount">Monto total recibido</label>
+                        <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentAmount" placeholder="0.00" value="${totalReceivedInit}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small" for="paymentTip">Propina</label>
+                        <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentTip" placeholder="0.00" value="${tipInit}">
+                        <div class="invalid-feedback" id="paymentTipError" role="alert">La propina no puede ser mayor al monto total recibido.</div>
+                    </div>
                 </div>
+                <div class="d-flex justify-content-between align-items-center mt-2 small">
+                    <span class="text-muted">Monto aplicado a servicios</span>
+                    <span class="fw-semibold" id="paymentServiceAmount">—</span>
+                </div>
+                <div class="alert alert-warning d-flex align-items-start gap-2 py-1 px-2 mb-0 mt-2 small d-none" id="paymentTipWarning" role="status" aria-live="polite">
+                    <i class="ti ti-alert-triangle mt-1"></i><span id="paymentTipWarningText"></span>
+                </div>
+            </div>
+            <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentCurrency">Moneda</label>
                     <select class="form-select form-select-sm" id="paymentCurrency">${opt('MXN', 'MXN', curr)}${opt('USD', 'USD', curr)}</select>
@@ -1958,11 +2000,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
                     <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}">
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentTip">Propina</label>
-                    <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentTip" placeholder="0.00" value="${existing?.tip || ''}">
-                </div>
-                <div class="col-md-4">
+                ${serviceSelectorHtml}
+                <div class="col-md-6">
                     <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
                     <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${(existing?.reference || '').replace(/"/g, '&quot;')}">
                 </div>
@@ -1988,6 +2027,37 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('savePaymentBtn').addEventListener('click', () => savePayment(existing ? existing.id : ''));
         attachThousands(document.getElementById('paymentAmount'));
         attachThousands(document.getElementById('paymentTip'));
+
+        // Recalcula "Monto aplicado a servicios" en vivo (cada tecleo, sin submit) y aplica el estado:
+        // warning (propina > servicios) muestra el banner no bloqueante; blocked (propina > total)
+        // marca la propina inválida y deshabilita Guardar. Nunca banner y error a la vez.
+        function updatePaymentServiceAmount() {
+            const total = parseAmount(document.getElementById('paymentAmount').value);
+            const tipVal = parseAmount(document.getElementById('paymentTip').value);
+            const cur = document.getElementById('paymentCurrency').value;
+            const { serviceAmount, state } = PaymentBreakdownHelpers.deriveServiceAmount(total, tipVal);
+            document.getElementById('paymentServiceAmount').textContent = formatCurrency(serviceAmount, cur);
+
+            const tipInput = document.getElementById('paymentTip');
+            const warnBox = document.getElementById('paymentTipWarning');
+            const saveBtn = document.getElementById('savePaymentBtn');
+            const blocked = state === 'blocked';
+            tipInput.classList.toggle('is-invalid', blocked);
+            if (saveBtn) saveBtn.disabled = blocked;
+
+            if (state === 'warning') {
+                const tipClean = Number.isFinite(tipVal) ? tipVal : 0;
+                document.getElementById('paymentTipWarningText').textContent =
+                    `La propina (${formatCurrency(tipClean, cur)}) es mayor al monto de servicios calculado (${formatCurrency(serviceAmount, cur)}). Verifica que los montos sean correctos antes de guardar.`;
+                warnBox.classList.remove('d-none');
+            } else {
+                warnBox.classList.add('d-none');
+            }
+        }
+        document.getElementById('paymentAmount').addEventListener('input', updatePaymentServiceAmount);
+        document.getElementById('paymentTip').addEventListener('input', updatePaymentServiceAmount);
+        document.getElementById('paymentCurrency').addEventListener('change', updatePaymentServiceAmount);
+        updatePaymentServiceAmount();
     }
 
     // Refresh the Financial Summary numbers from a POST/PUT/DELETE response summary
@@ -2010,21 +2080,32 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
 
     async function savePayment(paymentId) {
-        const amount = parseAmount(document.getElementById('paymentAmount').value);
+        const totalReceived = parseAmount(document.getElementById('paymentAmount').value);
         const tipRaw = parseAmount(document.getElementById('paymentTip').value);
+        const tip = Number.isFinite(tipRaw) ? tipRaw : 0;
         const paidAt = document.getElementById('paymentPaidAt').value;
 
-        if (!amount || amount <= 0) { pmToast('El monto debe ser mayor a 0', 'warning'); return; }
-        if (amount > 100000000) { pmToast('El monto no puede exceder 100,000,000', 'warning'); return; }
+        if (!totalReceived || totalReceived <= 0) { pmToast('El monto total recibido debe ser mayor a 0', 'warning'); return; }
+        if (totalReceived > 100000000) { pmToast('El monto no puede exceder 100,000,000', 'warning'); return; }
 
+        // amount = servicios (total recibido − propina); la propina va aparte. deriveServiceAmount es la
+        // misma fuente que el renglón en vivo, así el envío coincide con lo mostrado.
+        const { serviceAmount, state } = PaymentBreakdownHelpers.deriveServiceAmount(totalReceived, tip);
+        if (state === 'blocked') { pmToast('La propina no puede ser mayor al monto total recibido.', 'warning'); return; }
+
+        // tip y reservationServiceId SIEMPRE explícitos (nunca omitidos): en el PUT, el guard
+        // `!== undefined` de updatePayment/applyServicePointer deja intacto lo viejo si se omite la
+        // clave — así bajar la propina a 0 la limpia, y elegir "Propina general" ('') limpia el pointer.
+        const serviceSelect = document.getElementById('paymentService');
         const payload = {
-            amount,
+            amount: serviceAmount,
             currency: document.getElementById('paymentCurrency').value,
             method: document.getElementById('paymentMethod').value,
             reference: document.getElementById('paymentReference').value.trim(),
             notes: document.getElementById('paymentNotes').value.trim(),
+            tip,
+            reservationServiceId: serviceSelect ? serviceSelect.value : '',
         };
-        if (!Number.isNaN(tipRaw) && tipRaw > 0) payload.tip = tipRaw;
         if (paidAt) payload.paidAt = paidAt;
 
         // Receipt (optional) — validated here but uploaded in a SEPARATE request AFTER the payment is

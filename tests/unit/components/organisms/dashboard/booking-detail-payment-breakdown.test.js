@@ -116,3 +116,58 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).not.toContain('id="paymentsCard"');
   });
 });
+
+describe('Booking Detail Fase 4 — formulario claridad monto-servicios vs propina (admin)', () => {
+  let html;
+
+  beforeAll(async () => { html = await render('admin'); });
+
+  it('reagrupa el monto total recibido + propina + monto aplicado a servicios', () => {
+    expect(html).toContain('Monto total recibido');
+    expect(html).toContain('Monto aplicado a servicios');
+    expect(html).toContain('id="paymentServiceAmount"');
+  });
+
+  it('el selector de servicio incluye la opción "Propina general (se reparte entre todo el personal)"', () => {
+    expect(html).toContain('Propina general (se reparte entre todo el personal)');
+    expect(html).toContain('id="paymentService"');
+  });
+
+  it('el banner de advertencia es no bloqueante (role=status, aria-live=polite)', () => {
+    expect(html).toContain('id="paymentTipWarning"');
+    expect(html).toContain('role="status"');
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain('ti-alert-triangle');
+  });
+
+  it('el error bloqueante de propina es un role=alert inline con el copy exacto', () => {
+    expect(html).toContain('id="paymentTipError"');
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('La propina no puede ser mayor al monto total recibido.');
+  });
+
+  it('regresión maxlength sin cambios: Monto=17, Propina=17, Referencia=100, Notas=300', () => {
+    expect(html).toContain('maxlength="17" class="form-control form-control-sm" id="paymentAmount"');
+    expect(html).toContain('maxlength="17" class="form-control form-control-sm" id="paymentTip"');
+    expect(html).toContain('id="paymentReference" maxlength="100"');
+    expect(html).toContain('id="paymentNotes" rows="2" maxlength="300"');
+  });
+
+  it('getDisplayConcept sigue definido UNA sola vez (no duplicado en el módulo compartido)', () => {
+    expect((html.match(/function getDisplayConcept/g) || []).length).toBe(1);
+  });
+
+  it('carga deriveServiceAmount/buildServiceSelectorOptions desde el módulo compartido (no reimplementa)', () => {
+    expect(html).toContain('PaymentBreakdownHelpers.deriveServiceAmount');
+    expect(html).toContain('PaymentBreakdownHelpers.buildServiceSelectorOptions');
+  });
+});
+
+describe('Booking Detail Fase 4 — el formulario nuevo sigue AUSENTE en agencia/agente (Fase 3 intacta)', () => {
+  it.each(AGENCY_ROLES)('%s: sin "Monto total recibido" ni selector de servicio de pago', async (role) => {
+    const html = await render(role);
+    expect(html).not.toContain('Monto total recibido');
+    expect(html).not.toContain('id="paymentService"');
+    expect(html).not.toContain('Propina general (se reparte entre todo el personal)');
+  });
+});

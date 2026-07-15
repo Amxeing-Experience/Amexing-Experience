@@ -239,6 +239,97 @@ const PaymentBreakdownHelpers = (() => {
     return entries;
   }
 
+  /**
+   * Deriva el monto aplicado a servicios de un pago a partir del total recibido y la propina, con
+   * el estado de validacion del formulario (Fase 4). serviceAmount = round2(total - tip). Entradas
+   * no finitas/NaN/vacias se tratan como 0 (Number(x) + guard Number.isFinite, igual que el resto del
+   * motor), nunca se propaga NaN/Infinity. No impone el techo AMOUNT_MAX: ese se valida por campo
+   * (totalReceived/tip) por separado, nunca sobre la suma ni sobre este derivado.
+   * @param {number} totalReceived - Monto total recibido capturado por el staff.
+   * @param {number} tip - Propina capturada (parte de ese total).
+   * @returns {{serviceAmount:number, state:('ok'|'warning'|'blocked')}} Monto de servicios + estado.
+   * @example
+   * deriveServiceAmount(500, 100) // { serviceAmount: 400, state: 'ok' }
+   */
+  function deriveServiceAmount(totalReceived, tip) {
+    const totalNum = Number(totalReceived);
+    const tipNum = Number(tip);
+    const total = Number.isFinite(totalNum) ? totalNum : 0;
+    const t = Number.isFinite(tipNum) ? tipNum : 0;
+    const serviceAmount = round2(total - t);
+    let state = 'ok';
+    if (t > total) {
+      // La propina excede el total recibido: serviceAmount seria negativo (sin sentido) -> bloquea.
+      state = 'blocked';
+    } else if (t > serviceAmount) {
+      // Propina mayor al monto de servicios (t > total/2) pero <= total: solo advierte, no bloquea.
+      state = 'warning';
+    }
+    return { serviceAmount, state };
+  }
+
+  /**
+   * Estructura del <select> "Servicio de la reservacion" del formulario de pago (Fase 4). Decide
+   * visibilidad, orden y preseleccion; NO produce el HTML. La etiqueta de cada servicio la resuelve
+   * getLabel (el formulario pasa getDisplayConcept de la plantilla; sin el, cae a getServiceDisplayLabel),
+   * asi esa logica de concepto no se duplica aqui. La opcion "Propina general" (value '') va SIEMPRE
+   * primera; su etiqueta la pone el llamador segun isGeneral.
+   *
+   * Reglas: 0 servicios -> visible:false (se omite del DOM). 1 servicio -> preseleccionado en el en
+   * creacion; en edicion respeta el existente (general u huerfano caen a general). 2+ -> "general"
+   * preseleccionada por default en creacion (ambiguedad real, nunca un servicio); en edicion
+   * preselecciona el id existente si sigue en la lista, o cae a general si es null o un id huerfano
+   * (servicio borrado/reordenado) — mismo fallback-a-general que groupTipEntriesForDisplay.
+   * existingReservationServiceId === undefined = creacion; null = edicion sin servicio (general).
+   * @param {Array<object>} services - Servicios de la reservacion (cada uno con id).
+   * @param {?string} [existingReservationServiceId] - Servicio del pago en edicion (undefined en creacion).
+   * @param {Function} [getLabel] - Resuelve la etiqueta de un servicio (svc -> string).
+   * @returns {{visible:boolean, selectedValue:string, options:Array<object>}} Estructura del selector.
+   * @example
+   * buildServiceSelectorOptions([{ id: 'a', concept: 'Traslado' }], undefined) // visible, selectedValue 'a'
+   */
+  function buildServiceSelectorOptions(services, existingReservationServiceId, getLabel) {
+    const resolveLabel = typeof getLabel === 'function' ? getLabel : getServiceDisplayLabel;
+    const list = Array.isArray(services) ? services : [];
+    const valid = list.filter((svc) => svc && svc.id != null);
+
+    if (valid.length === 0) {
+      return { visible: false, selectedValue: '', options: [] };
+    }
+
+    const isEditing = existingReservationServiceId !== undefined;
+    const existingId = (existingReservationServiceId === null
+      || existingReservationServiceId === undefined
+      || existingReservationServiceId === '')
+      ? null
+      : String(existingReservationServiceId);
+    const matched = existingId !== null && valid.some((svc) => String(svc.id) === existingId);
+
+    let selectedValue;
+    if (matched) {
+      selectedValue = existingId;
+    } else if (isEditing) {
+      // Edicion sin servicio (general) o con un id huerfano -> pool general.
+      selectedValue = '';
+    } else {
+      // Creacion: un solo servicio no tiene ambiguedad (preselecciona ese); 2+ cae a general.
+      selectedValue = valid.length === 1 ? String(valid[0].id) : '';
+    }
+
+    const options = [{ value: '', isGeneral: true, selected: selectedValue === '' }];
+    for (const svc of valid) {
+      const value = String(svc.id);
+      options.push({
+        value,
+        isGeneral: false,
+        label: resolveLabel(svc),
+        selected: selectedValue === value,
+      });
+    }
+
+    return { visible: true, selectedValue, options };
+  }
+
   return {
     AUTO_RECONCILIATION_SOURCE,
     GENERAL_TIP_LABEL,
@@ -250,6 +341,8 @@ const PaymentBreakdownHelpers = (() => {
     getPaymentStatusBadge,
     hasAutoReconciliationBadge,
     groupTipEntriesForDisplay,
+    deriveServiceAmount,
+    buildServiceSelectorOptions,
   };
 })();
 

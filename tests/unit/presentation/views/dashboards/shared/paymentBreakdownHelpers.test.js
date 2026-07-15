@@ -241,3 +241,151 @@ describe('PaymentBreakdownHelpers.groupTipEntriesForDisplay', () => {
     expect(shown).toBe(real);
   });
 });
+
+describe('PaymentBreakdownHelpers.deriveServiceAmount (Fase 4)', () => {
+  it('caso normal: serviceAmount = total − propina, estado ok', () => {
+    expect(H.deriveServiceAmount(500, 100)).toEqual({ serviceAmount: 400, state: 'ok' });
+  });
+
+  it('propina 0: todo el total es servicios, estado ok', () => {
+    expect(H.deriveServiceAmount(500, 0)).toEqual({ serviceAmount: 500, state: 'ok' });
+  });
+
+  it('propina == total: warning (NO blocked), serviceAmount 0', () => {
+    expect(H.deriveServiceAmount(500, 500)).toEqual({ serviceAmount: 0, state: 'warning' });
+  });
+
+  it('límite exacto tip = total/2: ok (propina no supera a servicios)', () => {
+    expect(H.deriveServiceAmount(500, 250)).toEqual({ serviceAmount: 250, state: 'ok' });
+  });
+
+  it('0.01 sobre la mitad: warning', () => {
+    expect(H.deriveServiceAmount(500, 250.01)).toEqual({ serviceAmount: 249.99, state: 'warning' });
+  });
+
+  it('0.01 sobre el total: blocked (serviceAmount negativo)', () => {
+    expect(H.deriveServiceAmount(500, 500.01)).toEqual({ serviceAmount: -0.01, state: 'blocked' });
+  });
+
+  it('extremos en AMOUNT_MAX: total 100M sin propina -> ok', () => {
+    expect(H.deriveServiceAmount(100000000, 0)).toEqual({ serviceAmount: 100000000, state: 'ok' });
+  });
+
+  it('extremos en AMOUNT_MAX: total 100M con propina 100M -> warning, serviceAmount 0', () => {
+    expect(H.deriveServiceAmount(100000000, 100000000)).toEqual({ serviceAmount: 0, state: 'warning' });
+  });
+
+  it('decimales de arrastre flotante se corrigen con round2', () => {
+    expect(H.deriveServiceAmount(0.3, 0.1)).toEqual({ serviceAmount: 0.2, state: 'ok' });
+  });
+
+  it('NaN/Infinity en cualquiera de los 2 campos nunca se propaga (se trata como 0)', () => {
+    expect(H.deriveServiceAmount(NaN, NaN)).toEqual({ serviceAmount: 0, state: 'ok' });
+    // total no finito -> 0; propina 50 excede 0 -> blocked, serviceAmount finito (nunca NaN).
+    const a = H.deriveServiceAmount(Infinity, 50);
+    expect(Number.isFinite(a.serviceAmount)).toBe(true);
+    expect(a).toEqual({ serviceAmount: -50, state: 'blocked' });
+    // propina no finita -> 0; nunca contamina la salida.
+    const b = H.deriveServiceAmount(500, Infinity);
+    expect(b).toEqual({ serviceAmount: 500, state: 'ok' });
+    expect(H.deriveServiceAmount('abc', '')).toEqual({ serviceAmount: 0, state: 'ok' });
+  });
+
+  it('suma de servicios+propina excediendo 100M, cada campo bajo su propio límite: se permite (no cap)', () => {
+    // total 120M, propina 60M -> serviceAmount 60M (< 100M) y propina 60M (< 100M): deriveServiceAmount
+    // NO impone ningún tope sobre el derivado ni sobre la suma; el techo AMOUNT_MAX se valida por campo.
+    expect(H.deriveServiceAmount(120000000, 60000000)).toEqual({ serviceAmount: 60000000, state: 'ok' });
+  });
+});
+
+describe('PaymentBreakdownHelpers.buildServiceSelectorOptions (Fase 4)', () => {
+  // Réplica de getDisplayConcept (admin/booking-detail.ejs): concepto, o "A Disposición" para
+  // a-disposicion, o "—". La plantilla pasa su única copia; aquí se simula para probar el paso de label.
+  const getDisplayConcept = (svc) => {
+    const raw = (svc && svc.concept ? String(svc.concept) : '').trim();
+    if (raw) return raw;
+    if (svc && svc.type === 'a-disposicion') return 'A Disposición';
+    return '—';
+  };
+  const svcA = { id: 'a', concept: 'Traslado' };
+  const svcB = { id: 'b', concept: 'Tour' };
+  const svcC = { id: 'c', concept: 'Recepción' };
+
+  it('0 servicios: visible:false, sin opciones (se omite del DOM)', () => {
+    expect(H.buildServiceSelectorOptions([], undefined)).toEqual({ visible: false, selectedValue: '', options: [] });
+    expect(H.buildServiceSelectorOptions(null, undefined).visible).toBe(false);
+  });
+
+  it('1 servicio en creación: preseleccionado en ESE servicio, general primera pero no seleccionada', () => {
+    const r = H.buildServiceSelectorOptions([svcA], undefined, getDisplayConcept);
+    expect(r.visible).toBe(true);
+    expect(r.selectedValue).toBe('a');
+    expect(r.options[0]).toEqual({ value: '', isGeneral: true, selected: false });
+    expect(r.options[1]).toEqual({
+      value: 'a', isGeneral: false, label: 'Traslado', selected: true,
+    });
+  });
+
+  it('1 servicio en edición del MISMO servicio: sigue preseleccionado en él', () => {
+    const r = H.buildServiceSelectorOptions([svcA], 'a', getDisplayConcept);
+    expect(r.selectedValue).toBe('a');
+  });
+
+  it('1 servicio en edición general (null): respeta el existente -> general', () => {
+    const r = H.buildServiceSelectorOptions([svcA], null, getDisplayConcept);
+    expect(r.selectedValue).toBe('');
+    expect(r.options[0].selected).toBe(true);
+  });
+
+  it('1 servicio en edición con id huérfano: cae a general', () => {
+    const r = H.buildServiceSelectorOptions([svcA], 'ghost', getDisplayConcept);
+    expect(r.selectedValue).toBe('');
+  });
+
+  it('2+ servicios en creación: general SIEMPRE primera y preseleccionada (ambigüedad real)', () => {
+    const r = H.buildServiceSelectorOptions([svcA, svcB], undefined, getDisplayConcept);
+    expect(r.options[0].isGeneral).toBe(true);
+    expect(r.selectedValue).toBe('');
+    expect(r.options.map((o) => o.value)).toEqual(['', 'a', 'b']);
+  });
+
+  it('2+ servicios en edición con id existente en la lista: lo preselecciona', () => {
+    const r = H.buildServiceSelectorOptions([svcA, svcB], 'b', getDisplayConcept);
+    expect(r.selectedValue).toBe('b');
+    expect(r.options.find((o) => o.value === 'b').selected).toBe(true);
+  });
+
+  it('2+ servicios en edición con null: general', () => {
+    expect(H.buildServiceSelectorOptions([svcA, svcB], null, getDisplayConcept).selectedValue).toBe('');
+  });
+
+  it('2+ servicios en edición con id huérfano (servicio borrado/reordenado): cae a general', () => {
+    expect(H.buildServiceSelectorOptions([svcA, svcB], 'ghost', getDisplayConcept).selectedValue).toBe('');
+  });
+
+  it('3+ servicios: general primera, servicios en orden de la lista', () => {
+    const r = H.buildServiceSelectorOptions([svcA, svcB, svcC], undefined, getDisplayConcept);
+    expect(r.options.map((o) => o.value)).toEqual(['', 'a', 'b', 'c']);
+    expect(r.options[0].isGeneral).toBe(true);
+  });
+
+  it('labels con concept vacío vía getDisplayConcept: a-disposicion -> "A Disposición", otro -> "—"', () => {
+    const r = H.buildServiceSelectorOptions(
+      [{ id: 'x', concept: '', type: 'a-disposicion' }, { id: 'y', concept: '' }],
+      undefined,
+      getDisplayConcept
+    );
+    expect(r.options.find((o) => o.value === 'x').label).toBe('A Disposición');
+    expect(r.options.find((o) => o.value === 'y').label).toBe('—');
+  });
+
+  it('sin getLabel cae al getServiceDisplayLabel del módulo (fallback "Servicio")', () => {
+    const r = H.buildServiceSelectorOptions([{ id: 'z' }], undefined);
+    expect(r.options.find((o) => o.value === 'z').label).toBe('Servicio');
+  });
+
+  it('ignora servicios sin id (no aparecen como opción)', () => {
+    const r = H.buildServiceSelectorOptions([{ concept: 'sin id' }, svcA], undefined, getDisplayConcept);
+    expect(r.options.map((o) => o.value)).toEqual(['', 'a']);
+  });
+});

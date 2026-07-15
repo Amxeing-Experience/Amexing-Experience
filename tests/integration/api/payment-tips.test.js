@@ -330,4 +330,87 @@ describe('Payment tip aggregation (integration)', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  // Huecos backend que el formulario Fase 4 ejercitará (reservationServiceId y tip SIEMPRE explícitos):
+  // el guard `!== undefined` de updatePayment/applyServicePointer solo actúa si la clave viaja en el body.
+  describe('Fase 4 — reservationServiceId / tip explícitos (nunca omitidos)', () => {
+    it('editar de servicio específico a "general" (reservationServiceId: "") limpia el bucket viejo', async () => {
+      const { id, serviceIds } = await createReservation([{ total: 500 }, { total: 500 }], 'efectivo');
+      const [svcA] = serviceIds;
+
+      const p = await postPayment(id, {
+        amount: 0, tip: 80, reservationServiceId: svcA, method: 'efectivo',
+      });
+      expect(bucketFor(p.body.data.summary, svcA)).toEqual({ reservationServiceId: svcA, tip: 80 });
+
+      const upd = await putPayment(id, p.body.data.payment.id, { reservationServiceId: '' });
+      expect(upd.status).toBe(200);
+      const { summary } = upd.body.data;
+      expect(bucketFor(summary, svcA)).toBeUndefined(); // bucket del servicio limpiado
+      expect(bucketFor(summary, null)).toEqual({ reservationServiceId: null, tip: 80 }); // ahora en general
+      expect(summary.tip).toBe(80);
+      expect(upd.body.data.payment.reservationServiceId).toBeNull();
+    });
+
+    it('editar de "general" a un servicio específico mueve el tip al bucket del servicio', async () => {
+      const { id, serviceIds } = await createReservation([{ total: 500 }], 'efectivo');
+      const [svcA] = serviceIds;
+
+      const p = await postPayment(id, { amount: 0, tip: 60, method: 'efectivo' }); // general
+      expect(bucketFor(p.body.data.summary, null)).toEqual({ reservationServiceId: null, tip: 60 });
+
+      const upd = await putPayment(id, p.body.data.payment.id, { reservationServiceId: svcA });
+      expect(upd.status).toBe(200);
+      const { summary } = upd.body.data;
+      expect(bucketFor(summary, null)).toBeUndefined();
+      expect(bucketFor(summary, svcA)).toEqual({ reservationServiceId: svcA, tip: 60 });
+    });
+
+    it('un PUT que OMITE reservationServiceId preserva el pointer existente (guard !== undefined)', async () => {
+      const { id, serviceIds } = await createReservation([{ total: 500 }, { total: 500 }], 'efectivo');
+      const [svcA] = serviceIds;
+
+      const p = await postPayment(id, {
+        amount: 0, tip: 40, reservationServiceId: svcA, method: 'efectivo',
+      });
+
+      // Editar SOLO las notas: sin la clave reservationServiceId, el pointer NO se toca.
+      const upd = await putPayment(id, p.body.data.payment.id, { notes: 'sin tocar el servicio' });
+      expect(upd.status).toBe(200);
+      expect(upd.body.data.payment.reservationServiceId).toBe(svcA); // intacto
+      expect(bucketFor(upd.body.data.summary, svcA)).toEqual({ reservationServiceId: svcA, tip: 40 });
+    });
+
+    it('round-trip servicio -> general -> mismo servicio no deja residuos ni duplica el monto', async () => {
+      const { id, serviceIds } = await createReservation([{ total: 500 }, { total: 500 }], 'efectivo');
+      const [svcA] = serviceIds;
+
+      const p = await postPayment(id, {
+        amount: 0, tip: 90, reservationServiceId: svcA, method: 'efectivo',
+      });
+      const pid = p.body.data.payment.id;
+
+      await putPayment(id, pid, { reservationServiceId: '' }); // -> general
+      const back = await putPayment(id, pid, { reservationServiceId: svcA }); // -> mismo servicio
+      expect(back.status).toBe(200);
+      const { summary } = back.body.data;
+      expect(summary.tip).toBe(90); // sin duplicar
+      expect(bucketFor(summary, svcA)).toEqual({ reservationServiceId: svcA, tip: 90 });
+      expect(bucketFor(summary, null)).toBeUndefined(); // sin residuo en general
+    });
+
+    it('bajar la propina a 0 explícito (tip: 0) SÍ limpia el valor viejo en DB (fix del bug colateral)', async () => {
+      const { id } = await createReservation([{ total: 1000 }], 'efectivo');
+
+      const p = await postPayment(id, { amount: 1000, tip: 150, method: 'efectivo' });
+      expect(p.body.data.summary.tip).toBe(150);
+
+      // El formulario Fase 4 manda tip: 0 explícito (nunca omite la clave); el guard tip !== undefined lo limpia.
+      const upd = await putPayment(id, p.body.data.payment.id, { tip: 0 });
+      expect(upd.status).toBe(200);
+      expect(upd.body.data.payment.tip).toBe(0); // el 150 viejo se limpió, no quedó huérfano
+      expect(upd.body.data.summary.tip).toBe(0);
+      expect(upd.body.data.summary.balance).toBe(0); // servicios siguen saldados
+    });
+  });
 });
