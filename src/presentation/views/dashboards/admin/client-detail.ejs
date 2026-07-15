@@ -4105,27 +4105,44 @@ function setupExperienceFilters() {
         const originalContent = saveButton.innerHTML;
         saveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Guardando...';
         
-        // Gather form data
-        const formData = {
-            firstName: document.getElementById('editFirstName').value.trim(),
-            lastName: document.getElementById('editLastName').value.trim(),
-            email: document.getElementById('editEmail').value.trim(),
-            phone: document.getElementById('editPhone').value.trim() || undefined,
-            // Date input value is already YYYY-MM-DD; omit when empty so it doesn't clear an existing date.
-            birthDate: document.getElementById('editBirthDate').value || undefined,
-            companyName: document.getElementById('editCompanyName').value.trim(),
-            taxId: document.getElementById('editTaxId').value.trim() || undefined,
-            website: document.getElementById('editWebsite').value.trim() || undefined,
-            address: {
-                street: document.getElementById('editStreet').value.trim() || undefined,
-                city: document.getElementById('editCity').value.trim() || undefined,
-                state: document.getElementById('editState').value.trim() || undefined,
-                zipCode: document.getElementById('editZipCode').value.trim() || undefined,
-                country: document.getElementById('editCountry').value.trim() || undefined
-            },
-            notes: document.getElementById('editNotes').value.trim() || undefined,
-            active: document.getElementById('editActive').value === 'true'
-        };
+        // Gather form data — bifurca según el form renderizado (agencia unificada vs cliente viejo)
+        const gv = function (id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+        const isAgencyEdit = !!document.getElementById('agencyFirstName');
+        let formData;
+        if (isAgencyEdit) {
+            formData = {
+                firstName: gv('agencyFirstName'),
+                lastName: gv('agencyLastName'),
+                email: gv('agencyEmail'),
+                phone: gv('agencyPhone') || undefined,
+                birthDate: gv('agencyBirthDate') || undefined,
+                companyName: gv('agencyCompanyName') || undefined,
+                website: gv('agencyWebsite') || undefined,
+                notes: gv('agencyNotes') || undefined,
+                active: document.getElementById('editAgencyActive') ? document.getElementById('editAgencyActive').value === 'true' : undefined
+            };
+        } else {
+            formData = {
+                firstName: document.getElementById('editFirstName').value.trim(),
+                lastName: document.getElementById('editLastName').value.trim(),
+                email: document.getElementById('editEmail').value.trim(),
+                phone: document.getElementById('editPhone').value.trim() || undefined,
+                // Date input value is already YYYY-MM-DD; omit when empty so it doesn't clear an existing date.
+                birthDate: document.getElementById('editBirthDate').value || undefined,
+                companyName: document.getElementById('editCompanyName').value.trim(),
+                taxId: document.getElementById('editTaxId').value.trim() || undefined,
+                website: document.getElementById('editWebsite').value.trim() || undefined,
+                address: {
+                    street: document.getElementById('editStreet').value.trim() || undefined,
+                    city: document.getElementById('editCity').value.trim() || undefined,
+                    state: document.getElementById('editState').value.trim() || undefined,
+                    zipCode: document.getElementById('editZipCode').value.trim() || undefined,
+                    country: document.getElementById('editCountry').value.trim() || undefined
+                },
+                notes: document.getElementById('editNotes').value.trim() || undefined,
+                active: document.getElementById('editActive').value === 'true'
+            };
+        }
         
         // Get client ID
         const clientId = document.getElementById('editClientId').value;
@@ -4572,12 +4589,33 @@ function setupExperienceFilters() {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title text-white" id="editClientModalLabel">
-                    <i class="ti ti-edit me-2"></i>Editar Cliente
+                    <i class="ti ti-edit me-2"></i><%= isAgency ? 'Editar Agencia' : 'Editar Cliente' %>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <form id="editClientForm">
+<% if (isAgency) { %>
+                    <!-- ===== Edición unificada de AGENCIA (form nuevo prefilled, sin password) ===== -->
+                    <%- include('../../organisms/forms/form-editorial-styles') %>
+                    <%- include('../../organisms/forms/agency-form-fields', { client: clientData, showPassword: false }) %>
+                    <div class="client-form-editorial">
+                        <div class="mb-3">
+                            <%- include('../../atoms/form/select', {
+                                id: 'editAgencyActive',
+                                name: 'active',
+                                label: 'Estado',
+                                value: (clientData.active === false ? 'false' : 'true'),
+                                options: [
+                                    { value: 'true', label: 'Activo' },
+                                    { value: 'false', label: 'Inactivo' }
+                                ],
+                                required: false,
+                                helpText: 'Cambiar a inactivo deshabilitará el acceso de la agencia al sistema'
+                            }) %>
+                        </div>
+                    </div>
+<% } else { %>
                     <!-- Personal Information Section -->
                     <div class="mb-4">
                         <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
@@ -4763,6 +4801,7 @@ function setupExperienceFilters() {
                         </div>
                     </div>
 
+<% } %>
                     <!-- Hidden input for client ID -->
                     <input type="hidden" id="editClientId" name="clientId" value="<%= clientData.id %>">
                 </form>

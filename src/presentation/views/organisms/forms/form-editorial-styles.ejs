@@ -1,0 +1,60 @@
+<%
+/**
+ * Estilos editoriales compartidos por los formularios de cliente/agencia (.client-form-editorial):
+ * inputs/labels/encabezados de sección, acordeones y segmented control. Se incluye una sola vez por
+ * página (client-form-fields en el alta; el modal de edición en el detalle).
+ * Created by Denisse Maldonado
+ */
+%>
+<style>
+  .client-form-editorial{--olive:#6E7A50;--olive-d:#566040;--line:#ded9cb;--ink:#2b2b2b;--muted:#8a8f78;}
+  /* Encabezados de sección → editorial (mayúsculas, línea sutil) */
+  .client-form-editorial h6{text-transform:uppercase;letter-spacing:.16em;font-size:.72rem;font-weight:700;color:var(--olive-d)!important;
+    border:0!important;padding:0 0 .5rem 0!important;margin:1.7rem 0 1.1rem;position:relative;}
+  .client-form-editorial h6::after{content:"";position:absolute;left:0;bottom:0;width:100%;height:1px;background:var(--line);}
+  .client-form-editorial .mb-4:first-child > h6{margin-top:0;}
+  /* Etiquetas consistentes */
+  .client-form-editorial .form-label,.client-form-editorial label.form-label{font-size:.78rem;font-weight:600;color:var(--ink);margin-bottom:.35rem;}
+  /* Inputs/selects/áreas → mismo tamaño, borde salvia, foco olivo */
+  .client-form-editorial .form-control,.client-form-editorial .form-select{
+    border:1px solid var(--line);border-radius:10px;padding:.6rem .85rem;font-size:.9rem;color:var(--ink);min-height:44px;background:#fff;box-shadow:none;}
+  .client-form-editorial .form-control:focus,.client-form-editorial .form-select:focus{
+    border-color:var(--olive);box-shadow:0 0 0 .18rem rgba(110,122,80,.12);}
+  .client-form-editorial textarea.form-control{min-height:92px;}
+  /* input-group (password): bordes/altura alineados con los demás inputs */
+  .client-form-editorial .input-group > .form-control{border-radius:10px 0 0 10px;}
+  .client-form-editorial .input-group > .btn{border:1px solid var(--line);border-left:0;}
+  .client-form-editorial .input-group > .btn:last-child{border-radius:0 10px 10px 0;}
+  .client-form-editorial .form-text{font-size:.72rem;color:var(--muted);}
+  /* Espaciado compacto entre campos: el átomo ya trae mb-3, no duplicar en la columna */
+  .client-form-editorial .row > [class*="col-"]{margin-bottom:0;}
+  .client-form-editorial .mb-3{margin-bottom:.55rem !important;}
+  /* Campo solo en su fila → ocupa el ancho completo (sin hueco a la derecha) */
+  .client-form-editorial .row > .col-md-6:only-child{flex:0 0 100%;max-width:100%;}
+  /* Bloque esencial (alta rápida) */
+  .client-form-editorial .cff-essential-note{font-size:.78rem;color:var(--muted);font-style:italic;margin:.2rem 0 1rem;}
+  .client-form-editorial .cff-req-tag{display:inline-block;font-size:.62rem;letter-spacing:.05em;text-transform:none;color:var(--muted);
+    border:1px solid var(--line);border-radius:999px;padding:1px 9px;margin-left:8px;vertical-align:middle;font-weight:600;}
+  /* Acordeón (secciones opcionales) — compartido con agency-form-fields */
+  .client-form-editorial .cff-acc{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden;background:#fff;}
+  .client-form-editorial .cff-acc-h{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:14px 18px;cursor:pointer;background:#fbfaf6;border:0;text-align:left;}
+  .client-form-editorial .cff-acc-h .cff-t{text-transform:uppercase;letter-spacing:.14em;font-size:.72rem;font-weight:700;
+    color:var(--olive-d);display:flex;align-items:center;gap:10px;}
+  .client-form-editorial .cff-acc-h .cff-t i{opacity:.7;}
+  .client-form-editorial .cff-acc-h .cff-badge{background:#eceadd;color:var(--olive-d);border-radius:999px;font-size:.64rem;
+    padding:2px 9px;font-weight:700;letter-spacing:.05em;text-transform:none;}
+  .client-form-editorial .cff-acc-h .cff-chev{transition:transform .2s;color:var(--muted);margin-left:auto;}
+  .client-form-editorial .cff-acc.open .cff-acc-h .cff-chev{transform:rotate(90deg);}
+  .client-form-editorial .cff-acc-body{padding:0 18px;max-height:0;overflow:hidden;transition:max-height .28s ease,padding .28s ease;}
+  .client-form-editorial .cff-acc.open .cff-acc-body{padding:18px;max-height:2600px;}
+  .client-form-editorial .cff-hint-optional{font-size:.75rem;color:var(--muted);font-style:italic;margin:.4rem 0 .9rem;}
+  /* Segmented control "Tipo de Cliente" (btn-group como en los filtros del sistema) */
+  .client-form-editorial .cff-segmented{width:100%;}
+  .client-form-editorial .cff-segmented .btn{flex:1 1 0;min-height:44px;font-size:.83rem;
+    display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;}
+  @media (max-width:600px){
+    .client-form-editorial .cff-segmented{flex-wrap:wrap;}
+    .client-form-editorial .cff-segmented .btn{flex:1 1 45%;}
+  }
+</style>

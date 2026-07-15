@@ -1,10 +1,16 @@
 <%
 /**
  * Campos del formulario de AGENCIA, en 3 secciones: Empresa (lo primero a llenar) → Datos del
- * representante → Acceso (correo + contraseña juntos). SIN dirección fiscal: lo fiscal se maneja por
- * perfiles de facturación. Usa el estilo editorial de client-form-fields (co-presente). IDs agency*.
+ * representante → Acceso. SIN dirección fiscal (va por perfiles de facturación). Reutilizable en
+ * el alta (vacío) y en la edición (prefill server-side via `client` + showPassword:false, porque
+ * la contraseña se cambia por el flujo de reset). Usa el estilo editorial (form-editorial-styles).
+ * Params: client (objeto de prefill, opcional), showPassword (bool, default true).
  * Created by Denisse Maldonado
  */
+var data = (typeof client !== 'undefined' && client) ? client : {};
+var showPwd = (typeof showPassword === 'undefined') ? true : !!showPassword;
+var agencyBirth = (data.birthDate && !isNaN(new Date(data.birthDate)))
+  ? new Date(data.birthDate).toISOString().split('T')[0] : '';
 %>
 <div class="client-form-editorial">
     <!-- ===== Empresa ===== -->
@@ -12,10 +18,10 @@
         <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-building me-1"></i>Empresa</h6>
         <div class="row">
             <div class="col-md-6">
-                <%- include('../../molecules/common/form-field', { type: 'text', name: 'companyName', id: 'agencyCompanyName', label: 'Nombre de la Empresa', required: true, placeholder: 'Ej: Viajes ABC', inputAttributes: { maxlength: '200' } }) %>
+                <%- include('../../molecules/common/form-field', { type: 'text', name: 'companyName', id: 'agencyCompanyName', label: 'Nombre de la Empresa', required: true, placeholder: 'Ej: Viajes ABC', value: data.companyName || '', inputAttributes: { maxlength: '200' } }) %>
             </div>
             <div class="col-md-6">
-                <%- include('../../atoms/common/url-input', { name: 'website', id: 'agencyWebsite', label: 'Sitio Web', required: false }) %>
+                <%- include('../../atoms/common/url-input', { name: 'website', id: 'agencyWebsite', label: 'Sitio Web', required: false, value: data.website || '' }) %>
             </div>
         </div>
     </div>
@@ -25,18 +31,18 @@
         <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-user me-1"></i>Datos del representante</h6>
         <div class="row">
             <div class="col-md-6">
-                <%- include('../../atoms/common/first-name-input', { name: 'firstName', id: 'agencyFirstName', label: 'Nombre del Representante', required: true, placeholder: 'Ej: Juan', helpText: 'Contacto principal de la agencia' }) %>
+                <%- include('../../atoms/common/first-name-input', { name: 'firstName', id: 'agencyFirstName', label: 'Nombre del Representante', required: true, placeholder: 'Ej: Juan', helpText: 'Contacto principal de la agencia', value: data.firstName || '' }) %>
             </div>
             <div class="col-md-6">
-                <%- include('../../atoms/common/last-name-input', { name: 'lastName', id: 'agencyLastName', label: 'Apellido del Representante', required: true, placeholder: 'Ej: Pérez García' }) %>
+                <%- include('../../atoms/common/last-name-input', { name: 'lastName', id: 'agencyLastName', label: 'Apellido del Representante', required: true, placeholder: 'Ej: Pérez García', value: data.lastName || '' }) %>
             </div>
         </div>
         <div class="row">
             <div class="col-md-6">
-                <%- include('../../atoms/common/phone-input', { name: 'phone', id: 'agencyPhone', label: 'Teléfono', required: false, countryCode: 'MX', placeholder: '999 123 4567' }) %>
+                <%- include('../../atoms/common/phone-input', { name: 'phone', id: 'agencyPhone', label: 'Teléfono', required: false, countryCode: 'MX', placeholder: '999 123 4567', value: data.phone || '' }) %>
             </div>
             <div class="col-md-6">
-                <%- include('../../atoms/form/datepicker', { name: 'birthDate', id: 'agencyBirthDate', label: 'Fecha de nacimiento', required: false, min: '1900-01-01', max: new Date().toISOString().split('T')[0] }) %>
+                <%- include('../../atoms/form/datepicker', { name: 'birthDate', id: 'agencyBirthDate', label: 'Fecha de nacimiento', required: false, min: '1900-01-01', max: new Date().toISOString().split('T')[0], value: agencyBirth }) %>
             </div>
         </div>
     </div>
@@ -46,11 +52,13 @@
         <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-lock me-1"></i>Acceso</h6>
         <div class="row">
             <div class="col-md-6">
-                <%- include('../../atoms/common/email-input', { name: 'email', id: 'agencyEmail', label: 'Email Corporativo', required: true, placeholder: 'contacto@empresa.com', helpText: 'La agencia inicia sesión con este correo' }) %>
+                <%- include('../../atoms/common/email-input', { name: 'email', id: 'agencyEmail', label: 'Email Corporativo', required: true, placeholder: 'contacto@empresa.com', helpText: 'La agencia inicia sesión con este correo', value: data.email || '' }) %>
             </div>
+            <% if (showPwd) { %>
             <div class="col-md-6">
                 <%- include('../../molecules/common/password-field', { id: 'agencyPassword', name: 'password', label: 'Contraseña', required: true, helpText: '' }) %>
             </div>
+            <% } %>
         </div>
     </div>
 
@@ -58,7 +66,7 @@
     <div class="mb-3">
         <div class="row">
             <div class="col-12">
-                <%- include('../../molecules/common/form-field', { type: 'textarea', name: 'notes', id: 'agencyNotes', label: 'Notas', required: false, placeholder: 'Información general adicional', helpText: 'Información adicional', inputAttributes: { rows: '3' } }) %>
+                <%- include('../../molecules/common/form-field', { type: 'textarea', name: 'notes', id: 'agencyNotes', label: 'Notas', required: false, placeholder: 'Información general adicional', helpText: 'Información adicional', value: data.notes || '', inputAttributes: { rows: '3' } }) %>
             </div>
         </div>
     </div>
