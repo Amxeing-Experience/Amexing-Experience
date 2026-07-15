@@ -173,154 +173,6 @@
                             </div>
                         </div>
 
-                        <!-- ===== Opcional: Empresa y dirección (lo fiscal va por perfiles de facturación) ===== -->
-                        <div class="cff-acc">
-                            <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
-                                <span class="cff-t"><i class="ti ti-building"></i>Empresa y dirección</span>
-                                <span class="cff-badge">Opcional</span>
-                                <span class="cff-chev"><i class="ti ti-chevron-right"></i></span>
-                            </button>
-                            <div class="cff-acc-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <%- include('../../molecules/common/form-field', {
-                                            type: 'text',
-                                            name: 'companyName',
-                                            id: 'directClientCompanyName',
-                                            label: 'Nombre de la Empresa',
-                                            required: false,
-                                            placeholder: 'Ej: Viajes ABC',
-                                            inputAttributes: { maxlength: '200' }
-                                        }) %>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <%- include('../../molecules/common/form-field', {
-                                            type: 'select',
-                                            name: 'companyType',
-                                            id: 'directClientCompanyType',
-                                            label: 'Tipo de Empresa',
-                                            required: false,
-                                            options: [
-                                                { value: '', text: 'Seleccione un tipo' },
-                                                { value: 'individual', text: 'Persona Física' },
-                                                { value: 'corporate', text: 'Persona Moral' },
-                                                { value: 'travel_agency', text: 'Agencia de Viajes' },
-                                                { value: 'tour_operator', text: 'Tour Operador' },
-                                                { value: 'other', text: 'Otro' }
-                                            ],
-                                            helpText: 'Tipo de organización'
-                                        }) %>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <%- include('../../atoms/common/url-input', {
-                                            name: 'website',
-                                            id: 'directClientWebsite',
-                                            label: 'Sitio Web',
-                                            required: false,
-                                            placeholder: 'https://www.ejemplo.com',
-                                            helpText: 'URL completa del sitio web de la empresa'
-                                        }) %>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-12">
-                                        <p class="mb-2" style="text-transform:uppercase;letter-spacing:.12em;font-size:.66rem;font-weight:700;color:var(--muted);border-top:1px dashed var(--line);padding-top:.9rem;margin-top:.2rem;">
-                                            <i class="ti ti-map-pin me-1"></i>Dirección
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <%- include('../../atoms/common/street-type-select', {
-                                            name: 'streetType',
-                                            id: 'directClientStreetType',
-                                            label: 'Tipo de Vialidad',
-                                            required: false,
-                                            helpText: 'Tipo de vía',
-                                            value: 'Calle'
-                                        }) %>
-                                    </div>
-                                    <div class="col-md-5">
-                                        <%- include('../../atoms/common/street-name-input', {
-                                            name: 'streetName',
-                                            id: 'directClientStreetName',
-                                            label: 'Nombre de la Calle',
-                                            required: false,
-                                            placeholder: 'Ej: Reforma, 60, Insurgentes',
-                                            helpText: 'Nombre de la calle'
-                                        }) %>
-                                    </div>
-                                    <div class="col-md-2">
-                                        <%- include('../../atoms/common/exterior-number-input', {
-                                            name: 'exteriorNumber',
-                                            id: 'directClientExteriorNumber',
-                                            label: 'No. Exterior',
-                                            required: false,
-                                            placeholder: '123',
-                                            helpText: 'Número exterior'
-                                        }) %>
-                                    </div>
-                                    <div class="col-md-2">
-                                        <%- include('../../atoms/common/interior-number-input', {
-                                            name: 'interiorNumber',
-                                            id: 'directClientInteriorNumber',
-                                            label: 'No. Interior',
-                                            required: false,
-                                            placeholder: '4B',
-                                            helpText: 'Depto/oficina'
-                                        }) %>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <%- include('../../atoms/common/colonia-input', {
-                                            name: 'colonia',
-                                            id: 'directClientColonia',
-                                            label: 'Colonia',
-                                            required: false,
-                                            placeholder: 'Ej: Centro, Roma Norte',
-                                            helpText: 'Nombre de la colonia'
-                                        }) %>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <%- include('../../atoms/common/city-input', {
-                                            name: 'city',
-                                            id: 'directClientCity',
-                                            label: 'Ciudad / Municipio',
-                                            required: false,
-                                            placeholder: 'Ej: Mérida, Guadalajara',
-                                            helpText: 'Ciudad o municipio'
-                                        }) %>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <%- include('../../atoms/common/state-select', {
-                                            name: 'state',
-                                            id: 'directClientState',
-                                            label: 'Estado',
-                                            required: false,
-                                            helpText: 'Estado o región',
-                                            value: ''
-                                        }) %>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <%- include('../../atoms/common/postal-code-input', {
-                                            name: 'postalCode',
-                                            id: 'directClientPostalCode',
-                                            label: 'Código Postal',
-                                            required: false,
-                                            placeholder: '12345',
-                                            helpText: '5 dígitos',
-                                            country: 'MX'
-                                        }) %>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- ===== Opcional: Requerimientos Especiales ===== -->
                         <div class="cff-acc">
                             <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
@@ -477,21 +329,10 @@
         set('directClientEmail', d.email);
         set('directClientPhone', d.phone);
         if (d.birthDate) { var bd = new Date(d.birthDate); if (!isNaN(bd)) set('directClientBirthDate', bd.toISOString().split('T')[0]); }
-        set('directClientCompanyName', d.companyName);
-        set('directClientCompanyType', d.companyType);
-        set('directClientWebsite', d.website);
         set('directClientContactFirstName', d.contactFirstName);
         set('directClientContactLastName', d.contactLastName);
         set('directClientEmergencyContactName', d.emergencyContactName);
         set('directClientEmergencyContactPhone', d.emergencyContactPhone);
-        set('directClientStreetType', d.streetType);
-        set('directClientStreetName', d.streetName);
-        set('directClientExteriorNumber', d.exteriorNumber);
-        set('directClientInteriorNumber', d.interiorNumber);
-        set('directClientColonia', d.colonia);
-        set('directClientCity', d.city);
-        set('directClientState', d.state);
-        set('directClientPostalCode', d.postalCode);
         set('directClientPreferredLanguage', d.preferredLanguage);
         set('directClientAccessibilityRequirements', d.accessibilityRequirements);
         set('directClientAllergies', d.allergies);
