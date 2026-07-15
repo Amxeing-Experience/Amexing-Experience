@@ -8,6 +8,7 @@ const Quote = require('../../../domain/models/Quote');
 const QuoteOwnership = require('../../../domain/models/QuoteOwnership');
 const ReservationService = require('../../../domain/models/ReservationService');
 const ServiceChangeRequest = require('../../../domain/models/ServiceChangeRequest');
+const QuoteActivityService = require('../../services/QuoteActivityService');
 const QuoteService = require('../../services/QuoteService');
 const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
 const QuoteCollaborationService = require('../../services/QuoteCollaborationService');
@@ -177,6 +178,72 @@ async function injectServiceIncludes(serviceItems) {
       }
     });
   });
+}
+
+/**
+ * Aplana los subconceptos de un serviceItems a un Map por id → { sc, dayNumber }.
+ * @param {object} serviceItems - ServiceItems con days[].subconcepts[].
+ * @returns {Map<string, object>} Map por id de subconcepto.
+ * @example flattenSubconcepts(quote.get('serviceItems'))
+ */
+function flattenSubconcepts(serviceItems) {
+  const map = new Map();
+  ((serviceItems && serviceItems.days) || []).forEach((d) => {
+    (d.subconcepts || []).forEach((sc) => {
+      if (sc && sc.id) map.set(sc.id, { sc, dayNumber: d.dayNumber });
+    });
+  });
+  return map;
+}
+
+/**
+ * Firma de contenido "significativo" de un subconcepto (ignora metadata de lock/solicitud)
+ * para detectar ediciones reales en el timeline.
+ * @param {object} sc - Subconcepto.
+ * @returns {string} Firma JSON.
+ * @example subconceptSignature(sc)
+ */
+function subconceptSignature(sc) {
+  return JSON.stringify({
+    concept: sc.concept || '',
+    time: sc.time || '',
+    quantity: sc.quantity ?? null,
+    unitPrice: sc.unitPrice ?? 0,
+    total: sc.total ?? 0,
+    notes: sc.notes || '',
+    originName: sc.originName || '',
+    destinationName: sc.destinationName || '',
+    vehicleTypeName: sc.vehicleTypeName || '',
+  });
+}
+
+/**
+ * Compara el serviceItems previo vs el nuevo y arma los eventos legibles del timeline
+ * (agregado/editado/quitado por servicio).
+ * @param {object} before - ServiceItems previo.
+ * @param {object} after - ServiceItems nuevo (ya guardado).
+ * @returns {Array<object>} Eventos { action, summary, meta }.
+ * @example buildServiceItemsActivities(before, after)
+ */
+function buildServiceItemsActivities(before, after) {
+  const b = flattenSubconcepts(before);
+  const a = flattenSubconcepts(after);
+  const events = [];
+  a.forEach(({ sc, dayNumber }, id) => {
+    const label = sc.concept || 'servicio';
+    if (!b.has(id)) {
+      events.push({ action: 'service_added', summary: `agregó "${label}" al Día ${dayNumber || '?'}`, meta: { serviceId: id, dayNumber } });
+    } else if (subconceptSignature(sc) !== subconceptSignature(b.get(id).sc)) {
+      events.push({ action: 'service_edited', summary: `editó "${label}" (Día ${dayNumber || '?'})`, meta: { serviceId: id, dayNumber } });
+    }
+  });
+  b.forEach(({ sc, dayNumber }, id) => {
+    if (!a.has(id)) {
+      const label = sc.concept || 'servicio';
+      events.push({ action: 'service_removed', summary: `quitó "${label}" (Día ${dayNumber || '?'})`, meta: { serviceId: id, dayNumber } });
+    }
+  });
+  return events;
 }
 
 /**
@@ -1540,6 +1607,26 @@ class QuoteController {
           req.userRole
         );
 
+        // Timeline (Fase A): registrar el cambio de estado en un texto legible.
+        if (result && result.success !== false) {
+          const STATUS_LABELS = {
+            quoted: 'COTIZADO',
+            requested: 'SOLICITADO',
+            hold: 'BLOQUEADO',
+            scheduled: 'AGENDADO',
+            rejected: 'RECHAZADO',
+            cancelled: 'CANCELADO',
+          };
+          await QuoteActivityService.log({
+            quoteId,
+            actor: currentUser,
+            actorRole: req.userRole,
+            action: 'status_changed',
+            summary: `cambió el estado a ${STATUS_LABELS[updates.status] || updates.status}`,
+            meta: { status: updates.status },
+          });
+        }
+
         // Add edit tracking info to result (handle null editRecord for status-only updates)
         if (editRecord) {
           result.editId = editRecord.id;
@@ -2267,6 +2354,9 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
+      // Timeline (Fase A): snapshot del serviceItems previo para diffear agregados/editados/quitados.
+      const beforeServiceItems = quote.get('serviceItems') || { days: [] };
+
       // Debug: Log transport services with suggested departure time fields
       days.forEach((day, dayIndex) => {
         if (day.subconcepts) {
@@ -2385,6 +2475,14 @@ class QuoteController {
 
       // Create or update ReservationService records for transport services with suggested departure times
       await this.persistSuggestedDepartureTimes(quote.id, sortedAndCleanedDays, currentUser);
+
+      // Timeline (Fase A): eventos legibles de agregados/editados/quitados de servicios.
+      const activityEvents = buildServiceItemsActivities(beforeServiceItems, serviceItems);
+      if (activityEvents.length) {
+        await QuoteActivityService.logMany(activityEvents.map((e) => ({
+          quoteId: quote.id, actor: currentUser, actorRole: req.userRole, ...e,
+        })));
+      }
 
       // If this quote is already a reservation, keep the reservation in sync with
       // the edited service items (preserving driver/vehicle assignments). Isolated
@@ -2508,6 +2606,14 @@ class QuoteController {
       logger.info('Service change requested', {
         quoteId: quote.id, serviceId, type, requestId: record.id, requestedBy: currentUser.id,
       });
+      await QuoteActivityService.log({
+        quoteId: quote.id,
+        actor: currentUser,
+        actorRole: req.userRole,
+        action: 'change_requested',
+        summary: `solicitó ${type === 'delete' ? 'borrar' : 'modificar'} "${serviceLabel}"`,
+        meta: { serviceId, type, requestId: record.id },
+      });
       return this.sendSuccess(res, { serviceId, changeRequest: target.changeRequest }, 'Solicitud enviada', 200);
     } catch (error) {
       logger.error('Error in requestServiceChange', { error: error.message });
@@ -2605,6 +2711,15 @@ class QuoteController {
 
       logger.info('Service change reviewed', {
         quoteId: quote.id, serviceId, decision, reqType, action, reviewedBy: currentUser.id,
+      });
+      const reviewedLabel = (target && target.concept) || 'servicio';
+      await QuoteActivityService.log({
+        quoteId: quote.id,
+        actor: currentUser,
+        actorRole: req.userRole,
+        action: decision === 'approve' ? 'change_approved' : 'change_rejected',
+        summary: `${decision === 'approve' ? 'aprobó' : 'rechazó'} la solicitud de ${reqType === 'delete' ? 'borrado' : 'modificación'} de "${reviewedLabel}"`,
+        meta: { serviceId, type: reqType, requestId },
       });
       return this.sendSuccess(res, { serviceId, action, type: reqType }, 'Solicitud revisada', 200);
     } catch (error) {
@@ -2715,6 +2830,32 @@ class QuoteController {
       return this.sendError(
         res,
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error',
+        500
+      );
+    }
+  }
+
+  /**
+   * GET /api/quotes/:id/activity — Timeline de actividades legible de la cotización (Fase A).
+   * Lo ven admin y owner/agencia (nivel 4+). Read-only.
+   * @param {object} req - Express request; params id.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { activities }.
+   * @example
+   *   GET /api/quotes/abc/activity
+   */
+  async getQuoteActivity(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId } = req.params;
+      const activities = await QuoteActivityService.list(quoteId);
+      return this.sendSuccess(res, { activities }, 'OK', 200);
+    } catch (error) {
+      logger.error('Error in getQuoteActivity', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al obtener la actividad',
         500
       );
     }

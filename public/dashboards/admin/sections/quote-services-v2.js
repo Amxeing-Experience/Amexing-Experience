@@ -1347,8 +1347,10 @@ class ItineraryBuilder {
     document.getElementById('previewItineraryBtn')?.addEventListener('click', () => this.showPreview());
     document.getElementById('exportPdfBtn')?.addEventListener('click', () => this.exportPdf());
     // Fase 3: botón "Solicitudes" (historial de solicitudes de cambio) + carga del contador.
-    document.getElementById('changeRequestsBtn')?.addEventListener('click', () => this.openChangeRequestsModal());
+    document.getElementById('changeRequestsBtn')?.addEventListener('click', () => this.runWithButtonLoading('changeRequestsBtn', () => this.openChangeRequestsModal()));
     this.loadChangeRequests();
+    // Fase A: botón "Actividad" (timeline de actividades de la cotización).
+    document.getElementById('quoteActivityBtn')?.addEventListener('click', () => this.runWithButtonLoading('quoteActivityBtn', () => this.openActivityModal()));
 
     // Continue to Summary Button
     document.getElementById('continueToSummaryBtn')?.addEventListener('click', () => {
@@ -20646,6 +20648,33 @@ class ItineraryBuilder {
     }[c]));
   }
 
+  // Muestra un spinner en un botón mientras corre una operación async (evita que parezca
+  // congelada la pantalla al abrir un modal que hace fetch). Restaura el botón al terminar.
+  async runWithButtonLoading(btnId, fn) {
+    const btn = document.getElementById(btnId);
+    const original = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Abriendo...';
+    }
+    try {
+      await fn();
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = original; }
+    }
+  }
+
+  // Limpieza defensiva al cerrar un modal inyectado dinámicamente: evita que el backdrop
+  // se quede pegado bloqueando la página (elimina instancia, elemento y backdrop huérfano).
+  disposeTempModal(modalEl, modal) {
+    try { modal?.dispose(); } catch (_) { /* noop */ }
+    modalEl?.remove();
+    document.querySelectorAll('.modal-backdrop').forEach((b) => b.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+  }
+
   // Fase 2: controles COMPACTOS para la columna de acciones (solo owner en servicio bloqueado).
   // El aviso de revisión del admin va en una franja de ancho completo (renderServiceReviewBanner),
   // para no encimar los botones editar/duplicar/borrar.
@@ -20735,7 +20764,7 @@ class ItineraryBuilder {
       const note = modalEl.querySelector('#crNote')?.value || '';
       this.submitChangeRequest(serviceId, type, note, modal);
     });
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
+    modalEl.addEventListener('hidden.bs.modal', () => this.disposeTempModal(modalEl, modal));
     modal.show();
   }
 
@@ -20835,7 +20864,9 @@ class ItineraryBuilder {
   }
 
   // Fase 3: abre el modal con el historial de solicitudes de la cotización.
-  openChangeRequestsModal() {
+  async openChangeRequestsModal() {
+    // Refresca datos al abrir (además de justificar el spinner del botón).
+    await this.loadChangeRequests();
     const isAdmin = ['admin', 'superadmin'].includes(this.userRole);
     const reqs = this.changeRequests || [];
     const fmtDate = (d) => {
@@ -20879,7 +20910,7 @@ class ItineraryBuilder {
     document.body.insertAdjacentHTML('beforeend', html);
     const modalEl = document.getElementById('changeRequestsModal');
     const modal = new bootstrap.Modal(modalEl);
-    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
+    modalEl.addEventListener('hidden.bs.modal', () => this.disposeTempModal(modalEl, modal));
     modal.show();
 
     // El owner marca como vistas sus solicitudes resueltas → limpia contador + badges inline.
@@ -20897,6 +20928,121 @@ class ItineraryBuilder {
         this.renderItinerary();
       }).catch(() => {});
     }
+  }
+
+  // Fase A: modal con el timeline de actividades de la cotización (read-only, ambos roles).
+  async openActivityModal() {
+    let activities = [];
+    try {
+      const resp = await fetch(`/api/quotes/${this.quoteId}/activity`, {
+        headers: { Authorization: `Bearer ${this.getAccessToken() || ''}` },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) activities = (data.data && data.data.activities) || [];
+    } catch (e) { /* silencioso */ }
+
+    const COLORS = {
+      service_added: '#2e7d32',
+      service_edited: '#1565c0',
+      service_removed: '#c62828',
+      status_changed: '#6E7A50',
+      change_requested: '#b8894a',
+      change_approved: '#2e7d32',
+      change_rejected: '#c62828',
+    };
+    const ICONS = {
+      service_added: 'ti-plus',
+      service_edited: 'ti-pencil',
+      service_removed: 'ti-trash',
+      status_changed: 'ti-flag',
+      change_requested: 'ti-message-2',
+      change_approved: 'ti-check',
+      change_rejected: 'ti-x',
+    };
+    const dayLabel = (d) => {
+      const dt = new Date(d);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const that = new Date(dt); that.setHours(0, 0, 0, 0);
+      const diff = Math.round((today - that) / 86400000);
+      if (diff === 0) return 'Hoy';
+      if (diff === 1) return 'Ayer';
+      try { return dt.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; }
+    };
+    const timeLabel = (d) => {
+      try { return new Date(d).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; }
+    };
+
+    let body;
+    if (!activities.length) {
+      body = `<div class="text-center text-muted py-5">
+        <i class="ti ti-timeline-event" style="font-size:2.5rem;opacity:.35;"></i>
+        <p class="mb-0 mt-2">Aún no hay actividad registrada.</p>
+        <small>Los cambios en servicios, solicitudes y estado aparecerán aquí.</small>
+      </div>`;
+    } else {
+      let lastDay = null;
+      const parts = [];
+      activities.forEach((a) => {
+        const dk = new Date(a.createdAt); dk.setHours(0, 0, 0, 0);
+        const key = dk.getTime();
+        if (key !== lastDay) {
+          lastDay = key;
+          parts.push(`<div class="qa-date-sep">${dayLabel(a.createdAt)}</div>`);
+        }
+        const color = COLORS[a.action] || '#9aa0a6';
+        const icon = ICONS[a.action] || 'ti-point';
+        parts.push(`
+          <div class="qa-item">
+            <span class="qa-dot" style="background:${color}"><i class="ti ${icon}"></i></span>
+            <div class="qa-title"><strong>${this.escapeHtmlText(a.actorName || 'Alguien')}</strong> ${this.escapeHtmlText(a.summary || '')}</div>
+            <div class="qa-time">${timeLabel(a.createdAt)}</div>
+          </div>`);
+      });
+      body = `<div class="qa-timeline">${parts.join('')}</div>`;
+    }
+
+    if (!document.getElementById('qa-timeline-styles')) {
+      const st = document.createElement('style');
+      st.id = 'qa-timeline-styles';
+      st.textContent = `
+        #quoteActivityModal .modal-content{border:none;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.15);}
+        #quoteActivityModal .modal-header{border-bottom:1px solid #f1f1f0;padding-bottom:.75rem;}
+        #quoteActivityModal .modal-body{padding-top:1rem;}
+        #quoteActivityModal .qa-timeline{padding:2px 6px 0;}
+        #quoteActivityModal .qa-date-sep{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#9aa0a6;font-weight:700;margin:14px 0 12px;}
+        #quoteActivityModal .qa-date-sep:first-child{margin-top:0;}
+        #quoteActivityModal .qa-item{position:relative;padding-left:46px;padding-bottom:18px;}
+        #quoteActivityModal .qa-item::before{content:'';position:absolute;left:16px;top:32px;bottom:-4px;width:2px;background:#ececeb;}
+        #quoteActivityModal .qa-item:last-child::before{display:none;}
+        #quoteActivityModal .qa-dot{position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1rem;box-shadow:0 1px 3px rgba(0,0,0,.18);}
+        #quoteActivityModal .qa-title{font-size:.9rem;line-height:1.4;color:#2b2b2b;}
+        #quoteActivityModal .qa-title strong{color:#1a1a1a;}
+        #quoteActivityModal .qa-time{font-size:.72rem;color:#9aa0a6;margin-top:2px;}
+      `;
+      document.head.appendChild(st);
+    }
+
+    document.getElementById('quoteActivityModal')?.remove();
+    const html = `
+      <div class="modal fade" id="quoteActivityModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <div>
+                <h5 class="modal-title mb-0"><i class="ti ti-timeline-event me-2"></i>Actividad</h5>
+                <small class="text-muted">Quién hizo qué en esta cotización</small>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">${body}</div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modalEl = document.getElementById('quoteActivityModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modalEl.addEventListener('hidden.bs.modal', () => this.disposeTempModal(modalEl, modal));
+    modal.show();
   }
 
   duplicateService(serviceId) {
