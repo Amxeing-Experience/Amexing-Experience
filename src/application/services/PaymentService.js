@@ -188,10 +188,54 @@ class PaymentService {
   }
 
   /**
+   * Sum every payment tip into the global tip total. Sister to sumPayments; tips are
+   * real money received, separate from the services amount and never surcharged by
+   * payment method. Non-numeric/missing tip counts as 0 (same defensiveness as sumPayments).
+   * @param {Array<object>} rows - Plain rows { tip }.
+   * @returns {number} Total tip (MXN), rounded to cents.
+   * @example
+   * PaymentService.sumTips([{ tip: 100 }, { tip: 50 }]) // 150
+   */
+  static sumTips(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    let tipGlobal = 0;
+    for (const row of list) tipGlobal += Number(row.tip) || 0;
+    return round2(tipGlobal);
+  }
+
+  /**
+   * Group payment tips by their service pointer for read-only staff display. Falsy
+   * service ids ('' / null / undefined) collapse into a single null bucket = the
+   * reservation-wide tip pool. Zero-tip buckets are omitted to avoid UI noise. Never
+   * affects the balance: Σ bucket.tip === sumTips(sameRows).
+   * @param {Array<object>} rows - Plain rows { tip, reservationServiceId }.
+   * @returns {Array<object>} [{ reservationServiceId, tip }, ...] (null id = whole-reservation pool).
+   * @example
+   * PaymentService.groupTipsByService([{ tip: 100, reservationServiceId: 'a' }, { tip: 50 }])
+   * // [{ reservationServiceId: 'a', tip: 100 }, { reservationServiceId: null, tip: 50 }]
+   */
+  static groupTipsByService(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    const buckets = new Map();
+    for (const row of list) {
+      const tip = Number(row.tip) || 0;
+      // '' / null / undefined all collapse to the single null pool bucket.
+      const key = row.reservationServiceId ? row.reservationServiceId : null;
+      buckets.set(key, (buckets.get(key) || 0) + tip);
+    }
+    const result = [];
+    for (const [reservationServiceId, raw] of buckets) {
+      const tip = round2(raw);
+      if (tip !== 0) result.push({ reservationServiceId, tip });
+    }
+    return result;
+  }
+
+  /**
    * Load a reservation, its existing services and payments, and compute the
    * totals + global paid amount (without persisting). Shared by summarize/recalculate.
    * @param {string} reservationId - Reservation objectId.
-   * @returns {Promise<object>} { reservation, services, totals, paidGlobal }.
+   * @returns {Promise<object>} { reservation, services, totals, paidGlobal, tipByService }.
    * @example
    * const data = await PaymentService.loadAndCompute(reservationId);
    */
@@ -211,7 +255,6 @@ class PaymentService {
     const payments = await Payment.getExistingForReservation(reservationId);
 
     const paymentType = reservation.get('paymentType') || 'efectivo';
-    const reservationTip = reservation.get('tip') || 0;
     const currency = reservation.get('currency') || 'MXN';
     // Net reservation adjustments (charges add, discounts subtract) flow into the amount due.
     const adjustmentsList = reservation.get('adjustments') || [];
@@ -220,12 +263,28 @@ class PaymentService {
       return a && a.type === 'discount' ? sum - amt : sum + amt;
     }, 0);
     const serviceItems = this.toServiceItems(services);
-    const totals = this.computeTotals(serviceItems, paymentType, reservationTip, adjustmentsNet, currency);
 
-    const paidGlobal = this.sumPayments(payments.map((payment) => ({ amount: payment.get('amount') })));
+    // Tip is aggregated from the real payments (Payment.tip), not Reservation.tip — a dead field
+    // nothing writes. Each row carries its own tip + optional service pointer for the breakdown.
+    const paymentRows = payments.map((payment) => {
+      const svc = payment.get('reservationServicePtr');
+      return {
+        amount: payment.get('amount'),
+        tip: payment.get('tip'),
+        reservationServiceId: svc ? svc.id : null,
+      };
+    });
+    const tipTotal = this.sumTips(paymentRows);
+    const totals = this.computeTotals(serviceItems, paymentType, tipTotal, adjustmentsNet, currency);
+
+    // paidGlobal MUST include the tip: both the services amount AND the tip are real money received.
+    // computeTotals folds the tip into `total`, so excluding it here would leave a phantom pending
+    // balance exactly equal to the tip (e.g. a 100%-tip payment). Net effect: tip is balance-neutral.
+    const paidGlobal = round2(this.sumPayments(paymentRows) + tipTotal);
+    const tipByService = this.groupTipsByService(paymentRows);
 
     return {
-      reservation, services, totals, paidGlobal,
+      reservation, services, totals, paidGlobal, tipByService,
     };
   }
 
@@ -233,13 +292,13 @@ class PaymentService {
    * Build the payment summary (grand-total rollup) from computed data. Payments are
    * exact money amounts subtracted from the reservation total: balance = total − paid.
    * @param {string} reservationId - Reservation objectId.
-   * @param {object} computed - { totals, paidGlobal }.
-   * @returns {object} Summary { paymentStatus, paidAmount, balance, subtotal, adjustments, iva, tip, total }.
+   * @param {object} computed - { totals, paidGlobal, tipByService }.
+   * @returns {object} Summary { paymentStatus, paidAmount, balance, subtotal, adjustments, iva, tip, tipByService, total }.
    * @example
    * PaymentService.buildSummary(id, await PaymentService.loadAndCompute(id))
    */
   static buildSummary(reservationId, computed) {
-    const { totals, paidGlobal } = computed;
+    const { totals, paidGlobal, tipByService } = computed;
     const paid = round2(paidGlobal);
 
     return {
@@ -251,6 +310,7 @@ class PaymentService {
       adjustments: totals.adjustments,
       iva: totals.iva,
       tip: totals.tip,
+      tipByService: tipByService || [],
       total: totals.total,
     };
   }
