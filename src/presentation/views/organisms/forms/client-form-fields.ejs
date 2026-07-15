@@ -10,7 +10,8 @@
  */
 %>
 <%- include('form-editorial-styles') %>
-<% var showPwd = (typeof showPassword === 'undefined') ? true : !!showPassword; %>
+<% var showPwd = (typeof showPassword === 'undefined') ? true : !!showPassword;
+   var pwdHelp = (typeof passwordHelp !== 'undefined') ? passwordHelp : ''; %>
 <div class="client-form-editorial">
                         <!-- ===== Bloque esencial: lo mínimo para crear (requeridos agrupados) ===== -->
                         <div class="mb-4">
@@ -83,7 +84,7 @@
                                         name: 'password',
                                         label: 'Contraseña',
                                         required: false,
-                                        helpText: ''
+                                        helpText: pwdHelp
                                     }) %>
                                 </div>
                                 <% } %>

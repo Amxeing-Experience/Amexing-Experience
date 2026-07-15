@@ -9,6 +9,8 @@
  */
 var data = (typeof client !== 'undefined' && client) ? client : {};
 var showPwd = (typeof showPassword === 'undefined') ? true : !!showPassword;
+var pwdHelp = (typeof passwordHelp !== 'undefined') ? passwordHelp : '';
+var pwdRequired = (typeof passwordRequired !== 'undefined') ? !!passwordRequired : true;
 var agencyBirth = (data.birthDate && !isNaN(new Date(data.birthDate)))
   ? new Date(data.birthDate).toISOString().split('T')[0] : '';
 %>
@@ -56,7 +58,7 @@ var agencyBirth = (data.birthDate && !isNaN(new Date(data.birthDate)))
             </div>
             <% if (showPwd) { %>
             <div class="col-md-6">
-                <%- include('../../molecules/common/password-field', { id: 'agencyPassword', name: 'password', label: 'Contraseña', required: true, helpText: '' }) %>
+                <%- include('../../molecules/common/password-field', { id: 'agencyPassword', name: 'password', label: 'Contraseña', required: pwdRequired, helpText: pwdHelp }) %>
             </div>
             <% } %>
         </div>
