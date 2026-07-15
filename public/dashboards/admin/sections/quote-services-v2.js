@@ -1346,6 +1346,9 @@ class ItineraryBuilder {
     // Preview
     document.getElementById('previewItineraryBtn')?.addEventListener('click', () => this.showPreview());
     document.getElementById('exportPdfBtn')?.addEventListener('click', () => this.exportPdf());
+    // Fase 3: botón "Solicitudes" (historial de solicitudes de cambio) + carga del contador.
+    document.getElementById('changeRequestsBtn')?.addEventListener('click', () => this.openChangeRequestsModal());
+    this.loadChangeRequests();
 
     // Continue to Summary Button
     document.getElementById('continueToSummaryBtn')?.addEventListener('click', () => {
@@ -20649,11 +20652,18 @@ class ItineraryBuilder {
   renderServiceLockControls(service) {
     if (['admin', 'superadmin'].includes(this.userRole)) return '';
     if (!service.adminLocked) return '';
-    const cr = (service.changeRequest && service.changeRequest.status === 'pending')
-      ? service.changeRequest : null;
-    if (cr) {
+    const cr = service.changeRequest || null;
+    if (cr && cr.status === 'pending') {
       const typeLabel = cr.type === 'delete' ? 'borrado' : 'modificación';
       return `<span class="badge bg-warning-subtle text-warning-emphasis border d-inline-flex align-items-center"><i class="ti ti-clock me-1"></i>Solicitud de ${typeLabel} pendiente</span>`;
+    }
+    if (cr && cr.status === 'approved') {
+      const t = cr.reviewNote ? ` title="${this.escapeHtmlText(cr.reviewNote)}"` : '';
+      return `<span class="badge bg-success-subtle text-success-emphasis border d-inline-flex align-items-center"${t}><i class="ti ti-check me-1"></i>Tu solicitud fue aprobada</span>`;
+    }
+    if (cr && cr.status === 'rejected') {
+      const t = cr.reviewNote ? ` title="${this.escapeHtmlText(cr.reviewNote)}"` : '';
+      return `<span class="badge bg-danger-subtle text-danger-emphasis border d-inline-flex align-items-center"${t}><i class="ti ti-x me-1"></i>Tu solicitud fue rechazada</span>`;
     }
     return `<button type="button" class="btn btn-sm btn-outline-secondary request-change-btn" data-service-id="${service.id}"><i class="ti ti-message-2 me-1"></i>Solicitar cambio</button>`;
   }
@@ -20746,6 +20756,7 @@ class ItineraryBuilder {
       if (svc) svc.changeRequest = (data.data && data.data.changeRequest) || { type, note, status: 'pending' };
       modal?.hide();
       this.renderItinerary();
+      this.loadChangeRequests();
       this.showAlert('Solicitud enviada. Un administrador la revisará.', 'success');
     } catch (e) {
       this.showAlert('Error al enviar la solicitud.', 'danger');
@@ -20777,11 +20788,21 @@ class ItineraryBuilder {
         this.renderItinerary();
         // Persistir totales recalculados (el endpoint solo quitó el subconcepto).
         this.saveToBackend();
+        this.loadChangeRequests();
         this.showAlert('Servicio eliminado (solicitud aprobada).', 'success');
       } else {
+        // Mantener el marcador con el status transicionado (consistente con el server) para
+        // que el badge del owner sobreviva si el admin re-guarda antes de que el owner lo vea.
         const svc = this.services.get(serviceId);
-        if (svc) delete svc.changeRequest;
+        if (svc && svc.changeRequest) {
+          svc.changeRequest = {
+            ...svc.changeRequest,
+            status: action === 'modify-approved' ? 'approved' : 'rejected',
+            seenByRequester: false,
+          };
+        }
         this.renderItinerary();
+        this.loadChangeRequests();
         this.showAlert(
           action === 'modify-approved'
             ? 'Solicitud aprobada. Edita el servicio para aplicar el cambio.'
@@ -20791,6 +20812,90 @@ class ItineraryBuilder {
       }
     } catch (e) {
       this.showAlert('Error al procesar la solicitud.', 'danger');
+    }
+  }
+
+  // Fase 3: carga el historial de solicitudes + contador y pinta el badge del botón.
+  async loadChangeRequests() {
+    try {
+      if (!this.quoteId) return;
+      const resp = await fetch(`/api/quotes/${this.quoteId}/change-requests`, {
+        headers: { Authorization: `Bearer ${this.getAccessToken() || ''}` },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) return;
+      this.changeRequests = (data.data && data.data.requests) || [];
+      const counter = (data.data && data.data.counter) || 0;
+      const badge = document.getElementById('changeRequestsCounter');
+      if (badge) {
+        badge.textContent = String(counter);
+        badge.classList.toggle('d-none', !counter);
+      }
+    } catch (e) { /* silencioso */ }
+  }
+
+  // Fase 3: abre el modal con el historial de solicitudes de la cotización.
+  openChangeRequestsModal() {
+    const isAdmin = ['admin', 'superadmin'].includes(this.userRole);
+    const reqs = this.changeRequests || [];
+    const fmtDate = (d) => {
+      if (!d) return '';
+      try { return new Date(d).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }); } catch (_) { return ''; }
+    };
+    const statusBadge = (s) => {
+      if (s === 'approved') return '<span class="badge bg-success-subtle text-success-emphasis border">Aprobada</span>';
+      if (s === 'rejected') return '<span class="badge bg-danger-subtle text-danger-emphasis border">Rechazada</span>';
+      return '<span class="badge bg-warning-subtle text-warning-emphasis border">Pendiente</span>';
+    };
+    const rows = reqs.length ? reqs.map((r) => `
+      <div class="border rounded p-2 mb-2">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <div><strong>${r.type === 'delete' ? 'Borrar' : 'Modificar'}</strong> · ${this.escapeHtmlText(r.serviceLabel || 'Servicio')}${r.serviceDeleted ? ' <span class="text-muted">(eliminado)</span>' : ''}</div>
+            <div class="small text-muted">Solicitó ${this.escapeHtmlText(r.requestedByName || '')} · ${fmtDate(r.requestedAt)}</div>
+            ${r.note ? `<div class="small mt-1">“${this.escapeHtmlText(r.note)}”</div>` : ''}
+            ${r.status !== 'pending' ? `<div class="small text-muted mt-1">${r.status === 'approved' ? 'Aprobada' : 'Rechazada'} por ${this.escapeHtmlText(r.reviewedByName || '')} · ${fmtDate(r.reviewedAt)}${r.reviewNote ? ` — “${this.escapeHtmlText(r.reviewNote)}”` : ''}</div>` : ''}
+          </div>
+          <div>${statusBadge(r.status)}</div>
+        </div>
+      </div>`).join('') : '<p class="text-muted mb-0">No hay solicitudes.</p>';
+
+    document.getElementById('changeRequestsModal')?.remove();
+    const html = `
+      <div class="modal fade" id="changeRequestsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title"><i class="ti ti-inbox me-2"></i>Historial de solicitudes</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">${rows}</div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modalEl = document.getElementById('changeRequestsModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
+    modal.show();
+
+    // El owner marca como vistas sus solicitudes resueltas → limpia contador + badges inline.
+    if (!isAdmin) {
+      fetch(`/api/quotes/${this.quoteId}/change-requests/mark-seen`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.getAccessToken() || ''}` },
+      }).then(() => {
+        document.getElementById('changeRequestsCounter')?.classList.add('d-none');
+        (this.services || new Map()).forEach((svc) => {
+          if (svc.changeRequest && svc.changeRequest.status && svc.changeRequest.status !== 'pending') {
+            delete svc.changeRequest;
+          }
+        });
+        this.renderItinerary();
+      }).catch(() => {});
     }
   }
 

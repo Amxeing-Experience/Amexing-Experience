@@ -448,6 +448,30 @@ router.post(
 );
 
 /**
+ * GET /api/quotes/:id/change-requests — Historial de solicitudes de cambio de la cotización
+ * (Fase 3) + contador de novedades. Nivel 4+ (owner y admin).
+ */
+router.get(
+  '/:id/change-requests',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.getServiceChangeRequests(req, res)
+);
+
+/**
+ * POST /api/quotes/:id/change-requests/mark-seen — Marca como vistas las solicitudes resueltas
+ * del owner (limpia el contador). Nivel 4+.
+ */
+router.post(
+  '/:id/change-requests/mark-seen',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.markServiceChangeRequestsSeen(req, res)
+);
+
+/**
  * GET /api/quotes/:id/available-services - Get available services filtered by quote's rate.
  * Private access (Department Manager, Admin and SuperAdmin).
  *
