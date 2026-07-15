@@ -303,73 +303,6 @@ describe('PaymentService pure helpers', () => {
     });
   });
 
-  describe('groupTipsByService', () => {
-    it('groups tips by service id and keeps the whole-reservation pool in the null bucket', () => {
-      const rows = [
-        { tip: 200, reservationServiceId: 'svcA' },
-        { tip: 300, reservationServiceId: null },
-        { tip: 50, reservationServiceId: 'svcA' },
-      ];
-      expect(PaymentService.groupTipsByService(rows)).toEqual([
-        { reservationServiceId: 'svcA', tip: 250 },
-        { reservationServiceId: null, tip: 300 },
-      ]);
-    });
-
-    it("collapses '' / null / undefined service ids into a single null pool bucket", () => {
-      const rows = [
-        { tip: 10, reservationServiceId: '' },
-        { tip: 20, reservationServiceId: undefined },
-        { tip: 30, reservationServiceId: null },
-      ];
-      expect(PaymentService.groupTipsByService(rows)).toEqual([{ reservationServiceId: null, tip: 60 }]);
-    });
-
-    it('omits zero-tip buckets to avoid UI noise', () => {
-      const rows = [
-        { tip: 0, reservationServiceId: 'svcA' },
-        { tip: 100, reservationServiceId: 'svcB' },
-      ];
-      expect(PaymentService.groupTipsByService(rows)).toEqual([{ reservationServiceId: 'svcB', tip: 100 }]);
-    });
-
-    it('preserves the structural invariant Σ bucket.tip === sumTips(sameRows)', () => {
-      const rows = [
-        { tip: 12.5, reservationServiceId: 'svcA' },
-        { tip: 7.25, reservationServiceId: 'svcB' },
-        { tip: 30.25, reservationServiceId: null },
-        { tip: 0, reservationServiceId: 'svcC' },
-      ];
-      const grouped = PaymentService.groupTipsByService(rows);
-      const groupedTotal = grouped.reduce((sum, b) => sum + b.tip, 0);
-      expect(Math.round(groupedTotal * 100) / 100).toBe(PaymentService.sumTips(rows));
-    });
-
-    it('handles empty/invalid input', () => {
-      expect(PaymentService.groupTipsByService([])).toEqual([]);
-      expect(PaymentService.groupTipsByService(null)).toEqual([]);
-    });
-  });
-
-  describe('buildSummary exposes tipByService (and is back-compatible)', () => {
-    it('passes through the tipByService breakdown when provided', () => {
-      const summary = PaymentService.buildSummary('r1', {
-        totals: {
-          subtotal: 100, adjustments: 0, iva: 0, tip: 50, total: 150,
-        },
-        paidGlobal: 150,
-        tipByService: [{ reservationServiceId: 'svcA', tip: 50 }],
-      });
-      expect(summary.tip).toBe(50);
-      expect(summary.tipByService).toEqual([{ reservationServiceId: 'svcA', tip: 50 }]);
-    });
-
-    it('defaults tipByService to an empty array when the computed input omits it', () => {
-      const summary = PaymentService.buildSummary('r1', { totals: { total: 100 }, paidGlobal: 0 });
-      expect(summary.tipByService).toEqual([]);
-    });
-  });
-
   describe('propina agregada — el arreglo del saldo fantasma (fix crítico)', () => {
     // Reproduce lo que hace loadAndCompute: la propina se toma de sumTips(rows) y paidGlobal
     // DEBE incluirla (sumPayments + sumTips), o quedaría un saldo fantasma igual a la propina.
@@ -377,9 +310,7 @@ describe('PaymentService pure helpers', () => {
       const tipTotal = PaymentService.sumTips(rows);
       const totals = PaymentService.computeTotals(serviceItems, paymentType, tipTotal, 0, currency);
       const paidGlobal = Math.round((PaymentService.sumPayments(rows) + tipTotal) * 100) / 100;
-      return PaymentService.buildSummary('r', {
-        totals, paidGlobal, tipByService: PaymentService.groupTipsByService(rows),
-      });
+      return PaymentService.buildSummary('r', { totals, paidGlobal });
     };
 
     it('pago 100% propina (servicios = $0) queda paid, balance 0 — sin saldo fantasma', () => {
@@ -389,7 +320,6 @@ describe('PaymentService pure helpers', () => {
       expect(summary.balance).toBe(0);
       expect(summary.paymentStatus).toBe('paid');
       expect(summary.tip).toBe(100);
-      expect(summary.tipByService).toEqual([{ reservationServiceId: null, tip: 100 }]);
     });
 
     it('la propina es neutral al balance de servicios (pago parcial de servicios + propina)', () => {
@@ -409,7 +339,6 @@ describe('PaymentService pure helpers', () => {
       expect(summary.tip).toBe(0);
       expect(summary.balance).toBe(0);
       expect(summary.paymentStatus).toBe('paid');
-      expect(summary.tipByService).toEqual([]);
     });
   });
 

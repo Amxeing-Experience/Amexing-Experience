@@ -943,8 +943,6 @@ class ReservationController {
           currency: reservation.get('currency'),
           paymentType: reservation.get('paymentType'),
           // Payment rollup (con IVA + propina): paymentStatus pending|partial|paid|refunded.
-          // tipByService NO se filtra por rol (igual que adjustments/client/services): el filtrado
-          // de "quién ve la ficha de personal" ocurre client-side en el toggle de propina, no aquí.
           payment: paymentSummary ? {
             paymentStatus: paymentSummary.paymentStatus,
             paidAmount: paymentSummary.paidAmount,
@@ -952,12 +950,10 @@ class ReservationController {
             subtotal: paymentSummary.subtotal,
             iva: paymentSummary.iva,
             tip: paymentSummary.tip,
-            tipByService: paymentSummary.tipByService,
             total: paymentSummary.total,
           } : {
             // Fallback (summarize() lanzó): deriva total = balance + paidAmount para que la UI de
-            // agencia no lo pinte $0 junto a un Pagado real; tipByService [] explícito (nunca
-            // undefined) para que el toggle de propina simplemente no se renderice en este camino.
+            // agencia no lo pinte $0 junto a un Pagado real.
             paymentStatus: reservation.get('paymentStatus') || 'pending',
             paidAmount: reservation.get('paidAmount') || 0,
             balance: reservation.get('balance'),
@@ -965,7 +961,6 @@ class ReservationController {
             total: Math.round(
               ((Number(reservation.get('balance')) || 0) + (Number(reservation.get('paidAmount')) || 0)) * 100
             ) / 100,
-            tipByService: [],
           },
           numberOfPeople: reservation.get('numberOfPeople'),
           eventType: reservation.get('eventType'),

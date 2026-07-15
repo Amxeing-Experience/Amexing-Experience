@@ -4,7 +4,8 @@
  * Tests de CASCARÓN sobre el HTML renderizado de las 3 plantillas booking-detail.ejs (el <script>
  * embebido no se ejecuta, así que se verifica la presencia/ausencia de contenedores y marcadores
  * literales). Cubre: los 3 cargan el módulo compartido; el comparativo por método + botón de ajuste
- * viven solo en admin; el bloque de pago + toggle de propina existen en las 3; y — crítico para RBAC —
+ * viven solo en admin; la fila resumen de propina existe en las 3 pero el desglose por servicio salió
+ * de scope y está AUSENTE del DOM (toggle admin/agencia + selector de pago); y — crítico para RBAC —
  * los controles de ajuste/pago están AUSENTES DEL DOM (no solo ocultos) en department_manager/client.
  */
 
@@ -38,13 +39,13 @@ describe('Booking Detail Fase 3 — admin (nivel 6+)', () => {
     expect(html).toContain('Método actual:');
   });
 
-  it('tiene la fila de Propina y el toggle "Ver propina por servicio" en variante COMPLETA (con personal)', () => {
-    expect(html).toContain('id="tipByServiceToggle"');
-    expect(html).toContain('id="tipByServiceBreakdown"');
-    expect(html).toContain('Ver propina por servicio');
-    // Variante completa: incluye responsable + fallback "Sin responsable asignado".
-    expect(html).toContain('includeStaff: true');
-    expect(html).toContain('Sin responsable asignado');
+  it('N2: conserva la fila resumen "Propina" pero el toggle "Ver propina por servicio" está AUSENTE del DOM', () => {
+    // El desglose por servicio salió de scope (depende de asignaciones); la fila total de propina sigue.
+    expect(html).toContain('>Propina<');
+    expect(html).not.toContain('id="tipByServiceToggle"');
+    expect(html).not.toContain('id="tipByServiceBreakdown"');
+    expect(html).not.toContain('Ver propina por servicio');
+    expect(html).not.toContain('Sin responsable asignado');
   });
 
   it('renderiza el badge [Automático] con su tooltip para ajustes de reconciliación', () => {
@@ -67,12 +68,13 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).toContain('Saldo');
   });
 
-  it.each(AGENCY_ROLES)('%s: toggle de propina en variante SIMPLIFICADA (sin ficha de personal)', async (role) => {
+  it.each(AGENCY_ROLES)('%s N3: toggle "Ver propina por servicio" AUSENTE del DOM (desglose fuera de scope)', async (role) => {
     const html = await render(role);
-    expect(html).toContain('id="tipByServiceToggle"');
-    expect(html).toContain('includeStaff: false');
-    // La variante simplificada NO muestra la ficha de personal ni su fallback.
-    expect(html).not.toContain('Sin responsable asignado');
+    expect(html).not.toContain('id="tipByServiceToggle"');
+    expect(html).not.toContain('id="tipByServiceBreakdown"');
+    expect(html).not.toContain('Ver propina por servicio');
+    // La fila resumen de propina se conserva.
+    expect(html).toContain('>Propina<');
   });
 
   it.each(AGENCY_ROLES)('%s: badge [Automático] presente para ajustes de reconciliación', async (role) => {
@@ -128,9 +130,9 @@ describe('Booking Detail Fase 4 — formulario claridad monto-servicios vs propi
     expect(html).toContain('id="paymentServiceAmount"');
   });
 
-  it('el selector de servicio incluye la opción "Propina general (se reparte entre todo el personal)"', () => {
-    expect(html).toContain('Propina general (se reparte entre todo el personal)');
-    expect(html).toContain('id="paymentService"');
+  it('N4: el selector de servicio de pago está AUSENTE del formulario (atribución por servicio fuera de scope)', () => {
+    expect(html).not.toContain('id="paymentService"');
+    expect(html).not.toContain('Propina general (se reparte entre todo el personal)');
   });
 
   it('el banner de advertencia es no bloqueante (role=status, aria-live=polite)', () => {
@@ -157,9 +159,8 @@ describe('Booking Detail Fase 4 — formulario claridad monto-servicios vs propi
     expect((html.match(/function getDisplayConcept/g) || []).length).toBe(1);
   });
 
-  it('carga deriveServiceAmount/buildServiceSelectorOptions desde el módulo compartido (no reimplementa)', () => {
+  it('carga deriveServiceAmount desde el módulo compartido (no reimplementa)', () => {
     expect(html).toContain('PaymentBreakdownHelpers.deriveServiceAmount');
-    expect(html).toContain('PaymentBreakdownHelpers.buildServiceSelectorOptions');
   });
 });
 

@@ -1,14 +1,13 @@
 /**
  * GET /api/reservations/:id — desglose de pagos en el payload (Fase 3, integration).
  *
- * End-to-end sobre Parse + mongodb-memory-server: tipByService viaja igual para admin/
- * department_manager/client (sin filtrar por rol, decisión de Fase 3), es siempre un array (nunca
- * undefined) aun sin pagos, el RBAC no regresiona (agencia/agente siguen sin poder POST/DELETE
- * /adjustments pero sí POST /payments; nivel 3 sigue con 403 en GET /:id; superadmin sigue en el
- * allowlist de /adjustments), reconciliación de Fase 0 + propina real de Fase 1 se ven juntas en el
- * nuevo payload, una reservación cancelada sigue exponiendo el payload completo (el modo solo-lectura
- * es de UI, no de backend), y el fallback de summarize() fallido expone total = balance + paidAmount
- * y tipByService [].
+ * End-to-end sobre Parse + mongodb-memory-server: payment.tip viaja igual para admin/
+ * department_manager/client (sin filtrar por rol) y el payload ya NO incluye tipByService, el RBAC no
+ * regresiona (agencia/agente siguen sin poder POST/DELETE /adjustments pero sí POST /payments; nivel 3
+ * sigue con 403 en GET /:id; superadmin sigue en el allowlist de /adjustments), reconciliación de Fase 0
+ * + propina real de Fase 1 se ven juntas en el payload, una reservación cancelada sigue exponiendo el
+ * payload completo (el modo solo-lectura es de UI, no de backend), y el fallback de summarize() fallido
+ * expone total = balance + paidAmount.
  */
 
 const request = require('supertest');
@@ -116,12 +115,10 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
     if (clientQuote) await destroy(clientQuote);
   });
 
-  describe('tipByService viaja igual para los 3 roles (sin filtrar por rol)', () => {
-    it('admin, department_manager y client reciben el MISMO payment.tipByService', async () => {
-      const { id, serviceIds } = await createReservation([{ total: 1000, concept: 'Traslado' }]);
-      await postPayment(id, {
-        amount: 1000, tip: 80, reservationServiceId: serviceIds[0], method: 'efectivo',
-      });
+  describe('payment.tip viaja igual para los 3 roles (sin filtrar por rol)', () => {
+    it('admin, department_manager y client reciben el MISMO payment.tip agregado', async () => {
+      const { id } = await createReservation([{ total: 1000, concept: 'Traslado' }]);
+      await postPayment(id, { amount: 1000, tip: 80, method: 'efectivo' });
 
       const [asAdmin, asManager, asClient] = await Promise.all([
         getReservation(id, adminToken),
@@ -133,23 +130,22 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
       expect(asManager.status).toBe(200);
       expect(asClient.status).toBe(200);
 
-      const expected = [{ reservationServiceId: serviceIds[0], tip: 80 }];
-      expect(asAdmin.body.data.payment.tipByService).toEqual(expected);
-      expect(asManager.body.data.payment.tipByService).toEqual(expected);
-      expect(asClient.body.data.payment.tipByService).toEqual(expected);
-      // El tip agregado también es idéntico entre roles.
+      // El tip agregado es idéntico entre roles.
+      expect(asAdmin.body.data.payment.tip).toBe(80);
       expect(asManager.body.data.payment.tip).toBe(80);
       expect(asClient.body.data.payment.tip).toBe(80);
     });
   });
 
-  describe('tipByService es siempre un array (nunca undefined)', () => {
-    it('una reservación sin pagos expone payment.tipByService === []', async () => {
+  describe('N1 — el payload ya NO expone tipByService (payment.tip sí)', () => {
+    it('un pago con tip > 0 devuelve payment.tipByService undefined y payment.tip correcto (200)', async () => {
       const { id } = await createReservation([{ total: 500 }]);
+      await postPayment(id, { amount: 500, tip: 60, method: 'efectivo' });
+
       const res = await getReservation(id, managerToken);
       expect(res.status).toBe(200);
-      expect(res.body.data.payment.tipByService).toEqual([]);
-      expect(res.body.data.payment.tipByService).not.toBeUndefined();
+      expect(res.body.data.payment.tipByService).toBeUndefined();
+      expect(res.body.data.payment.tip).toBe(60);
     });
   });
 
@@ -197,11 +193,9 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
 
   describe('cross-fase — reconciliación (Fase 0) + propina real (Fase 1) juntas en el payload', () => {
     it('un cruce de tier genera el ajuste automático Y la propina se ve, ambos en GET /:id', async () => {
-      const { id, serviceIds } = await createReservation(CLEAN, 'transferencia');
+      const { id } = await createReservation(CLEAN, 'transferencia');
 
-      await postPayment(id, {
-        amount: 2320, tip: 50, reservationServiceId: serviceIds[0], method: 'transferencia',
-      });
+      await postPayment(id, { amount: 2320, tip: 50, method: 'transferencia' });
       await postPayment(id, { amount: 9680, tip: 70, method: 'tarjeta' });
 
       const res = await getReservation(id, adminToken);
@@ -214,37 +208,30 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
       expect(recon[0].amount).toBe(400);
       expect(recon[0].type).toBe('charge');
 
-      // Fase 1: propina agregada real + desglose por servicio, visibles en el mismo payload.
+      // Fase 1: propina agregada real, visible en el mismo payload.
       expect(payment.tip).toBe(120); // 50 + 70
-      const tiedBucket = payment.tipByService.find((b) => b.reservationServiceId === serviceIds[0]);
-      const generalBucket = payment.tipByService.find((b) => b.reservationServiceId === null);
-      expect(tiedBucket).toEqual({ reservationServiceId: serviceIds[0], tip: 50 });
-      expect(generalBucket).toEqual({ reservationServiceId: null, tip: 70 });
     });
   });
 
   describe('reservación cancelada sigue exponiendo el payload completo (solo-lectura es de UI)', () => {
-    it('GET /:id sobre una cancelada devuelve payment.total/tip/tipByService igual', async () => {
-      const { id, serviceIds } = await createReservation(
+    it('GET /:id sobre una cancelada devuelve payment.total/tip igual', async () => {
+      const { id } = await createReservation(
         [{ total: 1000, concept: 'Traslado' }],
         'efectivo',
         { status: 'cancelled' }
       );
-      await postPayment(id, {
-        amount: 1000, tip: 40, reservationServiceId: serviceIds[0], method: 'efectivo',
-      });
+      await postPayment(id, { amount: 1000, tip: 40, method: 'efectivo' });
 
       const res = await getReservation(id, managerToken);
       expect(res.status).toBe(200);
       expect(res.body.data.status).toBe('cancelled');
       expect(res.body.data.payment.total).toBeGreaterThan(0);
       expect(res.body.data.payment.tip).toBe(40);
-      expect(res.body.data.payment.tipByService).toEqual([{ reservationServiceId: serviceIds[0], tip: 40 }]);
     });
   });
 
   describe('fallback — summarize() falla', () => {
-    it('deriva total = balance + paidAmount y expone tipByService [] (no crashea)', async () => {
+    it('deriva total = balance + paidAmount (no crashea)', async () => {
       const { id } = await createReservation([{ total: 1000 }], 'efectivo', {
         paidAmount: 300, balance: 700,
       });
@@ -255,7 +242,6 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
         expect(res.status).toBe(200);
         expect(res.body.data.payment.total).toBe(1000); // 700 + 300 derivado
         expect(res.body.data.payment.paidAmount).toBe(300);
-        expect(res.body.data.payment.tipByService).toEqual([]);
       } finally {
         spy.mockRestore();
       }

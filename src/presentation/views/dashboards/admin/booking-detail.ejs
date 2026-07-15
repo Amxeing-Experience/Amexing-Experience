@@ -1690,35 +1690,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <span class="fw-semibold ${balanceCls}">${formatCurrency(pay.balance, curr)}</span>
                 </div>
             </div>`;
-
-            // Toggle "Ver propina por servicio" (variante completa: incluye responsable). Solo cuando
-            // hay propina real (tip > 0 o algún bucket) — si no, no se renderiza.
-            const tipEntries = PaymentBreakdownHelpers.groupTipEntriesForDisplay(
-                pay.tipByService, d.services, { includeStaff: true }
-            );
-            if (tip > 0 || tipEntries.length > 0) {
-                const tipRows = tipEntries.map(e => {
-                    let staffHtml = '';
-                    if (!e.isGeneral) {
-                        staffHtml = e.staff.length > 0
-                            ? e.staff.map(s => `<span class="small text-${s.colorClass} me-2"><i class="ti ${s.icon} me-1"></i>${s.name}</span>`).join('')
-                            : '<span class="small text-muted fst-italic">Sin responsable asignado</span>';
-                    }
-                    return `<div class="py-1 ps-3 border-bottom">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span class="small">${e.label}</span>
-                            <span class="small fw-semibold">${formatCurrency(e.tip, curr)}</span>
-                        </div>
-                        ${staffHtml ? `<div class="mt-1">${staffHtml}</div>` : ''}
-                    </div>`;
-                }).join('');
-                html += `<div class="pt-1">
-                    <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#tipByServiceBreakdown" aria-expanded="false" aria-controls="tipByServiceBreakdown" id="tipByServiceToggle">
-                        <i class="ti ti-coin me-1"></i>Ver propina por servicio
-                    </button>
-                    <div class="collapse mt-1" id="tipByServiceBreakdown">${tipRows || '<div class="small text-muted py-1 ps-3">Sin propina por servicio</div>'}</div>
-                </div>`;
-            }
         }
 
         // Comparativo por método de pago (staff-facing): subtotal de servicios en los 3 métodos,
@@ -1949,21 +1920,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         const totalReceivedInit = existing ? round2(svcOrig + tipOrig) : '';
         const tipInit = existing ? round2(tipOrig) : '';
 
-        // Selector de servicio: undefined = creación; en edición pasa el pointer existente (null =
-        // general). buildServiceSelectorOptions decide visibilidad, orden y preselección; getDisplayConcept
-        // (única copia de la plantilla) resuelve las etiquetas de servicio, sin duplicar esa lógica.
-        const svcSelector = PaymentBreakdownHelpers.buildServiceSelectorOptions(
-            reservationData.services, existing ? existing.reservationServiceId : undefined, getDisplayConcept
-        );
-        const serviceSelectorHtml = svcSelector.visible ? `
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold small" for="paymentService">Servicio de la reservación</label>
-                    <select class="form-select form-select-sm" id="paymentService">${svcSelector.options.map((o) => {
-                        const label = o.isGeneral ? 'Propina general (se reparte entre todo el personal)' : o.label;
-                        return `<option value="${o.value}" ${o.selected ? 'selected' : ''}>${label}</option>`;
-                    }).join('')}</select>
-                </div>` : '';
-
         wrap.innerHTML = `
             <h6 class="fw-bold mb-2">${existing ? '<i class="ti ti-edit me-1"></i>Editar pago' : '<i class="ti ti-cash me-1"></i>Registrar pago'}</h6>
             <input type="hidden" id="paymentId" value="${existing ? existing.id : ''}">
@@ -2000,7 +1956,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
                     <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}">
                 </div>
-                ${serviceSelectorHtml}
                 <div class="col-md-6">
                     <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
                     <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${PaymentBreakdownHelpers.escapeHtml(existing?.reference || '')}">
@@ -2093,10 +2048,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         const { serviceAmount, state } = PaymentBreakdownHelpers.deriveServiceAmount(totalReceived, tip);
         if (state === 'blocked') { pmToast('La propina no puede ser mayor al monto total recibido.', 'warning'); return; }
 
-        // tip y reservationServiceId SIEMPRE explícitos (nunca omitidos): en el PUT, el guard
-        // `!== undefined` de updatePayment/applyServicePointer deja intacto lo viejo si se omite la
-        // clave — así bajar la propina a 0 la limpia, y elegir "Propina general" ('') limpia el pointer.
-        const serviceSelect = document.getElementById('paymentService');
+        // tip SIEMPRE explícito (nunca omitido): en el PUT, el guard `!== undefined` de updatePayment
+        // deja intacto lo viejo si se omite la clave — enviarlo siempre hace que bajar la propina a 0 la limpie.
         const payload = {
             amount: serviceAmount,
             currency: document.getElementById('paymentCurrency').value,
@@ -2104,7 +2057,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             reference: document.getElementById('paymentReference').value.trim(),
             notes: document.getElementById('paymentNotes').value.trim(),
             tip,
-            reservationServiceId: serviceSelect ? serviceSelect.value : '',
         };
         if (paidAt) payload.paidAt = paidAt;
 

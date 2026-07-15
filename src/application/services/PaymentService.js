@@ -204,38 +204,10 @@ class PaymentService {
   }
 
   /**
-   * Group payment tips by their service pointer for read-only staff display. Falsy
-   * service ids ('' / null / undefined) collapse into a single null bucket = the
-   * reservation-wide tip pool. Zero-tip buckets are omitted to avoid UI noise. Never
-   * affects the balance: Σ bucket.tip === sumTips(sameRows).
-   * @param {Array<object>} rows - Plain rows { tip, reservationServiceId }.
-   * @returns {Array<object>} [{ reservationServiceId, tip }, ...] (null id = whole-reservation pool).
-   * @example
-   * PaymentService.groupTipsByService([{ tip: 100, reservationServiceId: 'a' }, { tip: 50 }])
-   * // [{ reservationServiceId: 'a', tip: 100 }, { reservationServiceId: null, tip: 50 }]
-   */
-  static groupTipsByService(rows) {
-    const list = Array.isArray(rows) ? rows : [];
-    const buckets = new Map();
-    for (const row of list) {
-      const tip = Number(row.tip) || 0;
-      // '' / null / undefined all collapse to the single null pool bucket.
-      const key = row.reservationServiceId ? row.reservationServiceId : null;
-      buckets.set(key, (buckets.get(key) || 0) + tip);
-    }
-    const result = [];
-    for (const [reservationServiceId, raw] of buckets) {
-      const tip = round2(raw);
-      if (tip !== 0) result.push({ reservationServiceId, tip });
-    }
-    return result;
-  }
-
-  /**
    * Load a reservation, its existing services and payments, and compute the
    * totals + global paid amount (without persisting). Shared by summarize/recalculate.
    * @param {string} reservationId - Reservation objectId.
-   * @returns {Promise<object>} { reservation, services, totals, paidGlobal, tipByService }.
+   * @returns {Promise<object>} { reservation, services, totals, paidGlobal }.
    * @example
    * const data = await PaymentService.loadAndCompute(reservationId);
    */
@@ -265,15 +237,11 @@ class PaymentService {
     const serviceItems = this.toServiceItems(services);
 
     // Tip is aggregated from the real payments (Payment.tip), not Reservation.tip — a dead field
-    // nothing writes. Each row carries its own tip + optional service pointer for the breakdown.
-    const paymentRows = payments.map((payment) => {
-      const svc = payment.get('reservationServicePtr');
-      return {
-        amount: payment.get('amount'),
-        tip: payment.get('tip'),
-        reservationServiceId: svc ? svc.id : null,
-      };
-    });
+    // nothing writes. Each row carries its own amount + tip for the global rollup.
+    const paymentRows = payments.map((payment) => ({
+      amount: payment.get('amount'),
+      tip: payment.get('tip'),
+    }));
     const tipTotal = this.sumTips(paymentRows);
     const totals = this.computeTotals(serviceItems, paymentType, tipTotal, adjustmentsNet, currency);
 
@@ -281,10 +249,9 @@ class PaymentService {
     // computeTotals folds the tip into `total`, so excluding it here would leave a phantom pending
     // balance exactly equal to the tip (e.g. a 100%-tip payment). Net effect: tip is balance-neutral.
     const paidGlobal = round2(this.sumPayments(paymentRows) + tipTotal);
-    const tipByService = this.groupTipsByService(paymentRows);
 
     return {
-      reservation, services, totals, paidGlobal, tipByService,
+      reservation, services, totals, paidGlobal,
     };
   }
 
@@ -292,13 +259,13 @@ class PaymentService {
    * Build the payment summary (grand-total rollup) from computed data. Payments are
    * exact money amounts subtracted from the reservation total: balance = total − paid.
    * @param {string} reservationId - Reservation objectId.
-   * @param {object} computed - { totals, paidGlobal, tipByService }.
-   * @returns {object} Summary { paymentStatus, paidAmount, balance, subtotal, adjustments, iva, tip, tipByService, total }.
+   * @param {object} computed - { totals, paidGlobal }.
+   * @returns {object} Summary { paymentStatus, paidAmount, balance, subtotal, adjustments, iva, tip, total }.
    * @example
    * PaymentService.buildSummary(id, await PaymentService.loadAndCompute(id))
    */
   static buildSummary(reservationId, computed) {
-    const { totals, paidGlobal, tipByService } = computed;
+    const { totals, paidGlobal } = computed;
     const paid = round2(paidGlobal);
 
     return {
@@ -310,7 +277,6 @@ class PaymentService {
       adjustments: totals.adjustments,
       iva: totals.iva,
       tip: totals.tip,
-      tipByService: tipByService || [],
       total: totals.total,
     };
   }
