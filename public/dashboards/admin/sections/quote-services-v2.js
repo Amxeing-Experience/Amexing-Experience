@@ -7922,7 +7922,7 @@ class ItineraryBuilder {
                     </div>
                     <div class="d-flex flex-column align-items-end">
                         <div class="service-actions mb-2">
-                            ${(['admin', 'superadmin'].includes(this.userRole) || !service.adminLocked) ? `
+                            ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <div class="btn-group btn-group-sm">
                                 <button type="button" class="btn btn-light edit-service-btn"
                                         data-day-id="${service.dayId}" data-service-id="${service.id}" title="Editar">
@@ -7948,7 +7948,7 @@ class ItineraryBuilder {
                                 ${this.formatCurrency(this.getServiceDisplayPrice(service))}
                                 ${this.getPriceTypeLabel()}
                             </div>
-                            ${(['admin', 'superadmin'].includes(this.userRole) || !service.adminLocked) ? `
+                            ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
                                     data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
                                 <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
@@ -20633,12 +20633,20 @@ class ItineraryBuilder {
     this.showAlert('Día duplicado exitosamente', 'success');
   }
 
-  // Bloqueo por-servicio (Fase 1): un servicio adminLocked solo lo pueden gestionar
-  // (editar/duplicar/borrar) admin/superadmin. Los demás lo ven en solo lectura.
+  // Un servicio queda "protegido" para no-admins si lo bloqueó un admin (adminLocked), o si la
+  // cotización ya es reservación (window.__isReservation): en una reservación cualquier cambio a un
+  // servicio existente debe pasar por una solicitud aprobada por admin (agregar nuevos sí se permite).
+  isServiceProtected(service) {
+    if (!service) return false;
+    return !!(service.adminLocked || window.__isReservation);
+  }
+
+  // Bloqueo por-servicio: un servicio protegido solo lo pueden gestionar (editar/duplicar/borrar)
+  // admin/superadmin. Los demás lo ven en solo lectura y pueden solicitar el cambio.
   canManageService(service) {
     if (!service) return false;
     if (['admin', 'superadmin'].includes(this.userRole)) return true;
-    return !service.adminLocked;
+    return !this.isServiceProtected(service);
   }
 
   // Escapa texto para meterlo en HTML (nota de la solicitud, input del owner).
@@ -20680,7 +20688,7 @@ class ItineraryBuilder {
   // para no encimar los botones editar/duplicar/borrar.
   renderServiceLockControls(service) {
     if (['admin', 'superadmin'].includes(this.userRole)) return '';
-    if (!service.adminLocked) return '';
+    if (!this.isServiceProtected(service)) return '';
     const cr = service.changeRequest || null;
     if (cr && cr.status === 'pending') {
       const typeLabel = cr.type === 'delete' ? 'borrado' : 'modificación';
