@@ -1,15 +1,28 @@
 <%
 /**
- * Campos del formulario de AGENCIA. Bloque esencial arriba (representante + empresa + contraseña,
- * requeridos agrupados para alta rápida) + acordeón opcional (RFC, sitio web, notas). SIN dirección
- * fiscal: lo fiscal se maneja por perfiles de facturación. Usa el estilo/JS de acordeón de
- * client-form-fields (siempre co-presente en la página de crear). IDs con prefijo agency*.
+ * Campos del formulario de AGENCIA, en 3 secciones: Empresa (lo primero a llenar) → Datos del
+ * representante → Acceso (correo + contraseña juntos). SIN dirección fiscal: lo fiscal se maneja por
+ * perfiles de facturación. Usa el estilo editorial de client-form-fields (co-presente). IDs agency*.
  * Created by Denisse Maldonado
  */
 %>
 <div class="client-form-editorial">
+    <!-- ===== Empresa ===== -->
     <div class="mb-4">
-        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-user me-1"></i>Representante</h6>
+        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-building me-1"></i>Empresa</h6>
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../molecules/common/form-field', { type: 'text', name: 'companyName', id: 'agencyCompanyName', label: 'Nombre de la Empresa', required: true, placeholder: 'Ej: Viajes ABC', inputAttributes: { maxlength: '200' } }) %>
+            </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/common/url-input', { name: 'website', id: 'agencyWebsite', label: 'Sitio Web', required: false }) %>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Datos del representante ===== -->
+    <div class="mb-4">
+        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-user me-1"></i>Datos del representante</h6>
         <div class="row">
             <div class="col-md-6">
                 <%- include('../../atoms/common/first-name-input', { name: 'firstName', id: 'agencyFirstName', label: 'Nombre del Representante', required: true, placeholder: 'Ej: Juan', helpText: 'Contacto principal de la agencia' }) %>
@@ -20,45 +33,32 @@
         </div>
         <div class="row">
             <div class="col-md-6">
-                <%- include('../../atoms/common/email-input', { name: 'email', id: 'agencyEmail', label: 'Email Corporativo', required: true, placeholder: 'contacto@empresa.com', helpText: 'Email del representante para acceso al sistema' }) %>
-            </div>
-            <div class="col-md-6">
                 <%- include('../../atoms/common/phone-input', { name: 'phone', id: 'agencyPhone', label: 'Teléfono', required: false, countryCode: 'MX', placeholder: '999 123 4567' }) %>
             </div>
+            <div class="col-md-6">
+                <%- include('../../atoms/form/datepicker', { name: 'birthDate', id: 'agencyBirthDate', label: 'Fecha de nacimiento', required: false, min: '1900-01-01', max: new Date().toISOString().split('T')[0] }) %>
+            </div>
         </div>
     </div>
 
+    <!-- ===== Acceso ===== -->
     <div class="mb-4">
-        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-building me-1"></i>Empresa y Acceso</h6>
+        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-lock me-1"></i>Acceso</h6>
         <div class="row">
             <div class="col-md-6">
-                <%- include('../../molecules/common/form-field', { type: 'text', name: 'companyName', id: 'agencyCompanyName', label: 'Nombre de la Empresa', required: true, placeholder: 'Ej: Viajes ABC', inputAttributes: { maxlength: '200' } }) %>
+                <%- include('../../atoms/common/email-input', { name: 'email', id: 'agencyEmail', label: 'Email Corporativo', required: true, placeholder: 'contacto@empresa.com', helpText: 'La agencia inicia sesión con este correo' }) %>
             </div>
             <div class="col-md-6">
-                <%- include('../../molecules/common/password-field', { id: 'agencyPassword', name: 'password', label: 'Contraseña', required: true, helpText: 'La agencia inicia sesión con su email y esta contraseña.' }) %>
+                <%- include('../../molecules/common/password-field', { id: 'agencyPassword', name: 'password', label: 'Contraseña', required: true, helpText: '' }) %>
             </div>
         </div>
     </div>
 
-    <p class="cff-hint-optional"><i class="ti ti-chevron-down me-1"></i>Información opcional — ábrela solo si la necesitas</p>
-
-    <!-- ===== Opcional: Datos adicionales (lo fiscal va por perfiles de facturación) ===== -->
-    <div class="cff-acc">
-        <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
-            <span class="cff-t"><i class="ti ti-notes"></i>Datos adicionales</span>
-            <span class="cff-badge">Opcional</span>
-            <span class="cff-chev"><i class="ti ti-chevron-right"></i></span>
-        </button>
-        <div class="cff-acc-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <%- include('../../atoms/common/url-input', { name: 'website', id: 'agencyWebsite', label: 'Sitio Web', required: false }) %>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-12">
-                    <%- include('../../molecules/common/form-field', { type: 'textarea', name: 'notes', id: 'agencyNotes', label: 'Notas', required: false, placeholder: 'Información general adicional', helpText: 'Información adicional', inputAttributes: { rows: '3' } }) %>
-                </div>
+    <!-- ===== Notas (al final) ===== -->
+    <div class="mb-3">
+        <div class="row">
+            <div class="col-12">
+                <%- include('../../molecules/common/form-field', { type: 'textarea', name: 'notes', id: 'agencyNotes', label: 'Notas', required: false, placeholder: 'Información general adicional', helpText: 'Información adicional', inputAttributes: { rows: '3' } }) %>
             </div>
         </div>
     </div>

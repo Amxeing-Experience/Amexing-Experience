@@ -29,8 +29,9 @@
   .client-form-editorial .input-group > .btn{border:1px solid var(--line);border-left:0;}
   .client-form-editorial .input-group > .btn:last-child{border-radius:0 10px 10px 0;}
   .client-form-editorial .form-text{font-size:.72rem;color:var(--muted);}
-  /* Espaciado uniforme entre campos */
-  .client-form-editorial .row > [class*="col-"]{margin-bottom:1rem;}
+  /* Espaciado compacto entre campos: el átomo ya trae mb-3, no duplicar en la columna */
+  .client-form-editorial .row > [class*="col-"]{margin-bottom:0;}
+  .client-form-editorial .mb-3{margin-bottom:.55rem !important;}
   /* Campo solo en su fila → ocupa el ancho completo (sin hueco a la derecha) */
   .client-form-editorial .row > .col-md-6:only-child{flex:0 0 100%;max-width:100%;}
   /* Bloque esencial (alta rápida) */
@@ -51,6 +52,14 @@
   .client-form-editorial .cff-acc-body{padding:0 18px;max-height:0;overflow:hidden;transition:max-height .28s ease,padding .28s ease;}
   .client-form-editorial .cff-acc.open .cff-acc-body{padding:18px;max-height:2600px;}
   .client-form-editorial .cff-hint-optional{font-size:.75rem;color:var(--muted);font-style:italic;margin:.4rem 0 .9rem;}
+  /* Segmented control "Tipo de Cliente" (btn-group como en los filtros del sistema) */
+  .client-form-editorial .cff-segmented{width:100%;}
+  .client-form-editorial .cff-segmented .btn{flex:1 1 0;min-height:44px;font-size:.83rem;
+    display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;}
+  @media (max-width:600px){
+    .client-form-editorial .cff-segmented{flex-wrap:wrap;}
+    .client-form-editorial .cff-segmented .btn{flex:1 1 45%;}
+  }
 </style>
 <div class="client-form-editorial">
                         <!-- ===== Bloque esencial: lo mínimo para crear (requeridos agrupados) ===== -->
@@ -61,26 +70,24 @@
                                 <span class="cff-req-tag">lo mínimo</span>
                             </h6>
 
+                            <!-- Tipo de Cliente: segmented control (consistente con los filtros del sistema) -->
                             <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label" for="directClientCategory">Tipo de Cliente</label>
-                                    <select class="form-select" id="directClientCategory" name="clientCategory">
-                                        <option value="direct_client" selected>Cliente Directo</option>
-                                        <option value="wedding_planner">Wedding Planner</option>
-                                        <option value="concierge">Concierge</option>
-                                        <option value="home_owner">Home Owner</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/phone-input', {
-                                        name: 'phone',
-                                        id: 'directClientPhone',
-                                        label: 'Teléfono',
-                                        required: false,
-                                        countryCode: 'MX',
-                                        placeholder: '999 123 4567',
-                                        helpText: 'Número de contacto principal'
-                                    }) %>
+                                <div class="col-12 mb-3">
+                                    <label class="form-label d-block">Tipo de Cliente</label>
+                                    <div class="btn-group cff-segmented w-100" role="radiogroup" aria-label="Tipo de Cliente">
+                                        <input type="radio" class="btn-check" name="directClientCategorySeg" id="directClientCatDirect" value="direct_client" checked>
+                                        <label class="btn btn-outline-primary" for="directClientCatDirect"><i class="ti ti-user me-1"></i>Cliente Directo</label>
+                                        <input type="radio" class="btn-check" name="directClientCategorySeg" id="directClientCatWedding" value="wedding_planner">
+                                        <label class="btn btn-outline-primary" for="directClientCatWedding"><i class="ti ti-heart me-1"></i>Wedding Planner</label>
+                                        <input type="radio" class="btn-check" name="directClientCategorySeg" id="directClientCatConcierge" value="concierge">
+                                        <label class="btn btn-outline-primary" for="directClientCatConcierge"><i class="ti ti-bell me-1"></i>Concierge</label>
+                                        <input type="radio" class="btn-check" name="directClientCategorySeg" id="directClientCatHome" value="home_owner">
+                                        <label class="btn btn-outline-primary" for="directClientCatHome"><i class="ti ti-home me-1"></i>Home Owner</label>
+                                    </div>
+                                    <!-- Espejo oculto: mantiene compatibilidad con quien lee #directClientCategory -->
+                                    <input type="hidden" id="directClientCategory" name="clientCategory" value="direct_client">
+                                    <!-- Hint de capacidades según el tipo (texto informativo; la fuente real es endClientCapabilities.js) -->
+                                    <div class="form-text mt-2" id="directClientCategoryHint"></div>
                                 </div>
                             </div>
 
@@ -118,14 +125,38 @@
                                         helpText: 'Requerido si defines contraseña'
                                     }) %>
                                 </div>
-                                <!-- Contraseña (opcional): mismo componente reutilizable que el form de agencia -->
+                                <!-- Contraseña (opcional): mismo componente que el form de agencia -->
                                 <div class="col-md-6">
                                     <%- include('../../molecules/common/password-field', {
                                         id: 'directClientPassword',
                                         name: 'password',
                                         label: 'Contraseña',
                                         required: false,
-                                        helpText: 'Si la defines, el cliente inicia sesión con su email. Déjala vacía para asignarla después.'
+                                        helpText: ''
+                                    }) %>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <%- include('../../atoms/common/phone-input', {
+                                        name: 'phone',
+                                        id: 'directClientPhone',
+                                        label: 'Teléfono',
+                                        required: false,
+                                        countryCode: 'MX',
+                                        placeholder: '999 123 4567',
+                                        helpText: 'Número de contacto principal'
+                                    }) %>
+                                </div>
+                                <div class="col-md-6">
+                                    <%- include('../../atoms/form/datepicker', {
+                                        name: 'birthDate',
+                                        id: 'directClientBirthDate',
+                                        label: 'Fecha de nacimiento',
+                                        required: false,
+                                        min: '1900-01-01',
+                                        max: new Date().toISOString().split('T')[0]
                                     }) %>
                                 </div>
                             </div>
@@ -133,26 +164,14 @@
 
                         <p class="cff-hint-optional"><i class="ti ti-chevron-down me-1"></i>Información opcional — ábrela solo si la necesitas</p>
 
-                        <!-- ===== Opcional: Datos personales y contactos ===== -->
+                        <!-- ===== Opcional: Datos de contacto ===== -->
                         <div class="cff-acc">
                             <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
-                                <span class="cff-t"><i class="ti ti-users"></i>Datos personales y contactos</span>
+                                <span class="cff-t"><i class="ti ti-users"></i>Datos de contacto</span>
                                 <span class="cff-badge">Opcional</span>
                                 <span class="cff-chev"><i class="ti ti-chevron-right"></i></span>
                             </button>
                             <div class="cff-acc-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <%- include('../../atoms/form/datepicker', {
-                                            name: 'birthDate',
-                                            id: 'directClientBirthDate',
-                                            label: 'Fecha de nacimiento',
-                                            required: false,
-                                            min: '1900-01-01',
-                                            max: new Date().toISOString().split('T')[0]
-                                        }) %>
-                                    </div>
-                                </div>
                                 <div class="row">
                                     <div class="col-md-6">
                                         <%- include('../../atoms/common/first-name-input', {
@@ -201,15 +220,26 @@
                             </div>
                         </div>
 
-                        <!-- ===== Opcional: Empresa (lo fiscal va por perfiles de facturación) ===== -->
+                        <!-- ===== Opcional: Empresa y dirección (lo fiscal va por perfiles de facturación) ===== -->
                         <div class="cff-acc">
                             <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
-                                <span class="cff-t"><i class="ti ti-building"></i>Empresa</span>
+                                <span class="cff-t"><i class="ti ti-building"></i>Empresa y dirección</span>
                                 <span class="cff-badge">Opcional</span>
                                 <span class="cff-chev"><i class="ti ti-chevron-right"></i></span>
                             </button>
                             <div class="cff-acc-body">
                                 <div class="row">
+                                    <div class="col-md-6">
+                                        <%- include('../../molecules/common/form-field', {
+                                            type: 'text',
+                                            name: 'companyName',
+                                            id: 'directClientCompanyName',
+                                            label: 'Nombre de la Empresa',
+                                            required: false,
+                                            placeholder: 'Ej: Viajes ABC',
+                                            inputAttributes: { maxlength: '200' }
+                                        }) %>
+                                    </div>
                                     <div class="col-md-6">
                                         <%- include('../../molecules/common/form-field', {
                                             type: 'select',
@@ -228,6 +258,8 @@
                                             helpText: 'Tipo de organización'
                                         }) %>
                                     </div>
+                                </div>
+                                <div class="row">
                                     <div class="col-md-6">
                                         <%- include('../../atoms/common/url-input', {
                                             name: 'website',
@@ -239,17 +271,13 @@
                                         }) %>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- ===== Opcional: Dirección ===== -->
-                        <div class="cff-acc">
-                            <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
-                                <span class="cff-t"><i class="ti ti-map-pin"></i>Dirección</span>
-                                <span class="cff-badge">Opcional</span>
-                                <span class="cff-chev"><i class="ti ti-chevron-right"></i></span>
-                            </button>
-                            <div class="cff-acc-body">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <p class="mb-2" style="text-transform:uppercase;letter-spacing:.12em;font-size:.66rem;font-weight:700;color:var(--muted);border-top:1px dashed var(--line);padding-top:.9rem;margin-top:.2rem;">
+                                            <i class="ti ti-map-pin me-1"></i>Dirección
+                                        </p>
+                                    </div>
+                                </div>
                                 <div class="row">
                                     <div class="col-md-3">
                                         <%- include('../../atoms/common/street-type-select', {
@@ -444,5 +472,43 @@
     window.cffRefreshAccordions = refresh;
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
+})();
+
+(function () {
+    // Segmented "Tipo de Cliente" ↔ input hidden #directClientCategory (compatibilidad con el submit)
+    // Hint de capacidades por tipo (texto informativo; la fuente real es endClientCapabilities.js)
+    var HINTS = {
+        direct_client: 'Podrá crear y ver sus cotizaciones. Sin acceso al tarifario.',
+        wedding_planner: 'Verá el tarifario y podrá cotizar. Catálogo de destinos y experiencias populares.',
+        concierge: 'Verá el tarifario completo y podrá crear y ver cotizaciones.',
+        home_owner: 'Solo verá el tarifario y el catálogo popular. No crea cotizaciones.'
+    };
+    function setHint(val) {
+        var el = document.getElementById('directClientCategoryHint');
+        if (!el) return;
+        var txt = Object.prototype.hasOwnProperty.call(HINTS, val) ? HINTS[val] : '';
+        el.innerHTML = txt ? '<i class="ti ti-info-circle me-1"></i>' + txt : '';
+    }
+    function sync() {
+        var hidden = document.getElementById('directClientCategory');
+        var radios = document.querySelectorAll('input[name="directClientCategorySeg"]');
+        if (!hidden || !radios.length) return;
+        // init: reflejar el valor del hidden (prefill/edición) en el segmento
+        var current = hidden.value || 'direct_client';
+        var matched = false;
+        radios.forEach(function (r) {
+            if (r.value === current) { r.checked = true; matched = true; }
+            if (!r.dataset.segBound) {
+                r.dataset.segBound = '1';
+                r.addEventListener('change', function () { if (r.checked) { hidden.value = r.value; setHint(r.value); } });
+            }
+        });
+        if (!matched && radios[0]) { radios[0].checked = true; hidden.value = radios[0].value; }
+        setHint(hidden.value);
+    }
+    // Exponer para re-sincronizar tras el prefill de edición
+    window.cffSyncCategory = sync;
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', sync);
+    else sync();
 })();
 </script>

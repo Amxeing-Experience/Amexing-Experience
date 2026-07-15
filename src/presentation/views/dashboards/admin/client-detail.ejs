@@ -83,55 +83,115 @@ const tarifarioTabs = [
 
 <% if (isNewClient) { %>
 <!-- ===== MODO NUEVO: crear cliente (misma página, sin controlador nuevo) ===== -->
-<div class="row mb-4">
+<div class="row mb-2">
     <div class="col-12">
-        <div class="d-flex justify-content-between align-items-start mb-3">
-            <div>
-                <h2 class="mb-1 fw-bold">Nuevo Cliente</h2>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item"><a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="/dashboard/admin/clients"><i class="ti ti-building me-1"></i>Clientes</a></li>
-                        <li class="breadcrumb-item active">Nuevo</li>
-                    </ol>
-                </nav>
-            </div>
-            <a href="/dashboard/admin/clients" class="btn btn-sm btn-outline-secondary"><i class="ti ti-arrow-left me-1"></i>Volver</a>
-        </div>
+        <p class="text-uppercase fw-bold mb-2" style="letter-spacing:.22em;font-size:.68rem;color:#6E7A50;">Gestión · Clientes</p>
+        <h1 class="fw-bold mb-1" style="font-size:2rem;letter-spacing:-.02em;">Nuevo cliente</h1>
+        <p class="mb-2" style="color:#8a8f78;font-size:.95rem;max-width:560px;">Da de alta una agencia colaboradora o un cliente final. Solo los campos marcados con <span style="color:#c0392b;">*</span> son obligatorios.</p>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0" style="font-size:.78rem;">
+                <li class="breadcrumb-item"><a href="/dashboard/admin">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="/dashboard/admin/clients">Clientes</a></li>
+                <li class="breadcrumb-item active">Nuevo</li>
+            </ol>
+        </nav>
+        <hr style="border:0;border-top:1px solid #ded9cb;margin:20px 0 24px;">
     </div>
 </div>
+<style>
+    .create-client-page{--line:#ded9cb;--danger:#c0392b;padding-bottom:84px;}
+    .create-client-page .cff-error{color:var(--danger);font-size:.74rem;margin-top:.3rem;}
+    .create-client-page .form-control.is-invalid,
+    .create-client-page .form-select.is-invalid{border-color:var(--danger);box-shadow:0 0 0 .18rem rgba(192,57,43,.10);}
+    /* Barra de acción fija al viewport, alineada con el área de contenido (sigue al sidebar) */
+    .create-client-page .cff-sticky{position:fixed;left:270px;right:0;bottom:0;z-index:1010;
+        background:rgba(255,255,255,.96);backdrop-filter:saturate(180%) blur(8px);-webkit-backdrop-filter:saturate(180%) blur(8px);
+        border-top:1px solid var(--line);box-shadow:0 -2px 12px rgba(0,0,0,.06);
+        padding:.75rem 2rem;display:flex;justify-content:flex-start;}
+    .create-client-page .cff-sticky .cff-sticky-inner{max-width:880px;width:100%;
+        display:flex;align-items:center;justify-content:flex-end;gap:.6rem;}
+    .create-client-page .cff-sticky .cff-form-error{margin-right:auto;font-size:.78rem;color:var(--danger);display:none;}
+    .create-client-page .cff-sticky .cff-form-error i{margin-right:.35rem;}
+    /* Sidebar colapsado (desktop) */
+    @media (min-width:992px){
+        .main-content.sidebar-collapsed .create-client-page .cff-sticky{left:80px;}
+    }
+    /* Móvil: sin sidebar */
+    @media (max-width:991.98px){
+        .create-client-page .cff-sticky{left:0;padding-left:1rem;padding-right:1rem;}
+    }
+    /* Selector Agencia / Cliente en tarjetas */
+    .create-client-page .sel-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:26px;}
+    .create-client-page .sel-radio{position:absolute;opacity:0;width:0;height:0;pointer-events:none;}
+    .create-client-page .sel-card{position:relative;border:1.5px solid var(--line);border-radius:16px;background:#fff;
+        padding:20px;cursor:pointer;transition:.18s;display:flex;gap:16px;align-items:flex-start;margin:0;}
+    .create-client-page .sel-card:hover{border-color:#6E7A50;transform:translateY(-1px);box-shadow:0 6px 18px rgba(110,122,80,.08);}
+    .create-client-page .sel-radio:checked + .sel-card{border-color:#6E7A50;background:linear-gradient(180deg,#fbfbf7,#f7f6ef);box-shadow:0 6px 18px rgba(110,122,80,.12);}
+    .create-client-page .sel-radio:focus-visible + .sel-card{outline:2px solid #6E7A50;outline-offset:2px;}
+    .create-client-page .sel-ic{flex:none;width:46px;height:46px;border-radius:12px;background:#eceadd;color:#566040;
+        display:flex;align-items:center;justify-content:center;font-size:1.4rem;}
+    .create-client-page .sel-radio:checked + .sel-card .sel-ic{background:#6E7A50;color:#fff;}
+    .create-client-page .sel-title{display:block;font-size:1rem;font-weight:700;margin-bottom:.25rem;}
+    .create-client-page .sel-desc{display:block;font-size:.8rem;color:#8a8f78;line-height:1.45;}
+    .create-client-page .sel-check{position:absolute;top:14px;right:14px;width:22px;height:22px;border-radius:50%;
+        border:2px solid var(--line);display:flex;align-items:center;justify-content:center;color:#fff;font-size:.72rem;transition:.15s;}
+    .create-client-page .sel-radio:checked + .sel-card .sel-check{background:#6E7A50;border-color:#6E7A50;}
+    .create-client-page .sel-check i{opacity:0;transition:.15s;}
+    .create-client-page .sel-radio:checked + .sel-card .sel-check i{opacity:1;}
+    @media (max-width:575.98px){ .create-client-page .sel-grid{grid-template-columns:1fr;} }
+    /* Formulario sobre superficie */
+    .create-client-page .form-card{background:#fff;border:1px solid var(--line);border-radius:18px;
+        padding:30px 32px;box-shadow:0 1px 3px rgba(0,0,0,.03);}
+    @media (max-width:575.98px){ .create-client-page .form-card{padding:20px 18px;} }
+</style>
 <div class="row">
     <div class="col-12">
-        <div style="max-width:880px;">
-            <!-- Toggle: Agencia / Cliente -->
-            <div class="client-form-editorial mb-4">
-                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-users me-1"></i>Tipo de Cliente</h6>
-                <div class="btn-group w-100" role="group" aria-label="Tipo de cliente">
-                    <input type="radio" class="btn-check" name="pageClientType" id="pageTypeAgency" value="agency" checked>
-                    <label class="btn btn-outline-primary" for="pageTypeAgency"><i class="ti ti-building me-2"></i>Agencia</label>
-                    <input type="radio" class="btn-check" name="pageClientType" id="pageTypeClient" value="client">
-                    <label class="btn btn-outline-primary" for="pageTypeClient"><i class="ti ti-user me-2"></i>Cliente</label>
-                </div>
-                <div class="form-text mt-2" id="pageTypeHelp"><strong>Agencia:</strong> usuario con acceso al sistema para gestionar sus propios clientes y reservas.</div>
+        <div class="create-client-page" style="max-width:880px;">
+            <!-- Selector: Agencia / Cliente (tarjetas) -->
+            <div class="sel-grid" role="radiogroup" aria-label="Tipo de cliente">
+                <input type="radio" class="sel-radio" name="pageClientType" id="pageTypeAgency" value="agency" checked>
+                <label class="sel-card" for="pageTypeAgency">
+                    <span class="sel-ic"><i class="ti ti-building"></i></span>
+                    <span class="sel-body">
+                        <span class="sel-title">Agencia</span>
+                        <span class="sel-desc">Colaborador con acceso al sistema para gestionar sus propios clientes, cotizaciones y reservas.</span>
+                    </span>
+                    <span class="sel-check"><i class="ti ti-check"></i></span>
+                </label>
+                <input type="radio" class="sel-radio" name="pageClientType" id="pageTypeClient" value="client">
+                <label class="sel-card" for="pageTypeClient">
+                    <span class="sel-ic"><i class="ti ti-user"></i></span>
+                    <span class="sel-body">
+                        <span class="sel-title">Cliente</span>
+                        <span class="sel-desc">Cliente final (directo, wedding planner, concierge…). Puede tener contraseña para ver sus cotizaciones.</span>
+                    </span>
+                    <span class="sel-check"><i class="ti ti-check"></i></span>
+                </label>
             </div>
 
-            <!-- Formulario AGENCIA -->
-            <form id="createAgencyPageForm" novalidate>
-                <%- include('../../organisms/forms/agency-form-fields') %>
-                <div class="d-flex justify-content-end gap-2 mt-2 mb-4">
-                    <a href="/dashboard/admin/clients" class="btn btn-outline-secondary">Cancelar</a>
-                    <button type="submit" class="btn btn-primary" id="createAgencyPageSubmit"><i class="ti ti-plus me-1"></i>Crear Agencia</button>
-                </div>
-            </form>
+            <!-- Formularios sobre superficie -->
+            <div class="form-card">
+                <!-- Formulario AGENCIA -->
+                <form id="createAgencyPageForm" novalidate>
+                    <%- include('../../organisms/forms/agency-form-fields') %>
+                </form>
 
-            <!-- Formulario CLIENTE (oculto por defecto) -->
-            <form id="createClientPageForm" novalidate style="display:none;">
-                <%- include('../../organisms/forms/client-form-fields', { client: {} }) %>
-                <div class="d-flex justify-content-end gap-2 mt-2 mb-4">
+                <!-- Formulario CLIENTE (oculto por defecto) -->
+                <form id="createClientPageForm" novalidate style="display:none;">
+                    <%- include('../../organisms/forms/client-form-fields', { client: {} }) %>
+                </form>
+            </div>
+
+            <!-- Barra de acción fija al viewport -->
+            <div class="cff-sticky">
+                <div class="cff-sticky-inner">
+                    <span class="cff-form-error" id="createPageError"><i class="ti ti-alert-circle"></i><span id="createPageErrorMsg"></span></span>
                     <a href="/dashboard/admin/clients" class="btn btn-outline-secondary">Cancelar</a>
-                    <button type="submit" class="btn btn-primary" id="createClientPageSubmit"><i class="ti ti-plus me-1"></i>Crear Cliente</button>
+                    <button type="button" class="btn btn-primary" id="createPageSubmit" data-label-agency="Crear Agencia" data-label-client="Crear Cliente">
+                        <i class="ti ti-plus me-1"></i><span class="cff-btn-text">Crear Agencia</span>
+                    </button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
@@ -139,28 +199,118 @@ const tarifarioTabs = [
 document.addEventListener('DOMContentLoaded', function () {
     var agencyForm = document.getElementById('createAgencyPageForm');
     var clientForm = document.getElementById('createClientPageForm');
-    var typeHelp = document.getElementById('pageTypeHelp');
-    if (!agencyForm || !clientForm) return;
+    var submitBtn = document.getElementById('createPageSubmit');
+    var btnText = submitBtn ? submitBtn.querySelector('.cff-btn-text') : null;
+    if (!agencyForm || !clientForm || !submitBtn) return;
+
     var g = function (id) { var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
     var pass = function (id) { var el = document.getElementById(id); return el && el.value ? el.value : undefined; };
     var token = function () { return (document.cookie.match(/clientAccessToken=([^;]+)/) || [])[1] || ''; };
+    var isAgencyMode = function () { return document.getElementById('pageTypeAgency').checked; };
+    var visibleForm = function () { return isAgencyMode() ? agencyForm : clientForm; };
 
-    // Toggle mostrar/ocultar
-    document.querySelectorAll('input[name="pageClientType"]').forEach(function (r) {
-        r.addEventListener('change', function () {
-            var isAgency = document.getElementById('pageTypeAgency').checked;
-            agencyForm.style.display = isAgency ? '' : 'none';
-            clientForm.style.display = isAgency ? 'none' : '';
-            if (typeHelp) {
-                typeHelp.innerHTML = isAgency
-                    ? '<strong>Agencia:</strong> usuario con acceso al sistema para gestionar sus propios clientes y reservas.'
-                    : '<strong>Cliente:</strong> cliente final. Puede tener contraseña para ver sus cotizaciones y reservaciones.';
+    // ---------- Guardia de cambios sin guardar ----------
+    var isDirty = false, allowLeave = false;
+    function markDirty() { isDirty = true; }
+    [agencyForm, clientForm].forEach(function (f) {
+        f.addEventListener('input', markDirty);
+        f.addEventListener('change', markDirty);
+    });
+    window.addEventListener('beforeunload', function (e) {
+        if (isDirty && !allowLeave) { e.preventDefault(); e.returnValue = ''; }
+    });
+    // Cancelar: confirmación amigable (y evita el doble prompt del beforeunload)
+    var cancelLink = document.querySelector('.cff-sticky a[href="/dashboard/admin/clients"]');
+    if (cancelLink) {
+        cancelLink.addEventListener('click', function (e) {
+            if (isDirty && !allowLeave && !window.confirm('Tienes cambios sin guardar. ¿Salir sin crear el registro?')) {
+                e.preventDefault();
+                return;
+            }
+            allowLeave = true;
+        });
+    }
+
+    // ---------- Errores inline ----------
+    function clearErrors(form) {
+        form.querySelectorAll('.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
+        form.querySelectorAll('.cff-error').forEach(function (el) { el.remove(); });
+    }
+    function setError(id, msg) {
+        var el = document.getElementById(id);
+        if (!el) return null;
+        el.classList.add('is-invalid');
+        var anchor = el.closest('.input-group') || el;
+        var err = document.createElement('div');
+        err.className = 'cff-error';
+        err.textContent = msg;
+        anchor.parentNode.insertBefore(err, anchor.nextSibling);
+        var clear = function () {
+            el.classList.remove('is-invalid');
+            if (err.parentNode) err.remove();
+            el.removeEventListener('input', clear);
+            el.removeEventListener('change', clear);
+        };
+        el.addEventListener('input', clear);
+        el.addEventListener('change', clear);
+        return el;
+    }
+    function focusFirst(el) {
+        if (!el) return;
+        var acc = el.closest('.cff-acc');
+        if (acc && !acc.classList.contains('open')) {
+            acc.classList.add('open');
+            var h = acc.querySelector('.js-cff-acc');
+            if (h) h.setAttribute('aria-expanded', 'true');
+        }
+        try { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) { el.scrollIntoView(); }
+        setTimeout(function () { try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); } }, 140);
+    }
+    // rules: [{id, msg, when}] → resalta todas las inválidas, devuelve la primera
+    function validate(form, rules) {
+        clearErrors(form);
+        var first = null;
+        rules.forEach(function (r) {
+            if (r.when) {
+                var el = setError(r.id, r.msg);
+                if (!first) first = el;
             }
         });
-    });
+        return first;
+    }
 
-    async function submitClient(endpoint, payload, btn) {
-        btn.disabled = true;
+    // ---------- Error de servidor (barra) ----------
+    var errBox = document.getElementById('createPageError');
+    var errMsg = document.getElementById('createPageErrorMsg');
+    function showFormError(msg) { if (errBox && errMsg) { errMsg.textContent = msg; errBox.style.display = ''; } }
+    function clearFormError() { if (errBox) errBox.style.display = 'none'; }
+
+    // ---------- Toggle ----------
+    function applyMode() {
+        var ag = isAgencyMode();
+        agencyForm.style.display = ag ? '' : 'none';
+        clientForm.style.display = ag ? 'none' : '';
+        if (btnText) btnText.textContent = ag ? submitBtn.dataset.labelAgency : submitBtn.dataset.labelClient;
+        clearFormError();
+    }
+    document.querySelectorAll('input[name="pageClientType"]').forEach(function (r) { r.addEventListener('change', applyMode); });
+    applyMode();
+
+    // ---------- Estado de carga ----------
+    function setLoading(on) {
+        submitBtn.disabled = on;
+        if (on) {
+            submitBtn.dataset.prevHtml = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creando…';
+        } else if (submitBtn.dataset.prevHtml) {
+            submitBtn.innerHTML = submitBtn.dataset.prevHtml;
+        }
+    }
+
+    async function submitClient(endpoint, payload) {
+        setLoading(true);
+        clearFormError();
+        allowLeave = true; // el submit navega al detalle; no dispares la guardia
         try {
             var resp = await fetch(endpoint, {
                 method: 'POST',
@@ -173,17 +323,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 var d = data.data || {};
                 var id = d.id || (d.client && (d.client.id || d.client.objectId)) || null;
                 window.location.href = id ? ('/dashboard/admin/clients/' + id) : '/dashboard/admin/clients';
-            } else {
-                alert((data && (data.error || data.message)) || 'No se pudo crear el registro');
-                btn.disabled = false;
+                return;
             }
+            showFormError((data && (data.error || data.message)) || 'No se pudo crear el registro');
+            setLoading(false);
+            allowLeave = false;
         } catch (err) {
-            alert('Error al crear el registro');
-            btn.disabled = false;
+            showFormError('Error de conexión al crear el registro');
+            setLoading(false);
+            allowLeave = false;
         }
     }
 
-    // AGENCIA → /api/clients
+    // ---------- Submit AGENCIA → /api/clients ----------
     agencyForm.addEventListener('submit', function (e) {
         e.preventDefault();
         var payload = {
@@ -192,17 +344,23 @@ document.addEventListener('DOMContentLoaded', function () {
             email: g('agencyEmail'),
             password: pass('agencyPassword'),
             phone: g('agencyPhone') || undefined,
+            birthDate: g('agencyBirthDate') || undefined,
             companyName: g('agencyCompanyName') || undefined,
             website: g('agencyWebsite') || undefined,
             notes: g('agencyNotes') || undefined
         };
-        if (!payload.firstName || !payload.lastName || !payload.email) { alert('Nombre, apellido y email del representante son obligatorios'); return; }
-        if (!payload.companyName) { alert('El nombre de la empresa es obligatorio'); return; }
-        if (!payload.password) { alert('La contraseña de la agencia es obligatoria'); return; }
-        submitClient('/api/clients', payload, document.getElementById('createAgencyPageSubmit'));
+        var bad = validate(agencyForm, [
+            { id: 'agencyFirstName', msg: 'El nombre es obligatorio', when: !payload.firstName },
+            { id: 'agencyLastName', msg: 'El apellido es obligatorio', when: !payload.lastName },
+            { id: 'agencyEmail', msg: 'El email es obligatorio', when: !payload.email },
+            { id: 'agencyCompanyName', msg: 'El nombre de la empresa es obligatorio', when: !payload.companyName },
+            { id: 'agencyPassword', msg: 'La contraseña es obligatoria', when: !payload.password }
+        ]);
+        if (bad) { focusFirst(bad); return; }
+        submitClient('/api/clients', payload);
     });
 
-    // CLIENTE → /api/owned-clients
+    // ---------- Submit CLIENTE → /api/owned-clients ----------
     clientForm.addEventListener('submit', function (e) {
         e.preventDefault();
         var payload = {
@@ -217,6 +375,7 @@ document.addEventListener('DOMContentLoaded', function () {
             contactLastName: g('directClientContactLastName') || undefined,
             emergencyContactName: g('directClientEmergencyContactName') || undefined,
             emergencyContactPhone: g('directClientEmergencyContactPhone') || undefined,
+            companyName: g('directClientCompanyName') || undefined,
             companyType: g('directClientCompanyType') || undefined,
             website: g('directClientWebsite') || undefined,
             streetType: g('directClientStreetType') || undefined,
@@ -233,9 +392,20 @@ document.addEventListener('DOMContentLoaded', function () {
             dietaryRestrictions: g('directClientDietaryRestrictions') || undefined,
             notes: g('directClientNotes') || undefined
         };
-        if (!payload.firstName || !payload.lastName) { alert('Nombre y apellido son obligatorios'); return; }
-        if (payload.password && !payload.email) { alert('Para asignar contraseña, el cliente necesita email'); return; }
-        submitClient('/api/owned-clients', payload, document.getElementById('createClientPageSubmit'));
+        var bad = validate(clientForm, [
+            { id: 'directClientFirstName', msg: 'El nombre es obligatorio', when: !payload.firstName },
+            { id: 'directClientLastName', msg: 'El apellido es obligatorio', when: !payload.lastName },
+            { id: 'directClientEmail', msg: 'Agrega un email para poder asignar contraseña', when: !!payload.password && !payload.email }
+        ]);
+        if (bad) { focusFirst(bad); return; }
+        submitClient('/api/owned-clients', payload);
+    });
+
+    // ---------- Botón sticky → dispara el form visible ----------
+    submitBtn.addEventListener('click', function () {
+        var f = visibleForm();
+        if (f.requestSubmit) f.requestSubmit();
+        else f.dispatchEvent(new Event('submit', { cancelable: true }));
     });
 });
 </script>

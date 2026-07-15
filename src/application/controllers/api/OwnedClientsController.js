@@ -106,6 +106,7 @@ class OwnedClientsController {
       contactLastName: data.contactLastName,
       emergencyContactName: data.emergencyContactName,
       emergencyContactPhone: data.emergencyContactPhone,
+      companyName: data.companyName,
       companyType: data.companyType,
       taxId: data.taxId,
       website: data.website,
@@ -508,7 +509,7 @@ class OwnedClientsController {
         contactFirstName, contactLastName,
         emergencyContactName, emergencyContactPhone,
         // Company fields
-        companyType, taxId, website,
+        companyName, companyType, taxId, website,
         // Address fields (structured)
         streetType, streetName, exteriorNumber, interiorNumber,
         colonia, city, state, postalCode,
@@ -582,6 +583,7 @@ class OwnedClientsController {
           contactLastName,
           emergencyContactName,
           emergencyContactPhone,
+          companyName,
           companyType,
           taxId,
           website,
@@ -891,7 +893,7 @@ class OwnedClientsController {
         contactFirstName, contactLastName,
         emergencyContactName, emergencyContactPhone,
         // Company fields
-        companyType, taxId, website,
+        companyName, companyType, taxId, website,
         // Address fields (structured)
         streetType, streetName, exteriorNumber, interiorNumber,
         colonia, city, state, postalCode,
@@ -966,6 +968,7 @@ class OwnedClientsController {
       if (email !== undefined) client.set('email', email);
       if (phone !== undefined) client.set('phone', phone);
       if (contactPerson !== undefined) client.set('contactPerson', contactPerson);
+      if (companyName !== undefined) client.set('companyName', companyName);
       if (companyType !== undefined) client.set('companyType', companyType);
       if (taxId !== undefined) client.set('taxId', taxId);
       if (website !== undefined) client.set('website', website);
