@@ -7,6 +7,7 @@ const Parse = require('parse/node');
 const Quote = require('../../../domain/models/Quote');
 const QuoteOwnership = require('../../../domain/models/QuoteOwnership');
 const ReservationService = require('../../../domain/models/ReservationService');
+const ServiceChangeRequest = require('../../../domain/models/ServiceChangeRequest');
 const QuoteService = require('../../services/QuoteService');
 const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
 const QuoteCollaborationService = require('../../services/QuoteCollaborationService');
@@ -2303,6 +2304,70 @@ class QuoteController {
         paymentType,
       };
 
+      // Bloqueo por-servicio (Fase 1): los subconceptos marcados adminLocked (agregados/editados
+      // por un admin) NO pueden ser editados, movidos ni eliminados por no-admins, y solo
+      // admin/superadmin pueden marcar un servicio como bloqueado. Los locks son "sticky" por id.
+      // Esto refuerza en el servidor lo que la UI ya impide (a prueba de bypass del request).
+      const isAdminUser = ['admin', 'superadmin'].includes(req.userRole);
+      const storedServiceItems = quote.get('serviceItems') || {};
+      const storedLockedById = new Map();
+      (Array.isArray(storedServiceItems.days) ? storedServiceItems.days : []).forEach((d) => {
+        (d.subconcepts || []).forEach((sc) => {
+          if (sc && sc.id && sc.adminLocked) {
+            storedLockedById.set(sc.id, { sub: sc, dayNumber: d.dayNumber });
+          }
+        });
+      });
+
+      if (storedLockedById.size > 0) {
+        const seenLockedIds = new Set();
+        const enforcedDays = serviceItems.days.map((d) => ({
+          ...d,
+          subconcepts: (d.subconcepts || []).map((sc) => {
+            if (!sc || !sc.id) return sc;
+            const locked = storedLockedById.get(sc.id);
+            if (locked) {
+              seenLockedIds.add(sc.id);
+              // Sticky: siempre queda bloqueado. Para no-admin se restaura el contenido guardado
+              // (no puede editar el servicio del admin); admin conserva sus cambios.
+              return isAdminUser ? { ...sc, adminLocked: true } : { ...locked.sub, adminLocked: true };
+            }
+            // Un no-admin no puede marcar como bloqueado un servicio nuevo.
+            if (!isAdminUser && sc.adminLocked) {
+              return { ...sc, adminLocked: false };
+            }
+            return sc;
+          }),
+        }));
+
+        // No-admin: re-insertar los servicios bloqueados que se hayan quitado del payload
+        // (intento de borrado no permitido).
+        if (!isAdminUser) {
+          storedLockedById.forEach((locked, id) => {
+            if (seenLockedIds.has(id)) return;
+            const restored = { ...locked.sub, adminLocked: true };
+            let idx = enforcedDays.findIndex((d) => d.dayNumber === locked.dayNumber);
+            if (idx < 0) idx = enforcedDays.length > 0 ? 0 : -1;
+            if (idx >= 0) {
+              enforcedDays[idx] = {
+                ...enforcedDays[idx],
+                subconcepts: [...(enforcedDays[idx].subconcepts || []), restored],
+              };
+            } else {
+              enforcedDays.push({ dayNumber: locked.dayNumber || 1, dayTitle: '', subconcepts: [restored] });
+            }
+          });
+          logger.info('updateServiceItems: enforced admin-locked services for non-admin', {
+            quoteId: quote.id,
+            userRole: req.userRole,
+            lockedCount: storedLockedById.size,
+            reinserted: storedLockedById.size - seenLockedIds.size,
+          });
+        }
+
+        serviceItems.days = enforcedDays;
+      }
+
       quote.set('serviceItems', serviceItems);
 
       // Save with user context
@@ -2365,6 +2430,291 @@ class QuoteController {
       return this.sendError(
         res,
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al actualizar los servicios',
+        500
+      );
+    }
+  }
+
+  /**
+   * POST /api/quotes/:id/services/:serviceId/request-change — Fase 2 del bloqueo por-servicio.
+   * El owner (no-admin) solicita BORRAR o MODIFICAR un servicio bloqueado por admin. Solo
+   * guarda la solicitud en el subconcepto (no elimina/edita nada); el admin la aprueba/rechaza.
+   * @param {object} req - Express request; params id/serviceId; body { type: 'delete'|'modify', note? }.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON con la solicitud creada.
+   * @example
+   *   POST /api/quotes/abc/services/service_17/request-change { "type": "delete", "note": "..." }
+   */
+  async requestServiceChange(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId, serviceId } = req.params;
+      const type = req.body?.type === 'modify' ? 'modify' : 'delete';
+      const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
+
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      const quote = await query.get(quoteId, { useMasterKey: true });
+      if (!quote) return this.sendError(res, 'Cotización no encontrada', 404);
+
+      const serviceItems = quote.get('serviceItems') || {};
+      let target = null;
+      (serviceItems.days || []).forEach((d) => (d.subconcepts || []).forEach((sc) => {
+        if (sc && sc.id === serviceId) target = sc;
+      }));
+      if (!target) return this.sendError(res, 'Servicio no encontrado en la cotización', 404);
+      if (!target.adminLocked) {
+        return this.sendError(res, 'Este servicio no está bloqueado; puedes editarlo directamente', 400);
+      }
+      if (target.changeRequest && target.changeRequest.status === 'pending') {
+        return this.sendError(res, 'Este servicio ya tiene una solicitud pendiente', 400);
+      }
+
+      const requesterName = `${currentUser.get('firstName') || ''} ${currentUser.get('lastName') || ''}`.trim()
+        || currentUser.get('email') || currentUser.get('username') || 'Owner';
+      const serviceLabel = target.concept || target.name || 'Servicio';
+      const requestedAt = new Date();
+
+      // Registro durable (historial + contador). Sobrevive si el servicio se elimina.
+      const record = new ServiceChangeRequest();
+      record.set('active', true);
+      record.set('exists', true);
+      record.set('quote', { __type: 'Pointer', className: 'Quote', objectId: quote.id });
+      record.set('serviceId', serviceId);
+      record.set('serviceLabel', serviceLabel);
+      record.set('type', type);
+      record.set('note', note);
+      record.set('status', ServiceChangeRequest.STATUS.PENDING);
+      record.set('requestedBy', { __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id });
+      record.set('requestedByName', requesterName);
+      record.set('requestedAt', requestedAt);
+      record.set('seenByRequester', true); // el owner ya la conoce (la acaba de crear)
+      await record.save(null, { useMasterKey: true });
+
+      // Marcador inline en el subconcepto (UI de acción de Fase 2 + badge del owner).
+      target.changeRequest = {
+        requestId: record.id,
+        type,
+        note,
+        requestedBy: currentUser.id,
+        requestedByName: requesterName,
+        requestedAt: requestedAt.toISOString(),
+        status: 'pending',
+      };
+      quote.set('serviceItems', serviceItems);
+      await quote.save(null, { useMasterKey: true });
+
+      logger.info('Service change requested', {
+        quoteId: quote.id, serviceId, type, requestId: record.id, requestedBy: currentUser.id,
+      });
+      return this.sendSuccess(res, { serviceId, changeRequest: target.changeRequest }, 'Solicitud enviada', 200);
+    } catch (error) {
+      logger.error('Error in requestServiceChange', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al solicitar el cambio',
+        500
+      );
+    }
+  }
+
+  /**
+   * POST /api/quotes/:id/services/:serviceId/review-change — Admin aprueba/rechaza la solicitud
+   * de cambio de un servicio. approve+delete elimina el servicio; approve+modify y reject dejan
+   * el servicio pero transicionan la solicitud (aprobada/rechazada) para el historial y el badge
+   * del owner. SOLO admin/superadmin (gate en la ruta).
+   * @param {object} req - Express request; params id/serviceId; body { decision, reviewNote? }.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON con la acción aplicada.
+   * @example
+   *   POST /api/quotes/abc/services/service_17/review-change { "decision": "approve" }
+   */
+  async reviewServiceChange(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId, serviceId } = req.params;
+      const decision = req.body?.decision === 'reject' ? 'reject' : 'approve';
+      const reviewNote = typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 1000) : '';
+
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      const quote = await query.get(quoteId, { useMasterKey: true });
+      if (!quote) return this.sendError(res, 'Cotización no encontrada', 404);
+
+      const serviceItems = quote.get('serviceItems') || {};
+      let target = null;
+      let targetDay = null;
+      (serviceItems.days || []).forEach((d) => (d.subconcepts || []).forEach((sc) => {
+        if (sc && sc.id === serviceId) { target = sc; targetDay = d; }
+      }));
+      if (!target) return this.sendError(res, 'Servicio no encontrado en la cotización', 404);
+      if (!target.changeRequest || target.changeRequest.status !== 'pending') {
+        return this.sendError(res, 'Este servicio no tiene una solicitud pendiente', 400);
+      }
+
+      const reqType = target.changeRequest.type;
+      const { requestId } = target.changeRequest;
+      const reviewerName = `${currentUser.get('firstName') || ''} ${currentUser.get('lastName') || ''}`.trim()
+        || currentUser.get('email') || currentUser.get('username') || 'Admin';
+      const reviewedAt = new Date();
+      const newStatus = decision === 'approve' ? 'approved' : 'rejected';
+      let action;
+      let serviceDeleted = false;
+
+      if (decision === 'approve' && reqType === 'delete') {
+        targetDay.subconcepts = (targetDay.subconcepts || []).filter((sc) => sc.id !== serviceId);
+        serviceDeleted = true;
+        action = 'deleted';
+      } else {
+        // modify-approve o reject: el servicio se queda; el marcador inline transiciona a
+        // aprobada/rechazada (badge del owner) hasta que lo vea (seenByRequester=false).
+        target.changeRequest = {
+          ...target.changeRequest,
+          status: newStatus,
+          reviewedByName: reviewerName,
+          reviewedAt: reviewedAt.toISOString(),
+          reviewNote,
+          seenByRequester: false,
+        };
+        action = decision === 'approve' ? 'modify-approved' : 'rejected';
+      }
+
+      quote.set('serviceItems', serviceItems);
+      await quote.save(null, { useMasterKey: true });
+
+      // Actualizar el registro durable (historial).
+      if (requestId) {
+        try {
+          const rec = await new Parse.Query('ServiceChangeRequest').get(requestId, { useMasterKey: true });
+          if (rec) {
+            rec.set('status', newStatus);
+            rec.set('reviewedBy', { __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id });
+            rec.set('reviewedByName', reviewerName);
+            rec.set('reviewedAt', reviewedAt);
+            rec.set('reviewNote', reviewNote);
+            rec.set('serviceDeleted', serviceDeleted);
+            rec.set('seenByRequester', false); // el owner debe enterarse del resultado
+            await rec.save(null, { useMasterKey: true });
+          }
+        } catch (recErr) {
+          logger.warn('reviewServiceChange: no se pudo actualizar el registro', { error: recErr.message, requestId });
+        }
+      }
+
+      logger.info('Service change reviewed', {
+        quoteId: quote.id, serviceId, decision, reqType, action, reviewedBy: currentUser.id,
+      });
+      return this.sendSuccess(res, { serviceId, action, type: reqType }, 'Solicitud revisada', 200);
+    } catch (error) {
+      logger.error('Error in reviewServiceChange', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al revisar la solicitud',
+        500
+      );
+    }
+  }
+
+  /**
+   * GET /api/quotes/:id/change-requests — Historial de solicitudes de cambio de la cotización
+   * (Fase 3). Devuelve la lista para el modal y un contador de novedades: admin = pendientes;
+   * owner = sus solicitudes resueltas sin ver.
+   * @param {object} req - Express request; params id.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { requests, counter }.
+   * @example
+   *   GET /api/quotes/abc/change-requests
+   */
+  async getServiceChangeRequests(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId } = req.params;
+      const isAdmin = ['admin', 'superadmin'].includes(req.userRole);
+
+      const q = new Parse.Query('ServiceChangeRequest');
+      q.equalTo('quote', { __type: 'Pointer', className: 'Quote', objectId: quoteId });
+      q.equalTo('exists', true);
+      q.descending('createdAt');
+      q.limit(500);
+      const records = await q.find({ useMasterKey: true });
+      const requests = records.map((r) => r.toDisplayJSON());
+
+      const counter = isAdmin
+        ? requests.filter((r) => r.status === 'pending').length
+        : requests.filter((r) => r.status !== 'pending' && !r.seenByRequester
+          && r.requestedById === currentUser.id).length;
+
+      return this.sendSuccess(res, { requests, counter, isAdmin }, 'OK', 200);
+    } catch (error) {
+      logger.error('Error in getServiceChangeRequests', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al obtener las solicitudes',
+        500
+      );
+    }
+  }
+
+  /**
+   * POST /api/quotes/:id/change-requests/mark-seen — Marca como vistas las solicitudes resueltas
+   * del owner (limpia el contador) y limpia los marcadores inline resueltos del subconcepto.
+   * @param {object} req - Express request; params id.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON.
+   * @example
+   *   POST /api/quotes/abc/change-requests/mark-seen
+   */
+  async markServiceChangeRequestsSeen(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId } = req.params;
+
+      const q = new Parse.Query('ServiceChangeRequest');
+      q.equalTo('quote', { __type: 'Pointer', className: 'Quote', objectId: quoteId });
+      q.equalTo('requestedBy', { __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id });
+      q.equalTo('exists', true);
+      q.notEqualTo('status', 'pending');
+      q.equalTo('seenByRequester', false);
+      q.limit(500);
+      const records = await q.find({ useMasterKey: true });
+      records.forEach((r) => r.set('seenByRequester', true));
+      if (records.length) await Parse.Object.saveAll(records, { useMasterKey: true });
+
+      // Limpiar los marcadores inline resueltos del owner en el subconcepto.
+      const quote = await new Parse.Query('Quote').equalTo('exists', true).get(quoteId, { useMasterKey: true }).catch(() => null);
+      if (quote) {
+        const serviceItems = quote.get('serviceItems') || {};
+        let changed = false;
+        const newDays = (serviceItems.days || []).map((d) => ({
+          ...d,
+          subconcepts: (d.subconcepts || []).map((sc) => {
+            const cr = sc && sc.changeRequest;
+            if (cr && cr.status && cr.status !== 'pending' && cr.requestedBy === currentUser.id) {
+              changed = true;
+              const rest = { ...sc };
+              delete rest.changeRequest;
+              return rest;
+            }
+            return sc;
+          }),
+        }));
+        if (changed) {
+          serviceItems.days = newDays;
+          quote.set('serviceItems', serviceItems);
+          await quote.save(null, { useMasterKey: true });
+        }
+      }
+
+      return this.sendSuccess(res, { seen: records.length }, 'OK', 200);
+    } catch (error) {
+      logger.error('Error in markServiceChangeRequestsSeen', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error',
         500
       );
     }
