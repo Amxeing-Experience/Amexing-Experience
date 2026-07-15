@@ -20634,11 +20634,11 @@ class ItineraryBuilder {
   }
 
   // Un servicio queda "protegido" para no-admins si lo bloqueó un admin (adminLocked), o si la
-  // cotización ya es reservación y el servicio toca un proveedor/establecimiento (providerType):
-  // en ambos casos el cambio debe pasar por una solicitud aprobada por admin, no editarse directo.
+  // cotización ya es reservación (window.__isReservation): en una reservación cualquier cambio a un
+  // servicio existente debe pasar por una solicitud aprobada por admin (agregar nuevos sí se permite).
   isServiceProtected(service) {
     if (!service) return false;
-    return !!(service.adminLocked || (window.__isReservation && service.providerType));
+    return !!(service.adminLocked || window.__isReservation);
   }
 
   // Bloqueo por-servicio: un servicio protegido solo lo pueden gestionar (editar/duplicar/borrar)
