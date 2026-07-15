@@ -20997,7 +20997,9 @@ class ItineraryBuilder {
       ownership_transferred: 'otros',
       quote_edited: 'otros',
     };
-    const renderTimeline = (filter) => {
+    // Fase B4: paginación en cliente ("ver más").
+    const PAGE_SIZE = 15;
+    const renderTimeline = (filter, limit) => {
       const list = filter === 'all'
         ? activities
         : activities.filter((a) => (CATEGORY[a.action] || 'otros') === filter);
@@ -21008,9 +21010,11 @@ class ItineraryBuilder {
           ${activities.length ? '' : '<small>Los cambios en servicios, solicitudes y estado aparecerán aquí.</small>'}
         </div>`;
       }
+      const shown = list.slice(0, limit);
+      const remaining = list.length - shown.length;
       let lastDay = null;
       const parts = [];
-      list.forEach((a) => {
+      shown.forEach((a) => {
         const dk = new Date(a.createdAt); dk.setHours(0, 0, 0, 0);
         const key = dk.getTime();
         if (key !== lastDay) {
@@ -21026,7 +21030,10 @@ class ItineraryBuilder {
             <div class="qa-time">${timeLabel(a.createdAt)}</div>
           </div>`);
       });
-      return `<div class="qa-timeline">${parts.join('')}</div>`;
+      const moreBtn = remaining > 0
+        ? `<div class="qa-more"><button type="button" class="qa-more-btn">Ver más (${remaining} ${remaining === 1 ? 'restante' : 'restantes'})</button></div>`
+        : '';
+      return `<div class="qa-timeline">${parts.join('')}</div>${moreBtn}`;
     };
     const FILTERS = [
       { key: 'all', label: 'Todos' },
@@ -21038,7 +21045,9 @@ class ItineraryBuilder {
     const filterBar = activities.length
       ? `<div class="qa-filters">${FILTERS.map((f) => `<button type="button" class="qa-chip${f.key === 'all' ? ' active' : ''}" data-filter="${f.key}">${f.label}</button>`).join('')}</div>`
       : '';
-    const body = `${filterBar}<div id="qa-timeline-container">${renderTimeline('all')}</div>`;
+    let currentFilter = 'all';
+    let currentLimit = PAGE_SIZE;
+    const body = `${filterBar}<div id="qa-timeline-container">${renderTimeline(currentFilter, currentLimit)}</div>`;
 
     if (!document.getElementById('qa-timeline-styles')) {
       const st = document.createElement('style');
@@ -21061,6 +21070,9 @@ class ItineraryBuilder {
         #quoteActivityModal .qa-chip{border:1px solid #e2e2e0;background:#fff;color:#5f6368;border-radius:16px;padding:3px 12px;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .12s;}
         #quoteActivityModal .qa-chip:hover{background:#f4f4f2;}
         #quoteActivityModal .qa-chip.active{background:#2e2e2d;border-color:#2e2e2d;color:#fff;}
+        #quoteActivityModal .qa-more{text-align:center;padding:4px 0 8px;}
+        #quoteActivityModal .qa-more-btn{border:1px solid #e2e2e0;background:#fff;color:#5f6368;border-radius:16px;padding:5px 18px;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .12s;}
+        #quoteActivityModal .qa-more-btn:hover{background:#f4f4f2;color:#2e2e2d;}
       `;
       document.head.appendChild(st);
     }
@@ -21085,14 +21097,26 @@ class ItineraryBuilder {
     const modalEl = document.getElementById('quoteActivityModal');
     const modal = new bootstrap.Modal(modalEl);
     modalEl.addEventListener('hidden.bs.modal', () => this.disposeTempModal(modalEl, modal));
-    // Fase B2: filtros por categoría — re-render del timeline al cambiar de chip.
+    const rerender = () => {
+      const cont = modalEl.querySelector('#qa-timeline-container');
+      if (cont) cont.innerHTML = renderTimeline(currentFilter, currentLimit);
+    };
+    // Fase B2: filtros por categoría — al cambiar de chip se resetea la paginación.
     modalEl.querySelectorAll('.qa-chip').forEach((chip) => {
       chip.addEventListener('click', () => {
         modalEl.querySelectorAll('.qa-chip').forEach((c) => c.classList.remove('active'));
         chip.classList.add('active');
-        const cont = modalEl.querySelector('#qa-timeline-container');
-        if (cont) cont.innerHTML = renderTimeline(chip.dataset.filter);
+        currentFilter = chip.dataset.filter;
+        currentLimit = PAGE_SIZE;
+        rerender();
       });
+    });
+    // Fase B4: "Ver más" — delegado en el contenedor para sobrevivir re-renders.
+    modalEl.querySelector('#qa-timeline-container')?.addEventListener('click', (ev) => {
+      if (ev.target.closest('.qa-more-btn')) {
+        currentLimit += PAGE_SIZE;
+        rerender();
+      }
     });
     modal.show();
   }
