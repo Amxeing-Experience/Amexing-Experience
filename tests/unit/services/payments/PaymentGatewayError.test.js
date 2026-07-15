@@ -159,5 +159,49 @@ describe('PaymentGatewayError', () => {
       const err = new PaymentGatewayError(PaymentGatewayError.CODES.CARD_DECLINED, 'pan=4000000000000002');
       expect(err.toJSON().message).not.toContain('4000000000000002');
     });
+
+    it('masks a space-separated PAN (4-4-4-4 copy-paste grouping)', () => {
+      const err = new PaymentGatewayError(
+        PaymentGatewayError.CODES.CARD_DECLINED,
+        'card 4242 4242 4242 4242 was declined'
+      );
+      expect(err.message).not.toContain('4242 4242 4242 4242');
+      expect(err.message).toContain('[REDACTED]');
+      expect(err.toJSON().message).not.toContain('4242 4242 4242 4242');
+      expect(err.toJSON().message).toContain('[REDACTED]');
+    });
+
+    it('masks a dash-separated PAN (4-4-4-4 grouping)', () => {
+      const err = new PaymentGatewayError(
+        PaymentGatewayError.CODES.CARD_DECLINED,
+        'card 4242-4242-4242-4242 was declined'
+      );
+      expect(err.message).not.toContain('4242-4242-4242-4242');
+      expect(err.message).toContain('[REDACTED]');
+      expect(err.toJSON().message).not.toContain('4242-4242-4242-4242');
+      expect(err.toJSON().message).toContain('[REDACTED]');
+    });
+
+    it('masks a dot-separated PAN (4-4-4-4 grouping)', () => {
+      const err = new PaymentGatewayError(
+        PaymentGatewayError.CODES.CARD_DECLINED,
+        'card 4242.4242.4242.4242 was declined'
+      );
+      expect(err.message).not.toContain('4242.4242.4242.4242');
+      expect(err.message).toContain('[REDACTED]');
+      expect(err.toJSON().message).not.toContain('4242.4242.4242.4242');
+      expect(err.toJSON().message).toContain('[REDACTED]');
+    });
+
+    it('masks a 4-6-5 separator grouping (Amex-style)', () => {
+      const err = new PaymentGatewayError(PaymentGatewayError.CODES.PROVIDER_ERROR, 'x 3782 822463 10005 y');
+      expect(err.message).toBe('x [REDACTED] y');
+    });
+
+    it('does NOT over-redact short separated groups below PAN length (e.g. a 3-3-4 phone number)', () => {
+      const err = new PaymentGatewayError(PaymentGatewayError.CODES.PROVIDER_ERROR, 'call 555 123 4567 now');
+      expect(err.message).toBe('call 555 123 4567 now');
+      expect(err.message).not.toContain('[REDACTED]');
+    });
   });
 });

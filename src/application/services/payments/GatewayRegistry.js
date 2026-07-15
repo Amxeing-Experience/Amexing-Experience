@@ -13,6 +13,7 @@
  */
 
 const PaymentGatewayError = require('./PaymentGatewayError');
+const PaymentGatewayService = require('./PaymentGatewayService');
 
 /**
  * Capabilities every adapter must expose as functions to be registrable.
@@ -49,6 +50,22 @@ function validateAdapter(adapter) {
     throw new PaymentGatewayError(
       PaymentGatewayError.CODES.PROVIDER_ERROR,
       `Gateway adapter is missing required capability "${missing}"`
+    );
+  }
+
+  // A subclass of PaymentGatewayService that forgets to override a required capability
+  // still passes the typeof-function check (it inherits the base abstract stub, which IS
+  // a function) and would only throw NOT_IMPLEMENTED when that method is invoked at
+  // runtime, in production. Reuse the own-vs-inherited technique from
+  // PaymentGatewayService.notImplemented: when adapter[method] is the SAME reference as
+  // the base prototype's method, it was never overridden. Fail loud at registration.
+  const inheritedStub = REQUIRED_METHODS.find(
+    (method) => adapter[method] === PaymentGatewayService.prototype[method]
+  );
+  if (inheritedStub) {
+    throw new PaymentGatewayError(
+      PaymentGatewayError.CODES.PROVIDER_ERROR,
+      `Gateway adapter inherits the abstract stub for "${inheritedStub}" without overriding it`
     );
   }
 

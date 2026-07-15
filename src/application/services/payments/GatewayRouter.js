@@ -149,7 +149,11 @@ class GatewayRouter {
       this.logger.warn('gateway-router: empty/invalid MXN toggle, falling back to Stripe');
       return null;
     }
-    const id = toggle.trim();
+    // Normalize the toggle the same way toggleNamesMexican() does (trim + lowercase):
+    // registry ids are canonical lowercase (adapter.getId()), so a valid-but-wrong-case
+    // toggle like 'Mexican'/'MEXICAN' must resolve, not fall through to the Stripe
+    // fallback and log the same "not registered" warning as a genuinely corrupt id.
+    const id = toggle.trim().toLowerCase();
     if (!this.registry.has(id)) {
       // Corrupt / unknown toggle id -> fallback (never a hard error, per plan 4.5).
       this.logger.warn(`gateway-router: MXN toggle "${id}" is not registered, falling back to Stripe`);

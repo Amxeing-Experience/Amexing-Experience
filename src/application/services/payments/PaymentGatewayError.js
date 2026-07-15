@@ -33,18 +33,29 @@ const CODES = Object.freeze({
 
 const VALID_CODES = new Set(Object.values(CODES));
 
-// Decision #9: basic PAN redaction. A card number is 13-19 digits, so any run of
-// 13-19 consecutive digits in a message is masked before it is ever stored. Bounded
-// quantifier, no nesting -> not vulnerable to ReDoS.
-const PAN_PATTERN = /\d{13,19}/g;
+// Decision #9: basic PAN redaction. A card number is 13-19 digits, but humans copy-paste
+// PANs grouped with single space/dash/dot separators (e.g. 4-4-4-4 or 4-6-5), which a
+// plain consecutive-digit pattern would miss. We instead capture any run that begins and
+// ends on a digit and is made only of digits + those separators, then count the digits in
+// the callback and mask the whole run once it holds at least a full PAN's worth (>= 13).
+// Anchoring on \d at both ends preserves surrounding whitespace/punctuation; the single
+// unbounded repetition (no nested quantifier) keeps star height 1 -> not ReDoS-prone. No
+// upper digit cap: an over-long run may still embed a PAN, so it is masked in full.
+const PAN_PATTERN = /\d[\d .-]{11,}\d/g;
+const PAN_MIN_DIGITS = 13;
 
 /**
- * Mask PAN-like digit runs inside a string.
+ * Mask PAN-like digit runs inside a string, including groups split by single space, dash,
+ * or dot separators (standard card grouping). A candidate is only masked when it actually
+ * carries >= 13 digits, so separator-heavy short sequences (phone numbers, dates) survive.
  * @param {string} text - Text to sanitize (already coerced to a string).
  * @returns {string} Text with any PAN-like sequence replaced by a fixed mask.
  */
 function redactPan(text) {
-  return String(text).replace(PAN_PATTERN, '[REDACTED]');
+  return String(text).replace(PAN_PATTERN, (match) => {
+    const digitCount = match.replace(/\D/g, '').length;
+    return digitCount >= PAN_MIN_DIGITS ? '[REDACTED]' : match;
+  });
 }
 
 /**

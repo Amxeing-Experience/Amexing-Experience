@@ -8,6 +8,7 @@
 
 const GatewayRegistry = require('../../../../src/application/services/payments/GatewayRegistry');
 const PaymentGatewayError = require('../../../../src/application/services/payments/PaymentGatewayError');
+const PaymentGatewayService = require('../../../../src/application/services/payments/PaymentGatewayService');
 const StripeAdapter = require('../../../../src/application/services/payments/gateways/StripeAdapter');
 const OpenpayAdapter = require('../../../../src/application/services/payments/gateways/OpenpayAdapter');
 
@@ -199,6 +200,42 @@ describe('GatewayRegistry', () => {
       const registry = new GatewayRegistry();
       const badRefund = makeMockAdapter({ refund: 'not-a-function' });
       expect(() => registry.register(badRefund)).toThrow(PaymentGatewayError);
+    });
+
+    it('rejects a PaymentGatewayService subclass that inherits an abstract stub instead of overriding it', () => {
+      // Overrides 6 of 7 capabilities; refund() is left as the inherited base stub, which
+      // passes a naive typeof-function check but only throws NOT_IMPLEMENTED when invoked.
+      class MissingRefundAdapter extends PaymentGatewayService {
+        getId() { return 'future'; }
+
+        getSupportedCurrencies() { return ['MXN']; }
+
+        isConfigured() { return true; }
+
+        createCharge() { return {}; }
+
+        getCharge() { return {}; }
+
+        verifyWebhook() { return {}; }
+      }
+      const registry = new GatewayRegistry();
+      let error;
+      try {
+        registry.register(new MissingRefundAdapter());
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(PaymentGatewayError);
+      expect(error.code).toBe(PaymentGatewayError.CODES.PROVIDER_ERROR);
+      expect(registry.has('future')).toBe(false); // registration failed loud, nothing keyed
+    });
+
+    it('accepts a fully-overriding PaymentGatewayService subclass (StripeAdapter regression guard)', () => {
+      // StripeAdapter/OpenpayAdapter extend PaymentGatewayService and override every
+      // capability, so the inherited-stub guard must NOT reject them.
+      const registry = new GatewayRegistry();
+      expect(() => registry.register(new StripeAdapter())).not.toThrow();
+      expect(registry.has('stripe')).toBe(true);
     });
   });
 

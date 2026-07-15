@@ -130,6 +130,36 @@ describe('GatewayRouter', () => {
     });
   });
 
+  describe('MXN toggle case-insensitivity (normalized like toggleNamesMexican)', () => {
+    it('RTR-20: MXN + toggle="Mexican" (valid but wrong case) -> mexican, no warning', () => {
+      const { router, mexican, logger } = standardSetup();
+      expect(router.resolve('MXN', 'Mexican')).toBe(mexican);
+      expect(logger.warn).not.toHaveBeenCalled();
+    });
+
+    it('RTR-21: MXN + toggle="MEXICAN" (upper case) -> mexican', () => {
+      const { router, mexican } = standardSetup();
+      expect(router.resolve('MXN', 'MEXICAN')).toBe(mexican);
+    });
+
+    it('RTR-22: MXN + toggle="  MeXiCaN  " (padded + mixed case) -> mexican', () => {
+      const { router, mexican } = standardSetup();
+      expect(router.resolve('MXN', '  MeXiCaN  ')).toBe(mexican);
+    });
+
+    it('RTR-23: distinguishes valid-but-wrong-case (resolves, no warn) from a genuinely corrupt id (fallback + warn)', () => {
+      const {
+        router, mexican, stripe, logger,
+      } = standardSetup();
+      // Wrong case resolves to the mexican gateway and does NOT warn.
+      expect(router.resolve('MXN', 'Mexican')).toBe(mexican);
+      expect(logger.warn).not.toHaveBeenCalled();
+      // A genuinely unregistered id still falls back to Stripe with the "not registered" warning.
+      expect(router.resolve('MXN', 'ghost-gateway')).toBe(stripe);
+      expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('not registered'));
+    });
+  });
+
   describe('adversarial toggle values (MXN) all fall back to Stripe', () => {
     const bad = [
       ['null', null],
