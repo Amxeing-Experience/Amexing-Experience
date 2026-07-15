@@ -424,6 +424,30 @@ router.put(
 );
 
 /**
+ * POST /api/quotes/:id/services/:serviceId/request-change — El owner (no-admin) solicita
+ * borrar/modificar un servicio bloqueado por admin (Fase 2 del bloqueo por-servicio).
+ */
+router.post(
+  '/:id/services/:serviceId/request-change',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4) y arriba
+  (req, res) => QuoteController.requestServiceChange(req, res)
+);
+
+/**
+ * POST /api/quotes/:id/services/:serviceId/review-change — Admin aprueba/rechaza la solicitud
+ * de cambio de un servicio. SOLO admin/superadmin.
+ */
+router.post(
+  '/:id/services/:serviceId/review-change',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRole(['admin', 'superadmin']),
+  (req, res) => QuoteController.reviewServiceChange(req, res)
+);
+
+/**
  * GET /api/quotes/:id/available-services - Get available services filtered by quote's rate.
  * Private access (Department Manager, Admin and SuperAdmin).
  *

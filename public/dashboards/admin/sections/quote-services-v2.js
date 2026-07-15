@@ -7933,6 +7933,7 @@ class ItineraryBuilder {
                                 </button>
                             </div>
                             ` : ''}
+                            ${this.renderServiceLockControls(service)}
                         </div>
                         ${!(service.type === 'concepto' && this.getServiceDisplayPrice(service) <= 0) ? `
                             ${service.includeInTotal === false ? `
@@ -7952,6 +7953,7 @@ class ItineraryBuilder {
                         ` : ''}
                     </div>
                 </div>
+                ${this.renderServiceReviewBanner(service)}
             </div>
         `;
   }
@@ -12187,6 +12189,8 @@ class ItineraryBuilder {
             dayId: dayData.id,
             // Bloqueo por-servicio (Fase 1): restaura el candado guardado para el render.
             adminLocked: subconcept.adminLocked || false,
+            // Fase 2: restaura la solicitud de cambio pendiente (si hay) para el render.
+            changeRequest: subconcept.changeRequest || null,
             type: subconcept.type || 'other',
             concept: subconcept.concept,
             startTime: subconcept.time || subconcept.startTime, // Backend sends 'time'
@@ -20221,6 +20225,8 @@ class ItineraryBuilder {
             // Bloqueo por-servicio (Fase 1): true si un admin lo agregó/editó → solo lectura
             // para no-admins. Se persiste en el subconcepto para restaurarlo al recargar.
             adminLocked: service.adminLocked || false,
+            // Fase 2: solicitud de cambio (borrar/modificar) pendiente de aprobación del admin.
+            changeRequest: service.changeRequest || null,
             concept: this.getServiceTitle(service),
             time: normalizeTimeHHMM(service.startTime), // Backend expects 'time' not 'startTime'
             endTime: normalizeTimeHHMM(service.endTime),
@@ -20628,6 +20634,164 @@ class ItineraryBuilder {
     if (!service) return false;
     if (['admin', 'superadmin'].includes(this.userRole)) return true;
     return !service.adminLocked;
+  }
+
+  // Escapa texto para meterlo en HTML (nota de la solicitud, input del owner).
+  escapeHtmlText(str) {
+    return String(str == null ? '' : str).replace(/[<>&"']/g, (c) => ({
+      '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  // Fase 2: controles COMPACTOS para la columna de acciones (solo owner en servicio bloqueado).
+  // El aviso de revisión del admin va en una franja de ancho completo (renderServiceReviewBanner),
+  // para no encimar los botones editar/duplicar/borrar.
+  renderServiceLockControls(service) {
+    if (['admin', 'superadmin'].includes(this.userRole)) return '';
+    if (!service.adminLocked) return '';
+    const cr = (service.changeRequest && service.changeRequest.status === 'pending')
+      ? service.changeRequest : null;
+    if (cr) {
+      const typeLabel = cr.type === 'delete' ? 'borrado' : 'modificación';
+      return `<span class="badge bg-warning-subtle text-warning-emphasis border d-inline-flex align-items-center"><i class="ti ti-clock me-1"></i>Solicitud de ${typeLabel} pendiente</span>`;
+    }
+    return `<button type="button" class="btn btn-sm btn-outline-secondary request-change-btn" data-service-id="${service.id}"><i class="ti ti-message-2 me-1"></i>Solicitar cambio</button>`;
+  }
+
+  // Fase 2: franja de ancho completo, abajo del servicio (solo admin), con la solicitud
+  // pendiente + Aprobar/Rechazar. Deja limpios los botones de la columna de acciones.
+  renderServiceReviewBanner(service) {
+    if (!['admin', 'superadmin'].includes(this.userRole)) return '';
+    const cr = (service.changeRequest && service.changeRequest.status === 'pending')
+      ? service.changeRequest : null;
+    if (!cr) return '';
+    const verb = cr.type === 'delete' ? 'borrar' : 'modificar';
+    const who = this.escapeHtmlText(cr.requestedByName || 'El owner');
+    const note = cr.note ? ` <span class="text-muted">“${this.escapeHtmlText(cr.note)}”</span>` : '';
+    return `
+      <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2 mt-2 mb-0 py-2 px-3" style="font-size: 0.85rem;">
+        <span class="me-auto"><i class="ti ti-bell me-1"></i><strong>${who}</strong> solicitó <strong>${verb}</strong> este servicio${note}</span>
+        <span class="d-flex gap-1">
+          <button type="button" class="btn btn-sm btn-success review-change-btn" data-service-id="${service.id}" data-decision="approve"><i class="ti ti-check me-1"></i>Aprobar</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary review-change-btn" data-service-id="${service.id}" data-decision="reject"><i class="ti ti-x me-1"></i>Rechazar</button>
+        </span>
+      </div>`;
+  }
+
+  // Fase 2: abre el mini-modal para que el owner elija borrar/modificar + nota opcional.
+  openChangeRequestModal(serviceId) {
+    const service = this.services.get(serviceId);
+    if (!service) return;
+    document.getElementById('changeRequestModal')?.remove();
+    const html = `
+      <div class="modal fade" id="changeRequestModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title"><i class="ti ti-message-2 me-2"></i>Solicitar cambio</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p class="mb-1">Servicio: <strong>${this.escapeHtmlText(this.getServiceTitle(service))}</strong></p>
+              <p class="text-muted small">Este servicio lo gestiona un administrador. Envía tu solicitud y un administrador la revisará.</p>
+              <div class="mb-3">
+                <label class="form-label fw-semibold">¿Qué necesitas?</label>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="crType" id="crTypeModify" value="modify" checked>
+                  <label class="form-check-label" for="crTypeModify">Modificar el servicio</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="crType" id="crTypeDelete" value="delete">
+                  <label class="form-check-label" for="crTypeDelete">Borrar el servicio</label>
+                </div>
+              </div>
+              <div class="mb-1">
+                <label for="crNote" class="form-label fw-semibold">Nota (opcional)</label>
+                <textarea class="form-control" id="crNote" rows="3" placeholder="Describe qué quieres cambiar o por qué..."></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="button" class="btn btn-primary" id="crSubmitBtn"><i class="ti ti-send me-1"></i>Enviar solicitud</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modalEl = document.getElementById('changeRequestModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modalEl.querySelector('#crSubmitBtn').addEventListener('click', () => {
+      const type = modalEl.querySelector('input[name="crType"]:checked')?.value || 'modify';
+      const note = modalEl.querySelector('#crNote')?.value || '';
+      this.submitChangeRequest(serviceId, type, note, modal);
+    });
+    modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
+    modal.show();
+  }
+
+  // Fase 2: envía la solicitud de cambio al backend y refleja el estado localmente.
+  async submitChangeRequest(serviceId, type, note, modal) {
+    try {
+      const resp = await fetch(`/api/quotes/${this.quoteId}/services/${serviceId}/request-change`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.getAccessToken() || ''}` },
+        body: JSON.stringify({ type, note }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) {
+        this.showAlert((data && data.error) || 'No se pudo enviar la solicitud.', 'danger');
+        return;
+      }
+      const svc = this.services.get(serviceId);
+      if (svc) svc.changeRequest = (data.data && data.data.changeRequest) || { type, note, status: 'pending' };
+      modal?.hide();
+      this.renderItinerary();
+      this.showAlert('Solicitud enviada. Un administrador la revisará.', 'success');
+    } catch (e) {
+      this.showAlert('Error al enviar la solicitud.', 'danger');
+    }
+  }
+
+  // Fase 2: admin aprueba/rechaza la solicitud de cambio de un servicio.
+  async reviewServiceChange(serviceId, decision) {
+    try {
+      const resp = await fetch(`/api/quotes/${this.quoteId}/services/${serviceId}/review-change`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.getAccessToken() || ''}` },
+        body: JSON.stringify({ decision }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) {
+        this.showAlert((data && data.error) || 'No se pudo procesar la solicitud.', 'danger');
+        return;
+      }
+      const action = data.data && data.data.action;
+      if (action === 'deleted') {
+        const svc = this.services.get(serviceId);
+        if (svc) {
+          const day = this.days.find((d) => d.id === svc.dayId)
+            || this.days.find((d) => (d.services || []).includes(serviceId));
+          if (day) day.services = (day.services || []).filter((sid) => sid !== serviceId);
+        }
+        this.services.delete(serviceId);
+        this.renderItinerary();
+        // Persistir totales recalculados (el endpoint solo quitó el subconcepto).
+        this.saveToBackend();
+        this.showAlert('Servicio eliminado (solicitud aprobada).', 'success');
+      } else {
+        const svc = this.services.get(serviceId);
+        if (svc) delete svc.changeRequest;
+        this.renderItinerary();
+        this.showAlert(
+          action === 'modify-approved'
+            ? 'Solicitud aprobada. Edita el servicio para aplicar el cambio.'
+            : 'Solicitud rechazada.',
+          action === 'modify-approved' ? 'success' : 'info',
+        );
+      }
+    } catch (e) {
+      this.showAlert('Error al procesar la solicitud.', 'danger');
+    }
   }
 
   duplicateService(serviceId) {
@@ -21521,6 +21685,16 @@ class ItineraryBuilder {
         const { serviceId } = btn.dataset;
         this.deleteService(serviceId);
       });
+    });
+
+    // Fase 2: owner solicita cambio (borrar/modificar) de un servicio bloqueado.
+    container.querySelectorAll('.request-change-btn').forEach((btn) => {
+      btn.addEventListener('click', () => this.openChangeRequestModal(btn.dataset.serviceId));
+    });
+
+    // Fase 2: admin aprueba/rechaza una solicitud de cambio.
+    container.querySelectorAll('.review-change-btn').forEach((btn) => {
+      btn.addEventListener('click', () => this.reviewServiceChange(btn.dataset.serviceId, btn.dataset.decision));
     });
 
     container.querySelectorAll('.accept-overlap-btn').forEach((btn) => {
