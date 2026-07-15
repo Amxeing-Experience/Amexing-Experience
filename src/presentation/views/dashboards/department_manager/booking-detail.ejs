@@ -415,7 +415,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         adjustments.filter(a => a.type === 'charge').forEach(adj => {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-plus text-danger me-1"></i><span class="small">${adj.description}</span>${autoBadge(adj)}</div>
+                <div><i class="ti ti-plus text-danger me-1"></i><span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span>${autoBadge(adj)}</div>
                 <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
             </div>`;
         });
@@ -424,7 +424,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // framing neutral de "ajuste" — sin la palabra "descuento" ni el ícono de descuento.
         adjustments.filter(a => a.type === 'discount').forEach(adj => {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-minus text-success me-1"></i><span class="small">${adj.description}</span>${autoBadge(adj)}</div>
+                <div><i class="ti ti-minus text-success me-1"></i><span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span>${autoBadge(adj)}</div>
                 <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
             </div>`;
         });

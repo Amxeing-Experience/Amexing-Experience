@@ -163,7 +163,7 @@ describe('Public reservation payment breakdown (integration)', () => {
   });
 
   describe('summarize() throws — degraded architecture', () => {
-    it('framing/discount rows STILL render while tip/paid/balance/status fall back to raw reservation fields', async () => {
+    it('framing/discount rows render, tip/paid/balance fall back, y Total a pagar = balance + paidAmount', async () => {
       const { folio } = await makeReservation({
         services: CLEAN,
         paymentType: 'efectivo',
@@ -184,6 +184,11 @@ describe('Public reservation payment breakdown (integration)', () => {
         expect(s).toContain('Propina');
         expect(/Propina<\/span><span class="v">\$77/.test(s)).toBe(true);
         expect(/Pagado<\/span><span class="v">\$33/.test(s)).toBe(true);
+        // Fix Fase 2: en el fallback el Total a pagar deriva de balance + paidAmount (88 + 33 = 121),
+        // NUNCA del total de solo-servicios (CLEAN efectivo = 10000), que contradecía el desglose de
+        // ajustes ya renderizado. Mismo patrón que ReservationController.getReservationById (Fase 3).
+        expect(/Total a pagar<\/span><span class="v">\$121\b/.test(s)).toBe(true);
+        expect(/Total a pagar<\/span><span class="v">\$10,000/.test(s)).toBe(false);
       } finally {
         spy.mockRestore();
       }

@@ -17,6 +17,13 @@ const PaymentBreakdownHelpers = (() => {
   const AUTO_RECONCILIATION_SOURCE = 'payment-method-reconciliation';
   const GENERAL_TIP_LABEL = 'Propina general (sin servicio asignado)';
 
+  // Entidades HTML para neutralizar texto controlado por el usuario (referencia/notas de pago,
+  // descripcion de ajuste) antes de interpolarlo en innerHTML / atributo / <textarea>. Un solo
+  // pase por regex evita el doble-escape de '&'.
+  const HTML_ENTITIES = {
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  };
+
   // Estado de pago — solid badge + text-white salvo bg-warning (text-dark).
   const PAYMENT_STATUS_MAP = {
     pending: { label: 'Pendiente de pago', cls: 'bg-secondary text-white' },
@@ -48,6 +55,19 @@ const PaymentBreakdownHelpers = (() => {
    */
   function round2(value) {
     return Math.round((Number(value) || 0) * 100) / 100;
+  }
+
+  /**
+   * Escapa los 5 caracteres con significado en HTML (& < > " ') a sus entidades, para interpolar
+   * texto controlado por el usuario dentro de innerHTML, de un atributo o de un textarea sin permitir
+   * inyeccion de markup/script (stored XSS). null/undefined -> '' (nunca 'null'/'undefined').
+   * @param {*} value - Valor a escapar (se coacciona a string).
+   * @returns {string} Texto seguro para interpolar en HTML.
+   * @example
+   * escapeHtml('<img src=x onerror=alert(1)>') // '&lt;img src=x onerror=alert(1)&gt;'
+   */
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, (c) => HTML_ENTITIES[c]);
   }
 
   /**
@@ -335,6 +355,7 @@ const PaymentBreakdownHelpers = (() => {
     GENERAL_TIP_LABEL,
     PAYMENT_STATUS_MAP,
     round2,
+    escapeHtml,
     cashRoundMXN,
     getServicePriceByType,
     computeServicesSubtotalByType,

@@ -1633,7 +1633,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
                 <div>
                     <i class="ti ti-plus text-danger me-1"></i>
-                    <span class="small">${adj.description}</span>${autoBadge(adj)}
+                    <span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span>${autoBadge(adj)}
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
@@ -1648,7 +1648,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
                 <div>
                     <i class="ti ti-discount-2 text-success me-1"></i>
-                    <span class="small">${adj.description}${pctLabel}</span>${autoBadge(adj)}
+                    <span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}${pctLabel}</span>${autoBadge(adj)}
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
@@ -1844,7 +1844,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         const rows = paymentsCache.map((p) => {
-            const ref = p.reference ? p.reference : '<span class="text-muted">—</span>';
+            const ref = p.reference ? PaymentBreakdownHelpers.escapeHtml(p.reference) : '<span class="text-muted">—</span>';
             const tipHtml = p.tip ? `<small class="text-muted d-block">+ propina ${formatCurrency(p.tip, curr)}</small>` : '';
             const receipt = p.receiptUrl
                 ? `<a href="${p.receiptUrl}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
@@ -2003,7 +2003,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 ${serviceSelectorHtml}
                 <div class="col-md-6">
                     <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
-                    <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${(existing?.reference || '').replace(/"/g, '&quot;')}">
+                    <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${PaymentBreakdownHelpers.escapeHtml(existing?.reference || '')}">
                 </div>
                 <div class="col-12">
                     <label class="form-label fw-semibold small" for="paymentReceipt">Comprobante (imagen o PDF)</label>
@@ -2012,7 +2012,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
                 <div class="col-12">
                     <label class="form-label fw-semibold small" for="paymentNotes">Notas</label>
-                    <textarea class="form-control form-control-sm" id="paymentNotes" rows="2" maxlength="300" placeholder="Notas del pago">${existing?.notes || ''}</textarea>
+                    <textarea class="form-control form-control-sm" id="paymentNotes" rows="2" maxlength="300" placeholder="Notas del pago">${PaymentBreakdownHelpers.escapeHtml(existing?.notes || '')}</textarea>
                 </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-3">

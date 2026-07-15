@@ -389,3 +389,72 @@ describe('PaymentBreakdownHelpers.buildServiceSelectorOptions (Fase 4)', () => {
     expect(r.options.map((o) => o.value)).toEqual(['', 'a']);
   });
 });
+
+describe('PaymentBreakdownHelpers.escapeHtml (stored XSS en reference/notes/adj.description)', () => {
+  // Prueba adversarial: el council verificó que reference/notes/adj.description se interpolaban en
+  // innerHTML / value="" / <textarea> sin escapar, permitiendo stored XSS desde nivel 4+. Estos
+  // payloads deben quedar como texto inerte; ningún '<', '>', '"', "'" o '&' crudo puede sobrevivir.
+  const RAW = /[<>"']/; // '&' se prueba aparte (queda como '&amp;', que contiene '&')
+
+  it('neutraliza <script>alert(1)</script>', () => {
+    const out = H.escapeHtml('<script>alert(1)</script>');
+    expect(out).toBe('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(RAW.test(out)).toBe(false);
+  });
+
+  it('neutraliza <img src=x onerror=alert(1)>', () => {
+    const out = H.escapeHtml('<img src=x onerror=alert(1)>');
+    expect(out).toBe('&lt;img src=x onerror=alert(1)&gt;');
+    expect(RAW.test(out)).toBe(false);
+  });
+
+  it('neutraliza el cierre de textarea </textarea><script>alert(1)</script> (vector citado por el council)', () => {
+    const out = H.escapeHtml('</textarea><script>alert(1)</script>');
+    expect(out).toBe('&lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;');
+    // El textarea NO se puede cerrar: no queda ningún '<' ni '>' crudo.
+    expect(out).not.toContain('</textarea>');
+    expect(RAW.test(out)).toBe(false);
+  });
+
+  it('escapa comillas dobles (breakout de atributo value="...")', () => {
+    const out = H.escapeHtml('" onmouseover="alert(1)');
+    expect(out).toBe('&quot; onmouseover=&quot;alert(1)');
+    expect(out).not.toContain('"');
+  });
+
+  it('escapa comillas simples (breakout de atributo delimitado por comilla simple)', () => {
+    const out = H.escapeHtml("' onmouseover='alert(1)");
+    expect(out).toBe('&#39; onmouseover=&#39;alert(1)');
+    expect(out).not.toContain("'");
+  });
+
+  it('escapa & una sola vez (sin doble-escape): "a & b" -> "a &amp; b"', () => {
+    expect(H.escapeHtml('a & b')).toBe('a &amp; b');
+    // Un valor ya-escapado no se re-escapa a &amp;lt; (single pass por regex de clase).
+    expect(H.escapeHtml('&lt;')).toBe('&amp;lt;');
+  });
+
+  it('deja intacto un folio/referencia legítimo (sin metacaracteres HTML)', () => {
+    expect(H.escapeHtml('AUTH-2607-0012')).toBe('AUTH-2607-0012');
+    expect(H.escapeHtml('SPEI 123456789')).toBe('SPEI 123456789');
+  });
+
+  it('deja intactas notas legítimas con acentos y ñ (no altera visualmente el texto)', () => {
+    const nota = 'Pago recibido en efectivo del señor Muñoz — depósito parcial';
+    expect(H.escapeHtml(nota)).toBe(nota);
+  });
+
+  it('null/undefined/no-string -> "" (nunca "null"/"undefined")', () => {
+    expect(H.escapeHtml(null)).toBe('');
+    expect(H.escapeHtml(undefined)).toBe('');
+    expect(H.escapeHtml('')).toBe('');
+    // Un número se coacciona a su string sin romper.
+    expect(H.escapeHtml(1234)).toBe('1234');
+  });
+
+  it('payload combinado en una descripción de ajuste queda 100% inerte', () => {
+    const out = H.escapeHtml('Cargo extra <b>"</b> \'x\' & <svg/onload=alert(1)>');
+    expect(RAW.test(out)).toBe(false);
+    expect(out).toContain('&lt;svg/onload=alert(1)&gt;');
+  });
+});

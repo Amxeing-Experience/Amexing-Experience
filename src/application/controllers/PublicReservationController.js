@@ -608,7 +608,13 @@ class PublicReservationController {
       paidAmount: reservation.get('paidAmount') || 0,
       balance: reservation.get('balance'),
       tip: reservation.get('tip') || 0,
-      total,
+      // Fallback (summarize() lanzó): deriva total = balance + paidAmount (los campos que sobreviven
+      // al fallo) para que el Total no se contradiga con el desglose de ajustes ya renderizado —
+      // usar dispTotals.servicesTotal ignoraba ajustes/propina. Mismo fix que
+      // ReservationController.getReservationById (Fase 3); Fase 2 no lo tenía.
+      total: Math.round(
+        ((Number(reservation.get('balance')) || 0) + (Number(reservation.get('paidAmount')) || 0)) * 100
+      ) / 100,
     };
     try {
       const summary = await PaymentService.summarize(reservation.id);
