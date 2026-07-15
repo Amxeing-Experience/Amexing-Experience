@@ -203,6 +203,9 @@
 }
 </style>
 
+<!-- Shared payment breakdown helpers (isomorphic; also require'd by Jest) -->
+<script src="/shared/payments/paymentBreakdownHelpers.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
@@ -388,15 +391,22 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     function renderFinancialSummary() {
         const d = reservationData;
-        const adjustments = d.adjustments || [];
-        if (adjustments.length === 0) return;
-
         const card = document.getElementById('financialSummaryCard');
         const body = document.getElementById('financialSummaryBody');
+        const adjustments = d.adjustments || [];
         const servicesSubtotal = d.servicesSubtotal || d.totalAmount || 0;
         const curr = d.currency || 'MXN';
 
+        // La tarjeta financiera se pinta SIEMPRE que haya datos de reservación, con o sin ajustes.
+        // (Antes un early-return con 0 ajustes ocultaba también Subtotal/Total/Saldo — bug corregido.)
         card.style.display = '';
+
+        // Esta plantilla es SIEMPRE de agencia: los ajustes se enmarcan como cargo/ajuste, nunca como
+        // "descuento". El badge [Automático] marca los ajustes de reconciliación de método de pago.
+        const autoBadge = (adj) => (PaymentBreakdownHelpers.hasAutoReconciliationBadge(adj)
+            ? ' <span class="badge bg-info-subtle text-info" title="Generado automáticamente al detectar un cambio de método de pago">Automático</span>'
+            : '');
+
         let html = '';
         html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom">
             <span class="text-muted"><i class="ti ti-list-details me-2"></i>Subtotal Servicios</span>
@@ -405,15 +415,16 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         adjustments.filter(a => a.type === 'charge').forEach(adj => {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-plus text-danger me-1"></i><span class="small">${adj.description}</span></div>
+                <div><i class="ti ti-plus text-danger me-1"></i><span class="small">${adj.description}</span>${autoBadge(adj)}</div>
                 <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
             </div>`;
         });
 
+        // Ajustes de tipo discount: se muestran como reducción (nunca se pierde dinero real) pero con
+        // framing neutral de "ajuste" — sin la palabra "descuento" ni el ícono de descuento.
         adjustments.filter(a => a.type === 'discount').forEach(adj => {
-            const pctLabel = adj.percentage ? ` (${adj.percentage}%)` : '';
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-discount-2 text-success me-1"></i><span class="small">${adj.description}${pctLabel}</span></div>
+                <div><i class="ti ti-minus text-success me-1"></i><span class="small">${adj.description}</span>${autoBadge(adj)}</div>
                 <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
             </div>`;
         });
@@ -422,6 +433,55 @@ document.addEventListener('DOMContentLoaded', async function() {
             <span class="fw-bold"><i class="ti ti-receipt me-2"></i>Total Final</span>
             <span class="fw-bold fs-5 text-success">${formatCurrency(d.totalAmount || 0, curr)}</span>
         </div>`;
+
+        // Bloque de pago (NUEVO en agencia/agente): Estado / Total a pagar / Pagado / Propina / Saldo.
+        // Sin comparativo de métodos, sin formulario de pago, sin historial (fuera de alcance).
+        const pay = d.payment;
+        if (pay) {
+            const balanceCls = (pay.balance || 0) > 0 ? 'text-danger' : 'text-success';
+            const tip = pay.tip || 0;
+            html += `<div class="border-top mt-2 pt-2">
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
+                    ${PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus)}
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total a pagar</span>
+                    <span class="fw-semibold">${formatCurrency(pay.total, curr)}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-check me-2"></i>Pagado</span>
+                    <span class="fw-semibold text-success">${formatCurrency(pay.paidAmount, curr)}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-coin me-2"></i>Propina</span>
+                    <span class="fw-semibold">${formatCurrency(tip, curr)}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2">
+                    <span class="text-muted"><i class="ti ti-wallet me-2"></i>Saldo</span>
+                    <span class="fw-semibold ${balanceCls}">${formatCurrency(pay.balance, curr)}</span>
+                </div>
+            </div>`;
+
+            // Toggle "Ver propina por servicio" — variante SIMPLIFICADA (sin ficha de personal: la
+            // agencia ya ve al responsable en su sección Servicios). Solo si hay propina.
+            const tipEntries = PaymentBreakdownHelpers.groupTipEntriesForDisplay(
+                pay.tipByService, d.services, { includeStaff: false }
+            );
+            if (tip > 0 || tipEntries.length > 0) {
+                const tipRows = tipEntries.map(e => `<div class="d-flex justify-content-between align-items-center py-1 ps-3 border-bottom">
+                        <span class="small">${e.label}</span>
+                        <span class="small fw-semibold">${formatCurrency(e.tip, curr)}</span>
+                    </div>`).join('');
+                html += `<div class="pt-1">
+                    <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#tipByServiceBreakdown" aria-expanded="false" aria-controls="tipByServiceBreakdown" id="tipByServiceToggle">
+                        <i class="ti ti-coin me-1"></i>Ver propina por servicio
+                    </button>
+                    <div class="collapse mt-1" id="tipByServiceBreakdown">${tipRows || '<div class="small text-muted py-1 ps-3">Sin propina por servicio</div>'}</div>
+                </div>`;
+            }
+        }
+
         body.innerHTML = html;
     }
 

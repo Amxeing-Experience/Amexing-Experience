@@ -312,6 +312,8 @@
 
 <!-- Shared cancel utilities -->
 <script src="/js/reservation-cancel-utils.js"></script>
+<!-- Shared payment breakdown helpers (isomorphic; also require'd by Jest) -->
+<script src="/shared/payments/paymentBreakdownHelpers.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
@@ -332,17 +334,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         return name.split(' ').map(w => w[0]).filter(Boolean).join('').substring(0, 2).toUpperCase();
     }
 
-    // Redondeo a efectivo: múltiplo de 5 MXN (ley de redondeo del proyecto, applyCashRounding).
-    // Regla física del efectivo (no hay denominación practicable de 1-2 pesos); NO aplica a
-    // tarjeta/transferencia, que se cobran exactas al valor de la cotización.
-    function cashRoundMXN(price) {
-        const integerPart = Math.floor(price);
-        const decimalPart = price - integerPart;
-        if (decimalPart <= 0.50) return Math.floor(integerPart / 5) * 5;
-        if (integerPart === 0) return 5;
-        return Math.ceil(integerPart / 5) * 5;
-    }
-
     // Precio base en efectivo de un servicio (0 si está excluido del total). Es el precio de
     // referencia para el desglose Subtotal/recargo -- no se usa para calcular el cobro de
     // otros métodos.
@@ -356,28 +347,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         return Number(svc?.total) || 0;
     }
 
-    // Lee el precio YA calculado y aprobado por la cotización para este método
-    // (pricesByType[paymentType]), igual que PaymentService.chargeAmount en el servidor --
-    // no se recalcula con ninguna tasa. Fallback a svc.total si ese método no está presente.
+    // Lógica de cálculo/desglose compartida (pura, probada por Jest) — ver
+    // /shared/payments/paymentBreakdownHelpers.js. Wrappers finos para no tocar los call sites.
     function getServicePriceByType(svc, paymentType) {
-        if (svc?.subconcept?.includeInTotal === false) return 0;
-        const pbt = svc?.subconcept?.pricesByType;
-        if (pbt && typeof pbt === 'object' && pbt[paymentType] != null) {
-            const v = Number(pbt[paymentType]);
-            if (!Number.isNaN(v)) return v;
-        }
-        return Number(svc?.total) || 0;
+        return PaymentBreakdownHelpers.getServicePriceByType(svc, paymentType);
     }
-
-    // Total de servicios por método: Σ pricesByType[paymentType] (valor ya aprobado en la
-    // cotización); efectivo (MXN) redondeado a múltiplo de 5.
     function computeServicesSubtotalByType(services, paymentType) {
-        let value = (services || []).reduce((sum, svc) => sum + getServicePriceByType(svc, paymentType), 0);
         const currency = (reservationData && reservationData.currency) || 'MXN';
-        if (paymentType === 'efectivo' && String(currency).toUpperCase() === 'MXN') {
-            value = cashRoundMXN(value);
-        }
-        return Math.round(value * 100) / 100;
+        return PaymentBreakdownHelpers.computeServicesSubtotalByType(services, paymentType, currency);
     }
 
     function buildPersonCard(person, roleLabel, roleIcon, colorClass) {
@@ -572,18 +549,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `<span class="badge ${s.cls}" title="Estado de la reservación">${s.label}</span>`;
     }
 
-    // Estado de pago — solid badge + text-white salvo bg-warning (text-dark).
-    const PAYMENT_STATUS_MAP = {
-        pending: { label: 'Pendiente de pago', cls: 'bg-secondary text-white' },
-        partial: { label: 'Pago parcial', cls: 'bg-warning text-dark' },
-        paid: { label: 'Pagado', cls: 'bg-success text-white' },
-        refunded: { label: 'Reembolsado', cls: 'bg-info text-white' },
-    };
-
+    // Estado de pago — delegado al módulo compartido (mismo PAYMENT_STATUS_MAP en las 3 plantillas).
     function getPaymentStatusBadge(status) {
-        if (!status) return '';
-        const s = PAYMENT_STATUS_MAP[status] || { label: status, cls: 'bg-secondary text-white' };
-        return `<span class="badge ${s.cls}" title="Estado de pago">${s.label}</span>`;
+        return PaymentBreakdownHelpers.getPaymentStatusBadge(status);
     }
 
     function formatDate(dateStr) {
@@ -1647,6 +1615,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         const finalTotal = Math.max(0, servicesSubtotal + chargesTotal - discountsTotal);
         const curr = d.currency || 'MXN';
 
+        // Badge [Automático] sobre ajustes generados por la reconciliación de método de pago
+        // (source === 'payment-method-reconciliation'); los manuales van sin badge.
+        const autoBadge = (adj) => (PaymentBreakdownHelpers.hasAutoReconciliationBadge(adj)
+            ? ' <span class="badge bg-info-subtle text-info" title="Generado automáticamente al detectar un cambio de método de pago">Automático</span>'
+            : '');
+
         let html = '';
         // Subtotal line
         html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -1659,7 +1633,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
                 <div>
                     <i class="ti ti-plus text-danger me-1"></i>
-                    <span class="small">${adj.description}</span>
+                    <span class="small">${adj.description}</span>${autoBadge(adj)}
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
@@ -1674,7 +1648,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
                 <div>
                     <i class="ti ti-discount-2 text-success me-1"></i>
-                    <span class="small">${adj.description}${pctLabel}</span>
+                    <span class="small">${adj.description}${pctLabel}</span>${autoBadge(adj)}
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
@@ -1689,10 +1663,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             <span class="fw-bold fs-5 text-success">${formatCurrency(finalTotal, curr)}</span>
         </div>`;
 
-        // Payment block — estado de pago + pagado / saldo / total con IVA.
+        // Payment block — estado de pago + pagado / propina / saldo / total con IVA.
         const pay = d.payment;
         if (pay) {
             const balanceCls = (pay.balance || 0) > 0 ? 'text-danger' : 'text-success';
+            const tip = pay.tip || 0;
             html += `<div class="border-top mt-2 pt-2">
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
@@ -1706,12 +1681,70 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <span class="text-muted"><i class="ti ti-check me-2"></i>Pagado</span>
                     <span class="fw-semibold text-success">${formatCurrency(pay.paidAmount, curr)}</span>
                 </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-muted"><i class="ti ti-coin me-2"></i>Propina</span>
+                    <span class="fw-semibold">${formatCurrency(tip, curr)}</span>
+                </div>
                 <div class="d-flex justify-content-between align-items-center py-2">
                     <span class="text-muted"><i class="ti ti-wallet me-2"></i>Saldo</span>
                     <span class="fw-semibold ${balanceCls}">${formatCurrency(pay.balance, curr)}</span>
                 </div>
             </div>`;
+
+            // Toggle "Ver propina por servicio" (variante completa: incluye responsable). Solo cuando
+            // hay propina real (tip > 0 o algún bucket) — si no, no se renderiza.
+            const tipEntries = PaymentBreakdownHelpers.groupTipEntriesForDisplay(
+                pay.tipByService, d.services, { includeStaff: true }
+            );
+            if (tip > 0 || tipEntries.length > 0) {
+                const tipRows = tipEntries.map(e => {
+                    let staffHtml = '';
+                    if (!e.isGeneral) {
+                        staffHtml = e.staff.length > 0
+                            ? e.staff.map(s => `<span class="small text-${s.colorClass} me-2"><i class="ti ${s.icon} me-1"></i>${s.name}</span>`).join('')
+                            : '<span class="small text-muted fst-italic">Sin responsable asignado</span>';
+                    }
+                    return `<div class="py-1 ps-3 border-bottom">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small">${e.label}</span>
+                            <span class="small fw-semibold">${formatCurrency(e.tip, curr)}</span>
+                        </div>
+                        ${staffHtml ? `<div class="mt-1">${staffHtml}</div>` : ''}
+                    </div>`;
+                }).join('');
+                html += `<div class="pt-1">
+                    <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#tipByServiceBreakdown" aria-expanded="false" aria-controls="tipByServiceBreakdown" id="tipByServiceToggle">
+                        <i class="ti ti-coin me-1"></i>Ver propina por servicio
+                    </button>
+                    <div class="collapse mt-1" id="tipByServiceBreakdown">${tipRows || '<div class="small text-muted py-1 ps-3">Sin propina por servicio</div>'}</div>
+                </div>`;
+            }
         }
+
+        // Comparativo por método de pago (staff-facing): subtotal de servicios en los 3 métodos,
+        // con marcador sobre el método actual. Reutiliza computeServicesSubtotalByType (sin fetch).
+        const comparisonMethods = [
+            { key: 'efectivo', label: 'Efectivo' },
+            { key: 'transferencia', label: 'Transferencia' },
+            { key: 'tarjeta', label: 'Tarjeta' },
+        ];
+        const comparisonRows = comparisonMethods.map(m => {
+            const amount = computeServicesSubtotalByType(d.services, m.key);
+            const isActive = m.key === d.paymentType;
+            const marker = isActive
+                ? `<i class="ti ti-point-filled text-primary me-1"></i>${m.label} <span class="small text-primary">(Método actual: ${m.label})</span>`
+                : `<i class="ti ti-point text-muted me-1"></i>${m.label}`;
+            return `<div class="d-flex justify-content-between align-items-center py-1">
+                <span class="${isActive ? 'fw-semibold' : 'text-muted'}">${marker}</span>
+                <span class="${isActive ? 'fw-semibold' : ''}">${formatCurrency(amount, curr)}</span>
+            </div>`;
+        }).join('');
+        html += `<div class="border-top mt-2 pt-2">
+            <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#paymentMethodComparison" aria-expanded="false" aria-controls="paymentMethodComparison" id="paymentMethodComparisonToggle">
+                <i class="ti ti-arrows-left-right me-1"></i>Ver comparativo por método de pago
+            </button>
+            <div class="collapse mt-2" id="paymentMethodComparison">${comparisonRows}</div>
+        </div>`;
 
         body.innerHTML = html;
 
