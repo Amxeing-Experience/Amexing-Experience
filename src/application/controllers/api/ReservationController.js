@@ -124,7 +124,6 @@ class ReservationController {
    * then scoped to these quotes (through quotePtr). Returns null for non-client roles.
    * @param {object} req - Express request with user info from JWT middleware.
    * @returns {Array<string>|null} Eligible quote ids for clients, or null for other roles.
-   * @example
    */
   static async getClientEligibleQuoteIds(req) {
     const { userRole } = req;
