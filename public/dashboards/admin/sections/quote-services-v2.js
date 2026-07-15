@@ -20982,17 +20982,35 @@ class ItineraryBuilder {
       try { return new Date(d).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; }
     };
 
-    let body;
-    if (!activities.length) {
-      body = `<div class="text-center text-muted py-5">
-        <i class="ti ti-timeline-event" style="font-size:2.5rem;opacity:.35;"></i>
-        <p class="mb-0 mt-2">Aún no hay actividad registrada.</p>
-        <small>Los cambios en servicios, solicitudes y estado aparecerán aquí.</small>
-      </div>`;
-    } else {
+    // Fase B2: filtros por categoría.
+    const CATEGORY = {
+      service_added: 'servicios',
+      service_edited: 'servicios',
+      service_removed: 'servicios',
+      change_requested: 'solicitudes',
+      change_approved: 'solicitudes',
+      change_rejected: 'solicitudes',
+      converted_to_reservation: 'reserva',
+      reservation_cancelled: 'reserva',
+      reverted_to_quote: 'reserva',
+      status_changed: 'otros',
+      ownership_transferred: 'otros',
+      quote_edited: 'otros',
+    };
+    const renderTimeline = (filter) => {
+      const list = filter === 'all'
+        ? activities
+        : activities.filter((a) => (CATEGORY[a.action] || 'otros') === filter);
+      if (!list.length) {
+        return `<div class="text-center text-muted py-5">
+          <i class="ti ti-timeline-event" style="font-size:2.5rem;opacity:.35;"></i>
+          <p class="mb-0 mt-2">${activities.length ? 'No hay actividad de este tipo.' : 'Aún no hay actividad registrada.'}</p>
+          ${activities.length ? '' : '<small>Los cambios en servicios, solicitudes y estado aparecerán aquí.</small>'}
+        </div>`;
+      }
       let lastDay = null;
       const parts = [];
-      activities.forEach((a) => {
+      list.forEach((a) => {
         const dk = new Date(a.createdAt); dk.setHours(0, 0, 0, 0);
         const key = dk.getTime();
         if (key !== lastDay) {
@@ -21008,8 +21026,19 @@ class ItineraryBuilder {
             <div class="qa-time">${timeLabel(a.createdAt)}</div>
           </div>`);
       });
-      body = `<div class="qa-timeline">${parts.join('')}</div>`;
-    }
+      return `<div class="qa-timeline">${parts.join('')}</div>`;
+    };
+    const FILTERS = [
+      { key: 'all', label: 'Todos' },
+      { key: 'servicios', label: 'Servicios' },
+      { key: 'solicitudes', label: 'Solicitudes' },
+      { key: 'reserva', label: 'Reservación' },
+      { key: 'otros', label: 'Otros' },
+    ];
+    const filterBar = activities.length
+      ? `<div class="qa-filters">${FILTERS.map((f) => `<button type="button" class="qa-chip${f.key === 'all' ? ' active' : ''}" data-filter="${f.key}">${f.label}</button>`).join('')}</div>`
+      : '';
+    const body = `${filterBar}<div id="qa-timeline-container">${renderTimeline('all')}</div>`;
 
     if (!document.getElementById('qa-timeline-styles')) {
       const st = document.createElement('style');
@@ -21028,6 +21057,10 @@ class ItineraryBuilder {
         #quoteActivityModal .qa-title{font-size:.9rem;line-height:1.4;color:#2b2b2b;}
         #quoteActivityModal .qa-title strong{color:#1a1a1a;}
         #quoteActivityModal .qa-time{font-size:.72rem;color:#9aa0a6;margin-top:2px;}
+        #quoteActivityModal .qa-filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+        #quoteActivityModal .qa-chip{border:1px solid #e2e2e0;background:#fff;color:#5f6368;border-radius:16px;padding:3px 12px;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .12s;}
+        #quoteActivityModal .qa-chip:hover{background:#f4f4f2;}
+        #quoteActivityModal .qa-chip.active{background:#2e2e2d;border-color:#2e2e2d;color:#fff;}
       `;
       document.head.appendChild(st);
     }
@@ -21052,6 +21085,15 @@ class ItineraryBuilder {
     const modalEl = document.getElementById('quoteActivityModal');
     const modal = new bootstrap.Modal(modalEl);
     modalEl.addEventListener('hidden.bs.modal', () => this.disposeTempModal(modalEl, modal));
+    // Fase B2: filtros por categoría — re-render del timeline al cambiar de chip.
+    modalEl.querySelectorAll('.qa-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        modalEl.querySelectorAll('.qa-chip').forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        const cont = modalEl.querySelector('#qa-timeline-container');
+        if (cont) cont.innerHTML = renderTimeline(chip.dataset.filter);
+      });
+    });
     modal.show();
   }
 
