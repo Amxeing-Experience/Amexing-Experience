@@ -28,6 +28,12 @@ describe('Payment endpoints — access by role (integration)', () => {
     reservation.set('active', true);
     reservation.set('exists', true);
     reservation.set('status', 'confirmed');
+    // Fix 2 (ownership scope): the reservation must belong to the acting agency (its clientPtr is a
+    // user in the manager's departmentId) — the manager itself qualifies. Without this the new 404
+    // scoping would hide it from the department_manager and this suite's intent (agency operates on
+    // ITS OWN reservation) would be lost.
+    const managerUser = await AuthTestHelper.getUserByRole('department_manager');
+    reservation.set('clientPtr', managerUser);
     await reservation.save(null, { useMasterKey: true });
     testReservationId = reservation.id;
   }, 30000);

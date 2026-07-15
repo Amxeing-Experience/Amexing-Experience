@@ -21,6 +21,9 @@ describe('Payment method reconciliation (integration)', () => {
   let app;
   let adminToken;
   let agencyToken;
+  // Dueño agencia de las reservaciones: role string 'department_manager' (=> isAgency true, preserva el
+  // re-anclaje que estas pruebas verifican) Y departmentId del manager de prueba (=> Fix 2 le da acceso).
+  let agencyOwner;
 
   // Clean pricesByType (base × 1.16 / × 1.21): T(efectivo)=10000, T(transferencia)=11600, T(tarjeta)=12100.
   const CLEAN = [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 } }];
@@ -38,6 +41,7 @@ describe('Payment method reconciliation (integration)', () => {
     reservation.set('status', 'confirmed');
     reservation.set('paymentType', paymentType);
     reservation.set('currency', currency);
+    reservation.set('clientPtr', agencyOwner); // dueño agencia (isAgency true + acceso Fix 2)
     await reservation.save(null, { useMasterKey: true });
 
     await Promise.all(services.map((svc) => {
@@ -70,7 +74,24 @@ describe('Payment method reconciliation (integration)', () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     adminToken = await AuthTestHelper.loginAs('admin', app);
     agencyToken = await AuthTestHelper.loginAs('department_manager', app);
+
+    // Dueño agencia: role string 'department_manager' (isAgency true) + departmentId del manager de
+    // prueba (test-dept-events) para que Fix 2 le conceda acceso al registrar pagos con agencyToken.
+    agencyOwner = new Parse.Object('AmexingUser');
+    agencyOwner.set('exists', true);
+    agencyOwner.set('active', true);
+    agencyOwner.set('role', 'department_manager');
+    agencyOwner.set('departmentId', 'test-dept-events');
+    agencyOwner.set('email', `recon-agency-${Date.now()}@test.local`);
+    agencyOwner.set('username', agencyOwner.get('email'));
+    await agencyOwner.save(null, { useMasterKey: true });
   }, 30000);
+
+  afterAll(async () => {
+    if (agencyOwner) {
+      try { await agencyOwner.destroy({ useMasterKey: true }); } catch (e) { /* already gone */ }
+    }
+  });
 
   describe('Bug 2 — 3 cruces secuenciales de tier convergen a balance $0 (sin saldo fantasma)', () => {
     it('$2,320 transferencia -> $4,840 tarjeta -> $4,640 transferencia = balance 0, un solo ajuste $200', async () => {

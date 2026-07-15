@@ -15,6 +15,7 @@ const logger = require('../../../infrastructure/logger');
 const Payment = require('../../../domain/models/Payment');
 const ExchangeRate = require('../../../domain/models/ExchangeRate');
 const PaymentService = require('../../services/PaymentService');
+const ReservationController = require('./ReservationController');
 const ClientProfileController = require('./ClientProfileController');
 const FileStorageService = require('../../services/FileStorageService');
 const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
@@ -41,16 +42,21 @@ const serverOptimizationService = new ServerImageOptimizationService();
  */
 class PaymentController {
   /**
-   * Load an active reservation by id (null if not found).
+   * Load an active reservation by id, scoped to what the acting actor may access (null otherwise).
+   * Reuses ReservationController.applyOwnershipScope so an out-of-scope reservation (another agency's)
+   * returns null exactly like a truly-missing one — the 5 call sites answer 404 either way, never
+   * leaking a foreign reservation nor a 403 that confirms it exists.
    * @param {string} id - Reservation objectId.
-   * @returns {Promise<object|null>} Reservation or null.
+   * @param {object} req - Express request with user info from JWT middleware.
+   * @returns {Promise<object|null>} Reservation the actor may access, or null.
    * @example
-   * const r = await PaymentController.loadReservation(id);
+   * const r = await PaymentController.loadReservation(id, req);
    */
-  static async loadReservation(id) {
+  static async loadReservation(id, req) {
     const query = new Parse.Query('Reservation');
     query.equalTo('active', true);
     query.equalTo('exists', true);
+    await ReservationController.applyOwnershipScope(query, req);
     try {
       return await query.get(id, { useMasterKey: true });
     } catch (err) {
@@ -88,7 +94,7 @@ class PaymentController {
   static async getPayments(req, res) {
     try {
       const { id } = req.params;
-      const reservation = await PaymentController.loadReservation(id);
+      const reservation = await PaymentController.loadReservation(id, req);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -133,7 +139,7 @@ class PaymentController {
         return res.status(400).json({ success: false, error: validation.error });
       }
 
-      const reservation = await PaymentController.loadReservation(id);
+      const reservation = await PaymentController.loadReservation(id, req);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -254,7 +260,7 @@ class PaymentController {
         fileBase64, fileName, mimeType,
       } = req.body || {};
 
-      const reservation = await PaymentController.loadReservation(id);
+      const reservation = await PaymentController.loadReservation(id, req);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -386,7 +392,7 @@ class PaymentController {
     try {
       const { id, paymentId } = req.params;
 
-      const reservation = await PaymentController.loadReservation(id);
+      const reservation = await PaymentController.loadReservation(id, req);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -445,7 +451,7 @@ class PaymentController {
       const { id, paymentId } = req.params;
       const { fileBase64, fileName, mimeType } = req.body || {};
 
-      const reservation = await PaymentController.loadReservation(id);
+      const reservation = await PaymentController.loadReservation(id, req);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }

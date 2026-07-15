@@ -21,6 +21,9 @@ describe('Payment tip aggregation (integration)', () => {
   let adminToken;
   let agencyToken; // department_manager = level 4
   let employeeToken; // employee = level 3 (below payments threshold)
+  // Dueño agencia de las reservaciones (role string + departmentId del manager): isAgency true
+  // preserva el comportamiento probado y Fix 2 concede acceso a agencyToken.
+  let agencyOwner;
 
   // Clean pricesByType (base × 1.16 / × 1.21): T(efectivo)=10000, T(transferencia)=11600, T(tarjeta)=12100.
   const CLEAN = [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 } }];
@@ -32,6 +35,7 @@ describe('Payment tip aggregation (integration)', () => {
     reservation.set('status', 'confirmed');
     reservation.set('paymentType', paymentType);
     reservation.set('currency', opts.currency || 'MXN');
+    reservation.set('clientPtr', agencyOwner); // dueño agencia (isAgency true + acceso Fix 2)
     // Legacy dead field: nothing should read this as the tip source anymore.
     if (opts.legacyTip !== undefined) reservation.set('tip', opts.legacyTip);
     await reservation.save(null, { useMasterKey: true });
@@ -77,7 +81,22 @@ describe('Payment tip aggregation (integration)', () => {
     adminToken = await AuthTestHelper.loginAs('admin', app);
     agencyToken = await AuthTestHelper.loginAs('department_manager', app);
     employeeToken = await AuthTestHelper.loginAs('employee', app);
+
+    agencyOwner = new Parse.Object('AmexingUser');
+    agencyOwner.set('exists', true);
+    agencyOwner.set('active', true);
+    agencyOwner.set('role', 'department_manager');
+    agencyOwner.set('departmentId', 'test-dept-events');
+    agencyOwner.set('email', `tips-agency-${Date.now()}@test.local`);
+    agencyOwner.set('username', agencyOwner.get('email'));
+    await agencyOwner.save(null, { useMasterKey: true });
   }, 30000);
+
+  afterAll(async () => {
+    if (agencyOwner) {
+      try { await agencyOwner.destroy({ useMasterKey: true }); } catch (e) { /* already gone */ }
+    }
+  });
 
   describe('fix crítico — pago 100% propina no deja saldo fantasma', () => {
     it('servicios $0, un pago { amount: 0, tip: 100 } queda paid con balance 0', async () => {

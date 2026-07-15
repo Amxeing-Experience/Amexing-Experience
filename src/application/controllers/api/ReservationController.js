@@ -186,6 +186,35 @@ class ReservationController {
   }
 
   /**
+   * Apply the SAME role-based ownership scope the listing uses (getRoleFilterPointers +
+   * getClientEligibleQuoteIds) to a single-reservation query (get-by-id / payment endpoints),
+   * so a nivel-4+ actor can only reach reservations they own. Admin/superadmin: no filter.
+   * Agency (department_manager): clientPtr must be a user in its departmentId (fallback: own
+   * clientPtr). Agent (client): scoped by quote ownership/collaboration ONLY, never by clientPtr
+   * (a clientPtr match can be accidental). Out-of-scope ids then miss the query and .get() throws
+   * OBJECT_NOT_FOUND → surfaced as 404 by the caller (never a 200 with foreign data, never a 403
+   * that confirms the resource exists).
+   * @param {Parse.Query} query - Reservation query to constrain in place.
+   * @param {object} req - Express request with user info from JWT middleware.
+   * @returns {Promise<void>}
+   * @example
+   */
+  static async applyOwnershipScope(query, req) {
+    const roleFilterPointers = await ReservationController.getRoleFilterPointers(req);
+    const clientQuoteIds = await ReservationController.getClientEligibleQuoteIds(req);
+    if (roleFilterPointers) {
+      query.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
+    }
+    // Client scoping lives on the quote (quotePtr), not on the reservation. An empty eligible list
+    // yields zero matches (containedIn on []), which is exactly what we want (deny by default).
+    if (clientQuoteIds) {
+      const innerQuote = new Parse.Query('Quote');
+      innerQuote.containedIn('objectId', clientQuoteIds);
+      query.matchesQuery('quotePtr', innerQuote);
+    }
+  }
+
+  /**
    * GET /api/reservations — DataTables server-side processing.
    * @param req
    * @param res
@@ -657,6 +686,9 @@ class ReservationController {
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
       query.equalTo('exists', true);
+      // Ownership scope (mismo criterio que el listado): una agencia/agente nivel 4+ solo puede ver
+      // SU propia reservación. Fuera de scope, .get() no encuentra match → safeGet null → 404.
+      await ReservationController.applyOwnershipScope(query, req);
       query.include('quotePtr');
       query.include('clientPtr');
       query.include('createdBy');

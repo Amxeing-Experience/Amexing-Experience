@@ -25,6 +25,12 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
   let clientToken; // client = level 5 (agente)
   let employeeToken; // employee = level 3 (bajo el umbral)
   let superadminToken;
+  // Fix 2 (ownership scope): para que las MISMAS reservaciones sean accesibles por admin, agencia y
+  // agente, cada una lleva clientPtr=agencyOwner (dueño agencia en el departmentId del manager) Y
+  // quotePtr=clientQuote (cotización cuyo owner es el agente de prueba). Sin esto el nuevo scoping
+  // daría 404 a agencia/agente sobre estas reservaciones.
+  let agencyOwner;
+  let clientQuote;
 
   // Clean pricesByType (base × 1.16 / × 1.21).
   const CLEAN = [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 } }];
@@ -36,6 +42,8 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
     reservation.set('status', opts.status || 'confirmed');
     reservation.set('paymentType', paymentType);
     reservation.set('currency', opts.currency || 'MXN');
+    reservation.set('clientPtr', agencyOwner); // acceso agencia (department filter)
+    reservation.set('quotePtr', clientQuote); // acceso agente (quote ownership)
     if (opts.paidAmount !== undefined) reservation.set('paidAmount', opts.paidAmount);
     if (opts.balance !== undefined) reservation.set('balance', opts.balance);
     await reservation.save(null, { useMasterKey: true });
@@ -82,7 +90,31 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
     clientToken = await AuthTestHelper.loginAs('client', app);
     employeeToken = await AuthTestHelper.loginAs('employee', app);
     superadminToken = await AuthTestHelper.loginAs('superadmin', app);
+
+    // Dueño agencia (role string + departmentId del manager) para el acceso de la agencia.
+    agencyOwner = new Parse.Object('AmexingUser');
+    agencyOwner.set('exists', true);
+    agencyOwner.set('active', true);
+    agencyOwner.set('role', 'department_manager');
+    agencyOwner.set('departmentId', 'test-dept-events');
+    agencyOwner.set('email', `breakdown-agency-${Date.now()}@test.local`);
+    agencyOwner.set('username', agencyOwner.get('email'));
+    await agencyOwner.save(null, { useMasterKey: true });
+
+    // Cotización cuyo owner es el agente de prueba (client) para el acceso del agente (quote ownership).
+    const clientUser = await AuthTestHelper.getUserByRole('client');
+    clientQuote = new Parse.Object('Quote');
+    clientQuote.set('exists', true);
+    clientQuote.set('active', true);
+    clientQuote.set('owner', clientUser);
+    await clientQuote.save(null, { useMasterKey: true });
   }, 30000);
+
+  afterAll(async () => {
+    const destroy = async (o) => { try { await o.destroy({ useMasterKey: true }); } catch (e) { /* gone */ } };
+    if (agencyOwner) await destroy(agencyOwner);
+    if (clientQuote) await destroy(clientQuote);
+  });
 
   describe('tipByService viaja igual para los 3 roles (sin filtrar por rol)', () => {
     it('admin, department_manager y client reciben el MISMO payment.tipByService', async () => {

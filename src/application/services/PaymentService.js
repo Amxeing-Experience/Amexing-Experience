@@ -390,9 +390,10 @@ class PaymentService {
    * @param {object|null} [input.existingReconciliationAdjustment] - The current tagged adjustment, or null.
    * @param {Array<string>} [input.validMethods] - Accepted method tokens (Payment.METHODS).
    * @param {string} [input.reconciliationDescription] - Base text for the auto adjustment description.
+   * @param {boolean} [input.isAgency] - True SOLO para agencias (re-ancla el total al nuevo tier). Cliente directo o indeterminado = false (fail-closed): nunca re-ancla, resuelve con el ajuste acotado ('complex'). Default false.
    * @returns {object} Decision { scenario, expectedCeiling, warning, paymentTypeUpdate, reconciliationAdjustment }.
    * @example
-   * PaymentService.decidePaymentMethodChange({ serviceItems, anchoredMethod: 'efectivo', currentPayment: { method: 'tarjeta', amount: 121 } });
+   * PaymentService.decidePaymentMethodChange({ serviceItems, anchoredMethod: 'efectivo', currentPayment: { method: 'tarjeta', amount: 121 }, isAgency: true });
    */
   static decidePaymentMethodChange(input) {
     const {
@@ -404,22 +405,30 @@ class PaymentService {
       existingReconciliationAdjustment = null,
       validMethods = ['efectivo', 'transferencia', 'tarjeta'],
       reconciliationDescription = 'Ajuste por método de pago',
+      isAgency = false,
     } = input || {};
+
+    // Fix 1 (hallazgo crítico del council): el re-anclaje automático de paymentType solo es correcto
+    // para AGENCIAS. Para un cliente directo la referencia SIEMPRE es tarjeta y NUNCA debe re-anclarse
+    // (un pago de $1 no puede repriciar la reservación completa). Fail-closed: cualquier valor que no
+    // sea exactamente true (indeterminado incluido) se trata como NO-agencia → fuerza 'complex'.
+    const agency = isAgency === true;
 
     const isValid = (m) => validMethods.includes(m);
     const totalForMethod = (m) => this.computeTotals(serviceItems, m, 0, 0, currency).servicesTotal;
     const baseTotal = totalForMethod('efectivo');
 
-    // Escenario: comparar el método del pago actual contra TODOS los pagos previos. Un pago previo
-    // con método corrupto/legacy (null/vacío/inválido) fuerza el camino conservador 'complex'.
+    // Escenario: comparar el método del pago actual contra TODOS los pagos previos. Un pago previo con
+    // método corrupto/legacy (null/vacío/inválido) fuerza el camino conservador 'complex'; un cliente
+    // directo (no-agencia) también lo fuerza SIEMPRE (nunca re-ancla el tier de precio).
     const currentMethod = currentPayment ? currentPayment.method : anchoredMethod;
     const corruptPrior = priorPayments.filter((p) => !isValid(p.method));
     const hasDifferentValidPrior = priorPayments.some((p) => isValid(p.method) && p.method !== currentMethod);
-    const scenario = (corruptPrior.length > 0 || hasDifferentValidPrior) ? 'complex' : 'none';
+    const scenario = (!agency || corruptPrior.length > 0 || hasDifferentValidPrior) ? 'complex' : 'none';
 
-    // El paymentType solo se reescribe en el caso simple, cuando llega un pago REAL de servicios con
-    // método distinto. Un pago solo-propina (amount 0) NUNCA ancla el tier: no tiene dinero de servicios
-    // sobre el cual decidir el método de precio de la reservación, así que dejaría el paymentType intacto.
+    // El paymentType solo se reescribe en el caso simple (solo agencia), cuando llega un pago REAL de
+    // servicios con método distinto. Un pago solo-propina (amount 0) NUNCA ancla el tier: no tiene
+    // dinero de servicios sobre el cual decidir el método de precio de la reservación.
     let paymentTypeUpdate = null;
     const currentAmount = currentPayment ? (Number(currentPayment.amount) || 0) : 0;
     if (scenario === 'none' && currentPayment && currentAmount > 0 && isValid(currentMethod) && currentMethod !== anchoredMethod) {
@@ -529,7 +538,11 @@ class PaymentService {
     const Reservation = require('../../domain/models/Reservation');
     const Payment = require('../../domain/models/Payment');
 
-    const reservation = await new Parse.Query(Reservation).get(reservationId, { useMasterKey: true });
+    // .include('clientPtr') es OBLIGATORIO: sin él clientPtr llega como pointer sin datos y
+    // clientPtr.get('role') devolvería undefined SIEMPRE, resolviendo isAgency mal en todos los casos.
+    const reservationQuery = new Parse.Query(Reservation);
+    reservationQuery.include('clientPtr');
+    const reservation = await reservationQuery.get(reservationId, { useMasterKey: true });
 
     const reservationPtr = new Reservation();
     reservationPtr.id = reservationId;
@@ -541,6 +554,15 @@ class PaymentService {
 
     const currency = reservation.get('currency') || 'MXN';
     const anchoredMethod = reservation.get('paymentType') || 'efectivo';
+
+    // isAgency del DUEÑO de la reservación, con el MISMO criterio exacto que PublicReservationController:
+    // rol string barato del pointer (o clientCategory), sin fetch extra de Role. clientPtr null o
+    // huérfano (usuario borrado) => '' => isAgency false (fail-closed, no re-ancla). La limitación
+    // conocida (roleId sin string `role`) es deuda preexistente documentada, fuera de alcance.
+    const clientPtr = reservation.get('clientPtr');
+    const clientRole = (clientPtr && typeof clientPtr.get === 'function') ? (clientPtr.get('role') || '') : '';
+    const clientCategory = (clientPtr && typeof clientPtr.get === 'function') ? (clientPtr.get('clientCategory') || '') : '';
+    const isAgency = clientRole === 'department_manager' || clientCategory === 'agency';
 
     const payments = await Payment.getExistingForReservation(reservationId);
     const priorPayments = payments
@@ -563,6 +585,7 @@ class PaymentService {
       currentPayment,
       existingReconciliationAdjustment: existing,
       validMethods: Payment.METHODS,
+      isAgency,
     });
 
     let mutated = false;
@@ -605,6 +628,7 @@ class PaymentService {
 
     logger.info('Payment method reconciliation resolved', {
       reservationId,
+      isAgency,
       scenario: decision.scenario,
       action: recon.action,
       paymentTypeUpdate: decision.paymentTypeUpdate,
