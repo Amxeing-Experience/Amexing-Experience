@@ -85,7 +85,7 @@ class GatewayRegistry {
    * @param {object} adapter - Adapter instance implementing the full contract.
    * @returns {GatewayRegistry} this, for chaining.
    * @throws {PaymentGatewayError} PROVIDER_ERROR on a malformed adapter or a
-   *   duplicate id.
+   * duplicate id.
    */
   register(adapter) {
     const id = validateAdapter(adapter);
@@ -108,7 +108,7 @@ class GatewayRegistry {
    * @param {string} id - Gateway id.
    * @returns {object} The registered adapter instance.
    * @throws {PaymentGatewayError} UNKNOWN_GATEWAY when the id is not a non-empty
-   *   string or was never registered (typed error, never a raw TypeError).
+   * string or was never registered (typed error, never a raw TypeError).
    */
   resolve(id) {
     if (typeof id !== 'string' || id.trim().length === 0) {

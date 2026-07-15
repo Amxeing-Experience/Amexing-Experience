@@ -41,7 +41,7 @@ const PaymentGatewayError = require('./PaymentGatewayError');
  * @property {string} gateway - Gateway id that processed the charge.
  * @property {string} chargeId - Provider-side charge/intent id (anchor for refunds).
  * @property {string} status - Normalized status (e.g. requires_action, pending,
- *   succeeded, failed, refunded, canceled).
+ * succeeded, failed, refunded, canceled).
  * @property {number} amount - Charged amount in the major unit.
  * @property {string} currency - 'MXN' or 'USD'.
  * @property {(string|null)} checkoutUrl - Hosted checkout URL when applicable, else null.
@@ -83,31 +83,6 @@ const PaymentGatewayError = require('./PaymentGatewayError');
  */
 
 /**
- * Build a NOT_IMPLEMENTED error for a capability. Tags the gateway id only when the
- * adapter actually overrides getId(), which also prevents infinite recursion when
- * getId() itself is the un-overridden capability being reported.
- * @param {PaymentGatewayService} instance - The adapter instance invoking the base.
- * @param {string} capability - The capability method name that was not overridden.
- * @returns {PaymentGatewayError} The typed NOT_IMPLEMENTED error to throw.
- */
-function notImplemented(instance, capability) {
-  let gatewayId = null;
-  if (instance && instance.getId !== PaymentGatewayService.prototype.getId) {
-    try {
-      const id = instance.getId();
-      gatewayId = typeof id === 'string' ? id : null;
-    } catch {
-      gatewayId = null;
-    }
-  }
-  return new PaymentGatewayError(
-    PaymentGatewayError.CODES.NOT_IMPLEMENTED,
-    `Capability "${capability}" is not implemented by this payment gateway adapter`,
-    { gateway: gatewayId }
-  );
-}
-
-/**
  * Abstract base every adapter must extend.
  */
 class PaymentGatewayService {
@@ -124,37 +99,62 @@ class PaymentGatewayService {
 
   /** Identify the gateway (e.g. "stripe", "mexican"). Adapters must override. */
   getId() {
-    throw notImplemented(this, 'getId');
+    throw PaymentGatewayService.notImplemented(this, 'getId');
   }
 
   /** Declare the ISO currency codes this gateway supports. Adapters must override. */
   getSupportedCurrencies() {
-    throw notImplemented(this, 'getSupportedCurrencies');
+    throw PaymentGatewayService.notImplemented(this, 'getSupportedCurrencies');
   }
 
   /** Report whether the gateway has valid credentials. Adapters must override. */
   isConfigured() {
-    throw notImplemented(this, 'isConfigured');
+    throw PaymentGatewayService.notImplemented(this, 'isConfigured');
   }
 
   /** Create a charge / build a hosted checkout (ChargeRequest -> ChargeResult). */
   createCharge() {
-    throw notImplemented(this, 'createCharge');
+    throw PaymentGatewayService.notImplemented(this, 'createCharge');
   }
 
   /** Look up an existing charge by its provider id (reconciliation / polling). */
   getCharge() {
-    throw notImplemented(this, 'getCharge');
+    throw PaymentGatewayService.notImplemented(this, 'getCharge');
   }
 
   /** Refund a charge (RefundRequest -> RefundResult). */
   refund() {
-    throw notImplemented(this, 'refund');
+    throw PaymentGatewayService.notImplemented(this, 'refund');
   }
 
   /** Verify a webhook signature and normalize it to a GatewayEvent. */
   verifyWebhook() {
-    throw notImplemented(this, 'verifyWebhook');
+    throw PaymentGatewayService.notImplemented(this, 'verifyWebhook');
+  }
+
+  /**
+   * Build a NOT_IMPLEMENTED error for a capability. Tags the gateway id only when the
+   * adapter actually overrides getId(), which also prevents infinite recursion when
+   * getId() itself is the un-overridden capability being reported.
+   * @param {PaymentGatewayService} instance - The adapter instance invoking the base.
+   * @param {string} capability - The capability method name that was not overridden.
+   * @returns {PaymentGatewayError} The typed NOT_IMPLEMENTED error to throw.
+   */
+  static notImplemented(instance, capability) {
+    let gatewayId = null;
+    if (instance && instance.getId !== PaymentGatewayService.prototype.getId) {
+      try {
+        const id = instance.getId();
+        gatewayId = typeof id === 'string' ? id : null;
+      } catch {
+        gatewayId = null;
+      }
+    }
+    return new PaymentGatewayError(
+      PaymentGatewayError.CODES.NOT_IMPLEMENTED,
+      `Capability "${capability}" is not implemented by this payment gateway adapter`,
+      { gateway: gatewayId }
+    );
   }
 }
 

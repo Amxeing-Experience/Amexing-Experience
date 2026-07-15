@@ -58,7 +58,7 @@ class PaymentGatewayError extends Error {
    * @param {object} [options] - Extra, non-sensitive context.
    * @param {string} [options.gateway] - Gateway id related to the error, when known.
    * @param {*} [options.providerError] - Raw provider payload, kept for internal
-   *   audit only (non-enumerable, never serialized).
+   * audit only (non-enumerable, never serialized).
    */
   constructor(code, message, options) {
     // Decision #8: reject any code outside the closed set synchronously. This turns a
@@ -98,7 +98,7 @@ class PaymentGatewayError extends Error {
    * Curated serialization: only safe fields. Never exposes providerError or the
    * stack trace, so logging the serialized error cannot leak provider internals.
    * @returns {{name: string, code: string, message: string, gateway: (string|null)}}
-   *   The safe, log/user-facing shape.
+   * The safe, log/user-facing shape.
    */
   toJSON() {
     return {

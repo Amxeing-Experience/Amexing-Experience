@@ -1,12 +1,11 @@
 /**
  * GatewayRouter - resolves WHICH adapter processes a charge, from currency x toggle
  * (plan seccion 4.5). Currency rules over the toggle:
- *   - USD always -> Stripe, regardless of the toggle.
- *   - MXN -> whichever the toggle names, UNLESS that gateway is not registered / not
- *     MXN-capable / not configured, in which case it falls back to Stripe with a
- *     warning log.
- *   - If not even Stripe (the baseline terminal) is available, throw NOT_CONFIGURED
- *     rather than hand back a broken adapter.
+ * - USD always -> Stripe, regardless of the toggle.
+ * - MXN -> whichever the toggle names, UNLESS that gateway is not registered / not
+ * MXN-capable / not configured, in which case it falls back to Stripe with a warning log.
+ * - If not even Stripe (the baseline terminal) is available, throw NOT_CONFIGURED rather
+ * than hand back a broken adapter.
  *
  * The toggle is an explicit parameter to resolve() (Decision #6). In PR1 the caller
  * passes a mock/injected value; PR3 swaps in the real Setting read without touching
@@ -110,7 +109,7 @@ class GatewayRouter {
    * @param {string} toggle - Active gateway id for MXN (mock/injected in PR1).
    * @returns {object} The resolved gateway adapter instance.
    * @throws {PaymentGatewayError} UNSUPPORTED_CURRENCY for a bad currency;
-   *   NOT_CONFIGURED when no terminal gateway is available.
+   * NOT_CONFIGURED when no terminal gateway is available.
    */
   resolve(currency, toggle) {
     // Decision #4: normalize + validate the currency BEFORE consulting the toggle.
