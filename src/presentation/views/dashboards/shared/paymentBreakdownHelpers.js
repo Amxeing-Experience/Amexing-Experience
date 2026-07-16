@@ -267,8 +267,8 @@ const PaymentBreakdownHelpers = (() => {
         ? `<span class="badge ms-1" style="background:${DISCOUNT_GREEN};color:#fff;">Más barato</span>` : '';
       return `<div class="border rounded p-2 payment-chip-card">
           <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-semibold small">${escapeHtml(methodLabel(m))}${cheaperTag}</span>
-            <span class="small">${formatMoney(methodTotal, currency)}</span>
+            <span class="fw-semibold">${escapeHtml(methodLabel(m))}${cheaperTag}</span>
+            <span>${formatMoney(methodTotal, currency)}</span>
           </div>
           <div class="progress" style="height:6px;" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
             <div class="progress-bar bg-success" style="width:${coverageWidth}%;"></div>
@@ -301,23 +301,23 @@ const PaymentBreakdownHelpers = (() => {
           <div class="small" style="color:${DISCOUNT_GREEN};">${escapeHtml(resolved.savings.sublabel)}</div>
         </div>` : '';
     return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-        <span class="text-muted fw-semibold small"><i class="ti ti-receipt-2 me-1"></i>Total a pagar</span>
+        <span class="text-muted fw-semibold"><i class="ti ti-receipt-2 me-1"></i>Total a pagar</span>
         <span class="fw-bold fs-5">${formatMoney(round2(s.total), currency)}</span>
       </div>
       <div class="text-muted small mb-2">Cotizado: <span class="fw-semibold text-body">${escapeHtml(methodLabel(s.anchoredMethod))}</span></div>
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <span class="text-muted fw-semibold small"><i class="ti ti-cash me-1"></i>Estado de pago</span>
+        <span class="text-muted fw-semibold"><i class="ti ti-cash me-1"></i>Estado de pago</span>
         ${getPaymentStatusBadge(s.paymentStatus)}
       </div>
       <div class="progress mb-2" style="height:12px;" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
         <div class="progress-bar bg-success" style="width:${coverageWidth}%;">${coverage}%</div>
       </div>
       <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-        <span class="text-muted fw-semibold small"><i class="ti ti-check me-1"></i>Pagado</span>
+        <span class="text-muted fw-semibold"><i class="ti ti-check me-1"></i>Pagado</span>
         <span class="fw-semibold text-success">${formatMoney(round2(s.paidAmount), currency)}</span>
       </div>
       <div class="d-flex justify-content-between align-items-center py-1">
-        <span class="text-muted fw-semibold small"><i class="ti ti-wallet me-1"></i>Saldo</span>
+        <span class="text-muted fw-semibold"><i class="ti ti-wallet me-1"></i>Saldo</span>
         <span class="fw-semibold ${balanceCls}">${formatMoney(resolved.displayedBalance, currency)}</span>
       </div>
       ${savingsHtml}`;
@@ -340,7 +340,7 @@ const PaymentBreakdownHelpers = (() => {
     if (!methods.length) return '';
     const mps = s.montoParaSaldar || {};
     const rows = methods.map((m) => `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-        <span class="small">${escapeHtml(methodLabel(m))}</span>
+        <span class="fw-semibold">${escapeHtml(methodLabel(m))}</span>
         <span class="fw-semibold">${formatMoney(round2(mps[m]), currency)}</span>
       </div>`).join('');
     return `<div class="text-muted small mb-1">Para saldar el restante (${round2(s.remainingPercent)}%):</div>${rows}`;
