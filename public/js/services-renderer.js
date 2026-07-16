@@ -1708,8 +1708,20 @@
             return String(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
         }
 
-        // Render service actions (edit, duplicate, delete buttons)
+        // ¿Servicio protegido para no-admins? (espeja quote-services-v2.js isServiceProtected)
+        // Protegido si lo bloqueó un admin (adminLocked) o si la cotización ya es reservación
+        // (window.__isReservation): el no-admin no edita directo, debe solicitar el cambio.
+        isServiceProtected(service) {
+            return !!(service && (service.adminLocked || window.__isReservation));
+        }
+
+        // Render service actions. Admin/superadmin edita directo; un no-admin sobre un servicio
+        // protegido ve "Solicitar cambio" (aprobado por admin). Espeja quote-services-v2.js.
         renderServiceActions(service) {
+            const isAdmin = ['admin', 'superadmin'].includes(window.userRole || '');
+            if (!isAdmin && this.isServiceProtected(service)) {
+                return this.renderServiceLockControls(service);
+            }
             return `
                 <div class="service-actions">
                     <button type="button" class="btn btn-sm btn-light edit-service-btn"
@@ -1726,6 +1738,26 @@
                     </button>
                 </div>
             `;
+        }
+
+        // Controles de solicitud de cambio para un no-admin sobre un servicio protegido:
+        // badge del estado si ya hay solicitud, o el botón "Solicitar cambio" (lo cablea
+        // quote-services-v2.js vía delegación por .request-change-btn en el contenedor).
+        renderServiceLockControls(service) {
+            const cr = service.changeRequest || null;
+            if (cr && cr.status === 'pending') {
+                const typeLabel = cr.type === 'delete' ? 'borrado' : 'modificación';
+                return `<span class="badge bg-warning-subtle text-warning-emphasis border d-inline-flex align-items-center"><i class="ti ti-clock me-1"></i>Solicitud de ${typeLabel} pendiente</span>`;
+            }
+            if (cr && cr.status === 'approved') {
+                const t = cr.reviewNote ? ` title="${this._escapeAttr(cr.reviewNote)}"` : '';
+                return `<span class="badge bg-success-subtle text-success-emphasis border d-inline-flex align-items-center"${t}><i class="ti ti-check me-1"></i>Tu solicitud fue aprobada</span>`;
+            }
+            if (cr && cr.status === 'rejected') {
+                const t = cr.reviewNote ? ` title="${this._escapeAttr(cr.reviewNote)}"` : '';
+                return `<span class="badge bg-danger-subtle text-danger-emphasis border d-inline-flex align-items-center"${t}><i class="ti ti-x me-1"></i>Tu solicitud fue rechazada</span>`;
+            }
+            return `<button type="button" class="btn btn-sm btn-outline-secondary request-change-btn" data-service-id="${service.id}"><i class="ti ti-message-2 me-1"></i>Solicitar cambio</button>`;
         }
 
 
