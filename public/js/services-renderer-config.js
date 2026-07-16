@@ -322,10 +322,6 @@
             experienceId: service.experienceId,
             providerType: service.providerType,
 
-            // Bloqueo por-servicio / solicitud de cambio (para renderServiceActions)
-            adminLocked: service.adminLocked,
-            changeRequest: service.changeRequest,
-
             // Hotel specific
             hotelName: service.hotelName,
             checkIn: service.checkIn,
