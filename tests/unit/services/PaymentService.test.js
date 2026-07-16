@@ -103,6 +103,13 @@ describe('PaymentService pure helpers', () => {
       expect(t.total).toBe(175.30);
     });
 
+    it('un ajuste que aterriza en X.XX5 exacto (ej. 0.5% de descuento sobre 201) redondea al centavo correcto, no lo pierde por punto flotante', () => {
+      // 201 * 0.5 / 100 = 1.005 exacto. Math.round((1.005*100))/100 sin Number.EPSILON da 1.00 (pierde
+      // un centavo real) porque 1.005 se representa como 1.00499999999999989 en IEEE-754 double.
+      const t = PaymentService.computeTotals([], 'efectivo', 1.005, 'USD');
+      expect(t.total).toBe(1.01);
+    });
+
     it('redondea el efectivo a múltiplo de 5 (MXN)', () => {
       // 101 → 100 (decimal ≤ 0.50 baja); 103.6 → 105 (> 0.50 sube)
       expect(PaymentService.computeTotals([{ total: 101 }], 'efectivo', 0, 'MXN').total).toBe(100);

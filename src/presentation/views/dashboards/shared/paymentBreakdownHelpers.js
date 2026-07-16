@@ -42,7 +42,10 @@ const PaymentBreakdownHelpers = (() => {
    * round2(12.345) // 12.35
    */
   function round2(value) {
-    return Math.round((Number(value) || 0) * 100) / 100;
+    // + Number.EPSILON corrige el caso clasico de punto flotante donde un valor como 1.005 se
+    // representa internamente como 1.00499999999999989, redondeando a 1.00 en vez de 1.01 (perdiendo
+    // un centavo real) — misma correccion que PaymentService.round2 del servidor, para no divergir.
+    return Math.round((Number(value) + Number.EPSILON || 0) * 100) / 100;
   }
 
   /**

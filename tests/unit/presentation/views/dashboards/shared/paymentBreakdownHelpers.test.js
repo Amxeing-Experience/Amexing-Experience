@@ -10,6 +10,21 @@
 
 const H = require('../../../../../../src/presentation/views/dashboards/shared/paymentBreakdownHelpers');
 
+describe('PaymentBreakdownHelpers.round2 (paridad con PaymentService.round2 del servidor)', () => {
+  it('un valor X.XX5 exacto (ej. 1.005) redondea al centavo correcto, no lo pierde por punto flotante', () => {
+    // 1.005 se representa en IEEE-754 double como 1.00499999999999989; sin el fix de Number.EPSILON,
+    // Math.round(1.005*100)/100 da 1.00 (pierde un centavo real) en vez de 1.01.
+    expect(H.round2(1.005)).toBe(1.01);
+  });
+
+  it('no rompe ningún valor ya verificado (no introduce un desvío nuevo)', () => {
+    expect(H.round2(12.345)).toBe(12.35);
+    expect(H.round2(483.95999999999987)).toBe(483.96);
+    expect(H.round2(-1979)).toBe(-1979);
+    expect(H.round2(0)).toBe(0);
+  });
+});
+
 describe('PaymentBreakdownHelpers.getServicePriceByType', () => {
   it('lee el precio del método desde pricesByType (valor ya aprobado)', () => {
     expect(H.getServicePriceByType({ subconcept: { pricesByType: { tarjeta: 121 } } }, 'tarjeta')).toBe(121);
