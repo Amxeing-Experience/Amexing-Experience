@@ -475,7 +475,7 @@
       <%
         const breadcrumbDeleteId = breadcrumb ? breadcrumb.title ? breadcrumb.title.replace(/\s+/g, '-').toLowerCase() : 'principal-title' : 'principal-title';
       %>
-      document.getElementById('breadcrumb-<%= breadcrumbDeleteId %>').remove();
+      document.getElementById('breadcrumb-<%= breadcrumbDeleteId %>')?.remove();
     </script>
 
 </body>

@@ -1892,21 +1892,29 @@ class QuoteService {
         if (!existingByKey.has(key)) existingByKey.set(key, rs);
       });
 
-      // Reconcile: update matched, create new
+      // Reconcile: update matched, create new. Se matchea por id y, si no hay match, se cae a
+      // la clave por contenido. Esto protege reservaciones legacy: sus ReservationService se
+      // crearon cuando el subconcepto no tenía id (clave por contenido); al asignarle un id
+      // después (backfill o updateServiceItems), el match por id fallaría y se recrearían los
+      // RS perdiendo asignaciones de chofer/vehículo. Con el fallback se ACTUALIZAN en su lugar.
       const seen = new Set();
       const toSave = [];
       for (const day of days) {
         const subconcepts = Array.isArray(day.subconcepts) ? day.subconcepts : [];
         for (const sub of subconcepts) {
-          const key = this.reservationServiceMatchKey(sub, day.dayNumber);
-          const match = existingByKey.get(key);
-          if (match && !seen.has(key)) {
-            seen.add(key);
+          const idKey = this.reservationServiceMatchKey(sub, day.dayNumber);
+          const contentKey = this.reservationServiceMatchKey({ ...sub, id: undefined }, day.dayNumber);
+          let matchedKey = null;
+          if (existingByKey.has(idKey) && !seen.has(idKey)) matchedKey = idKey;
+          else if (existingByKey.has(contentKey) && !seen.has(contentKey)) matchedKey = contentKey;
+          if (matchedKey) {
+            seen.add(matchedKey);
+            const match = existingByKey.get(matchedKey);
             this.applyReservationServiceDescriptiveFields(match, day, sub);
             toSave.push(match);
           } else {
             toSave.push(this.buildReservationServiceRecord(reservation, day, sub));
-            seen.add(key);
+            seen.add(idKey);
           }
         }
       }

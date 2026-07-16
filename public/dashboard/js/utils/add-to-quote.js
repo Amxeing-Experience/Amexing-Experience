@@ -230,6 +230,12 @@
   // sub.total (base efectivo), salvo que la superficie ya lo traiga.
   async function buildSub() {
     const sub = opts.buildSubconcept(peopleCounts);
+    // Id estable por servicio: los buildSubconcept de las superficies no lo ponen, y sin id
+    // se rompen luego request-change y el bloqueo por-servicio (keyean por sc.id). El backend
+    // también lo asegura, pero lo mandamos ya asignado desde el cliente.
+    if (sub && !sub.id) {
+      sub.id = 'service_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    }
     if (sub && sub.pricesByType == null && sub.total != null) {
       const base = Number(sub.total) || 0;
       const rates = await getRates();
