@@ -23,6 +23,11 @@ describe('PaymentBreakdownHelpers.getServicePriceByType', () => {
     expect(H.getServicePriceByType({ subconcept: { pricesByType: { efectivo: 100 } }, total: 50 }, 'tarjeta')).toBe(50);
   });
 
+  it('FIX council (L4F0): un null explícito da 0 (paridad con chargeAmount del servidor, NO cae a item.total)', () => {
+    // Antes divergía: cliente devolvía item.total (99) y servidor 0 para el mismo input. Ahora ambos = 0.
+    expect(H.getServicePriceByType({ subconcept: { pricesByType: { tarjeta: null } }, total: 99 }, 'tarjeta')).toBe(0);
+  });
+
   it('FIX Number.isFinite: Infinity en pricesByType cae al fallback, nunca pinta $Infinity', () => {
     expect(H.getServicePriceByType({ subconcept: { pricesByType: { tarjeta: Infinity } }, total: 50 }, 'tarjeta')).toBe(50);
     expect(H.getServicePriceByType({ subconcept: { pricesByType: { tarjeta: -Infinity } }, total: 50 }, 'tarjeta')).toBe(50);
@@ -149,6 +154,20 @@ describe('PaymentBreakdownHelpers.cheapestAvailableMethod + buildDiscountEmphasi
   it('un solo método disponible: sin descuento', () => {
     expect(H.buildDiscountEmphasis({ anchoredMethod: 'tarjeta', availableMethods: ['tarjeta'] }, services, 'MXN')).toBe('');
   });
+
+  it('FIX council (L3F0, stored XSS): un anchoredMethod malicioso se ESCAPA en el énfasis de descuento', () => {
+    // anchoredMethod viene de reservation.paymentType (escribible por nivel 4+ sin enum estricto); un
+    // token con markup no debe llegar crudo al innerHTML. item.total alto hace que el ancla corrupta
+    // rinda como "precio de lista" (fallback a total) y supere al más barato, forzando el render.
+    const svc = [{ subconcept: { pricesByType: { efectivo: 100, tarjeta: 200 } }, total: 500 }];
+    const payload = '"><img src=x onerror=alert(1)>';
+    const html = H.buildDiscountEmphasis(
+      { anchoredMethod: payload, availableMethods: ['efectivo', 'tarjeta'] }, svc, 'MXN'
+    );
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).not.toContain('<img src=x');
+    expect(html).not.toContain('"><img');
+  });
 });
 
 describe('PaymentBreakdownHelpers.buildMethodChips (Requisito 3 — % del backend TAL CUAL)', () => {
@@ -176,6 +195,17 @@ describe('PaymentBreakdownHelpers.buildMethodChips (Requisito 3 — % del backen
       adjustments: 0, coveragePercent: 0,
     };
     expect(H.buildMethodChips(summary, services, 'MXN')).toContain('Más barato');
+  });
+
+  it('FIX council (L4F1): un descuento/ajuste mayor al subtotal NO pinta un total negativo (clamp a $0.00)', () => {
+    // Subtotal efectivo 1000 + ajuste -1400 => -400 en el servidor se clampa a 0; la UI debe mostrar $0.00.
+    const summary = {
+      availableMethods: ['efectivo'], anchoredMethod: 'efectivo',
+      adjustments: -1400, coveragePercent: 0,
+    };
+    const html = H.buildMethodChips(summary, services, 'MXN');
+    expect(html).not.toContain('-$');
+    expect(html).toContain('$0.00');
   });
 });
 

@@ -25,6 +25,7 @@ const PDFReceiptService = require('./PDFReceiptService');
 const Invoice = require('../../domain/models/Invoice');
 const Reservation = require('../../domain/models/Reservation');
 const ReservationService = require('../../domain/models/ReservationService');
+const Payment = require('../../domain/models/Payment');
 
 /**
  * QuoteService class implementing Quote business logic.
@@ -1777,7 +1778,13 @@ class QuoteService {
       reservation.set('totalAmount', total);
       reservation.set('servicesSubtotal', serviceItems.subtotal ?? total);
       if (serviceItems.currency) reservation.set('currency', serviceItems.currency);
-      if (serviceItems.paymentType) reservation.set('paymentType', serviceItems.paymentType);
+      // Defensa en profundidad: el ancla persistida siempre es un método válido. Un token corrupto
+      // (dato legacy u otro path) cae al default en vez de propagarse a la reservación, donde habilitaría
+      // stored XSS en el desglose y bloquearía el registro de pagos (council L3F0/L0F1).
+      if (serviceItems.paymentType) {
+        reservation.set('paymentType', Payment.isValidMethod(serviceItems.paymentType)
+          ? serviceItems.paymentType : 'efectivo');
+      }
 
       let startDate = null;
       let endDate = null;
@@ -2031,7 +2038,10 @@ class QuoteService {
       reservation.set('servicesSubtotal', serviceItems.total || 0);
       reservation.set('adjustments', []);
       reservation.set('currency', serviceItems.currency || 'MXN');
-      reservation.set('paymentType', serviceItems.paymentType || 'efectivo');
+      // Defensa en profundidad (igual que syncReservationFromQuote): el ancla persistida siempre es un
+      // método válido; un token corrupto de una cotización legacy cae al default en vez de propagarse.
+      reservation.set('paymentType', Payment.isValidMethod(serviceItems.paymentType)
+        ? serviceItems.paymentType : 'efectivo');
       reservation.set('numberOfPeople', quote.get('numberOfPeople') || 1);
       reservation.set('eventType', quote.get('eventType') || '');
       reservation.set('contactPerson', quote.get('contactPerson') || '');

@@ -168,6 +168,29 @@ describe('Payment mixed-method coverage (integration)', () => {
     });
   });
 
+  describe('USD — un PAGO REAL refleja la cobertura real, no ~18.5x inflada (council L5F0)', () => {
+    it('reservación USD total 101, pago REAL de 10 USD en efectivo: cobertura ~10 y status partial (NO paid inflado)', async () => {
+      const id = await createReservation(
+        [{ pricesByType: { efectivo: 101, transferencia: 116, tarjeta: 121 } }],
+        'efectivo',
+        'USD'
+      );
+
+      // POST real: el pago se guarda en MXN (10 USD × tasa ~18.5 ≈ 185), pero el motor de cobertura debe
+      // medir en USD (origAmount = 10), no tomar 185 contra un total de 101 (bug: coverage ~183% / paid).
+      const r = await postPayment(id, { amount: 10, currency: 'USD', method: 'efectivo' });
+      expect(r.status).toBe(200);
+      const s = r.body.data.summary;
+      expect(s.total).toBe(101); // USD, sin redondeo a múltiplo de 5
+      expect(s.coverageAmount).toBe(10); // 10 USD cubre 10 USD (mismo método que el ancla), JAMÁS ~185
+      expect(s.coveragePercent).toBeLessThan(20); // ~9.9%, nunca ~183%
+      expect(s.paymentStatus).toBe('partial'); // 10 de 101, NO 'paid' inflado por mezclar MXN/USD
+      expect(s.remainingBase).toBe(91); // 101 − 10, en USD
+      expect(s.paidAmount).toBe(10); // en la moneda de la reservación (USD), consistente con el total
+      expect(s.balance).toBe(91); // total − paid, ambos en USD
+    });
+  });
+
   describe('editar monto/método recalcula desde CERO el historial (nunca un delta incremental)', () => {
     it('bajar el monto de un pago tarjeta a la mitad recalcula la cobertura completa', async () => {
       const id = await createReservation(CLEAN, 'efectivo');

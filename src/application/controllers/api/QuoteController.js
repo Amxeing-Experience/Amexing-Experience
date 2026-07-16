@@ -7,6 +7,7 @@ const Parse = require('parse/node');
 const Quote = require('../../../domain/models/Quote');
 const QuoteOwnership = require('../../../domain/models/QuoteOwnership');
 const ReservationService = require('../../../domain/models/ReservationService');
+const Payment = require('../../../domain/models/Payment');
 const QuoteService = require('../../services/QuoteService');
 const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
 const QuoteCollaborationService = require('../../services/QuoteCollaborationService');
@@ -2052,6 +2053,14 @@ class QuoteController {
         days = [], subtotal = 0, iva = 0, total = 0,
         currency = 'MXN', paymentType = 'efectivo',
       } = req.body;
+
+      // Enum guard: paymentType alimenta reservation.paymentType (ancla del carrito de pagos) y se
+      // renderiza en el desglose de las 3 vistas de reservación. Un valor fuera de los métodos válidos
+      // habilitaba stored XSS (council L3F0) y corrompía el ancla (bloqueaba el registro de pagos). Se
+      // rechaza aquí, el único punto de escritura de paymentType desde el request.
+      if (!Payment.isValidMethod(paymentType)) {
+        return this.sendError(res, `Forma de pago inválida. Use: ${Payment.METHODS.join(', ')}`, 400);
+      }
 
       // Validate serviceItems structure
       if (!Array.isArray(days)) {

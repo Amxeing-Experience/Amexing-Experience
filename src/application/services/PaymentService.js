@@ -27,6 +27,7 @@
 const Parse = require('parse/node');
 const BaseModel = require('../../domain/models/BaseModel');
 const Payment = require('../../domain/models/Payment');
+const ExchangeRate = require('../../domain/models/ExchangeRate');
 const logger = require('../../infrastructure/logger');
 // Solo se importa el redondeo a efectivo (múltiplo de 5). No se modifica el motor.
 const { applyCashRounding } = require('../../domain/pricing/pricingEngine');
@@ -217,9 +218,15 @@ class PaymentService {
     const remainingPercent = totalDue > 0 ? round2((remainingBase / totalDue) * 100) : 0;
     const montoParaSaldar = {};
     validMethods.forEach((m) => {
-      montoParaSaldar[m] = baseTotal > 0
-        ? round2(remainingBase * (this.totalForMethod(serviceItems, m, currency) / baseTotal))
-        : 0;
+      if (baseTotal > 0) {
+        montoParaSaldar[m] = round2(remainingBase * (this.totalForMethod(serviceItems, m, currency) / baseTotal));
+      } else {
+        // Sin base de servicios (baseTotal<=0) el saldo proviene solo de ajustes/cargos manuales: pesos
+        // fijos sin tarifa por método, no hay "regla de tres" que aplicar — el monto a saldar en cualquier
+        // método es el remanente completo. Antes quedaba en 0 aunque remainingPercent mostrara 100%,
+        // contradiciendo la UI ("restante 100%: $0.00 en los 3 métodos", council L0F0).
+        montoParaSaldar[m] = remainingBase;
+      }
     });
     return {
       totalDue, coverageAmount, remainingBase, remainingPercent, montoParaSaldar,
@@ -272,7 +279,8 @@ class PaymentService {
    * precio finito para ese método en su pricesByType (unión por servicio, no intersección). El método
    * ancla (paymentType heredado de la cotización) SIEMPRE está disponible (invariante) — cubre también
    * 0 servicios y reservaciones 100% legacy sin pricesByType, que caen solo al ancla. Un ancla corrupta
-   * (no válida) nunca se inyecta, así que la lista puede quedar vacía en ese caso.
+   * (no válida) nunca se inyecta; si además ningún servicio respalda método alguno, se cae a los métodos
+   * canónicos (fallback de seguridad) para no bloquear todo registro de pago por un dato corrupto.
    *
    * Inspecciona pricesByType[method] DIRECTAMENTE con Number.isFinite(Number(...)): a diferencia de
    * chargeAmount/serviceBase, que caen a item.total cuando falta la llave y harían que cualquier
@@ -293,9 +301,15 @@ class PaymentService {
 
     const union = new Set(validMethods.filter(supported));
     // El ancla SIEMPRE disponible (invariante crítico): garantiza que el método que fijó la cotización
-    // no quede fuera aunque ningún servicio traiga su llave. Con unión vacía, cae solo al ancla; un
-    // ancla no válida no se agrega (nunca se inyecta un token inválido) y la lista puede quedar vacía.
+    // no quede fuera aunque ningún servicio traiga su llave. Un ancla no válida no se agrega (nunca se
+    // inyecta un token inválido).
     if (validMethods.includes(anchoredMethod)) union.add(anchoredMethod);
+    // Fallback de seguridad (council L0F1): si el ancla es un token corrupto (fuera de validMethods) Y
+    // ningún servicio respalda método alguno, la unión queda vacía; el guard de escritura del controller
+    // rechaza cualquier método contra una lista vacía, bloqueando TODO pago para todos los roles (incluido
+    // admin) sin salida. Se exponen los métodos canónicos para no dejar la reservación sin vía de pago por
+    // un dato corrupto — el token inválido nunca se inyecta.
+    if (union.size === 0) validMethods.forEach((m) => union.add(m));
     return validMethods.filter((m) => union.has(m));
   }
 
@@ -312,6 +326,34 @@ class PaymentService {
     let paidGlobal = 0;
     for (const row of list) paidGlobal += Number(row.amount) || 0;
     return round2(paidGlobal);
+  }
+
+  /**
+   * Expresa un pago (siempre almacenado en `amount` MXN) en la MONEDA DE LA RESERVACIÓN, para que el
+   * motor de cobertura (baseEquivalente/remainingBreakdown/paidAmount) compare contra pricesByType y
+   * totalDue, que ya vienen en esa moneda, sin mezclar unidades. Reservación MXN: se usa `amount` tal
+   * cual (misma cifra que antes; Fase B intacta). Reservación USD: un pago capturado en USD usa su
+   * snapshot exacto (origAmount); un pago capturado en MXN se reconvierte con la tasa actual (la tasa
+   * snapshot del pago es 1 para una captura en MXN, así que no sirve para MXN->USD) — introduce a lo
+   * sumo un error menor de redondeo, nunca un desajuste de unidades (bug del council L5F0: $10 USD se
+   * contaba como ~$185 y disparaba coverage ~183% / status 'paid' con cobertura real ~10%).
+   * @param {object} payment - Pago plano { amount, origAmount, origCurrency }.
+   * @param {string} currency - Moneda de la reservación (MXN|USD).
+   * @param {number} [currentRate] - Tasa USD/MXN vigente (para pagos MXN contra reservación USD).
+   * @returns {number} Monto del pago en la moneda de la reservación.
+   * @example
+   * PaymentService.paymentAmountInCurrency({ amount: 185, origAmount: 10, origCurrency: 'USD' }, 'USD') // 10
+   */
+  static paymentAmountInCurrency(payment, currency, currentRate = 0) {
+    const amountMXN = Number(payment && payment.amount) || 0;
+    if (String(currency).toUpperCase() !== 'USD') return amountMXN;
+    const origCurrency = String((payment && payment.origCurrency) || '').toUpperCase();
+    const origAmount = Number(payment && payment.origAmount);
+    // Capturado en USD: el snapshot original ES el monto en la moneda de la reservación (exacto, sin tasa).
+    if (origCurrency === 'USD' && Number.isFinite(origAmount)) return round2(origAmount);
+    // Capturado en MXN (o sin snapshot USD): convertir MXN -> USD con la tasa vigente.
+    const rate = Number(currentRate) > 0 ? Number(currentRate) : 0;
+    return rate > 0 ? round2(amountMXN / rate) : amountMXN;
   }
 
   /**
@@ -346,8 +388,20 @@ class PaymentService {
     }, 0);
     const serviceItems = this.toServiceItems(services);
 
+    // Reservación USD: los pagos se almacenan en MXN pero el motor de cobertura trabaja en la moneda de
+    // la reservación (pricesByType/totalDue en USD). Se resuelve la tasa UNA vez y solo cuando hace falta
+    // (pago MXN contra reservación USD); un pago USD usa su snapshot exacto sin tocar la tasa (council L5F0).
+    let usdRate = 0;
+    if (String(currency).toUpperCase() === 'USD') {
+      usdRate = await ExchangeRate.getCurrentValue();
+    }
+
     const paymentRows = payments.map((payment) => ({
-      amount: payment.get('amount'),
+      amount: this.paymentAmountInCurrency({
+        amount: payment.get('amount'),
+        origAmount: payment.get('origAmount'),
+        origCurrency: payment.get('origCurrency'),
+      }, currency, usdRate),
       method: payment.get('method'),
     }));
     const totals = this.computeTotals(serviceItems, paymentType, adjustmentsNet, currency);

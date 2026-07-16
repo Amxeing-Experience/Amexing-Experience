@@ -36,6 +36,12 @@ describe('PaymentService pure helpers', () => {
     it('un valor no numérico en pricesByType cae al fallback de total', () => {
       expect(PaymentService.chargeAmount({ pricesByType: { tarjeta: 'abc' }, total: 300 }, 'tarjeta')).toBe(300);
     });
+
+    // FIX council (L4F0): un null explícito para el método es finito (Number(null) === 0) => 0, NO cae al
+    // fallback item.total. DEBE coincidir con getServicePriceByType del cliente (mismo input, mismo 0).
+    it('un null explícito en pricesByType[método] da 0 (no cae a item.total)', () => {
+      expect(PaymentService.chargeAmount({ pricesByType: { tarjeta: null }, total: 500 }, 'tarjeta')).toBe(0);
+    });
   });
 
   describe('serviceBase', () => {
@@ -446,6 +452,20 @@ describe('PaymentService pure helpers', () => {
       expect(b.remainingPercent).toBe(0);
       expect(b.montoParaSaldar).toEqual({ efectivo: 0, transferencia: 0, tarjeta: 0 });
     });
+
+    it('FIX council (L0F0): base de servicios 0 pero saldo por ajuste => montoParaSaldar refleja el remanente, no $0 con 100%', () => {
+      // Servicios sin base cobrable + un cargo manual de $400 (adjustmentsNet). Sin "regla de tres" que
+      // aplicar (no hay tier de servicios): saldar en cualquier método cuesta el remanente completo.
+      const b = PaymentService.remainingBreakdown(
+        [],
+        { serviceItems: [{ includeInTotal: false, total: 999 }], anchoredMethod: 'efectivo', adjustmentsNet: 400 }
+      );
+      expect(b.totalDue).toBe(400);
+      expect(b.remainingBase).toBe(400);
+      expect(b.remainingPercent).toBe(100);
+      // Antes: { efectivo: 0, transferencia: 0, tarjeta: 0 } contradiciendo el 100% mostrado.
+      expect(b.montoParaSaldar).toEqual({ efectivo: 400, transferencia: 400, tarjeta: 400 });
+    });
   });
 
   describe('sumPayments', () => {
@@ -474,6 +494,38 @@ describe('PaymentService pure helpers', () => {
     it('handles empty/invalid input', () => {
       expect(PaymentService.sumPayments([])).toBe(0);
       expect(PaymentService.sumPayments(null)).toBe(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // FIX council (L5F0) — el pago (siempre almacenado en MXN) se expresa en la moneda de la reservación
+  // antes de alimentar el motor de cobertura, para no mezclar MXN con pricesByType/totalDue en USD.
+  // ---------------------------------------------------------------------------
+  describe('paymentAmountInCurrency', () => {
+    it('reservación MXN: usa el amount (MXN) tal cual, ignora la tasa (Fase B intacta)', () => {
+      expect(PaymentService.paymentAmountInCurrency({ amount: 1850, origAmount: 1850, origCurrency: 'MXN' }, 'MXN', 18.5)).toBe(1850);
+      // Sin snapshot (reservación/legacy MXN) tampoco convierte.
+      expect(PaymentService.paymentAmountInCurrency({ amount: 500 }, 'MXN')).toBe(500);
+    });
+
+    it('reservación USD + pago capturado en USD: usa origAmount EXACTO (sin tasa, sin drift)', () => {
+      // El bug del council: 10 USD se guardaba como 185 MXN y el motor lo tomaba como 185 (18.5x inflado).
+      expect(PaymentService.paymentAmountInCurrency({ amount: 185, origAmount: 10, origCurrency: 'USD' }, 'USD', 18.5)).toBe(10);
+      // La tasa vigente NO afecta al pago USD (usa su snapshot), aunque haya cambiado desde la captura.
+      expect(PaymentService.paymentAmountInCurrency({ amount: 185, origAmount: 10, origCurrency: 'USD' }, 'USD', 20)).toBe(10);
+    });
+
+    it('reservación USD + pago capturado en MXN: reconvierte MXN -> USD con la tasa vigente', () => {
+      // Un pago MXN contra una reservación USD SÍ necesita la tasa (su snapshot es 1, inservible para MXN->USD).
+      expect(PaymentService.paymentAmountInCurrency({ amount: 1850, origAmount: 1850, origCurrency: 'MXN' }, 'USD', 18.5)).toBe(100);
+    });
+
+    it('reservación USD + pago USD sin snapshot (legacy): cae a la conversión por tasa vigente', () => {
+      expect(PaymentService.paymentAmountInCurrency({ amount: 185, origCurrency: 'USD' }, 'USD', 18.5)).toBe(10);
+    });
+
+    it('reservación USD sin tasa utilizable: no inventa unidades, devuelve el MXN crudo (último recurso)', () => {
+      expect(PaymentService.paymentAmountInCurrency({ amount: 185, origCurrency: 'MXN' }, 'USD', 0)).toBe(185);
     });
   });
 
@@ -629,8 +681,14 @@ describe('PaymentService pure helpers', () => {
       // Con servicios que respaldan métodos: se devuelven esos, sin el token inválido.
       const withData = [{ pricesByType: { efectivo: 100, tarjeta: 121 } }];
       expect(PaymentService.deriveAvailableMethods(withData, 'bitcoin')).toEqual(['efectivo', 'tarjeta']);
-      // Sin ningún respaldo y ancla inválida => lista vacía (jamás 'bitcoin').
-      expect(PaymentService.deriveAvailableMethods([{ total: 200 }], 'bitcoin')).toEqual([]);
+    });
+
+    it('FIX council (L0F1): ancla corrupta SIN respaldo cae a los métodos canónicos, no a lista vacía', () => {
+      // Antes devolvía [] -> el guard del controller bloqueaba TODO pago para todos los roles. Ahora se
+      // exponen los 3 métodos canónicos (nunca el token inválido) para no bloquear la operación real.
+      const methods = PaymentService.deriveAvailableMethods([{ total: 200 }], 'bitcoin');
+      expect(methods).toEqual(['efectivo', 'transferencia', 'tarjeta']);
+      expect(methods).not.toContain('bitcoin');
     });
 
     it('llaves extra no reconocidas (oxxo) se ignoran; solo cuentan los validMethods', () => {

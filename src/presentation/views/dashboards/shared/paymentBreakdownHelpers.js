@@ -88,7 +88,10 @@ const PaymentBreakdownHelpers = (() => {
   function getServicePriceByType(svc, paymentType) {
     if (svc && svc.subconcept && svc.subconcept.includeInTotal === false) return 0;
     const pbt = svc && svc.subconcept ? svc.subconcept.pricesByType : null;
-    if (pbt && typeof pbt === 'object' && pbt[paymentType] != null) {
+    // Paridad EXACTA con PaymentService.chargeAmount del servidor: solo un Number(...) FINITO cuenta.
+    // Sin el pre-check `!= null`: un null explícito (Number(null) === 0) da 0 igual que el servidor, en
+    // vez de caer al fallback item.total (antes divergían: cliente=item.total vs servidor=0).
+    if (pbt && typeof pbt === 'object') {
       const v = Number(pbt[paymentType]);
       if (Number.isFinite(v)) return v;
     }
@@ -256,14 +259,16 @@ const PaymentBreakdownHelpers = (() => {
     const cheapest = cheapestAvailableMethod(methods, services, currency);
     const showCheaper = cheapest && anchor && cheapest !== anchor;
     const chips = methods.map((m) => {
-      const methodTotal = round2(computeServicesSubtotalByType(services, m, currency) + adjustments);
+      // Clamp a 0 igual que computeTotals del servidor (Math.max(0, ...)): un descuento/ajuste mayor al
+      // subtotal de servicios no debe pintar un total negativo por método (council L4F1).
+      const methodTotal = Math.max(0, round2(computeServicesSubtotalByType(services, m, currency) + adjustments));
       const anchorTag = m === anchor
         ? '<span class="badge bg-secondary-subtle text-secondary ms-1">Cotizado</span>' : '';
       const cheaperTag = (showCheaper && m === cheapest)
         ? `<span class="badge ms-1" style="background:${DISCOUNT_GREEN};color:#fff;">Más barato</span>` : '';
       return `<div class="border rounded p-2">
           <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-semibold small">${methodLabel(m)}${anchorTag}${cheaperTag}</span>
+            <span class="fw-semibold small">${escapeHtml(methodLabel(m))}${anchorTag}${cheaperTag}</span>
             <span class="small">${formatMoney(methodTotal, currency)}</span>
           </div>
           <div class="progress" style="height:6px;" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
@@ -331,7 +336,7 @@ const PaymentBreakdownHelpers = (() => {
     if (!methods.length) return '';
     const mps = s.montoParaSaldar || {};
     const rows = methods.map((m) => `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-        <span class="small">${methodLabel(m)}</span>
+        <span class="small">${escapeHtml(methodLabel(m))}</span>
         <span class="fw-semibold">${formatMoney(round2(mps[m]), currency)}</span>
       </div>`).join('');
     return `<div class="text-muted small mb-1">Para saldar el restante (${round2(s.remainingPercent)}%):</div>${rows}`;
@@ -360,9 +365,11 @@ const PaymentBreakdownHelpers = (() => {
     const cheapestTotal = computeServicesSubtotalByType(services, cheapest, currency);
     const savings = round2(anchorTotal - cheapestTotal);
     if (savings <= 0) return '';
+    // methodLabel(anchor) sale de summary.anchoredMethod (= reservation.paymentType), escribible por
+    // nivel 4+ sin enum estricto: se ESCAPA como en los demás builders para cortar el stored XSS (council L3F0).
     return `<div class="p-2 rounded" style="background:#e8f5ee;">
-        <div class="fw-semibold" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>Ahorra ${formatMoney(savings, currency)} pagando en ${methodLabel(cheapest)}.</div>
-        <div class="small" style="color:${DISCOUNT_GREEN};">Precio de lista (${methodLabel(anchor)}): <s>${formatMoney(anchorTotal, currency)}</s> &middot; Con ${methodLabel(cheapest)}: ${formatMoney(cheapestTotal, currency)}</div>
+        <div class="fw-semibold" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>Ahorra ${formatMoney(savings, currency)} pagando en ${escapeHtml(methodLabel(cheapest))}.</div>
+        <div class="small" style="color:${DISCOUNT_GREEN};">Precio de lista (${escapeHtml(methodLabel(anchor))}): <s>${formatMoney(anchorTotal, currency)}</s> &middot; Con ${escapeHtml(methodLabel(cheapest))}: ${formatMoney(cheapestTotal, currency)}</div>
       </div>`;
   }
 
@@ -385,7 +392,7 @@ const PaymentBreakdownHelpers = (() => {
         : '<span class="text-muted">&mdash;</span>';
       return `<tr>
           <td>${formatDate(p.paidAt || p.createdAt)}</td>
-          <td><span class="badge bg-secondary-subtle text-secondary">${methodLabel(p.method)}</span></td>
+          <td><span class="badge bg-secondary-subtle text-secondary">${escapeHtml(methodLabel(p.method))}</span></td>
           <td>${ref}</td>
           <td class="text-end">${formatMoney(p.amount, currency)}</td>
           <td>${escapeHtml(p.origCurrency || currency)}</td>
