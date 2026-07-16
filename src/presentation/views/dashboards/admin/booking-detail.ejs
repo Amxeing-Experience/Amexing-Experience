@@ -276,13 +276,16 @@
    borde explicito (0.5rem, el mismo que usan las demas cards de esta pagina) porque el `.rounded`
    por defecto de Bootstrap se veia casi recto a este tamano. */
 #paymentCoverageCard.payment-coverage-highlight,
-#paymentChips > div,
+#paymentChips .payment-chip-card,
 #paymentRemainingByMethod,
 #paymentFormWrap {
     background: #fff;
     border: 1px solid #e0e6ed;
     border-radius: 0.5rem;
 }
+/* El wrapper flex que envuelve los chips (buildMethodChips) no debe tener su propio borde/fondo —
+   cada chip individual ya trae el suyo via .payment-chip-card. */
+#paymentChips > div { background: transparent; border: none; }
 /* Card de cobertura: filete de acento del verde sage de marca (--brand-primary), en vez del degradado
    turquesa anterior (no encajaba con el resto del sistema). */
 #paymentCoverageCard.payment-coverage-highlight { border-left: 4px solid #969b81; }
