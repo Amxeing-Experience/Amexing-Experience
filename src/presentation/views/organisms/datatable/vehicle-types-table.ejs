@@ -22,6 +22,10 @@ const canDelete = ['superadmin', 'admin'].includes(dtUserRole); // Admin and sup
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 // Modo editorial (plano, sin panel blanco ni header con gradiente). Opt-in por vista.
 const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
+// Compacto: sin controles de DataTables (búsqueda/paginación/length), muestra todo. Ideal en panel.
+const dtCompact = typeof compact !== 'undefined' ? compact : false;
+// Init diferido (lazy): no inicializa el DataTable en carga; la vista lo llama al mostrarlo.
+const dtDeferInit = typeof deferInit !== 'undefined' ? deferInit : false;
 %>
 
 <div class="<%= editorialFlat ? 'vt-editorial' : 'card border-0 shadow-sm' %>">
@@ -200,6 +204,7 @@ const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
         const userRole = '<%= dtUserRole %>';
+        const isCompact = <%= dtCompact ? 'true' : 'false' %>;
 
         // DataTable Configuration
         const dataTable = $(`#${tableId}`).DataTable({
@@ -310,9 +315,10 @@ const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando tipos...'
             },
             order: [[0, 'asc']], // Sort by name by default
-            pageLength: 10,
+            pageLength: isCompact ? 100 : 10,
             searchDelay: 300,
-            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+            // Compacto: solo la tabla (sin length/search/info/paginación). Ideal para pocos registros.
+            dom: isCompact ? 't' : '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
                  '<"row"<"col-sm-12"tr>>' +
                  '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
             drawCallback: function() {
@@ -730,11 +736,15 @@ const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
         }
     }
 
-    // Initialize when DOM is ready
+    // Exponer para init diferido (lazy) desde la vista contenedora (p. ej. al abrir un panel).
+    window.__vehicleTypesInit = initWhenReady;
+    // Init normal en carga, salvo que la vista pida diferirlo.
+    <% if (!dtDeferInit) { %>
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initWhenReady);
     } else {
         initWhenReady();
     }
+    <% } %>
 })();
 </script>

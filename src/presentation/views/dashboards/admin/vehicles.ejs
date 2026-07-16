@@ -61,7 +61,9 @@ const canCreate = ['superadmin', 'admin'].includes(currentUserRole);
         apiEndpoint: '/api/vehicle-types',
         userRole: currentUserRole,
         showActions: true,
-        editorial: true
+        editorial: true,
+        compact: true,
+        deferInit: true
     }) %>
 </aside>
 
@@ -136,17 +138,24 @@ const canCreate = ['superadmin', 'admin'].includes(currentUserRole);
     var closeBtn = document.getElementById('closeTypesDrawer');
     if (!drawer || !openBtn) return;
 
+    var typesInited = false;
     function openDrawer() {
         drawer.classList.add('open');
         if (backdrop) backdrop.classList.add('open');
         drawer.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
-        // El DataTable de tipos se inicializó oculto → recalcular anchos al mostrarse.
-        try {
-            if (window.jQuery && jQuery.fn.dataTable && jQuery.fn.dataTable.isDataTable('#vehicle-types-table')) {
-                jQuery('#vehicle-types-table').DataTable().columns.adjust();
-            }
-        } catch (e) { /* noop */ }
+        if (!typesInited) {
+            // Lazy: inicializa el DataTable de tipos la primera vez que se abre el panel.
+            typesInited = true;
+            if (typeof window.__vehicleTypesInit === 'function') window.__vehicleTypesInit();
+        } else {
+            // Ya inicializado (oculto) → recalcular anchos al mostrarse.
+            try {
+                if (window.jQuery && jQuery.fn.dataTable && jQuery.fn.dataTable.isDataTable('#vehicle-types-table')) {
+                    jQuery('#vehicle-types-table').DataTable().columns.adjust();
+                }
+            } catch (e) { /* noop */ }
+        }
     }
     function closeDrawer() {
         drawer.classList.remove('open');
