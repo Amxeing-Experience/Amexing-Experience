@@ -34,8 +34,23 @@ describe('Payment endpoints — access by role (integration)', () => {
     // ITS OWN reservation) would be lost.
     const managerUser = await AuthTestHelper.getUserByRole('department_manager');
     reservation.set('clientPtr', managerUser);
+    reservation.set('paymentType', 'efectivo');
     await reservation.save(null, { useMasterKey: true });
     testReservationId = reservation.id;
+
+    // Fase C: este suite prueba ACCESO por rol, no disponibilidad de método. La reservación necesita
+    // respaldo real de pricesByType para que efectivo y tarjeta (usados abajo) estén disponibles y el
+    // guard de contenido no interfiera con lo que aquí se verifica (RBAC por nivel).
+    const service = new Parse.Object('ReservationService');
+    service.set('active', true);
+    service.set('exists', true);
+    service.set('reservationPtr', reservation);
+    service.set('subconcept', {
+      includeInTotal: true,
+      pricesByType: { efectivo: 100, transferencia: 116, tarjeta: 121 },
+      total: 100,
+    });
+    await service.save(null, { useMasterKey: true });
   }, 30000);
 
   afterAll(async () => {

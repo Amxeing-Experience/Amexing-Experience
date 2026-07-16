@@ -550,4 +550,105 @@ describe('PaymentService pure helpers', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Fase C (carrito de pagos) — métodos disponibles derivados de pricesByType,
+  // NUNCA hardcodeados. Inspecciona la llave directamente (no usa el fallback a
+  // total de chargeAmount) y siempre mantiene el ancla disponible.
+  // ---------------------------------------------------------------------------
+  describe('deriveAvailableMethods', () => {
+    it('2 servicios con los 3 métodos completos => unión completa en orden canónico', () => {
+      const items = [
+        { pricesByType: { efectivo: 100, transferencia: 116, tarjeta: 121 } },
+        { pricesByType: { efectivo: 200, transferencia: 232, tarjeta: 242 } },
+      ];
+      expect(PaymentService.deriveAvailableMethods(items, 'efectivo'))
+        .toEqual(['efectivo', 'transferencia', 'tarjeta']);
+    });
+
+    it('es UNIÓN, no intersección: un servicio 2/3 + otro 3/3 => los 3', () => {
+      const items = [
+        { pricesByType: { efectivo: 100, transferencia: 116 } }, // sin tarjeta
+        { pricesByType: { efectivo: 200, transferencia: 232, tarjeta: 242 } }, // completo
+      ];
+      expect(PaymentService.deriveAvailableMethods(items, 'efectivo'))
+        .toEqual(['efectivo', 'transferencia', 'tarjeta']);
+    });
+
+    it('NaN / Infinity / string corrupto en una llave la EXCLUYEN (no es finita)', () => {
+      const items = [{ pricesByType: { efectivo: 100, transferencia: NaN, tarjeta: 'corrupto' } }];
+      // transferencia (NaN) y tarjeta ('corrupto') no son finitos => fuera; solo efectivo respaldado.
+      expect(PaymentService.deriveAvailableMethods(items, 'efectivo')).toEqual(['efectivo']);
+      const inf = [{ pricesByType: { efectivo: 100, tarjeta: Infinity } }];
+      expect(PaymentService.deriveAvailableMethods(inf, 'efectivo')).toEqual(['efectivo']);
+    });
+
+    it('una llave corrupta en un servicio pero respaldada por OTRO servicio SÍ cuenta', () => {
+      const items = [
+        { pricesByType: { efectivo: 100, tarjeta: NaN } }, // tarjeta corrupta aquí
+        { pricesByType: { efectivo: 100, tarjeta: 121 } }, // pero válida aquí
+      ];
+      expect(PaymentService.deriveAvailableMethods(items, 'efectivo'))
+        .toEqual(['efectivo', 'tarjeta']);
+    });
+
+    it('100% legacy sin pricesByType => solo el ancla (NO los 3 por fallback a total)', () => {
+      const items = [{ total: 200 }, { total: 50 }];
+      expect(PaymentService.deriveAvailableMethods(items, 'efectivo')).toEqual(['efectivo']);
+      expect(PaymentService.deriveAvailableMethods(items, 'tarjeta')).toEqual(['tarjeta']);
+    });
+
+    it('legacy parcial (un servicio con pricesByType + otro legacy) no reduce la unión', () => {
+      const items = [
+        { pricesByType: { efectivo: 100, transferencia: 116, tarjeta: 121 } },
+        { total: 50 }, // legacy: no aporta ni resta métodos
+      ];
+      expect(PaymentService.deriveAvailableMethods(items, 'efectivo'))
+        .toEqual(['efectivo', 'transferencia', 'tarjeta']);
+    });
+
+    it('0 servicios => [anchoredMethod]', () => {
+      expect(PaymentService.deriveAvailableMethods([], 'transferencia')).toEqual(['transferencia']);
+      expect(PaymentService.deriveAvailableMethods(null, 'efectivo')).toEqual(['efectivo']);
+    });
+
+    it('includeInTotal:false NO cuenta para la unión', () => {
+      const items = [{ includeInTotal: false, pricesByType: { efectivo: 100, transferencia: 116, tarjeta: 121 } }];
+      // El único servicio está excluido del total => solo queda el ancla.
+      expect(PaymentService.deriveAvailableMethods(items, 'efectivo')).toEqual(['efectivo']);
+    });
+
+    it('CRÍTICO: el ancla SIEMPRE está presente aunque ningún servicio traiga su llave', () => {
+      // Servicios solo respaldan efectivo/transferencia; ancla = tarjeta (sin respaldo en datos).
+      const items = [{ pricesByType: { efectivo: 100, transferencia: 116 } }];
+      const methods = PaymentService.deriveAvailableMethods(items, 'tarjeta');
+      expect(methods).toContain('tarjeta'); // invariante: el ancla nunca queda fuera
+      expect(methods).toEqual(['efectivo', 'transferencia', 'tarjeta']);
+    });
+
+    it('ancla corrupta (no es uno de los 3 tokens) NUNCA se inyecta', () => {
+      // Con servicios que respaldan métodos: se devuelven esos, sin el token inválido.
+      const withData = [{ pricesByType: { efectivo: 100, tarjeta: 121 } }];
+      expect(PaymentService.deriveAvailableMethods(withData, 'bitcoin')).toEqual(['efectivo', 'tarjeta']);
+      // Sin ningún respaldo y ancla inválida => lista vacía (jamás 'bitcoin').
+      expect(PaymentService.deriveAvailableMethods([{ total: 200 }], 'bitcoin')).toEqual([]);
+    });
+
+    it('llaves extra no reconocidas (oxxo) se ignoran; solo cuentan los validMethods', () => {
+      const items = [{ pricesByType: { efectivo: 100, oxxo: 999 } }];
+      expect(PaymentService.deriveAvailableMethods(items, 'efectivo')).toEqual(['efectivo']);
+    });
+
+    it('el orden de salida es SIEMPRE canónico, sin importar el orden de las llaves', () => {
+      const items = [{ pricesByType: { tarjeta: 121, efectivo: 100, transferencia: 116 } }];
+      expect(PaymentService.deriveAvailableMethods(items, 'tarjeta'))
+        .toEqual(['efectivo', 'transferencia', 'tarjeta']);
+    });
+
+    it('respeta un validMethods personalizado (subconjunto + orden dado)', () => {
+      const items = [{ pricesByType: { efectivo: 100, transferencia: 116, tarjeta: 121 } }];
+      expect(PaymentService.deriveAvailableMethods(items, 'efectivo', ['tarjeta', 'efectivo']))
+        .toEqual(['tarjeta', 'efectivo']);
+    });
+  });
+
 });

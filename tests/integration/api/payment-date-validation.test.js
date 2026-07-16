@@ -30,8 +30,23 @@ describe('Payment paidAt date validation (integration)', () => {
     reservation.set('active', true);
     reservation.set('exists', true);
     reservation.set('status', 'confirmed');
+    reservation.set('paymentType', 'efectivo');
     await reservation.save(null, { useMasterKey: true });
     testReservationId = reservation.id;
+
+    // Fase C: este suite prueba validación de FECHA, no disponibilidad de método. La reservación
+    // necesita respaldo real de pricesByType para que los 3 métodos estén disponibles y el guard de
+    // contenido no bloquee los pagos (efectivo/transferencia/tarjeta) que usan estos casos.
+    const service = new Parse.Object('ReservationService');
+    service.set('active', true);
+    service.set('exists', true);
+    service.set('reservationPtr', reservation);
+    service.set('subconcept', {
+      includeInTotal: true,
+      pricesByType: { efectivo: 100, transferencia: 116, tarjeta: 121 },
+      total: 100,
+    });
+    await service.save(null, { useMasterKey: true });
   }, 30000);
 
   afterAll(async () => {

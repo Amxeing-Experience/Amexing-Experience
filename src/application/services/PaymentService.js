@@ -26,6 +26,7 @@
 
 const Parse = require('parse/node');
 const BaseModel = require('../../domain/models/BaseModel');
+const Payment = require('../../domain/models/Payment');
 const logger = require('../../infrastructure/logger');
 // Solo se importa el redondeo a efectivo (múltiplo de 5). No se modifica el motor.
 const { applyCashRounding } = require('../../domain/pricing/pricingEngine');
@@ -266,6 +267,39 @@ class PaymentService {
   }
 
   /**
+   * Deriva los métodos de pago realmente disponibles para una reservación a partir de los datos que
+   * la cotización ya calculó: un método está disponible solo si ALGÚN servicio facturable trae un
+   * precio finito para ese método en su pricesByType (unión por servicio, no intersección). El método
+   * ancla (paymentType heredado de la cotización) SIEMPRE está disponible (invariante) — cubre también
+   * 0 servicios y reservaciones 100% legacy sin pricesByType, que caen solo al ancla. Un ancla corrupta
+   * (no válida) nunca se inyecta, así que la lista puede quedar vacía en ese caso.
+   *
+   * Inspecciona pricesByType[method] DIRECTAMENTE con Number.isFinite(Number(...)): a diferencia de
+   * chargeAmount/serviceBase, que caen a item.total cuando falta la llave y harían que cualquier
+   * reservación (incluida la legacy) "ofrezca" los 3 métodos — el hardcode disfrazado a eliminar.
+   * @param {Array<object>} serviceItems - Plain items { includeInTotal, pricesByType }.
+   * @param {string} anchoredMethod - Método ancla (reservation.paymentType).
+   * @param {Array<string>} [validMethods] - Métodos aceptados por el sistema (orden canónico de salida).
+   * @returns {Array<string>} Métodos disponibles, subconjunto de validMethods en orden canónico.
+   * @example
+   * PaymentService.deriveAvailableMethods([{ pricesByType: { efectivo: 100, tarjeta: 121 } }], 'efectivo')
+   */
+  static deriveAvailableMethods(serviceItems, anchoredMethod, validMethods = Payment.METHODS) {
+    const items = Array.isArray(serviceItems) ? serviceItems : [];
+    const supported = (method) => items.some((item) => item
+      && item.includeInTotal !== false
+      && item.pricesByType && typeof item.pricesByType === 'object'
+      && Number.isFinite(Number(item.pricesByType[method])));
+
+    const union = new Set(validMethods.filter(supported));
+    // El ancla SIEMPRE disponible (invariante crítico): garantiza que el método que fijó la cotización
+    // no quede fuera aunque ningún servicio traiga su llave. Con unión vacía, cae solo al ancla; un
+    // ancla no válida no se agrega (nunca se inyecta un token inválido) y la lista puede quedar vacía.
+    if (validMethods.includes(anchoredMethod)) union.add(anchoredMethod);
+    return validMethods.filter((m) => union.has(m));
+  }
+
+  /**
    * Sum all payment amounts into the global paid total. Payments are plain money
    * amounts applied against the reservation grand total (no per-service split).
    * @param {Array<object>} rows - Plain rows { amount }.
@@ -290,7 +324,6 @@ class PaymentService {
    */
   static async loadAndCompute(reservationId) {
     const Reservation = require('../../domain/models/Reservation');
-    const Payment = require('../../domain/models/Payment');
 
     const reservation = await new Parse.Query(Reservation).get(reservationId, { useMasterKey: true });
 
@@ -326,6 +359,27 @@ class PaymentService {
     return {
       reservation, services, totals, paidGlobal, serviceItems, paymentType, currency, paymentRows,
     };
+  }
+
+  /**
+   * Wrapper con I/O de deriveAvailableMethods: carga los ReservationService de la reservación (misma
+   * query que loadAndCompute), los mapea con toServiceItems y deriva la lista de métodos disponibles
+   * usando reservation.paymentType como ancla. Lo consumen el guard de escritura del controller y el
+   * summary de lectura, para que ninguno hardcodee los métodos. No comparte carga con loadAndCompute
+   * (el controller ya tiene la reservación scopeada), así que hace su propia query mínima de servicios.
+   * @param {object} reservation - Parse Reservation object (ya cargado/scopeado por el controller).
+   * @returns {Promise<Array<string>>} Métodos disponibles en orden canónico.
+   * @example
+   * const methods = await PaymentService.loadAvailableMethods(reservation);
+   */
+  static async loadAvailableMethods(reservation) {
+    const servicesQuery = BaseModel.queryExisting('ReservationService');
+    servicesQuery.equalTo('reservationPtr', reservation);
+    servicesQuery.limit(1000);
+    const services = await servicesQuery.find({ useMasterKey: true });
+    const serviceItems = this.toServiceItems(services);
+    const anchoredMethod = reservation.get('paymentType') || 'efectivo';
+    return this.deriveAvailableMethods(serviceItems, anchoredMethod);
   }
 
   /**
@@ -378,6 +432,11 @@ class PaymentService {
       remainingBase: breakdown.remainingBase,
       remainingPercent: breakdown.remainingPercent,
       montoParaSaldar: breakdown.montoParaSaldar,
+      // Fase C (carrito de pagos): métodos realmente disponibles derivados de pricesByType (nunca
+      // hardcodeados) + el ancla, expuestos en cada lectura sin query extra (serviceItems/paymentType
+      // ya vienen en `computed`). Consumidos por la capa de presentación y validados por el controller.
+      availableMethods: this.deriveAvailableMethods(serviceItems, paymentType),
+      anchoredMethod: paymentType,
     };
   }
 

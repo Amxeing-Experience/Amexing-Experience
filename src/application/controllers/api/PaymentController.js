@@ -144,6 +144,18 @@ class PaymentController {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
 
+      // Guard de CONTENIDO (Fase C): el método debe estar realmente disponible según los datos de la
+      // cotización (pricesByType por servicio + ancla), no solo ser un token con FORMA válida (eso ya lo
+      // filtró Payment.isValidMethod en validatePaymentInput). El método ancla siempre pasa (invariante
+      // de deriveAvailableMethods). Se mide contra la RESERVACIÓN completa, no el servicio individual.
+      const availableMethods = await PaymentService.loadAvailableMethods(reservation);
+      if (!availableMethods.includes(method)) {
+        return res.status(400).json({
+          success: false,
+          error: `Método no disponible para esta reservación. Métodos disponibles: ${availableMethods.join(', ')}`,
+        });
+      }
+
       let servicePtr = null;
       if (reservationServiceId) {
         servicePtr = await PaymentController.loadReservationService(reservationServiceId, reservation);
@@ -263,6 +275,19 @@ class PaymentController {
       });
       if (validation.error) {
         return res.status(400).json({ success: false, error: validation.error });
+      }
+
+      // Guard de CONTENIDO (Fase C): SOLO cuando el actor cambia el método explícitamente. Editar otros
+      // campos NO re-valida el método histórico contra los availableMethods actuales — el respaldo de
+      // precio pudo cambiar después y no debe bloquear una edición legítima (monto, nota, comprobante).
+      if (method !== undefined) {
+        const availableMethods = await PaymentService.loadAvailableMethods(reservation);
+        if (!availableMethods.includes(method)) {
+          return res.status(400).json({
+            success: false,
+            error: `Método no disponible para esta reservación. Métodos disponibles: ${availableMethods.join(', ')}`,
+          });
+        }
       }
 
       // Payment date — shared standard (future allowed). Only validated when a new value is sent.
