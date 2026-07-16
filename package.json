@@ -351,6 +351,7 @@
     "undici": ">=5.19.1",
     "crypto-js": ">=4.2.0",
     "ws": ">=7.5.10",
+    "websocket-driver": ">=0.7.5",
     "form-data": ">=2.5.4",
     "express": ">=4.19.2",
     "@babel/runtime": ">=7.26.10",
