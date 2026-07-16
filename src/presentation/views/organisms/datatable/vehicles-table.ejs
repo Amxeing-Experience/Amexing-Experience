@@ -22,6 +22,8 @@ const canDelete = ['superadmin', 'admin'].includes(dtUserRole); // Admin and sup
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 // Modo editorial (plano, sin panel blanco ni header con gradiente). Opt-in por vista.
 const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
+// Ocultar el botón "Nuevo" del topbar (cuando la vista lo pone en el encabezado de la página).
+const hideCreate = typeof hideCreateBtn !== 'undefined' ? hideCreateBtn : false;
 %>
 
 <div class="<%= editorialFlat ? 'vt-editorial' : 'card border-0 shadow-sm' %>">
@@ -36,7 +38,7 @@ const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
                 <!-- Pills de tarifas cargadas dinámicamente -->
             </div>
         </div>
-        <% if (canCreate) { %>
+        <% if (canCreate && !hideCreate) { %>
         <button type="button" class="btn btn-sm vt-btn-new" id="createVehicleBtn">
             <i class="ti ti-plus me-1"></i>Nuevo Vehículo
         </button>
