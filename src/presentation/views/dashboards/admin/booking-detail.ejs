@@ -236,10 +236,10 @@
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
     </div>
     <div class="offcanvas-body">
+        <!-- Card de cobertura (total + estado + barra + Pagado/Saldo), primero para verse sin scroll -->
+        <div class="border rounded p-3 mb-3" id="paymentCoverageCard"></div>
         <!-- Chips por método de pago (Requisito 3) -->
         <div class="mb-3" id="paymentChips"></div>
-        <!-- Card de cobertura (estado + barra + Pagado/Saldo) -->
-        <div class="border rounded p-3 mb-3" id="paymentCoverageCard"></div>
         <!-- Desglose de saldo restante por método (Requisito 8) -->
         <div class="border rounded p-3 mb-3" id="paymentRemainingByMethod" style="display:none;"></div>
         <!-- Énfasis de descuento (Fase E) -->
@@ -1998,10 +1998,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         renderPaymentsOffcanvas();
     }
 
-    // "Agregar pago" (header): abre el carrito y muestra el formulario de nuevo pago.
+    // "Agregar pago" (header): abre el carrito. El formulario queda colapsado detrás de
+    // "Registrar pago" dentro del panel (menos amontonado al abrir).
     document.getElementById('addPaymentBtn')?.addEventListener('click', () => {
         paymentsOffcanvasInstance()?.show();
-        renderPaymentForm(null);
     });
     // "Registrar pago" (dentro del carrito): muestra el formulario de nuevo pago sin reabrir el panel.
     document.getElementById('showPaymentFormBtn')?.addEventListener('click', () => renderPaymentForm(null));

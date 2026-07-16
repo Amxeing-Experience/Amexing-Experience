@@ -301,7 +301,11 @@ const PaymentBreakdownHelpers = (() => {
           <div class="fw-semibold" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>${escapeHtml(resolved.savings.label)}</div>
           <div class="small" style="color:${DISCOUNT_GREEN};">${escapeHtml(resolved.savings.sublabel)}</div>
         </div>` : '';
-    return `<div class="d-flex justify-content-between align-items-center mb-2">
+    return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom mb-2">
+        <span class="text-muted small"><i class="ti ti-receipt-2 me-1"></i>Total a pagar</span>
+        <span class="fw-bold fs-5">${formatMoney(round2(s.total), currency)}</span>
+      </div>
+      <div class="d-flex justify-content-between align-items-center mb-2">
         <span class="text-muted small"><i class="ti ti-cash me-1"></i>Estado de pago</span>
         ${getPaymentStatusBadge(s.paymentStatus)}
       </div>
