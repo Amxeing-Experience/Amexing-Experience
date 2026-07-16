@@ -28,10 +28,12 @@ const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
     <div class="<%= editorialFlat ? 'vt-toolbar' : 'card-header text-white' %>"<% if (!editorialFlat) { %> style="background: var(--brand-gradient); border: none;"<% } %>>
         <div class="row align-items-center">
             <div class="col">
-                <h5 class="card-title mb-0 <%= editorialFlat ? 'vt-title' : 'text-white' %>">
+                <% if (!editorialFlat) { %>
+                <h5 class="card-title mb-0 text-white">
                     <i class="ti ti-car me-2"></i>Flota de Vehículos
                 </h5>
-                <small class="<%= editorialFlat ? 'vt-sub' : 'text-white' %>" style="opacity: 0.9;">Gestión completa del inventario de vehículos</small>
+                <small class="text-white" style="opacity: 0.9;">Gestión completa del inventario de vehículos</small>
+                <% } %>
             </div>
             <div class="col-auto">
                 <% if (canCreate) { %>
