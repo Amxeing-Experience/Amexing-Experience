@@ -195,7 +195,7 @@
         <button class="btn btn-sm btn-link text-decoration-none ps-0 fw-bold mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#paymentsHistoryCollapse">
             <i class="ti ti-history me-1"></i>Historial de pagos <i class="ti ti-chevron-down ms-1" style="font-size:0.75rem;"></i>
         </button>
-        <div class="collapse" id="paymentsHistoryCollapse"><div id="paymentsBody"></div></div>
+        <div class="collapse" id="paymentsHistoryCollapse"><div class="p-2" id="paymentsBody"></div></div>
     </div>
 </div>
 
@@ -206,13 +206,20 @@
 #paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 0.82rem; }
 #paymentCoverageCard.payment-coverage-highlight,
 #paymentChips .payment-chip-card,
-#paymentRemainingByMethod {
+#paymentRemainingByMethod,
+#paymentsBody {
     background: #fff;
     border: 1px solid #e0e6ed;
     border-radius: 0.5rem;
 }
 #paymentChips > div { background: transparent; border: none; }
 #paymentCoverageCard.payment-coverage-highlight { border-left: 4px solid #969b81; }
+#paymentChips .payment-chip-card,
+#paymentRemainingByMethod,
+#paymentsBody {
+    border-left: 4px solid rgba(150,155,129,0.4);
+}
+#paymentsBody { overflow: hidden; }
 #paymentsOffcanvas #paymentsBody table { font-size: 0.72rem; }
 #paymentsOffcanvas #paymentsBody .badge { font-size: 0.68rem; }
 #paymentDiscountEmphasis > div, #paymentCoverageCard .rounded { border-radius: 0.5rem; }
