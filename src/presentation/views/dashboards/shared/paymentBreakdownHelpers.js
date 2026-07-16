@@ -262,13 +262,12 @@ const PaymentBreakdownHelpers = (() => {
       // Clamp a 0 igual que computeTotals del servidor (Math.max(0, ...)): un descuento/ajuste mayor al
       // subtotal de servicios no debe pintar un total negativo por método (council L4F1).
       const methodTotal = Math.max(0, round2(computeServicesSubtotalByType(services, m, currency) + adjustments));
-      const anchorTag = m === anchor
-        ? '<span class="badge bg-secondary-subtle text-secondary ms-1">Cotizado</span>' : '';
+      // El badge "Cotizado" vive en la card de cobertura (junto a Total a pagar), no repetido aquí.
       const cheaperTag = (showCheaper && m === cheapest)
         ? `<span class="badge ms-1" style="background:${DISCOUNT_GREEN};color:#fff;">Más barato</span>` : '';
       return `<div class="border rounded p-2">
           <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-semibold small">${escapeHtml(methodLabel(m))}${anchorTag}${cheaperTag}</span>
+            <span class="fw-semibold small">${escapeHtml(methodLabel(m))}${cheaperTag}</span>
             <span class="small">${formatMoney(methodTotal, currency)}</span>
           </div>
           <div class="progress" style="height:6px;" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
@@ -301,10 +300,11 @@ const PaymentBreakdownHelpers = (() => {
           <div class="fw-semibold" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>${escapeHtml(resolved.savings.label)}</div>
           <div class="small" style="color:${DISCOUNT_GREEN};">${escapeHtml(resolved.savings.sublabel)}</div>
         </div>` : '';
-    return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom mb-2">
+    return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
         <span class="text-muted small"><i class="ti ti-receipt-2 me-1"></i>Total a pagar</span>
         <span class="fw-bold fs-5">${formatMoney(round2(s.total), currency)}</span>
       </div>
+      <div class="text-muted mb-2" style="font-size:0.75rem;">Cotizado: <span class="badge bg-secondary-subtle text-secondary">${escapeHtml(methodLabel(s.anchoredMethod))}</span></div>
       <div class="d-flex justify-content-between align-items-center mb-2">
         <span class="text-muted small"><i class="ti ti-cash me-1"></i>Estado de pago</span>
         ${getPaymentStatusBadge(s.paymentStatus)}
@@ -347,10 +347,11 @@ const PaymentBreakdownHelpers = (() => {
   }
 
   /**
-   * Énfasis de descuento (Fase E): cuando el método ancla es más caro que el método disponible más
-   * barato, resalta el ahorro potencial de pagar en el más barato (verde #146c43, no text-success).
-   * Frase explícita de ahorro + precio de lista del ancla tachado. Vacío cuando el ancla ya es el más
-   * barato (sin descuento que mostrar — regla de dirección).
+   * Énfasis de descuento (Fase E): desglosa, UNO por método, el descuento de pagar en cada método
+   * disponible más barato que el ancla de la cotización (verde #146c43, no text-success) — no solo el
+   * más barato de todos, para que se vea "cotizado en tarjeta, descuento de $X en efectivo Y de $Y en
+   * transferencia" cuando aplique a más de un método. Ordenado de mayor a menor descuento. Vacío cuando
+   * ningún método disponible es más barato que el ancla (regla de dirección).
    * @param {object} summary - Summary del backend.
    * @param {Array<object>} services - Servicios de la reservación.
    * @param {string} currency - Moneda.
@@ -363,17 +364,22 @@ const PaymentBreakdownHelpers = (() => {
     const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
     const anchor = s.anchoredMethod;
     if (methods.length < 2 || !anchor) return '';
-    const cheapest = cheapestAvailableMethod(methods, services, currency);
-    if (!cheapest || cheapest === anchor) return '';
     const anchorTotal = computeServicesSubtotalByType(services, anchor, currency);
-    const cheapestTotal = computeServicesSubtotalByType(services, cheapest, currency);
-    const savings = round2(anchorTotal - cheapestTotal);
-    if (savings <= 0) return '';
-    // methodLabel(anchor) sale de summary.anchoredMethod (= reservation.paymentType), escribible por
-    // nivel 4+ sin enum estricto: se ESCAPA como en los demás builders para cortar el stored XSS (council L3F0).
+    const rows = methods
+      .filter((m) => m !== anchor)
+      .map((m) => ({ m, savings: round2(anchorTotal - computeServicesSubtotalByType(services, m, currency)) }))
+      .filter(({ savings }) => savings > 0)
+      .sort((a, b) => b.savings - a.savings);
+    if (!rows.length) return '';
+    // methodLabel(m) sale de summary.anchoredMethod indirectamente (comparado, no interpolado como ancla)
+    // y de availableMethods (derivado, no de input libre) — igual se escapa por consistencia (council L3F0).
+    const lines = rows.map(({ m, savings }) => `<div class="d-flex justify-content-between align-items-center py-1">
+        <span class="small" style="color:${DISCOUNT_GREEN};">Descuento pagando en ${escapeHtml(methodLabel(m))}</span>
+        <span class="fw-semibold small" style="color:${DISCOUNT_GREEN};">${formatMoney(savings, currency)}</span>
+      </div>`).join('');
     return `<div class="p-2 rounded" style="background:#e8f5ee;">
-        <div class="fw-semibold" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>Descuento de ${formatMoney(savings, currency)} pagando en ${escapeHtml(methodLabel(cheapest))}</div>
-        <div class="small" style="color:${DISCOUNT_GREEN};">Precio de lista (${escapeHtml(methodLabel(anchor))}): <s>${formatMoney(anchorTotal, currency)}</s> &middot; Con ${escapeHtml(methodLabel(cheapest))}: ${formatMoney(cheapestTotal, currency)}</div>
+        <div class="fw-semibold small mb-1" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>Descuentos disponibles</div>
+        ${lines}
       </div>`;
   }
 
@@ -403,7 +409,7 @@ const PaymentBreakdownHelpers = (() => {
           <td class="text-center">${receipt}</td>
         </tr>`;
     }).join('');
-    return `<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0">
+    return `<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 small">
         <thead class="table-light"><tr>
           <th>Fecha</th><th>Método</th><th>Referencia</th><th class="text-end">Monto</th><th>Moneda</th><th class="text-center">Comprobante</th>
         </tr></thead><tbody>${rows}</tbody></table></div>`;

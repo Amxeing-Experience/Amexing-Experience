@@ -1834,7 +1834,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const rows = paymentsCache.map((p) => {
             const ref = p.reference ? PaymentBreakdownHelpers.escapeHtml(p.reference) : '<span class="text-muted">—</span>';
             const receipt = p.receiptUrl
-                ? `<a href="${p.receiptUrl}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
+                ? `<a href="${PaymentBreakdownHelpers.escapeHtml(p.receiptUrl)}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
                 : '<span class="text-muted">—</span>';
             return `<tr>
                 <td>${formatDate(p.paidAt || p.createdAt)}</td>
@@ -1851,7 +1851,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }).join('');
 
         body.innerHTML = `<div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0">
+            <table class="table table-sm table-hover align-middle mb-0 small">
                 <thead class="table-light">
                     <tr>
                         <th>Fecha</th>

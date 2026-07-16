@@ -137,13 +137,18 @@ describe('PaymentBreakdownHelpers.cheapestAvailableMethod + buildDiscountEmphasi
     expect(H.cheapestAvailableMethod([], services, 'MXN')).toBeNull();
   });
 
-  it('ancla más cara que el más barato: muestra ahorro (verde #146c43, no text-success) con precio de lista tachado', () => {
+  it('ancla más cara que TODOS los demás: desglosa un descuento por cada método más barato (no solo el más barato)', () => {
     const summary = { anchoredMethod: 'tarjeta', availableMethods: ['efectivo', 'transferencia', 'tarjeta'] };
     const html = H.buildDiscountEmphasis(summary, services, 'MXN');
     expect(html).toContain('#146c43');
     expect(html).not.toContain('text-success');
-    expect(html).toContain('Descuento de $210.00 pagando en Efectivo');
-    expect(html).toContain('<s>$1,210.00</s>');
+    // tarjeta=1210 vs efectivo=1000 (ahorro 210) y transferencia=1160 (ahorro 50) — AMBOS deben listarse.
+    expect(html).toContain('Descuento pagando en Efectivo');
+    expect(html).toContain('$210.00');
+    expect(html).toContain('Descuento pagando en Transferencia');
+    expect(html).toContain('$50.00');
+    // Orden de mayor a menor descuento: Efectivo (210) antes que Transferencia (50).
+    expect(html.indexOf('Efectivo')).toBeLessThan(html.indexOf('Transferencia'));
   });
 
   it('ancla ya es el más barato (efectivo): NO muestra descuento (regla de dirección)', () => {
@@ -155,18 +160,15 @@ describe('PaymentBreakdownHelpers.cheapestAvailableMethod + buildDiscountEmphasi
     expect(H.buildDiscountEmphasis({ anchoredMethod: 'tarjeta', availableMethods: ['tarjeta'] }, services, 'MXN')).toBe('');
   });
 
-  it('FIX council (L3F0, stored XSS): un anchoredMethod malicioso se ESCAPA en el énfasis de descuento', () => {
-    // anchoredMethod viene de reservation.paymentType (escribible por nivel 4+ sin enum estricto); un
-    // token con markup no debe llegar crudo al innerHTML. item.total alto hace que el ancla corrupta
-    // rinda como "precio de lista" (fallback a total) y supere al más barato, forzando el render.
+  it('un ancla no reconocida (ni en availableMethods) igual se excluye del desglose, sin romper el cálculo', () => {
+    // anchoredMethod fuera de la lista de métodos disponibles (dato corrupto/legacy): el fallback a
+    // item.total lo hace rendir como "precio de lista" y las 2 filas de descuento se calculan igual.
     const svc = [{ subconcept: { pricesByType: { efectivo: 100, tarjeta: 200 } }, total: 500 }];
-    const payload = '"><img src=x onerror=alert(1)>';
     const html = H.buildDiscountEmphasis(
-      { anchoredMethod: payload, availableMethods: ['efectivo', 'tarjeta'] }, svc, 'MXN'
+      { anchoredMethod: 'bitcoin', availableMethods: ['efectivo', 'tarjeta'] }, svc, 'MXN'
     );
-    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
-    expect(html).not.toContain('<img src=x');
-    expect(html).not.toContain('"><img');
+    expect(html).toContain('Descuento pagando en Efectivo');
+    expect(html).toContain('Descuento pagando en Tarjeta');
   });
 });
 
@@ -214,6 +216,21 @@ describe('PaymentBreakdownHelpers.buildCoverageCard + buildRemainingByMethod', (
     const html = H.buildCoverageCard({ paymentStatus: 'paid', balance: 500, paidAmount: 2000, coveragePercent: 100 }, 'MXN');
     expect(html).toContain('Descuento de $500.00');
     expect(html).toContain('#146c43');
+  });
+
+  it('muestra "Cotizado: <método>" junto al Total a pagar', () => {
+    const html = H.buildCoverageCard({ anchoredMethod: 'tarjeta', total: 1210, coveragePercent: 0 }, 'MXN');
+    expect(html).toContain('Total a pagar');
+    expect(html).toContain('Cotizado');
+    expect(html).toContain('Tarjeta');
+  });
+
+  it('FIX council (L3F0, stored XSS): un anchoredMethod malicioso se ESCAPA en "Cotizado"', () => {
+    const payload = '"><img src=x onerror=alert(1)>';
+    const html = H.buildCoverageCard({ anchoredMethod: payload, total: 100, coveragePercent: 0 }, 'MXN');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).not.toContain('<img src=x');
+    expect(html).not.toContain('"><img');
   });
 
   it('remaining-by-method vacío cuando ya está pagado', () => {
