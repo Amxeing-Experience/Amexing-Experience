@@ -20,20 +20,22 @@ const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole); // Admin and superadmin can delete
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+// Modo editorial (plano, sin panel blanco ni header con gradiente). Opt-in por vista.
+const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
 %>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
+<div class="<%= editorialFlat ? 'vt-editorial' : 'card border-0 shadow-sm' %>">
+    <div class="<%= editorialFlat ? 'vt-toolbar' : 'card-header text-white' %>"<% if (!editorialFlat) { %> style="background: var(--brand-gradient); border: none;"<% } %>>
         <div class="row align-items-center">
             <div class="col">
-                <h5 class="card-title mb-0 text-white">
+                <h5 class="card-title mb-0 <%= editorialFlat ? 'vt-title' : 'text-white' %>">
                     <i class="ti ti-list me-2"></i>Tipos de Vehículo
                 </h5>
-                <small class="text-white" style="opacity: 0.9;">Catálogo de tipos de vehículos del sistema</small>
+                <small class="<%= editorialFlat ? 'vt-sub' : 'text-white' %>" style="opacity: 0.9;">Catálogo de tipos de vehículos del sistema</small>
             </div>
             <div class="col-auto">
                 <% if (canCreate) { %>
-                    <button type="button" class="btn btn-light btn-sm" id="createVehicleTypeBtn">
+                    <button type="button" class="btn btn-sm <%= editorialFlat ? 'vt-btn-new' : 'btn-light' %>" id="createVehicleTypeBtn">
                         <i class="ti ti-plus me-1"></i>Nuevo Tipo
                     </button>
                 <% } %>
@@ -41,7 +43,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         </div>
     </div>
 
-    <div class="card-body" id="vehicle-types-content">
+    <div class="<%= editorialFlat ? 'vt-table' : 'card-body' %>" id="vehicle-types-content">
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
