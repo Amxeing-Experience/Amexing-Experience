@@ -183,9 +183,10 @@ const PaymentBreakdownHelpers = (() => {
    * de la cotización), ese residuo es un AHORRO y se muestra como línea separada, nunca restado del
    * saldo; si el `balance` físico es <= 0 (se pagó igual o más caro que el ancla, caso overpay H1) no
    * hay línea de ahorro. Cuando NO está pagado (pending/partial, y refunded se trata igual que "no
-   * pagado" literal — H2) el saldo mostrado es el `balance` físico tal cual y NUNCA hay línea de ahorro,
-   * sin importar el método del pago parcial (trampa: un parcial en método distinto al ancla no genera
-   * ahorro mostrado; solo lo genera un pago 'paid').
+   * pagado" literal — H2) el saldo mostrado es el `balance` físico, clampado a 0 (NUNCA se muestra un
+   * saldo negativo, decisión explícita del dueño del negocio) y NUNCA hay línea de ahorro, sin importar
+   * el método del pago parcial (trampa: un parcial en método distinto al ancla no genera ahorro
+   * mostrado; solo lo genera un pago 'paid').
    * @param {object} summary - Summary de PaymentService.buildSummary ({ paymentStatus, balance, ... }).
    * @returns {object} { displayedBalance:number, savings:null|{ amount:number, label:string, sublabel:string } }.
    * @example
@@ -210,8 +211,12 @@ const PaymentBreakdownHelpers = (() => {
       // Overpay / método igual o más caro que el ancla (H1): saldo $0, sin mensaje especial.
       return { displayedBalance: 0, savings: null };
     }
-    // pending / partial / refunded (H2): saldo físico tal cual, nunca línea de ahorro.
-    return { displayedBalance: balance, savings: null };
+    // pending / partial / refunded (H2): saldo físico tal cual, nunca línea de ahorro. Se clampa a 0
+    // (nunca un saldo negativo mostrado): puede ocurrir cuando el pago parcial fue en un método más
+    // caro que el ancla y su equivalente aún no cierra 'paid', dejando el balance físico en negativo
+    // (se pagó más dinero físico del total, pero no lo suficiente en la moneda de la cotización). El
+    // dueño del negocio fue explícito: nunca debe mostrarse un saldo negativo.
+    return { displayedBalance: Math.max(0, balance), savings: null };
   }
 
   /**

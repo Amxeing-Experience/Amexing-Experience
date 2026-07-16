@@ -132,6 +132,13 @@ describe('PaymentBreakdownHelpers.resolveDisplayedBalance (Pregunta 0 — saldo 
     expect(H.resolveDisplayedBalance({ paymentStatus: 'pending', balance: 50000 })).toEqual({ displayedBalance: 50000, savings: null });
   });
 
+  it('partial + balance físico NEGATIVO (pagó en un método más caro que el ancla sin cerrar "paid"): saldo se clampa a 0, NUNCA negativo', () => {
+    // Decisión explícita del dueño: nunca debe mostrarse un saldo negativo, en ningún estado.
+    const r = H.resolveDisplayedBalance({ paymentStatus: 'partial', balance: -1979 });
+    expect(r.displayedBalance).toBe(0);
+    expect(r.savings).toBeNull();
+  });
+
   it('refunded (H2): se trata igual que "no pagado" — saldo físico tal cual, sin ahorro', () => {
     expect(H.resolveDisplayedBalance({ paymentStatus: 'refunded', balance: 3000 })).toEqual({ displayedBalance: 3000, savings: null });
   });
