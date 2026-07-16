@@ -236,23 +236,28 @@
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
     </div>
     <div class="offcanvas-body">
-        <!-- Card de cobertura (total + estado + barra + Pagado/Saldo), primero para verse sin scroll -->
-        <div class="border rounded p-3 mb-3" id="paymentCoverageCard"></div>
+        <!-- Card de cobertura (total + estado + barra + Pagado/Saldo), primero para verse sin scroll,
+             con color de marca propio (payment-coverage-highlight) para distinguirla del resto del carrito -->
+        <div class="rounded p-3 mb-3 payment-coverage-highlight" id="paymentCoverageCard"></div>
         <!-- Chips por método de pago (Requisito 3) -->
         <div class="mb-3" id="paymentChips"></div>
         <!-- Desglose de saldo restante por método (Requisito 8) -->
         <div class="border rounded p-3 mb-3" id="paymentRemainingByMethod" style="display:none;"></div>
         <!-- Énfasis de descuento (Fase E) -->
         <div class="mb-3" id="paymentDiscountEmphasis" style="display:none;"></div>
-        <!-- Historial de pagos + registro (admin) -->
+        <!-- Historial de pagos (colapsado por defecto, menos amontonado) + registro (admin) -->
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="fw-bold mb-0"><i class="ti ti-history me-1"></i>Historial de pagos</h6>
+            <button class="btn btn-sm btn-link text-decoration-none ps-0 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#paymentsHistoryCollapse" id="paymentsHistoryToggle">
+                <i class="ti ti-history me-1"></i>Historial de pagos <i class="ti ti-chevron-down ms-1" style="font-size:0.75rem;"></i>
+            </button>
             <button class="btn btn-sm btn-primary d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
         </div>
         <!-- Inline payment form (relocated from the old card; only admin renders/uses it) -->
         <div id="paymentFormWrap" class="border rounded p-3 mb-3 bg-light" style="display:none;"></div>
-        <div id="paymentsBody">
-            <!-- Payments table — rendered by JS -->
+        <div class="collapse" id="paymentsHistoryCollapse">
+            <div id="paymentsBody">
+                <!-- Payments table — rendered by JS -->
+            </div>
         </div>
     </div>
 </div>
@@ -260,6 +265,21 @@
 <style>
 #paymentsOffcanvas { --bs-offcanvas-width: 680px; }
 @media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
+/* Letra mas chica en todo el carrito (chips, cobertura, historial) para que quepa mas sin sentirse
+   amontonado; el historial ya trae ademas la clase Bootstrap "small" encima de esta base. */
+#paymentsOffcanvas .offcanvas-body { font-size: 0.82rem; }
+/* Card de cobertura con color propio (gradiente de marca, igual al header de Resumen Financiero) para
+   que no se pierda entre las demas tarjetas del carrito. */
+#paymentCoverageCard.payment-coverage-highlight {
+    background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%);
+    color: #fff;
+    border: none;
+}
+#paymentCoverageCard.payment-coverage-highlight .text-muted { color: rgba(255,255,255,0.85) !important; }
+#paymentCoverageCard.payment-coverage-highlight .progress { background-color: rgba(255,255,255,0.35); }
+#paymentCoverageCard.payment-coverage-highlight .border-bottom { border-color: rgba(255,255,255,0.35) !important; }
+#paymentCoverageCard.payment-coverage-highlight .text-success { color: #d7fff0 !important; }
+#paymentCoverageCard.payment-coverage-highlight .text-danger { color: #ffe1e1 !important; }
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
@@ -1599,6 +1619,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const card = document.getElementById('financialSummaryCard');
         const body = document.getElementById('financialSummaryBody');
         const addBtn = document.getElementById('addAdjustmentBtn');
+        const addPaymentBtn = document.getElementById('addPaymentBtn');
         const adjustments = d.adjustments || [];
         // Subtotal recomputed from per-service pricesByType[paymentType] so the booking
         // matches the quote's totals when both use the same payment type, and updates
@@ -1613,6 +1634,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         card.style.display = '';
         if (canEdit) addBtn.classList.remove('d-none');
         else addBtn.classList.add('d-none');
+        // "Agregar pago" solo depende de d.status (ya disponible aquí, tras loadReservation), no de
+        // paymentsCache — se habilita en el mismo punto que "+ Ajuste" para no esperar el fetch aparte
+        // de loadPayments (evita el retraso visible del botón tras un hard reload).
+        if (addPaymentBtn) {
+            if (canEdit) addPaymentBtn.classList.remove('d-none');
+            else addPaymentBtn.classList.add('d-none');
+        }
 
         const charges = adjustments.filter(a => a.type === 'charge');
         const discounts = adjustments.filter(a => a.type === 'discount');
@@ -1814,7 +1842,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     function renderPayments() {
         const body = document.getElementById('paymentsBody');
-        const addBtn = document.getElementById('addPaymentBtn');
         const showFormBtn = document.getElementById('showPaymentFormBtn');
         if (!body) return;
 
@@ -1822,8 +1849,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
         const curr = d.currency || 'MXN';
 
-        // Controles de escritura (abrir carrito / registrar pago) solo cuando la reservación es editable.
-        if (addBtn) { if (canEdit) addBtn.classList.remove('d-none'); else addBtn.classList.add('d-none'); }
+        // "Agregar pago" (header) ya se habilita en renderFinancialSummary, justo tras loadReservation.
+        // "Registrar pago" (dentro del carrito) solo es relevante una vez abierto el offcanvas.
         if (showFormBtn) { if (canEdit) showFormBtn.classList.remove('d-none'); else showFormBtn.classList.add('d-none'); }
 
         if (!paymentsCache.length) {
