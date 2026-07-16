@@ -2432,6 +2432,19 @@ class QuoteController {
         paymentType,
       };
 
+      // Asegura un id estable por subconcepto ANTES de guardar. Los servicios agregados desde
+      // "Agregar a cotización" (tarifario) llegan sin id; sin id se rompen request-change y el
+      // bloqueo por-servicio, que keyean por sc.id. Se asigna solo a los que falten.
+      const nowId = Date.now();
+      serviceItems.days = (serviceItems.days || []).map((d, di) => ({
+        ...d,
+        subconcepts: (d.subconcepts || []).map((sc, si) => (
+          (sc && !sc.id)
+            ? { ...sc, id: `service_${nowId}_${di}_${si}_${Math.random().toString(36).slice(2, 8)}` }
+            : sc
+        )),
+      }));
+
       // Bloqueo por-servicio: los subconceptos PROTEGIDOS no pueden ser editados ni eliminados
       // por no-admins (el servidor los restaura), reforzando lo que la UI ya impide.
       // Un subconcepto está protegido si:
