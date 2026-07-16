@@ -189,9 +189,9 @@
     </div>
     <div class="offcanvas-body">
         <div class="rounded p-3 mb-3 payment-coverage-highlight" id="paymentCoverageCard"></div>
+        <div class="mb-3" id="paymentDiscountEmphasis" style="display:none;"></div>
         <div class="mb-3" id="paymentChips"></div>
         <div class="border rounded p-3 mb-3" id="paymentRemainingByMethod" style="display:none;"></div>
-        <div class="mb-3" id="paymentDiscountEmphasis" style="display:none;"></div>
         <button class="btn btn-sm btn-link text-decoration-none ps-0 fw-bold mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#paymentsHistoryCollapse">
             <i class="ti ti-history me-1"></i>Historial de pagos <i class="ti ti-chevron-down ms-1" style="font-size:0.75rem;"></i>
         </button>
@@ -200,19 +200,14 @@
 </div>
 
 <style>
-#paymentsOffcanvas { --bs-offcanvas-width: 680px; }
+#paymentsOffcanvas { --bs-offcanvas-width: 760px; }
 @media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
 #paymentsOffcanvas .offcanvas-body { font-size: 0.82rem; }
 #paymentCoverageCard.payment-coverage-highlight {
-    background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%);
-    color: #fff;
+    background: #f3f4f0;
     border: none;
+    border-left: 4px solid #969b81;
 }
-#paymentCoverageCard.payment-coverage-highlight .text-muted { color: rgba(255,255,255,0.85) !important; }
-#paymentCoverageCard.payment-coverage-highlight .progress { background-color: rgba(255,255,255,0.35); }
-#paymentCoverageCard.payment-coverage-highlight .border-bottom { border-color: rgba(255,255,255,0.35) !important; }
-#paymentCoverageCard.payment-coverage-highlight .text-success { color: #d7fff0 !important; }
-#paymentCoverageCard.payment-coverage-highlight .text-danger { color: #ffe1e1 !important; }
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;

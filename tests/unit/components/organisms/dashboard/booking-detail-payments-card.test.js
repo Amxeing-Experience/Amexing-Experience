@@ -24,10 +24,10 @@ describe('Booking Detail - Pagos Offcanvas (admin)', () => {
     expect(html).not.toContain('id="paymentsCountBadge"');
   });
 
-  test('existe el Offcanvas nativo de Bootstrap con ancho 680px y breakpoint sm (576px)', () => {
+  test('existe el Offcanvas nativo de Bootstrap con ancho 760px y breakpoint sm (576px)', () => {
     expect(html).toContain('id="paymentsOffcanvas"');
     expect(html).toContain('offcanvas offcanvas-end');
-    expect(html).toContain('--bs-offcanvas-width: 680px');
+    expect(html).toContain('--bs-offcanvas-width: 760px');
     expect(html).toContain('@media (max-width: 576px)');
   });
 
