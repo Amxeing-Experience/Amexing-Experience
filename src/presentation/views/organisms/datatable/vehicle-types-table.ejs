@@ -247,13 +247,17 @@ const dtCardList = typeof cardList !== 'undefined' ? cardList : false;
                             acts += `<button type="button" class="tcard-btn danger delete-type-btn" data-id="${id}" data-name="${row.name}" title="Eliminar"><i class="ti ti-trash"></i></button>`;
                         }
                         const tag = active ? '' : ' <span class="tcard-tag">Inactivo</span>';
-                        const meta = `${cap} pasajeros${carry != null ? ' · ' + carry + ' equipaje' : ''}${row.description ? ' · ' + row.description : ''}`;
+                        const desc = row.description ? `<div class="tcard-desc">${row.description}</div>` : '';
+                        const stats = '<div class="tcard-stats">'
+                            + `<span class="tcard-stat" title="Capacidad de pasajeros"><i class="ti ti-users"></i>${cap}</span>`
+                            + (carry != null ? `<span class="tcard-stat" title="Carry-on"><i class="ti ti-luggage"></i>${carry}</span>` : '')
+                            + '</div>';
                         return `<div class="tcard${active ? '' : ' off'}">
-                            <div class="tcard-ic"><i class="ti ti-car"></i></div>
                             <div class="tcard-body">
                                 <div class="tcard-name">${row.name || '-'}${tag}</div>
-                                <div class="tcard-meta">${meta}</div>
+                                ${desc}
                             </div>
+                            ${stats}
                             <div class="tcard-actions">${acts}</div>
                         </div>`;
                     }
