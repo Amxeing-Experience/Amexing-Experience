@@ -265,17 +265,23 @@
 <style>
 #paymentsOffcanvas { --bs-offcanvas-width: 760px; }
 @media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
+/* Backdrop mas oscuro que el default de Bootstrap (0.5) para que las tarjetas blancas del carrito
+   resalten mas contra el resto de la pagina (unico offcanvas de esta vista). */
+.offcanvas-backdrop.show { background-color: rgba(15,23,32,0.72) !important; opacity: 1 !important; }
 /* Fondo gris claro (el mismo tono de fondo de pagina del resto del dashboard, #f8f9fa) para que las
    tarjetas blancas "floten" con contraste, en vez de perderse contra un panel blanco parejo. */
 #paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 0.82rem; }
 /* Letra mas chica en todo el carrito (chips, cobertura, historial) para que quepa mas sin sentirse
-   amontonado; el historial ya trae ademas la clase Bootstrap "small" encima de esta base. */
+   amontonado; el historial ya trae ademas la clase Bootstrap "small" encima de esta base. Radio de
+   borde explicito (0.5rem, el mismo que usan las demas cards de esta pagina) porque el `.rounded`
+   por defecto de Bootstrap se veia casi recto a este tamano. */
 #paymentCoverageCard.payment-coverage-highlight,
 #paymentChips > div,
 #paymentRemainingByMethod,
 #paymentFormWrap {
     background: #fff;
     border: 1px solid #e0e6ed;
+    border-radius: 0.5rem;
 }
 /* Card de cobertura: filete de acento del verde sage de marca (--brand-primary), en vez del degradado
    turquesa anterior (no encajaba con el resto del sistema). */
@@ -283,6 +289,8 @@
 /* Historial: letra explicitamente chica en la tabla (mas chica que el resto del panel). */
 #paymentsOffcanvas #paymentsBody table { font-size: 0.72rem; }
 #paymentsOffcanvas #paymentsBody .badge { font-size: 0.68rem; }
+/* Mismo radio de borde explicito para el bloque de descuento/ahorro (fondo verde claro propio). */
+#paymentDiscountEmphasis > div, #paymentCoverageCard .rounded { border-radius: 0.5rem; }
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
