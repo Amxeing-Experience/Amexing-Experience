@@ -1,136 +1,151 @@
 <%
 /**
- * Admin Vehicles Management Page
- * Manages Amexing vehicle fleet and vehicle types
+ * Admin Vehicles Management Page (editorial)
  *
- * Layout Structure:
- * - Vertical navigation menu (collapsible)
- * - Two sections: Vehículos (vehicles list) and Tipos (vehicle types management)
- * - Section-based content rendering
+ * Estructura:
+ * - Encabezado editorial con acciones a la derecha: "Tipos" (abre panel lateral) + "Nuevo Vehículo".
+ * - Vista principal = la flota (vehicles-table) inline.
+ * - Los Tipos de Vehículo se gestionan en un panel lateral (drawer), no como tab.
  *
- * Note: DataTables CSS/JS libraries are loaded via controller
+ * Nota: DataTables / Dropzone se cargan vía el controlador.
  */
 
 // Page configuration
 const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
-const activeSection = typeof section !== 'undefined' ? section : 'vehicles';
-
-// Menu items configuration
-const menuItems = [
-    { label: 'Vehículos', icon: 'car', section: 'vehicles', href: '/dashboard/admin/vehicles' },
-    { label: 'Tipos de Vehículo', icon: 'list', section: 'types', href: '/dashboard/admin/vehicles?section=types' }
-];
+const canCreate = ['superadmin', 'admin'].includes(currentUserRole);
 %>
 
-<!-- Page Header with Breadcrumb -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-start mb-3">
-            <div>
-                <h2 class="mb-1 fw-bold">Gestión de Vehículos</h2>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item">
-                            <a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a>
-                        </li>
-                        <li class="breadcrumb-item active">
-                            <i class="ti ti-car me-1"></i>Vehículos
-                        </li>
-                    </ol>
-                </nav>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <a href="/dashboard/admin" class="btn btn-sm btn-outline-secondary">
-                    <i class="ti ti-arrow-left me-1"></i>Volver
-                </a>
-            </div>
-        </div>
+<div class="vehicles-wrap">
+
+<!-- Encabezado editorial + acciones -->
+<div class="vh-head-row">
+    <div class="vh-titles">
+        <div class="eyebrow">Gestión</div>
+        <h1>Vehículos</h1>
+        <div class="crumb"><a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a> · Vehículos</div>
     </div>
-</div>
-
-<!-- Main Content -->
-<div class="row mt-4">
-    <!-- Section tabs (horizontal) -->
-    <div class="col-12">
-        <nav class="vehicles-nav-tabs mb-3">
-            <% menuItems.forEach(function(item) { %>
-                <a href="<%= item.href %>" class="vehicles-nav-tab <%= item.section === activeSection ? 'active' : '' %>">
-                    <i class="ti ti-<%= item.icon %> me-2"></i><%= item.label %>
-                </a>
-            <% }); %>
-        </nav>
-    </div>
-
-    <!-- Content Column -->
-    <div class="col-12" id="contentColumn">
-        <% if (activeSection === 'vehicles') { %>
-            <!-- Vehicles Management Section -->
-            <%- include('../../organisms/datatable/vehicles-table', {
-                tableId: 'vehicles-table',
-                apiEndpoint: '/api/vehicles',
-                userRole: currentUserRole,
-                showActions: true
-            }) %>
-
-        <% } else if (activeSection === 'types') { %>
-            <!-- Vehicle Types Management Section -->
-
-            <%- include('../../organisms/datatable/vehicle-types-table', {
-                tableId: 'vehicle-types-table',
-                apiEndpoint: '/api/vehicle-types',
-                userRole: currentUserRole,
-                showActions: true
-            }) %>
-
+    <div class="vh-actions">
+        <button type="button" class="vt-btn-types" id="openTypesDrawer">
+            <i class="ti ti-settings me-1"></i>Tipos
+        </button>
+        <% if (canCreate) { %>
+        <button type="button" class="vt-btn-new" id="createVehicleBtn">
+            <i class="ti ti-plus me-1"></i>Nuevo Vehículo
+        </button>
         <% } %>
     </div>
 </div>
 
-<!-- Vertical Menu Styles -->
+<!-- Vista principal: la flota -->
+<%- include('../../organisms/datatable/vehicles-table', {
+    tableId: 'vehicles-table',
+    apiEndpoint: '/api/vehicles',
+    userRole: currentUserRole,
+    showActions: true,
+    editorial: true,
+    hideCreateBtn: true
+}) %>
+
+<!-- Panel lateral: Tipos de Vehículo (catálogo de referencia) -->
+<div class="vt-backdrop" id="typesBackdrop"></div>
+<aside class="vt-drawer" id="typesDrawer" aria-hidden="true" aria-label="Tipos de vehículo">
+    <div class="vt-drawer-head">
+        <div>
+            <h3>Tipos de Vehículo</h3>
+            <div class="vt-drawer-sub">Catálogo de referencia · define capacidad y categoría</div>
+        </div>
+        <button type="button" class="vt-drawer-close" id="closeTypesDrawer" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <%- include('../../organisms/datatable/vehicle-types-table', {
+        tableId: 'vehicle-types-table',
+        apiEndpoint: '/api/vehicle-types',
+        userRole: currentUserRole,
+        showActions: true,
+        editorial: true,
+        cardList: true,
+        deferInit: true
+    }) %>
+</aside>
+
+</div>
+
+<!-- Estilos editoriales -->
 <style>
-/* Vertical Menu Styles */
-/* Section tabs (horizontal, salvia) */
-.vehicles-nav-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    border-bottom: 1px solid #e9ecef;
-    overflow-x: auto;
-}
+.vehicles-wrap{--olive:#6E7A50;--olive-d:#566040;--line:#ded9cb;--ink:#2b2b2b;--muted:#8a8f78;}
+/* Encabezado editorial + acciones */
+.vehicles-wrap .eyebrow{text-transform:uppercase;letter-spacing:.34em;font-size:.7rem;color:var(--olive);font-weight:600;}
+.vehicles-wrap .vh-head-row{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:24px;}
+.vehicles-wrap .vh-titles h1{margin:.15rem 0 0;font-weight:400;letter-spacing:.06em;font-size:1.9rem;color:var(--ink);}
+.vehicles-wrap .vh-titles .crumb{margin-top:.35rem;font-size:.78rem;color:var(--muted);}
+.vehicles-wrap .vh-titles .crumb a{color:var(--muted);text-decoration:none;}
+.vehicles-wrap .vh-titles .crumb a:hover{color:var(--olive-d);}
+.vehicles-wrap .vh-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.vehicles-wrap .vt-btn-types{display:inline-flex;align-items:center;background:#fff;color:var(--olive-d);border:1px solid var(--line);
+    border-radius:10px;font-weight:700;font-size:.76rem;text-transform:uppercase;letter-spacing:.06em;padding:.5rem 1rem;cursor:pointer;}
+.vehicles-wrap .vt-btn-types:hover{border-color:var(--olive);background:#faf9f5;}
 
-.vehicles-nav-tab {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.6rem 1.1rem;
-    color: var(--brand-primary-active);
-    text-decoration: none;
-    font-weight: 500;
-    white-space: nowrap;
-    border-bottom: 2px solid transparent;
-    border-radius: 0.5rem 0.5rem 0 0;
-    transition: all 0.2s ease;
-}
+/* Tabla en modo editorial (sin panel blanco ni header con gradiente) */
+.vehicles-wrap .vt-editorial{background:transparent;}
+.vehicles-wrap .vt-toolbar{margin:.2rem 0 1.2rem;}
+/* Fila superior: filtro por tarifa (chips) */
+.vehicles-wrap .vt-topbar{display:flex;align-items:center;justify-content:space-between;gap:14px 20px;flex-wrap:wrap;margin:.2rem 0 1.2rem;}
+.vehicles-wrap .vt-filter-inline{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0;}
+.vehicles-wrap .vt-filter-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:700;white-space:nowrap;}
+.vehicles-wrap .vt-pills{display:flex;flex-wrap:wrap;gap:.4rem;}
+.vehicles-wrap .vt-pills .btn{border-radius:999px;border:1px solid var(--line);color:var(--muted);background:#fff;
+    font-weight:600;font-size:.76rem;padding:.32rem .9rem;box-shadow:none;transition:all .15s ease;}
+.vehicles-wrap .vt-pills .btn:hover{border-color:var(--olive);color:var(--olive-d);}
+.vehicles-wrap .vt-pills .btn-check:checked + .btn{background:var(--olive);border-color:var(--olive);color:#fff;}
+.vehicles-wrap .vt-pills .btn-check:focus-visible + .btn{outline:2px solid var(--olive);outline-offset:2px;}
+.vehicles-wrap .vt-btn-new{background:var(--olive);color:#fff;border:1px solid var(--olive);border-radius:10px;
+    font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.76rem;padding:.5rem 1rem;white-space:nowrap;cursor:pointer;}
+.vehicles-wrap .vt-btn-new:hover{background:var(--olive-d);color:#fff;}
+.vehicles-wrap .vt-table{padding:0;}
+/* thead sobrio (crema / versalita) — como en reservaciones */
+.vehicles-wrap .table > thead.table-light th,
+.vehicles-wrap .table thead.table-light th{background:rgba(228,223,207,.35);border-bottom:1px solid var(--line);
+    color:var(--muted);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;font-weight:600;vertical-align:middle;}
+.vehicles-wrap .table > tbody td{vertical-align:middle;border-color:#f0eee6;}
 
-.vehicles-nav-tab:hover {
-    background: rgba(var(--brand-primary-rgb), 0.08);
-    color: var(--brand-primary-active);
-}
-
-.vehicles-nav-tab.active {
-    color: #fff;
-    background: var(--brand-gradient);
-    border-bottom-color: var(--brand-primary);
-}
-
-/* Breadcrumb styles */
-.breadcrumb-item a {
-    color: #5a6a85;
-    text-decoration: none;
-}
-
-.breadcrumb-item a:hover {
-    color: var(--brand-primary-active);
-}
+/* Panel lateral (drawer) de Tipos */
+/* z-index a nivel offcanvas (1040/1045), DEBAJO de los modales de Bootstrap (backdrop 1050 / modal 1055),
+   para que los modales de crear/editar/eliminar/desactivar tipo salgan por ENCIMA del panel y sean clicables. */
+.vehicles-wrap .vt-backdrop{position:fixed;inset:0;background:rgba(30,28,22,.28);opacity:0;pointer-events:none;transition:opacity .25s;z-index:1040;}
+.vehicles-wrap .vt-backdrop.open{opacity:1;pointer-events:auto;}
+.vehicles-wrap .vt-drawer{position:fixed;top:0;right:0;height:100vh;width:560px;max-width:92vw;background:#fff;border-left:1px solid var(--line);
+    box-shadow:-10px 0 30px rgba(0,0,0,.10);transform:translateX(100%);transition:transform .28s ease;z-index:1045;padding:22px 24px;overflow:auto;}
+.vehicles-wrap .vt-drawer.open{transform:none;}
+.vehicles-wrap .vt-drawer .vt-drawer-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
+    margin-bottom:18px;border-bottom:1px solid var(--line);padding-bottom:14px;}
+.vehicles-wrap .vt-drawer h3{margin:0;font-size:1.05rem;font-weight:700;color:var(--ink);}
+.vehicles-wrap .vt-drawer .vt-drawer-sub{font-size:.78rem;color:var(--muted);margin-top:.2rem;}
+.vehicles-wrap .vt-drawer .vt-drawer-close{border:1px solid var(--line);background:#fff;border-radius:8px;width:32px;height:32px;
+    display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;font-size:1rem;flex:none;}
+.vehicles-wrap .vt-drawer .vt-drawer-close:hover{color:var(--ink);border-color:var(--olive);}
+/* Tipos como lista de tarjetas (la tabla de 1 columna se muestra como cards) */
+.vehicles-wrap .vt-drawer .table,
+.vehicles-wrap .vt-drawer .table-responsive{border:0;}
+.vehicles-wrap .vt-drawer .table thead{display:none;}
+.vehicles-wrap .vt-drawer .table tbody,
+.vehicles-wrap .vt-drawer .table tr,
+.vehicles-wrap .vt-drawer .table td{display:block;width:100%;}
+.vehicles-wrap .vt-drawer .table td{border:0;padding:0;}
+.vehicles-wrap .vt-drawer .table tr{margin-bottom:10px;}
+.vehicles-wrap .vt-drawer .table.table-hover tbody tr:hover{background:transparent;}
+.vehicles-wrap .tcard{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#fff;transition:border-color .15s;}
+.vehicles-wrap .tcard:hover{border-color:#c9c3ad;}
+.vehicles-wrap .tcard.off{opacity:.6;}
+.vehicles-wrap .tcard .tcard-body{flex:1;min-width:0;}
+.vehicles-wrap .tcard .tcard-name{font-weight:700;font-size:.9rem;color:var(--ink);}
+.vehicles-wrap .tcard .tcard-tag{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;background:#f0e3e0;color:#b4453a;border-radius:999px;padding:1px 7px;font-weight:700;vertical-align:middle;margin-left:4px;}
+.vehicles-wrap .tcard .tcard-stats{display:flex;gap:8px;flex:none;}
+.vehicles-wrap .tcard .tcard-stat{display:inline-flex;align-items:center;gap:5px;background:#f4f3ee;border:1px solid var(--line);border-radius:8px;padding:3px 9px;font-size:.8rem;font-weight:700;color:var(--olive-d);}
+.vehicles-wrap .tcard .tcard-stat i{font-size:.95rem;opacity:.85;}
+.vehicles-wrap .tcard .tcard-actions{display:flex;gap:6px;flex:none;}
+.vehicles-wrap .tcard .tcard-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--olive-d);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:.85rem;}
+.vehicles-wrap .tcard .tcard-btn:hover{border-color:var(--olive);background:#faf9f5;}
+.vehicles-wrap .tcard .tcard-btn.danger{color:#b4453a;}
+.vehicles-wrap .tcard .tcard-btn.danger:hover{border-color:#b4453a;background:#fbf1ef;}
 </style>
 
 <!-- Load Dropzone.js from CDN -->
@@ -139,3 +154,50 @@ const menuItems = [
 
 <!-- Vehicle Images Modal JavaScript -->
 <script src="/js/vehicle-images-modal.js"></script>
+
+<!-- Drawer de Tipos: abrir/cerrar + ajustar columnas del DataTable (se inicializa oculto) -->
+<script>
+(function () {
+    var drawer = document.getElementById('typesDrawer');
+    var backdrop = document.getElementById('typesBackdrop');
+    var openBtn = document.getElementById('openTypesDrawer');
+    var closeBtn = document.getElementById('closeTypesDrawer');
+    if (!drawer || !openBtn) return;
+
+    // El modal de crear/editar tipo es estático dentro del drawer; se mueve a <body> para que su
+    // backdrop (nivel body) no lo tape (el drawer crea su propio stacking context).
+    var typeModal = document.getElementById('vehicleTypeModal');
+    if (typeModal && typeModal.parentElement !== document.body) document.body.appendChild(typeModal);
+
+    var typesInited = false;
+    function openDrawer() {
+        drawer.classList.add('open');
+        if (backdrop) backdrop.classList.add('open');
+        drawer.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        if (!typesInited) {
+            // Lazy: inicializa el DataTable de tipos la primera vez que se abre el panel.
+            typesInited = true;
+            if (typeof window.__vehicleTypesInit === 'function') window.__vehicleTypesInit();
+        } else {
+            // Ya inicializado (oculto) → recalcular anchos al mostrarse.
+            try {
+                if (window.jQuery && jQuery.fn.dataTable && jQuery.fn.dataTable.isDataTable('#vehicle-types-table')) {
+                    jQuery('#vehicle-types-table').DataTable().columns.adjust();
+                }
+            } catch (e) { /* noop */ }
+        }
+    }
+    function closeDrawer() {
+        drawer.classList.remove('open');
+        if (backdrop) backdrop.classList.remove('open');
+        drawer.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    openBtn.addEventListener('click', openDrawer);
+    if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+    if (backdrop) backdrop.addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && drawer.classList.contains('open')) closeDrawer(); });
+})();
+</script>

@@ -20,20 +20,30 @@ const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole); // Admin and superadmin can delete
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+// Modo editorial (plano, sin panel blanco ni header con gradiente). Opt-in por vista.
+const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
+// Compacto: sin controles de DataTables (búsqueda/paginación/length), muestra todo. Ideal en panel.
+const dtCompact = typeof compact !== 'undefined' ? compact : false;
+// Init diferido (lazy): no inicializa el DataTable en carga; la vista lo llama al mostrarlo.
+const dtDeferInit = typeof deferInit !== 'undefined' ? deferInit : false;
+// Lista de tarjetas: 1 columna que renderiza cada tipo como tarjeta (reusa el CRUD/modal). Ideal en panel.
+const dtCardList = typeof cardList !== 'undefined' ? cardList : false;
 %>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
+<div class="<%= editorialFlat ? 'vt-editorial' : 'card border-0 shadow-sm' %>">
+    <div class="<%= editorialFlat ? 'vt-toolbar' : 'card-header text-white' %>"<% if (!editorialFlat) { %> style="background: var(--brand-gradient); border: none;"<% } %>>
         <div class="row align-items-center">
             <div class="col">
+                <% if (!editorialFlat) { %>
                 <h5 class="card-title mb-0 text-white">
                     <i class="ti ti-list me-2"></i>Tipos de Vehículo
                 </h5>
                 <small class="text-white" style="opacity: 0.9;">Catálogo de tipos de vehículos del sistema</small>
+                <% } %>
             </div>
             <div class="col-auto">
                 <% if (canCreate) { %>
-                    <button type="button" class="btn btn-light btn-sm" id="createVehicleTypeBtn">
+                    <button type="button" class="btn btn-sm <%= editorialFlat ? 'vt-btn-new' : 'btn-light' %>" id="createVehicleTypeBtn">
                         <i class="ti ti-plus me-1"></i>Nuevo Tipo
                     </button>
                 <% } %>
@@ -41,19 +51,23 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         </div>
     </div>
 
-    <div class="card-body" id="vehicle-types-content">
+    <div class="<%= editorialFlat ? 'vt-table' : 'card-body' %>" id="vehicle-types-content">
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
                     <tr>
-                        <th>Nombre</th>
-                        <th>Capacidad</th>
-                        <th>Carry-on</th>
-                        <% if (dtUserRole !== 'department_manager') { %>
-                            <th>Estado</th>
-                        <% } %>
-                        <% if (dtShowActions) { %>
-                            <th class="text-center">Acciones</th>
+                        <% if (dtCardList) { %>
+                            <th>Tipos de Vehículo</th>
+                        <% } else { %>
+                            <th>Nombre</th>
+                            <th>Capacidad</th>
+                            <th>Carry-on</th>
+                            <% if (dtUserRole !== 'department_manager') { %>
+                                <th>Estado</th>
+                            <% } %>
+                            <% if (dtShowActions) { %>
+                                <th class="text-center">Acciones</th>
+                            <% } %>
                         <% } %>
                     </tr>
                 </thead>
@@ -196,6 +210,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
         const userRole = '<%= dtUserRole %>';
+        const isCompact = <%= dtCompact ? 'true' : 'false' %>;
+        const isCardList = <%= dtCardList ? 'true' : 'false' %>;
 
         // DataTable Configuration
         const dataTable = $(`#${tableId}`).DataTable({
@@ -212,7 +228,39 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     showErrorAlert('Error al cargar los tipos de vehículo');
                 }
             },
-            columns: [
+            columns: isCardList ? [
+                {
+                    data: null,
+                    orderable: false,
+                    render: function (row) {
+                        const id = row.objectId || row.id;
+                        const cap = (row.defaultCapacity != null) ? row.defaultCapacity : '-';
+                        const carry = (row.trunkCapacity != null) ? row.trunkCapacity : null;
+                        const active = !!row.active;
+                        let acts = '';
+                        if (canEdit) {
+                            acts += `<button type="button" class="tcard-btn edit-type-btn" data-id="${id}" title="Editar"><i class="ti ti-edit"></i></button>`;
+                            const si = active ? 'ti-archive' : 'ti-archive-off';
+                            acts += `<button type="button" class="tcard-btn toggle-status-btn" data-id="${id}" data-current-status="${active}" data-name="${row.name}" title="${active ? 'Desactivar' : 'Activar'}"><i class="ti ${si}"></i></button>`;
+                        }
+                        if (canDelete) {
+                            acts += `<button type="button" class="tcard-btn danger delete-type-btn" data-id="${id}" data-name="${row.name}" title="Eliminar"><i class="ti ti-trash"></i></button>`;
+                        }
+                        const tag = active ? '' : ' <span class="tcard-tag">Inactivo</span>';
+                        const stats = '<div class="tcard-stats">'
+                            + `<span class="tcard-stat" title="Capacidad de pasajeros"><i class="ti ti-users"></i>${cap}</span>`
+                            + (carry != null ? `<span class="tcard-stat" title="Carry-on"><i class="ti ti-luggage"></i>${carry}</span>` : '')
+                            + '</div>';
+                        return `<div class="tcard${active ? '' : ' off'}">
+                            <div class="tcard-body">
+                                <div class="tcard-name">${row.name || '-'}${tag}</div>
+                            </div>
+                            ${stats}
+                            <div class="tcard-actions">${acts}</div>
+                        </div>`;
+                    }
+                }
+            ] : [
                 {
                     data: null,
                     render: function(data) {
@@ -305,10 +353,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando tipos...'
             },
-            order: [[0, 'asc']], // Sort by name by default
-            pageLength: 10,
+            order: isCardList ? [] : [[0, 'asc']], // Sort by name by default
+            pageLength: (isCompact || isCardList) ? 100 : 10,
             searchDelay: 300,
-            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+            // Compacto/tarjetas: solo la tabla (sin length/search/info/paginación).
+            dom: (isCompact || isCardList) ? 't' : '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
                  '<"row"<"col-sm-12"tr>>' +
                  '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
             drawCallback: function() {
@@ -726,11 +775,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         }
     }
 
-    // Initialize when DOM is ready
+    // Exponer para init diferido (lazy) desde la vista contenedora (p. ej. al abrir un panel).
+    window.__vehicleTypesInit = initWhenReady;
+    // Init normal en carga, salvo que la vista pida diferirlo.
+    <% if (!dtDeferInit) { %>
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initWhenReady);
     } else {
         initWhenReady();
     }
+    <% } %>
 })();
 </script>
