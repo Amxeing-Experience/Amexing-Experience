@@ -660,7 +660,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <% if (canManageReservations) { %>
                         actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}?context=reservation" class="btn btn-sm btn-outline-secondary me-1" title="Editar reservación"><i class="ti ti-edit"></i></a>`;
                         <% } else { %>
-                        actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-text"></i></a>`;
+                        actions += `<a href="/dashboard/<%= basePath %>/quotes/${row.quoteId}?context=reservation" class="btn btn-sm btn-outline-secondary me-1" title="Ver cotización"><i class="ti ti-file-text"></i></a>`;
                         <% } %>
                     }
                     // Recibo / Factura: operan sobre la cotización agendada (row.quoteId).
