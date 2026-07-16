@@ -20778,6 +20778,15 @@ class ItineraryBuilder {
 
   // Fase 2: envía la solicitud de cambio al backend y refleja el estado localmente.
   async submitChangeRequest(serviceId, type, note, modal) {
+    const btn = document.getElementById('crSubmitBtn');
+    const originalBtn = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Enviando...';
+    }
+    const restoreBtn = () => {
+      if (btn) { btn.disabled = false; btn.innerHTML = originalBtn; }
+    };
     try {
       const resp = await fetch(`/api/quotes/${this.quoteId}/services/${serviceId}/request-change`, {
         method: 'POST',
@@ -20787,6 +20796,7 @@ class ItineraryBuilder {
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data.success) {
         this.showAlert((data && data.error) || 'No se pudo enviar la solicitud.', 'danger');
+        restoreBtn();
         return;
       }
       const svc = this.services.get(serviceId);
@@ -20797,6 +20807,7 @@ class ItineraryBuilder {
       this.showAlert('Solicitud enviada. Un administrador la revisará.', 'success');
     } catch (e) {
       this.showAlert('Error al enviar la solicitud.', 'danger');
+      restoreBtn();
     }
   }
 
