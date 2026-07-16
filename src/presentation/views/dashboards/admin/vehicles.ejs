@@ -108,10 +108,12 @@ const canCreate = ['superadmin', 'admin'].includes(currentUserRole);
 .vehicles-wrap .table > tbody td{vertical-align:middle;border-color:#f0eee6;}
 
 /* Panel lateral (drawer) de Tipos */
-.vehicles-wrap .vt-backdrop{position:fixed;inset:0;background:rgba(30,28,22,.28);opacity:0;pointer-events:none;transition:opacity .25s;z-index:1055;}
+/* z-index a nivel offcanvas (1040/1045), DEBAJO de los modales de Bootstrap (backdrop 1050 / modal 1055),
+   para que los modales de crear/editar/eliminar/desactivar tipo salgan por ENCIMA del panel y sean clicables. */
+.vehicles-wrap .vt-backdrop{position:fixed;inset:0;background:rgba(30,28,22,.28);opacity:0;pointer-events:none;transition:opacity .25s;z-index:1040;}
 .vehicles-wrap .vt-backdrop.open{opacity:1;pointer-events:auto;}
 .vehicles-wrap .vt-drawer{position:fixed;top:0;right:0;height:100vh;width:560px;max-width:92vw;background:#fff;border-left:1px solid var(--line);
-    box-shadow:-10px 0 30px rgba(0,0,0,.10);transform:translateX(100%);transition:transform .28s ease;z-index:1056;padding:22px 24px;overflow:auto;}
+    box-shadow:-10px 0 30px rgba(0,0,0,.10);transform:translateX(100%);transition:transform .28s ease;z-index:1045;padding:22px 24px;overflow:auto;}
 .vehicles-wrap .vt-drawer.open{transform:none;}
 .vehicles-wrap .vt-drawer .vt-drawer-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;
     margin-bottom:18px;border-bottom:1px solid var(--line);padding-bottom:14px;}
@@ -161,6 +163,11 @@ const canCreate = ['superadmin', 'admin'].includes(currentUserRole);
     var openBtn = document.getElementById('openTypesDrawer');
     var closeBtn = document.getElementById('closeTypesDrawer');
     if (!drawer || !openBtn) return;
+
+    // El modal de crear/editar tipo es estático dentro del drawer; se mueve a <body> para que su
+    // backdrop (nivel body) no lo tape (el drawer crea su propio stacking context).
+    var typeModal = document.getElementById('vehicleTypeModal');
+    if (typeModal && typeModal.parentElement !== document.body) document.body.appendChild(typeModal);
 
     var typesInited = false;
     function openDrawer() {
