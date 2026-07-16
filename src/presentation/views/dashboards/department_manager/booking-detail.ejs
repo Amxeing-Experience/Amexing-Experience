@@ -202,12 +202,16 @@
 <style>
 #paymentsOffcanvas { --bs-offcanvas-width: 760px; }
 @media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
-#paymentsOffcanvas .offcanvas-body { font-size: 0.82rem; }
-#paymentCoverageCard.payment-coverage-highlight {
-    background: #f3f4f0;
-    border: none;
-    border-left: 4px solid #969b81;
+#paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 0.82rem; }
+#paymentCoverageCard.payment-coverage-highlight,
+#paymentChips > div,
+#paymentRemainingByMethod {
+    background: #fff;
+    border: 1px solid #e0e6ed;
 }
+#paymentCoverageCard.payment-coverage-highlight { border-left: 4px solid #969b81; }
+#paymentsOffcanvas #paymentsBody table { font-size: 0.72rem; }
+#paymentsOffcanvas #paymentsBody .badge { font-size: 0.68rem; }
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;

@@ -301,23 +301,23 @@ const PaymentBreakdownHelpers = (() => {
           <div class="small" style="color:${DISCOUNT_GREEN};">${escapeHtml(resolved.savings.sublabel)}</div>
         </div>` : '';
     return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-        <span class="text-muted small"><i class="ti ti-receipt-2 me-1"></i>Total a pagar</span>
+        <span class="text-muted fw-semibold small"><i class="ti ti-receipt-2 me-1"></i>Total a pagar</span>
         <span class="fw-bold fs-5">${formatMoney(round2(s.total), currency)}</span>
       </div>
-      <div class="text-muted mb-2" style="font-size:0.75rem;">Cotizado: <span class="badge bg-secondary-subtle text-secondary">${escapeHtml(methodLabel(s.anchoredMethod))}</span></div>
+      <div class="text-muted small mb-2">Cotizado: <span class="fw-semibold text-body">${escapeHtml(methodLabel(s.anchoredMethod))}</span></div>
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <span class="text-muted small"><i class="ti ti-cash me-1"></i>Estado de pago</span>
+        <span class="text-muted fw-semibold small"><i class="ti ti-cash me-1"></i>Estado de pago</span>
         ${getPaymentStatusBadge(s.paymentStatus)}
       </div>
       <div class="progress mb-2" style="height:12px;" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
         <div class="progress-bar bg-success" style="width:${coverageWidth}%;">${coverage}%</div>
       </div>
       <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-        <span class="text-muted small"><i class="ti ti-check me-1"></i>Pagado</span>
+        <span class="text-muted fw-semibold small"><i class="ti ti-check me-1"></i>Pagado</span>
         <span class="fw-semibold text-success">${formatMoney(round2(s.paidAmount), currency)}</span>
       </div>
       <div class="d-flex justify-content-between align-items-center py-1">
-        <span class="text-muted small"><i class="ti ti-wallet me-1"></i>Saldo</span>
+        <span class="text-muted fw-semibold small"><i class="ti ti-wallet me-1"></i>Saldo</span>
         <span class="fw-semibold ${balanceCls}">${formatMoney(resolved.displayedBalance, currency)}</span>
       </div>
       ${savingsHtml}`;
