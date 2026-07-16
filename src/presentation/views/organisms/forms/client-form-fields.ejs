@@ -1,0 +1,350 @@
+<%
+/**
+ * Campos del formulario de cliente directo (datos esenciales + acordeones opcionales:
+ * contactos, empresa/fiscal, direccion, requerimientos + password). Reutilizable: modal de la
+ * lista y pagina de detalle. Lo requerido se agrupa arriba para alta rapida; lo opcional colapsado.
+ * Prefill (editar): un <script> en la vista contenedora setea los #directClient* desde el cliente;
+ * los acordeones con datos se abren solos (window.cffRefreshAccordions() para re-evaluar tras prefill).
+ * Provee tambien el CSS+JS de acordeon que reutiliza agency-form-fields (siempre co-presente).
+ * Created by Denisse Maldonado
+ */
+%>
+<%- include('form-editorial-styles') %>
+<% var showPwd = (typeof showPassword === 'undefined') ? true : !!showPassword;
+   var pwdHelp = (typeof passwordHelp !== 'undefined') ? passwordHelp : ''; %>
+<div class="client-form-editorial">
+                        <!-- ===== Bloque esencial: lo mínimo para crear (requeridos agrupados) ===== -->
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                                <i class="ti ti-user me-1"></i>
+                                Datos para crear
+                                <span class="cff-req-tag">lo mínimo</span>
+                            </h6>
+
+                            <!-- Tipo de Cliente: segmented control (consistente con los filtros del sistema) -->
+                            <div class="row">
+                                <div class="col-12 mb-3">
+                                    <label class="form-label d-block">Tipo de Cliente</label>
+                                    <div class="btn-group cff-segmented w-100" role="radiogroup" aria-label="Tipo de Cliente">
+                                        <input type="radio" class="btn-check" name="directClientCategorySeg" id="directClientCatDirect" value="direct_client" checked>
+                                        <label class="btn btn-outline-primary" for="directClientCatDirect"><i class="ti ti-user me-1"></i>Cliente Directo</label>
+                                        <input type="radio" class="btn-check" name="directClientCategorySeg" id="directClientCatWedding" value="wedding_planner">
+                                        <label class="btn btn-outline-primary" for="directClientCatWedding"><i class="ti ti-heart me-1"></i>Wedding Planner</label>
+                                        <input type="radio" class="btn-check" name="directClientCategorySeg" id="directClientCatConcierge" value="concierge">
+                                        <label class="btn btn-outline-primary" for="directClientCatConcierge"><i class="ti ti-bell me-1"></i>Concierge</label>
+                                        <input type="radio" class="btn-check" name="directClientCategorySeg" id="directClientCatHome" value="home_owner">
+                                        <label class="btn btn-outline-primary" for="directClientCatHome"><i class="ti ti-home me-1"></i>Home Owner</label>
+                                    </div>
+                                    <!-- Espejo oculto: mantiene compatibilidad con quien lee #directClientCategory -->
+                                    <input type="hidden" id="directClientCategory" name="clientCategory" value="direct_client">
+                                    <!-- Hint de capacidades según el tipo (texto informativo; la fuente real es endClientCapabilities.js) -->
+                                    <div class="form-text mt-2" id="directClientCategoryHint"></div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <%- include('../../atoms/common/first-name-input', {
+                                        name: 'firstName',
+                                        id: 'directClientFirstName',
+                                        label: 'Nombre',
+                                        required: true,
+                                        placeholder: 'Ej: Juan',
+                                        helpText: 'Primer nombre del cliente'
+                                    }) %>
+                                </div>
+                                <div class="col-md-6">
+                                    <%- include('../../atoms/common/last-name-input', {
+                                        name: 'lastName',
+                                        id: 'directClientLastName',
+                                        label: 'Apellido',
+                                        required: true,
+                                        placeholder: 'Ej: Pérez',
+                                        helpText: 'Apellido(s) del cliente'
+                                    }) %>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <%- include('../../atoms/common/email-input', {
+                                        name: 'email',
+                                        id: 'directClientEmail',
+                                        label: 'Correo Electrónico',
+                                        required: false,
+                                        placeholder: 'cliente@empresa.com',
+                                        helpText: 'Requerido si defines contraseña'
+                                    }) %>
+                                </div>
+                                <!-- Contraseña (opcional): mismo componente que el form de agencia. Oculta en edición (reset aparte) -->
+                                <% if (showPwd) { %>
+                                <div class="col-md-6">
+                                    <%- include('../../molecules/common/password-field', {
+                                        id: 'directClientPassword',
+                                        name: 'password',
+                                        label: 'Contraseña',
+                                        required: false,
+                                        helpText: pwdHelp
+                                    }) %>
+                                </div>
+                                <% } %>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <%- include('../../atoms/common/phone-input', {
+                                        name: 'phone',
+                                        id: 'directClientPhone',
+                                        label: 'Teléfono',
+                                        required: false,
+                                        countryCode: 'MX',
+                                        placeholder: '999 123 4567',
+                                        helpText: 'Número de contacto principal'
+                                    }) %>
+                                </div>
+                                <div class="col-md-6">
+                                    <%- include('../../atoms/form/datepicker', {
+                                        name: 'birthDate',
+                                        id: 'directClientBirthDate',
+                                        label: 'Fecha de nacimiento',
+                                        required: false,
+                                        min: '1900-01-01',
+                                        max: new Date().toISOString().split('T')[0]
+                                    }) %>
+                                </div>
+                            </div>
+                        </div>
+
+                        <p class="cff-hint-optional"><i class="ti ti-chevron-down me-1"></i>Información opcional — ábrela solo si la necesitas</p>
+
+                        <!-- ===== Opcional: Datos de contacto ===== -->
+                        <div class="cff-acc">
+                            <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
+                                <span class="cff-t"><i class="ti ti-users"></i>Datos de contacto</span>
+                                <span class="cff-badge">Opcional</span>
+                                <span class="cff-chev"><i class="ti ti-chevron-right"></i></span>
+                            </button>
+                            <div class="cff-acc-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <%- include('../../atoms/common/first-name-input', {
+                                            name: 'contactFirstName',
+                                            id: 'directClientContactFirstName',
+                                            label: 'Nombre de Contacto',
+                                            required: false,
+                                            placeholder: 'Ej: María',
+                                            helpText: 'Nombre de la persona de contacto en la empresa'
+                                        }) %>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <%- include('../../atoms/common/last-name-input', {
+                                            name: 'contactLastName',
+                                            id: 'directClientContactLastName',
+                                            label: 'Apellido de Contacto',
+                                            required: false,
+                                            placeholder: 'Ej: García',
+                                            helpText: 'Apellido de la persona de contacto'
+                                        }) %>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <%- include('../../atoms/common/emergency-contact-input', {
+                                            name: 'emergencyContactName',
+                                            id: 'directClientEmergencyContactName',
+                                            label: 'Contacto de Emergencia',
+                                            required: false,
+                                            placeholder: 'Ej: Carlos Pérez',
+                                            helpText: 'Persona a contactar en caso de emergencia'
+                                        }) %>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <%- include('../../atoms/common/emergency-phone-input', {
+                                            name: 'emergencyContactPhone',
+                                            id: 'directClientEmergencyContactPhone',
+                                            label: 'Teléfono de Emergencia',
+                                            required: false,
+                                            countryCode: 'MX',
+                                            placeholder: '999 123 4567',
+                                            helpText: 'Número disponible 24/7'
+                                        }) %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ===== Opcional: Requerimientos Especiales ===== -->
+                        <div class="cff-acc">
+                            <button type="button" class="cff-acc-h js-cff-acc" aria-expanded="false">
+                                <span class="cff-t"><i class="ti ti-heart"></i>Requerimientos Especiales</span>
+                                <span class="cff-badge">Opcional</span>
+                                <span class="cff-chev"><i class="ti ti-chevron-right"></i></span>
+                            </button>
+                            <div class="cff-acc-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <%- include('../../atoms/common/language-select', {
+                                            name: 'preferredLanguage',
+                                            id: 'directClientPreferredLanguage',
+                                            label: 'Idioma Preferido',
+                                            required: false,
+                                            helpText: 'Idioma para comunicaciones y servicios',
+                                            value: 'es'
+                                        }) %>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <%- include('../../atoms/common/accessibility-input', {
+                                            name: 'accessibilityRequirements',
+                                            id: 'directClientAccessibilityRequirements',
+                                            label: 'Requerimientos de Accesibilidad',
+                                            required: false,
+                                            placeholder: 'Ej: Silla de ruedas, bastón, asistencia visual...',
+                                            helpText: 'Necesidades especiales de accesibilidad'
+                                        }) %>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <%- include('../../atoms/common/allergies-input', {
+                                            name: 'allergies',
+                                            id: 'directClientAllergies',
+                                            label: 'Alergias',
+                                            required: false,
+                                            placeholder: 'Ingrese cada alergia en una línea separada',
+                                            helpText: 'Una alergia por línea para mejor organización'
+                                        }) %>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <%- include('../../atoms/common/dietary-restrictions-input', {
+                                            name: 'dietaryRestrictions',
+                                            id: 'directClientDietaryRestrictions',
+                                            label: 'Restricciones Alimenticias',
+                                            required: false,
+                                            placeholder: 'Ingrese cada restricción en una línea separada',
+                                            helpText: 'Una restricción por línea para mejor organización'
+                                        }) %>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12">
+                                        <%- include('../../molecules/common/form-field', {
+                                            type: 'textarea',
+                                            name: 'notes',
+                                            id: 'directClientNotes',
+                                            label: 'Notas Adicionales',
+                                            required: false,
+                                            placeholder: 'Cualquier información adicional relevante sobre el cliente...',
+                                            helpText: 'Información general adicional',
+                                            inputAttributes: { rows: '3' }
+                                        }) %>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+</div>
+<script>
+(function () {
+    // Acordeón editorial reutilizable (client + agency). Idempotente: seguro si se incluye una vez por página.
+    function isFilled(el) {
+        if (!el || el.type === 'hidden' || el.disabled) return false;
+        if (el.tagName === 'SELECT') return el.selectedIndex > 0 && String(el.value || '').trim() !== '';
+        return String(el.value || '').trim() !== '';
+    }
+    function openAcc(acc, open) {
+        acc.classList.toggle('open', open);
+        var h = acc.querySelector('.js-cff-acc');
+        if (h) h.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    function refresh() {
+        // Abre automáticamente los acordeones que ya tengan datos (modo edición / prefill)
+        document.querySelectorAll('.client-form-editorial .cff-acc').forEach(function (acc) {
+            var filled = Array.prototype.some.call(acc.querySelectorAll('input, select, textarea'), isFilled);
+            if (filled) openAcc(acc, true);
+        });
+    }
+    function init() {
+        document.querySelectorAll('.client-form-editorial .js-cff-acc').forEach(function (h) {
+            if (h.dataset.cffBound) return;
+            h.dataset.cffBound = '1';
+            h.addEventListener('click', function () {
+                var acc = h.closest('.cff-acc');
+                openAcc(acc, !acc.classList.contains('open'));
+            });
+        });
+        refresh();
+    }
+    // Exponer para que el prefill de edición re-evalúe tras setear valores
+    window.cffRefreshAccordions = refresh;
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();
+
+(function () {
+    // Segmented "Tipo de Cliente" ↔ input hidden #directClientCategory (compatibilidad con el submit)
+    // Hint de capacidades por tipo (texto informativo; la fuente real es endClientCapabilities.js)
+    var HINTS = {
+        direct_client: 'Podrá crear y ver sus cotizaciones. Sin acceso al tarifario.',
+        wedding_planner: 'Verá el tarifario y podrá cotizar. Catálogo de destinos y experiencias populares.',
+        concierge: 'Verá el tarifario completo y podrá crear y ver cotizaciones.',
+        home_owner: 'Solo verá el tarifario y el catálogo popular. No crea cotizaciones.'
+    };
+    function setHint(val) {
+        var el = document.getElementById('directClientCategoryHint');
+        if (!el) return;
+        var txt = Object.prototype.hasOwnProperty.call(HINTS, val) ? HINTS[val] : '';
+        el.innerHTML = txt ? '<i class="ti ti-info-circle me-1"></i>' + txt : '';
+    }
+    function sync() {
+        var hidden = document.getElementById('directClientCategory');
+        var radios = document.querySelectorAll('input[name="directClientCategorySeg"]');
+        if (!hidden || !radios.length) return;
+        // init: reflejar el valor del hidden (prefill/edición) en el segmento
+        var current = hidden.value || 'direct_client';
+        var matched = false;
+        radios.forEach(function (r) {
+            if (r.value === current) { r.checked = true; matched = true; }
+            if (!r.dataset.segBound) {
+                r.dataset.segBound = '1';
+                r.addEventListener('change', function () { if (r.checked) { hidden.value = r.value; setHint(r.value); } });
+            }
+        });
+        if (!matched && radios[0]) { radios[0].checked = true; hidden.value = radios[0].value; }
+        setHint(hidden.value);
+    }
+    // Exponer para re-sincronizar tras el prefill de edición
+    window.cffSyncCategory = sync;
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', sync);
+    else sync();
+})();
+</script>
+<script>
+(function () {
+    // Prefill de edición (server-side JSON → setea #directClient*). En alta el objeto va vacío → no hace nada.
+    var d = <%- JSON.stringify((typeof client !== 'undefined' && client) ? client : {}).replace(/</g, '\\u003c') %>;
+    if (!d || !Object.keys(d).length) return;
+    function set(id, val) { var el = document.getElementById(id); if (el && val != null && val !== '') el.value = val; }
+    function run() {
+        set('directClientFirstName', d.firstName);
+        set('directClientLastName', d.lastName);
+        set('directClientEmail', d.email);
+        set('directClientPhone', d.phone);
+        if (d.birthDate) { var bd = new Date(d.birthDate); if (!isNaN(bd)) set('directClientBirthDate', bd.toISOString().split('T')[0]); }
+        set('directClientContactFirstName', d.contactFirstName);
+        set('directClientContactLastName', d.contactLastName);
+        set('directClientEmergencyContactName', d.emergencyContactName);
+        set('directClientEmergencyContactPhone', d.emergencyContactPhone);
+        set('directClientPreferredLanguage', d.preferredLanguage);
+        set('directClientAccessibilityRequirements', d.accessibilityRequirements);
+        set('directClientAllergies', d.allergies);
+        set('directClientDietaryRestrictions', d.dietaryRestrictions);
+        set('directClientNotes', d.notes);
+        // Categoría (segmented): setear hidden y reflejar en el segmento
+        if (d.clientCategory) { var hid = document.getElementById('directClientCategory'); if (hid) hid.value = d.clientCategory; }
+        if (typeof window.cffSyncCategory === 'function') window.cffSyncCategory();
+        // Abrir los acordeones que ahora tienen datos
+        if (typeof window.cffRefreshAccordions === 'function') window.cffRefreshAccordions();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run);
+    else run();
+})();
+</script>

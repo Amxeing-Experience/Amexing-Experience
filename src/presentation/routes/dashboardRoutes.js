@@ -27,9 +27,9 @@ router.use('/end_client', (req, res, next) => {
 });
 
 /**
- * Guard por capacidad para rutas de end_client (p. ej. la sección Tarifario solo para wedding
+ * Guard por capacidad para rutas de end_client (p. Ej. La sección Tarifario solo para wedding
  * planner). Si el tipo de cliente no tiene la capacidad, lo regresa a su dashboard de inicio.
- * @param {string} cap - Capacidad requerida (clave de endClientCapabilities, p. ej. 'viewTarifario').
+ * @param {string} cap - Capacidad requerida (clave de endClientCapabilities, p. Ej. 'viewTarifario').
  * @returns {Function} Middleware Express que permite o redirige según la capacidad del usuario.
  * @example
  * router.get('/end_client/vehicles', requireEndClientCap('viewTarifario'), handler);

@@ -102,6 +102,19 @@ class AdminController extends RoleBasedController {
         return this.handleError(res, new Error('Autenticación requerida'), 401);
       }
 
+      // Modo "nuevo": la misma página sirve para crear (como quoteDetail con id 'new'). No hay
+      // fetch; la vista muestra solo el form de Información (vacío) y oculta los demás tabs.
+      if (clientId === 'new') {
+        return await this.renderRoleView(req, res, 'client-detail', {
+          title: 'Nuevo Cliente',
+          client: {},
+          isNewClient: true,
+          section: 'information',
+          subsection: null,
+          breadcrumb: null,
+        });
+      }
+
       // Use UserManagementService directly instead of HTTP call
       const UserManagementService = require('../../services/UserManagementService');
       const userService = new UserManagementService();
@@ -172,6 +185,17 @@ class AdminController extends RoleBasedController {
         anniversary: client.anniversary || client.get?.('anniversary') || null,
         createdAt: client.createdAt || client.get?.('createdAt'),
         updatedAt: client.updatedAt || client.get?.('updatedAt'),
+        // Campos de persona (Cliente Directo / end_client) para prefill del form de edición unificado.
+        companyType: client.companyType || client.get?.('companyType') || null,
+        contactFirstName: client.contactFirstName || client.get?.('contactFirstName') || '',
+        contactLastName: client.contactLastName || client.get?.('contactLastName') || '',
+        emergencyContactName: client.emergencyContactName || client.get?.('emergencyContactName') || '',
+        emergencyContactPhone: client.emergencyContactPhone || client.get?.('emergencyContactPhone') || '',
+        preferredLanguage: client.preferredLanguage || client.get?.('preferredLanguage') || 'es',
+        accessibilityRequirements:
+          client.accessibilityRequirements || client.get?.('accessibilityRequirements') || '',
+        allergies: client.allergies || client.get?.('allergies') || [],
+        dietaryRestrictions: client.dietaryRestrictions || client.get?.('dietaryRestrictions') || [],
       };
 
       // Determine active section (default: information)
@@ -196,6 +220,7 @@ class AdminController extends RoleBasedController {
       const viewData = {
         title: `Cliente: ${displayName}`,
         client: clientData,
+        isNewClient: false,
         section,
         subsection,
         breadcrumb: null, // Disable automatic breadcrumb generation

@@ -16,44 +16,54 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const currentPath = '/dashboard/admin/clients';
 %>
 
-<!-- Page Header with Breadcrumb -->
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2 class="mb-1 fw-bold">Gestión de Clientes</h2>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item">
-                            <a href="/dashboard/admin" class="text-decoration-none">
-                                <i class="ti ti-home me-1"></i>Dashboard
-                            </a>
-                        </li>
-                        <li class="breadcrumb-item active" aria-current="page">
-                            <i class="ti ti-building me-1"></i>Clientes
-                        </li>
-                    </ol>
-                </nav>
-            </div>
-            <div class="text-muted">
-                <small class="d-block">Total clientes registrados</small>
+<style>
+  .clients-wrap{--olive:#6E7A50;--olive-d:#566040;--line:#ded9cb;--ink:#2b2b2b;--muted:#8a8f78;}
+  /* Encabezado editorial */
+  .clients-wrap .eyebrow{text-transform:uppercase;letter-spacing:.34em;font-size:.7rem;color:var(--olive);font-weight:600;}
+  .clients-wrap .cl-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:26px;}
+  .clients-wrap .cl-head h1{margin:.15rem 0 0;font-weight:400;letter-spacing:.06em;font-size:1.9rem;color:var(--ink);}
+  .clients-wrap .cl-head .crumb{margin-top:.35rem;font-size:.78rem;color:var(--muted);}
+  .clients-wrap .cl-head .crumb a{color:var(--muted);text-decoration:none;}
+  .clients-wrap .cl-head .crumb a:hover{color:var(--olive-d);}
+  .clients-wrap .cl-head-actions{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+  .clients-wrap .cl-count{text-align:right;color:var(--muted);line-height:1.1;}
+  .clients-wrap .cl-count small{display:block;text-transform:uppercase;letter-spacing:.1em;font-size:.62rem;}
+  .clients-wrap .cl-count strong{font-size:1.5rem;color:var(--ink);font-weight:700;}
+  .clients-wrap .btn-nuevo{display:inline-flex;align-items:center;gap:7px;background:var(--olive);color:#fff;border:1px solid var(--olive);
+    border-radius:11px;padding:.72rem 1.35rem;font-size:.88rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;text-decoration:none;}
+  .clients-wrap .btn-nuevo:hover{background:var(--olive-d);color:#fff;}
+</style>
+
+<div class="clients-wrap">
+
+    <!-- Encabezado editorial -->
+    <div class="cl-head">
+        <div>
+            <div class="eyebrow">Gestión</div>
+            <h1>Clientes</h1>
+            <div class="crumb"><a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a> · Clientes</div>
+        </div>
+        <div class="cl-head-actions">
+            <div class="cl-count">
+                <small>Registrados</small>
                 <strong id="total-clients-count">-</strong>
             </div>
+            <% if (['superadmin', 'admin'].includes(currentUserRole)) { %>
+            <a href="/dashboard/admin/clients/new" class="btn-nuevo">
+                <i class="ti ti-plus"></i> Nuevo Cliente
+            </a>
+            <% } %>
         </div>
     </div>
-</div>
 
+    <!-- Clients DataTable -->
+    <%- include('../../organisms/datatable/clients-table', {
+        tableId: 'clients-table',
+        apiEndpoint: '/api/clients/mixed',
+        userRole: currentUserRole,
+        showActions: true
+    }) %>
 
-<!-- Clients DataTable -->
-<div class="row">
-    <div class="col-12">
-        <%- include('../../organisms/datatable/clients-table', {
-            tableId: 'clients-table',
-            apiEndpoint: '/api/clients/mixed',
-            userRole: currentUserRole,
-            showActions: true
-        }) %>
-    </div>
 </div>
 
 <!-- Client Management Modals -->
@@ -273,73 +283,6 @@ const currentPath = '/dashboard/admin/clients';
                         }) %>
                     </div>
 
-                    <!-- Sección: Dirección Fiscal -->
-                    <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                            <i class="ti ti-map-pin me-1"></i>
-                            Dirección Fiscal
-                        </h6>
-
-                        <%- include('../../molecules/common/form-field', {
-                            type: 'text',
-                            name: 'addressStreet',
-                            id: 'addressStreet',
-                            label: 'Calle y Número',
-                            required: false,
-                            placeholder: 'Av. Principal #123, Col. Centro',
-                            inputAttributes: { maxlength: '200' }
-                        }) %>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'text',
-                                    name: 'addressCity',
-                                    id: 'addressCity',
-                                    label: 'Ciudad',
-                                    required: false,
-                                    placeholder: 'Mérida',
-                                    inputAttributes: { maxlength: '100' }
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'text',
-                                    name: 'addressState',
-                                    id: 'addressState',
-                                    label: 'Estado',
-                                    required: false,
-                                    placeholder: 'Yucatán',
-                                    inputAttributes: { maxlength: '100' }
-                                }) %>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'text',
-                                    name: 'addressZipCode',
-                                    id: 'addressZipCode',
-                                    label: 'Código Postal',
-                                    required: false,
-                                    placeholder: '97000',
-                                    inputAttributes: { maxlength: '10' }
-                                }) %>
-                            </div>
-                            <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'text',
-                                    name: 'addressCountry',
-                                    id: 'addressCountry',
-                                    label: 'País',
-                                    required: false,
-                                    value: 'México',
-                                    inputAttributes: { maxlength: '100' }
-                                }) %>
-                            </div>
-                        </div>
-                    </div>
 
                     <!-- Sección: Notas Adicionales -->
                     <div class="mb-3">
@@ -373,364 +316,7 @@ const currentPath = '/dashboard/admin/clients';
                 <!-- Client Form (Hidden by default) -->
                 <div id="clientForm" style="display: none;">
                     <form id="createClientDirectForm">
-                        <!-- Sección: Información del Cliente -->
-                        <div class="mb-4">
-                            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                                <i class="ti ti-user me-1"></i>
-                                Información del Cliente
-                            </h6>
-
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label" for="directClientCategory">Tipo de Cliente</label>
-                                    <select class="form-select" id="directClientCategory" name="clientCategory">
-                                        <option value="direct_client" selected>Cliente Directo</option>
-                                        <option value="wedding_planner">Wedding Planner</option>
-                                        <option value="concierge">Concierge</option>
-                                        <option value="home_owner">Home Owner</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/first-name-input', {
-                                        name: 'firstName',
-                                        id: 'directClientFirstName',
-                                        label: 'Nombre',
-                                        required: true,
-                                        placeholder: 'Ej: Juan',
-                                        helpText: 'Primer nombre del cliente'
-                                    }) %>
-                                </div>
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/last-name-input', {
-                                        name: 'lastName',
-                                        id: 'directClientLastName',
-                                        label: 'Apellido',
-                                        required: true,
-                                        placeholder: 'Ej: Pérez',
-                                        helpText: 'Apellido(s) del cliente'
-                                    }) %>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/email-input', {
-                                        name: 'email',
-                                        id: 'directClientEmail',
-                                        label: 'Correo Electrónico',
-                                        required: false,
-                                        placeholder: 'cliente@empresa.com',
-                                        helpText: 'Email de contacto principal'
-                                    }) %>
-                                </div>
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/phone-input', {
-                                        name: 'phone',
-                                        id: 'directClientPhone',
-                                        label: 'Teléfono',
-                                        required: false,
-                                        countryCode: 'MX',
-                                        placeholder: '999 123 4567',
-                                        helpText: 'Número de contacto principal'
-                                    }) %>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/form/datepicker', {
-                                        name: 'birthDate',
-                                        id: 'directClientBirthDate',
-                                        label: 'Fecha de nacimiento',
-                                        required: false,
-                                        min: '1900-01-01',
-                                        max: new Date().toISOString().split('T')[0]
-                                    }) %>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Sección: Persona de Contacto y Emergencia -->
-                        <div class="mb-4">
-                            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                                <i class="ti ti-users me-1"></i>
-                                Contactos
-                            </h6>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/first-name-input', {
-                                        name: 'contactFirstName',
-                                        id: 'directClientContactFirstName',
-                                        label: 'Nombre de Contacto',
-                                        required: false,
-                                        placeholder: 'Ej: María',
-                                        helpText: 'Nombre de la persona de contacto en la empresa'
-                                    }) %>
-                                </div>
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/last-name-input', {
-                                        name: 'contactLastName',
-                                        id: 'directClientContactLastName',
-                                        label: 'Apellido de Contacto',
-                                        required: false,
-                                        placeholder: 'Ej: García',
-                                        helpText: 'Apellido de la persona de contacto'
-                                    }) %>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/emergency-contact-input', {
-                                        name: 'emergencyContactName',
-                                        id: 'directClientEmergencyContactName',
-                                        label: 'Contacto de Emergencia',
-                                        required: false,
-                                        placeholder: 'Ej: Carlos Pérez',
-                                        helpText: 'Persona a contactar en caso de emergencia'
-                                    }) %>
-                                </div>
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/emergency-phone-input', {
-                                        name: 'emergencyContactPhone',
-                                        id: 'directClientEmergencyContactPhone',
-                                        label: 'Teléfono de Emergencia',
-                                        required: false,
-                                        countryCode: 'MX',
-                                        placeholder: '999 123 4567',
-                                        helpText: 'Número disponible 24/7'
-                                    }) %>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Sección: Información de la Empresa -->
-                        <div class="mb-4">
-                            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                                <i class="ti ti-building me-1"></i>
-                                Información de la Empresa
-                            </h6>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <%- include('../../molecules/common/form-field', {
-                                        type: 'select',
-                                        name: 'companyType',
-                                        id: 'directClientCompanyType',
-                                        label: 'Tipo de Empresa',
-                                        required: false,
-                                        options: [
-                                            { value: '', text: 'Seleccione un tipo' },
-                                            { value: 'individual', text: 'Persona Física' },
-                                            { value: 'corporate', text: 'Persona Moral' },
-                                            { value: 'travel_agency', text: 'Agencia de Viajes' },
-                                            { value: 'tour_operator', text: 'Tour Operador' },
-                                            { value: 'other', text: 'Otro' }
-                                        ],
-                                        helpText: 'Tipo de organización'
-                                    }) %>
-                                </div>
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/rfc-input', {
-                                        name: 'taxId',
-                                        id: 'directClientTaxId',
-                                        label: 'RFC / ID Fiscal',
-                                        required: false,
-                                        placeholder: 'ABC123456789 o ABCD123456ABC',
-                                        helpText: 'Registro Federal de Contribuyentes'
-                                    }) %>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/url-input', {
-                                        name: 'website',
-                                        id: 'directClientWebsite',
-                                        label: 'Sitio Web',
-                                        required: false,
-                                        placeholder: 'https://www.ejemplo.com',
-                                        helpText: 'URL completa del sitio web de la empresa'
-                                    }) %>
-                                </div>
-                            </div>
-
-                            <!-- Sección: Dirección Detallada -->
-                            <div class="row">
-                                <div class="col-12 mb-2">
-                                    <h6 class="text-muted small fw-bold">
-                                        <i class="ti ti-map-pin me-1"></i>
-                                        Dirección Completa
-                                    </h6>
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-3">
-                                    <%- include('../../atoms/common/street-type-select', {
-                                        name: 'streetType',
-                                        id: 'directClientStreetType',
-                                        label: 'Tipo de Vialidad',
-                                        required: false,
-                                        helpText: 'Tipo de vía',
-                                        value: 'Calle'
-                                    }) %>
-                                </div>
-                                <div class="col-md-5">
-                                    <%- include('../../atoms/common/street-name-input', {
-                                        name: 'streetName',
-                                        id: 'directClientStreetName',
-                                        label: 'Nombre de la Calle',
-                                        required: false,
-                                        placeholder: 'Ej: Reforma, 60, Insurgentes',
-                                        helpText: 'Nombre de la calle'
-                                    }) %>
-                                </div>
-                                <div class="col-md-2">
-                                    <%- include('../../atoms/common/exterior-number-input', {
-                                        name: 'exteriorNumber',
-                                        id: 'directClientExteriorNumber',
-                                        label: 'No. Exterior',
-                                        required: false,
-                                        placeholder: '123',
-                                        helpText: 'Número exterior'
-                                    }) %>
-                                </div>
-                                <div class="col-md-2">
-                                    <%- include('../../atoms/common/interior-number-input', {
-                                        name: 'interiorNumber',
-                                        id: 'directClientInteriorNumber',
-                                        label: 'No. Interior',
-                                        required: false,
-                                        placeholder: '4B',
-                                        helpText: 'Depto/oficina'
-                                    }) %>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <%- include('../../atoms/common/colonia-input', {
-                                        name: 'colonia',
-                                        id: 'directClientColonia',
-                                        label: 'Colonia',
-                                        required: false,
-                                        placeholder: 'Ej: Centro, Roma Norte',
-                                        helpText: 'Nombre de la colonia'
-                                    }) %>
-                                </div>
-                                <div class="col-md-4">
-                                    <%- include('../../atoms/common/city-input', {
-                                        name: 'city',
-                                        id: 'directClientCity',
-                                        label: 'Ciudad / Municipio',
-                                        required: false,
-                                        placeholder: 'Ej: Mérida, Guadalajara',
-                                        helpText: 'Ciudad o municipio'
-                                    }) %>
-                                </div>
-                                <div class="col-md-4">
-                                    <%- include('../../atoms/common/state-select', {
-                                        name: 'state',
-                                        id: 'directClientState',
-                                        label: 'Estado',
-                                        required: false,
-                                        helpText: 'Estado o región',
-                                        value: ''
-                                    }) %>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <%- include('../../atoms/common/postal-code-input', {
-                                        name: 'postalCode',
-                                        id: 'directClientPostalCode',
-                                        label: 'Código Postal',
-                                        required: false,
-                                        placeholder: '12345',
-                                        helpText: '5 dígitos',
-                                        country: 'MX'
-                                    }) %>
-                                </div>
-                                <div class="col-md-8">
-                                    <!-- Spacer -->
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Sección: Requerimientos Especiales -->
-                        <div class="mb-4">
-                            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                                <i class="ti ti-heart me-1"></i>
-                                Requerimientos Especiales
-                            </h6>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/language-select', {
-                                        name: 'preferredLanguage',
-                                        id: 'directClientPreferredLanguage',
-                                        label: 'Idioma Preferido',
-                                        required: false,
-                                        helpText: 'Idioma para comunicaciones y servicios',
-                                        value: 'es'
-                                    }) %>
-                                </div>
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/accessibility-input', {
-                                        name: 'accessibilityRequirements',
-                                        id: 'directClientAccessibilityRequirements',
-                                        label: 'Requerimientos de Accesibilidad',
-                                        required: false,
-                                        placeholder: 'Ej: Silla de ruedas, bastón, asistencia visual...',
-                                        helpText: 'Necesidades especiales de accesibilidad'
-                                    }) %>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/allergies-input', {
-                                        name: 'allergies',
-                                        id: 'directClientAllergies',
-                                        label: 'Alergias',
-                                        required: false,
-                                        placeholder: 'Ingrese cada alergia en una línea separada',
-                                        helpText: 'Una alergia por línea para mejor organización'
-                                    }) %>
-                                </div>
-                                <div class="col-md-6">
-                                    <%- include('../../atoms/common/dietary-restrictions-input', {
-                                        name: 'dietaryRestrictions',
-                                        id: 'directClientDietaryRestrictions',
-                                        label: 'Restricciones Alimenticias',
-                                        required: false,
-                                        placeholder: 'Ingrese cada restricción en una línea separada',
-                                        helpText: 'Una restricción por línea para mejor organización'
-                                    }) %>
-                                </div>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-12">
-                                    <%- include('../../molecules/common/form-field', {
-                                        type: 'textarea',
-                                        name: 'notes',
-                                        id: 'directClientNotes',
-                                        label: 'Notas Adicionales',
-                                        required: false,
-                                        placeholder: 'Cualquier información adicional relevante sobre el cliente...',
-                                        helpText: 'Información general adicional',
-                                        inputAttributes: { rows: '3' }
-                                    }) %>
-                                </div>
-                            </div>
-                        </div>
+                        <%- include("../../organisms/forms/client-form-fields", { client: {} }) %>
                     </form>
                 </div>
             </div>
@@ -1269,6 +855,8 @@ const currentPath = '/dashboard/admin/clients';
                     firstName: document.getElementById('directClientFirstName').value.trim(),
                     lastName: document.getElementById('directClientLastName').value.trim(),
                     email: document.getElementById('directClientEmail').value.trim() || undefined,
+                    // Contraseña opcional: si se define, el cliente directo podrá iniciar sesión.
+                    password: document.getElementById('directClientPassword')?.value || undefined,
                     phone: document.getElementById('directClientPhone').value.trim() || undefined,
                     birthDate: document.getElementById('directClientBirthDate')?.value || undefined,
 
