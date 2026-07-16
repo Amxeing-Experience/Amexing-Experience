@@ -265,7 +265,7 @@ const PaymentBreakdownHelpers = (() => {
       // El badge "Cotizado" vive en la card de cobertura (junto a Total a pagar), no repetido aquí.
       const cheaperTag = (showCheaper && m === cheapest)
         ? `<span class="badge ms-1" style="background:${DISCOUNT_GREEN};color:#fff;">Más barato</span>` : '';
-      return `<div class="border rounded p-2 payment-chip-card">
+      return `<div class="p-2 payment-chip-card">
           <div class="d-flex justify-content-between align-items-center mb-1">
             <span class="fw-semibold">${escapeHtml(methodLabel(m))}${cheaperTag}</span>
             <span>${formatMoney(methodTotal, currency)}</span>
