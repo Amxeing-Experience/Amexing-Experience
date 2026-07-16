@@ -97,7 +97,7 @@ describe('PaymentBreakdownHelpers.resolveDisplayedBalance (Pregunta 0 — saldo 
     expect(r.displayedBalance).toBe(0);
     expect(r.savings).not.toBeNull();
     expect(r.savings.amount).toBe(21000);
-    expect(r.savings.label).toBe('Ahorraste $21,000.00 pagando en un método distinto al de la cotización.');
+    expect(r.savings.label).toBe('Descuento de $21,000.00');
     expect(r.savings.sublabel).toBe('Cubierto en su totalidad pagando en un método distinto al de la cotización.');
   });
 
@@ -142,7 +142,7 @@ describe('PaymentBreakdownHelpers.cheapestAvailableMethod + buildDiscountEmphasi
     const html = H.buildDiscountEmphasis(summary, services, 'MXN');
     expect(html).toContain('#146c43');
     expect(html).not.toContain('text-success');
-    expect(html).toContain('Ahorra $210.00 pagando en Efectivo');
+    expect(html).toContain('Descuento de $210.00 pagando en Efectivo');
     expect(html).toContain('<s>$1,210.00</s>');
   });
 
@@ -212,7 +212,7 @@ describe('PaymentBreakdownHelpers.buildMethodChips (Requisito 3 — % del backen
 describe('PaymentBreakdownHelpers.buildCoverageCard + buildRemainingByMethod', () => {
   it('coverage card muestra la línea de ahorro cuando paid + balance > 0', () => {
     const html = H.buildCoverageCard({ paymentStatus: 'paid', balance: 500, paidAmount: 2000, coveragePercent: 100 }, 'MXN');
-    expect(html).toContain('Ahorraste $500.00');
+    expect(html).toContain('Descuento de $500.00');
     expect(html).toContain('#146c43');
   });
 

@@ -199,7 +199,7 @@ const PaymentBreakdownHelpers = (() => {
           displayedBalance: 0,
           savings: {
             amount: balance,
-            label: `Ahorraste $${shown} pagando en un método distinto al de la cotización.`,
+            label: `Descuento de $${shown}`,
             sublabel: 'Cubierto en su totalidad pagando en un método distinto al de la cotización.',
           },
         };
@@ -372,7 +372,7 @@ const PaymentBreakdownHelpers = (() => {
     // methodLabel(anchor) sale de summary.anchoredMethod (= reservation.paymentType), escribible por
     // nivel 4+ sin enum estricto: se ESCAPA como en los demás builders para cortar el stored XSS (council L3F0).
     return `<div class="p-2 rounded" style="background:#e8f5ee;">
-        <div class="fw-semibold" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>Ahorra ${formatMoney(savings, currency)} pagando en ${escapeHtml(methodLabel(cheapest))}.</div>
+        <div class="fw-semibold" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>Descuento de ${formatMoney(savings, currency)} pagando en ${escapeHtml(methodLabel(cheapest))}</div>
         <div class="small" style="color:${DISCOUNT_GREEN};">Precio de lista (${escapeHtml(methodLabel(anchor))}): <s>${formatMoney(anchorTotal, currency)}</s> &middot; Con ${escapeHtml(methodLabel(cheapest))}: ${formatMoney(cheapestTotal, currency)}</div>
       </div>`;
   }
