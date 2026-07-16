@@ -86,6 +86,139 @@ describe('PaymentBreakdownHelpers.computeServicesSubtotalByType (comparativo 3 m
   });
 });
 
+describe('PaymentBreakdownHelpers.resolveDisplayedBalance (Pregunta 0 — saldo mostrado + ahorro)', () => {
+  it('paid + balance físico > 0: saldo mostrado 0 y línea de AHORRO por el residuo físico', () => {
+    const r = H.resolveDisplayedBalance({ paymentStatus: 'paid', balance: 21000 });
+    expect(r.displayedBalance).toBe(0);
+    expect(r.savings).not.toBeNull();
+    expect(r.savings.amount).toBe(21000);
+    expect(r.savings.label).toBe('Ahorraste $21,000.00 pagando en un método distinto al de la cotización.');
+    expect(r.savings.sublabel).toBe('Cubierto en su totalidad pagando en un método distinto al de la cotización.');
+  });
+
+  it('paid + balance físico <= 0 (H1, overpay/método más caro): saldo 0 y SIN línea de ahorro', () => {
+    expect(H.resolveDisplayedBalance({ paymentStatus: 'paid', balance: 0 })).toEqual({ displayedBalance: 0, savings: null });
+    expect(H.resolveDisplayedBalance({ paymentStatus: 'paid', balance: -1500 })).toEqual({ displayedBalance: 0, savings: null });
+  });
+
+  it('partial + balance > 0 (LA TRAMPA): saldo físico tal cual y NUNCA línea de ahorro', () => {
+    // Un pago parcial en un método distinto al ancla NO genera ahorro mostrado — solo lo genera 'paid'.
+    const r = H.resolveDisplayedBalance({ paymentStatus: 'partial', balance: 12000 });
+    expect(r.displayedBalance).toBe(12000);
+    expect(r.savings).toBeNull();
+  });
+
+  it('pending: saldo físico tal cual, sin ahorro', () => {
+    expect(H.resolveDisplayedBalance({ paymentStatus: 'pending', balance: 50000 })).toEqual({ displayedBalance: 50000, savings: null });
+  });
+
+  it('refunded (H2): se trata igual que "no pagado" — saldo físico tal cual, sin ahorro', () => {
+    expect(H.resolveDisplayedBalance({ paymentStatus: 'refunded', balance: 3000 })).toEqual({ displayedBalance: 3000, savings: null });
+  });
+
+  it('redondea a 2 decimales y tolera summary vacío/no numérico', () => {
+    expect(H.resolveDisplayedBalance({ paymentStatus: 'pending', balance: 100.005 }).displayedBalance).toBe(100.01);
+    expect(H.resolveDisplayedBalance({})).toEqual({ displayedBalance: 0, savings: null });
+    expect(H.resolveDisplayedBalance(null)).toEqual({ displayedBalance: 0, savings: null });
+  });
+});
+
+describe('PaymentBreakdownHelpers.cheapestAvailableMethod + buildDiscountEmphasis (dirección del descuento)', () => {
+  const services = [{ subconcept: { pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } } }];
+
+  it('elige el método disponible más barato', () => {
+    expect(H.cheapestAvailableMethod(['efectivo', 'transferencia', 'tarjeta'], services, 'MXN')).toBe('efectivo');
+    expect(H.cheapestAvailableMethod(['transferencia', 'tarjeta'], services, 'MXN')).toBe('transferencia');
+    expect(H.cheapestAvailableMethod([], services, 'MXN')).toBeNull();
+  });
+
+  it('ancla más cara que el más barato: muestra ahorro (verde #146c43, no text-success) con precio de lista tachado', () => {
+    const summary = { anchoredMethod: 'tarjeta', availableMethods: ['efectivo', 'transferencia', 'tarjeta'] };
+    const html = H.buildDiscountEmphasis(summary, services, 'MXN');
+    expect(html).toContain('#146c43');
+    expect(html).not.toContain('text-success');
+    expect(html).toContain('Ahorra $210.00 pagando en Efectivo');
+    expect(html).toContain('<s>$1,210.00</s>');
+  });
+
+  it('ancla ya es el más barato (efectivo): NO muestra descuento (regla de dirección)', () => {
+    const summary = { anchoredMethod: 'efectivo', availableMethods: ['efectivo', 'transferencia', 'tarjeta'] };
+    expect(H.buildDiscountEmphasis(summary, services, 'MXN')).toBe('');
+  });
+
+  it('un solo método disponible: sin descuento', () => {
+    expect(H.buildDiscountEmphasis({ anchoredMethod: 'tarjeta', availableMethods: ['tarjeta'] }, services, 'MXN')).toBe('');
+  });
+});
+
+describe('PaymentBreakdownHelpers.buildMethodChips (Requisito 3 — % del backend TAL CUAL)', () => {
+  const services = [{ subconcept: { pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } } }];
+
+  it('H3: availableMethods vacío NO crashea — renderiza el aviso, cero chips', () => {
+    const html = H.buildMethodChips({ availableMethods: [] }, services, 'MXN');
+    expect(html).toContain('No hay métodos de pago disponibles para esta reservación.');
+  });
+
+  it('usa coveragePercent del backend TAL CUAL, idéntico en los 3 chips (no re-deriva por método)', () => {
+    const summary = {
+      availableMethods: ['efectivo', 'transferencia', 'tarjeta'], anchoredMethod: 'efectivo',
+      adjustments: 0, coveragePercent: 42.5, remainingPercent: 57.5,
+    };
+    const html = H.buildMethodChips(summary, services, 'MXN');
+    // El mismo 42.5% aparece una vez por chip (3 métodos) — nunca un % distinto por método.
+    const matches = html.match(/42\.5% cubierto/g) || [];
+    expect(matches.length).toBe(3);
+  });
+
+  it('marca el método más barato con el badge "Más barato" cuando el ancla es más cara', () => {
+    const summary = {
+      availableMethods: ['efectivo', 'tarjeta'], anchoredMethod: 'tarjeta',
+      adjustments: 0, coveragePercent: 0,
+    };
+    expect(H.buildMethodChips(summary, services, 'MXN')).toContain('Más barato');
+  });
+});
+
+describe('PaymentBreakdownHelpers.buildCoverageCard + buildRemainingByMethod', () => {
+  it('coverage card muestra la línea de ahorro cuando paid + balance > 0', () => {
+    const html = H.buildCoverageCard({ paymentStatus: 'paid', balance: 500, paidAmount: 2000, coveragePercent: 100 }, 'MXN');
+    expect(html).toContain('Ahorraste $500.00');
+    expect(html).toContain('#146c43');
+  });
+
+  it('remaining-by-method vacío cuando ya está pagado', () => {
+    expect(H.buildRemainingByMethod({ paymentStatus: 'paid', availableMethods: ['efectivo'] }, 'MXN')).toBe('');
+  });
+
+  it('remaining-by-method lista montoParaSaldar por método cuando NO está pagado', () => {
+    const summary = {
+      paymentStatus: 'partial', availableMethods: ['efectivo', 'tarjeta'], remainingPercent: 50,
+      montoParaSaldar: { efectivo: 500, tarjeta: 605 },
+    };
+    const html = H.buildRemainingByMethod(summary, 'MXN');
+    expect(html).toContain('$500.00');
+    expect(html).toContain('$605.00');
+    expect(html).toContain('(50%)');
+  });
+});
+
+describe('PaymentBreakdownHelpers.buildPaymentsHistoryTable (solo lectura, agencia/agente)', () => {
+  it('vacío legible cuando no hay pagos', () => {
+    expect(H.buildPaymentsHistoryTable([], 'MXN')).toContain('Sin pagos registrados');
+  });
+
+  it('renderiza filas SIN columna/acciones de editar/eliminar y escapa la referencia (XSS)', () => {
+    const html = H.buildPaymentsHistoryTable([
+      { method: 'efectivo', amount: 1000, reference: '<img src=x onerror=alert(1)>', paidAt: '2026-07-15T00:00:00Z' },
+    ], 'MXN');
+    expect(html).toContain('$1,000.00');
+    expect(html).not.toContain('edit-payment-btn');
+    expect(html).not.toContain('delete-payment-btn');
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+    expect(html).not.toContain('<img src=x');
+  });
+});
+
 describe('PaymentBreakdownHelpers.getPaymentStatusBadge', () => {
   it('renderiza los 4 estados con su clase', () => {
     expect(H.getPaymentStatusBadge('pending')).toContain('Pendiente de pago');

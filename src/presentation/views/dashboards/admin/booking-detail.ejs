@@ -144,43 +144,19 @@
                 <h5 class="card-title mb-0 text-white">
                     <i class="ti ti-calculator me-2"></i>Resumen Financiero
                 </h5>
-                <button class="btn btn-sm btn-light d-none" id="addAdjustmentBtn">
-                    <i class="ti ti-plus me-1"></i>Ajuste
-                </button>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-light d-none" id="addPaymentBtn">
+                        <i class="ti ti-cash me-1"></i>Agregar pago
+                    </button>
+                    <button class="btn btn-sm btn-light d-none" id="addAdjustmentBtn">
+                        <i class="ti ti-plus me-1"></i>Ajuste
+                    </button>
+                </div>
             </div>
         </div>
         <div class="card-body">
             <div id="financialSummaryBody">
                 <!-- Resumen (totales + saldo) — rendered by JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Pagos — sección propia, separada de Cargos Adicionales (antes vivían en la misma tarjeta).
-         Colapsable: se auto-colapsa una vez cargados los pagos si ya hay al menos uno registrado
-         (ver loadPayments), para no obligar a hacer scroll por una tabla que el usuario ya conoce. -->
-    <div class="card border-0 shadow-sm mb-4" id="paymentsCard" style="display:none;">
-        <div class="card-header" style="background: linear-gradient(135deg, #0d6efd 0%, #6ea8fe 100%); border: none;">
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center flex-grow-1" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#paymentsCollapse" aria-expanded="true" aria-controls="paymentsCollapse">
-                    <h5 class="card-title mb-0 text-white">
-                        <i class="ti ti-cash me-2"></i>Pagos
-                        <span class="badge bg-light text-primary ms-2 d-none" id="paymentsCountBadge"></span>
-                    </h5>
-                    <i class="ti ti-chevron-up text-white ms-2" id="paymentsChevron"></i>
-                </div>
-                <button class="btn btn-sm btn-light d-none" id="addPaymentBtn">
-                    <i class="ti ti-plus me-1"></i>Agregar pago
-                </button>
-            </div>
-        </div>
-        <div class="collapse show" id="paymentsCollapse">
-            <div class="card-body">
-                <!-- Inline payment form (replaces the old modal) -->
-                <div id="paymentFormWrap" class="border rounded p-3 mb-3 bg-light" style="display:none;"></div>
-                <div id="paymentsBody">
-                    <!-- Payments table — rendered by JS -->
-                </div>
             </div>
         </div>
     </div>
@@ -250,7 +226,40 @@
     </div>
 </div>
 
+<!-- Pagos — Offcanvas (Bootstrap 5 nativo). Reemplaza la antigua #paymentsCard: chips por método,
+     cobertura, saldo restante por método, énfasis de descuento, historial y (admin) el formulario de
+     registro. Se abre con "Agregar pago" del Resumen Financiero. Ancho 680px; full-width bajo el
+     breakpoint sm (576px) nativo de Bootstrap. -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="paymentsOffcanvas" aria-labelledby="paymentsOffcanvasLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title mb-0" id="paymentsOffcanvasLabel"><i class="ti ti-cash me-2"></i>Pagos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+    <div class="offcanvas-body">
+        <!-- Chips por método de pago (Requisito 3) -->
+        <div class="mb-3" id="paymentChips"></div>
+        <!-- Card de cobertura (estado + barra + Pagado/Saldo) -->
+        <div class="border rounded p-3 mb-3" id="paymentCoverageCard"></div>
+        <!-- Desglose de saldo restante por método (Requisito 8) -->
+        <div class="border rounded p-3 mb-3" id="paymentRemainingByMethod" style="display:none;"></div>
+        <!-- Énfasis de descuento (Fase E) -->
+        <div class="mb-3" id="paymentDiscountEmphasis" style="display:none;"></div>
+        <!-- Historial de pagos + registro (admin) -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="fw-bold mb-0"><i class="ti ti-history me-1"></i>Historial de pagos</h6>
+            <button class="btn btn-sm btn-primary d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
+        </div>
+        <!-- Inline payment form (relocated from the old card; only admin renders/uses it) -->
+        <div id="paymentFormWrap" class="border rounded p-3 mb-3 bg-light" style="display:none;"></div>
+        <div id="paymentsBody">
+            <!-- Payments table — rendered by JS -->
+        </div>
+    </div>
+</div>
+
 <style>
+#paymentsOffcanvas { --bs-offcanvas-width: 680px; }
+@media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
@@ -1657,10 +1666,20 @@ document.addEventListener('DOMContentLoaded', async function() {
             <span class="fw-bold fs-5 text-success">${formatCurrency(finalTotal, curr)}</span>
         </div>`;
 
-        // Payment block — estado de pago + pagado / saldo / total con IVA.
+        // Payment block — estado + total + pagado + saldo. El "Saldo" se resuelve con
+        // resolveDisplayedBalance: cuando está pagado el saldo mostrado es 0 y, si el pago se hizo en un
+        // método más barato que el ancla de la cotización, el residuo físico aparece como línea de AHORRO
+        // aparte (nunca restado del saldo). El detalle completo (chips, cobertura, desglose por método,
+        // historial y registro) vive en #paymentsOffcanvas.
         const pay = d.payment;
         if (pay) {
-            const balanceCls = (pay.balance || 0) > 0 ? 'text-danger' : 'text-success';
+            const resolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
+            const balanceCls = resolved.displayedBalance > 0 ? 'text-danger' : 'text-success';
+            const savingsRow = resolved.savings
+                ? `<div class="py-2 border-top" style="color:#146c43;">
+                    <div class="fw-semibold"><i class="ti ti-discount-2 me-2"></i>${PaymentBreakdownHelpers.escapeHtml(resolved.savings.label)}</div>
+                    <div class="small">${PaymentBreakdownHelpers.escapeHtml(resolved.savings.sublabel)}</div>
+                </div>` : '';
             html += `<div class="border-top mt-2 pt-2">
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
@@ -1676,8 +1695,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2">
                     <span class="text-muted"><i class="ti ti-wallet me-2"></i>Saldo</span>
-                    <span class="fw-semibold ${balanceCls}">${formatCurrency(pay.balance, curr)}</span>
+                    <span class="fw-semibold ${balanceCls}">${formatCurrency(resolved.displayedBalance, curr)}</span>
                 </div>
+                ${savingsRow}
             </div>`;
         }
 
@@ -1739,12 +1759,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     // ===== PAYMENTS =====
 
     let paymentsCache = [];
-    // Auto-collapse only once (first load) — re-collapsing after every add/edit save would fight the user.
-    let paymentsAutoCollapseDone = false;
+    // Último summary AMPLIO de GET .../payments (coveragePercent/availableMethods/anchoredMethod/
+    // montoParaSaldar). El summary ANGOSTO de getReservationById NO trae estos campos, así que el carrito
+    // se puebla solo desde aquí.
+    let latestSummary = null;
 
-    function paymentsCollapseInstance() {
-        const el = document.getElementById('paymentsCollapse');
-        return el ? bootstrap.Collapse.getOrCreateInstance(el, { toggle: false }) : null;
+    function paymentsOffcanvasInstance() {
+        const el = document.getElementById('paymentsOffcanvas');
+        return el ? bootstrap.Offcanvas.getOrCreateInstance(el) : null;
     }
 
     const PAYMENT_METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
@@ -1756,7 +1778,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
             const result = await response.json();
             paymentsCache = result?.data?.payments || [];
-            // GET returns the fresh summary too — keep the saldo (Total/Pagado/Saldo) in sync on every reload.
+            // GET returns the fresh summary too — keep the saldo y el carrito en sync en cada recarga.
             if (result?.data?.summary) applyPaymentSummary(result.data.summary);
         } catch (err) {
             // Keep the existing cache on a transient network error instead of blanking the list.
@@ -1765,38 +1787,44 @@ document.addEventListener('DOMContentLoaded', async function() {
         renderPayments();
     }
 
+    // Rellena las secciones del offcanvas (chips / cobertura / saldo restante / descuento) desde el
+    // summary AMPLIO. Los % de cada chip y la barra usan coveragePercent/remainingPercent del backend TAL
+    // CUAL (no re-derivar en cliente: rompería con ajustes manuales).
+    function renderPaymentsOffcanvas() {
+        if (!latestSummary) return;
+        const services = reservationData?.services || [];
+        const curr = reservationData?.currency || 'MXN';
+        const chips = document.getElementById('paymentChips');
+        const coverage = document.getElementById('paymentCoverageCard');
+        const remaining = document.getElementById('paymentRemainingByMethod');
+        const discount = document.getElementById('paymentDiscountEmphasis');
+        if (chips) chips.innerHTML = PaymentBreakdownHelpers.buildMethodChips(latestSummary, services, curr);
+        if (coverage) coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr);
+        if (remaining) {
+            const html = PaymentBreakdownHelpers.buildRemainingByMethod(latestSummary, curr);
+            remaining.innerHTML = html;
+            remaining.style.display = html ? '' : 'none';
+        }
+        if (discount) {
+            const html = PaymentBreakdownHelpers.buildDiscountEmphasis(latestSummary, services, curr);
+            discount.innerHTML = html;
+            discount.style.display = html ? '' : 'none';
+        }
+    }
+
     function renderPayments() {
         const body = document.getElementById('paymentsBody');
         const addBtn = document.getElementById('addPaymentBtn');
+        const showFormBtn = document.getElementById('showPaymentFormBtn');
         if (!body) return;
-
-        // Pagos now lives in its own card (split out of Resumen Financiero) — show it here
-        // since it's no longer unhidden as a side effect of renderFinancialSummary().
-        const card = document.getElementById('paymentsCard');
-        if (card) card.style.display = '';
 
         const d = reservationData;
         const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
         const curr = d.currency || 'MXN';
 
+        // Controles de escritura (abrir carrito / registrar pago) solo cuando la reservación es editable.
         if (addBtn) { if (canEdit) addBtn.classList.remove('d-none'); else addBtn.classList.add('d-none'); }
-
-        const countBadge = document.getElementById('paymentsCountBadge');
-        if (countBadge) {
-            if (paymentsCache.length) {
-                countBadge.textContent = paymentsCache.length;
-                countBadge.classList.remove('d-none');
-            } else {
-                countBadge.classList.add('d-none');
-            }
-        }
-
-        // First load only: collapse the section when there's already data (nothing new to review),
-        // keep it open when empty (invites registering the first payment).
-        if (!paymentsAutoCollapseDone) {
-            paymentsAutoCollapseDone = true;
-            if (paymentsCache.length) paymentsCollapseInstance()?.hide();
-        }
+        if (showFormBtn) { if (canEdit) showFormBtn.classList.remove('d-none'); else showFormBtn.classList.add('d-none'); }
 
         if (!paymentsCache.length) {
             body.innerHTML = '<div class="text-center py-3 text-muted">Sin pagos registrados</div>';
@@ -1881,21 +1909,31 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    // Inline payment form (replaces the old modal). null = nuevo, id = editar el pago.
+    // Inline payment form (relocated into #paymentsOffcanvas). null = nuevo, id = editar el pago.
     function renderPaymentForm(paymentId) {
         const wrap = document.getElementById('paymentFormWrap');
         if (!wrap) return;
-        // The form lives inside the collapsible Pagos section — expand it so the form is actually visible.
-        paymentsCollapseInstance()?.show();
         const existing = paymentId ? paymentsCache.find((p) => p.id === paymentId) : null;
         const curr = existing?.origCurrency || 'MXN';
         const paidAt = existing?.paidAt ? new Date(existing.paidAt).toISOString().slice(0, 10) : '';
         // Payment date allows the future (reservations later); shared standard 1900 .. today + 20y.
         const paidAtMax = (() => { const dt = new Date(); dt.setFullYear(dt.getFullYear() + 20); return dt.toISOString().slice(0, 10); })();
         const opt = (v, label, sel) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${label}</option>`;
-        const method = existing?.method || 'efectivo';
         const receiptLink = existing?.receiptUrl
             ? `<a href="${existing.receiptUrl}" target="_blank" class="small d-block mt-1"><i class="ti ti-file-invoice me-1"></i>Ver comprobante actual</a>` : '';
+
+        // Método: poblado dinámicamente desde availableMethods (Fase C), NUNCA hardcodeado a 3 opciones.
+        // Al editar, se conserva el método guardado aunque ya no esté disponible (no cambiarlo en silencio).
+        // Sin métodos disponibles (H3): select deshabilitado con mensaje y guardado bloqueado.
+        const available = (latestSummary && Array.isArray(latestSummary.availableMethods)) ? latestSummary.availableMethods.slice() : [];
+        const method = existing?.method || available[0] || '';
+        const methodOrder = available.slice();
+        if (existing?.method && !methodOrder.includes(existing.method)) methodOrder.push(existing.method);
+        const methodDisabled = methodOrder.length === 0;
+        const methodSelectHtml = methodDisabled
+            ? `<select class="form-select form-select-sm" id="paymentMethod" disabled><option value="">Sin métodos disponibles</option></select>
+               <div class="form-text text-danger">No hay métodos de pago disponibles para esta reservación.</div>`
+            : `<select class="form-select form-select-sm" id="paymentMethod">${methodOrder.map((m) => opt(m, PAYMENT_METHOD_LABELS[m] || m, method)).join('')}</select>`;
 
         const amountInit = existing ? (existing.origAmount ?? existing.amount ?? '') : '';
 
@@ -1913,7 +1951,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentMethod">Método</label>
-                    <select class="form-select form-select-sm" id="paymentMethod">${opt('efectivo', 'Efectivo', method)}${opt('transferencia', 'Transferencia', method)}${opt('tarjeta', 'Tarjeta', method)}</select>
+                    ${methodSelectHtml}
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
@@ -1937,32 +1975,40 @@ document.addEventListener('DOMContentLoaded', async function() {
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelPaymentBtn">Cancelar</button>
                 <button type="button" class="btn btn-sm btn-primary px-4" id="savePaymentBtn"><i class="ti ti-check me-1"></i>Guardar</button>
             </div>`;
-        // Make the inline form obvious (it lives above the payments table): a clearly bordered panel
-        // centered in the viewport, so opening "Editar/Registrar pago" no longer desconcierta.
-        wrap.style.cssText = 'border:2px solid #0d6efd;border-radius:.5rem;padding:1rem 1.25rem;background:#f5f9ff';
-        wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // El formulario vive dentro del offcanvas (posición fija con scroll propio): se muestra en su
+        // sitio y se desplaza a la vista dentro del panel, sin scrollIntoView de página ni borde inline.
+        wrap.style.display = '';
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const saveBtn = document.getElementById('savePaymentBtn');
+        // Sin métodos disponibles (H3): no se puede registrar/editar el pago — bloquea el guardado.
+        if (methodDisabled && saveBtn) saveBtn.disabled = true;
         document.getElementById('cancelPaymentBtn').addEventListener('click', () => { wrap.style.display = 'none'; wrap.innerHTML = ''; });
-        document.getElementById('savePaymentBtn').addEventListener('click', () => savePayment(existing ? existing.id : ''));
+        saveBtn.addEventListener('click', () => savePayment(existing ? existing.id : ''));
         attachThousands(document.getElementById('paymentAmount'));
     }
 
-    // Refresh the Financial Summary numbers from a POST/PUT/DELETE response summary
-    // (paymentStatus, paidAmount, balance, total) without a full reload.
+    // Refresh the Financial Summary numbers + el carrito desde un summary de respuesta (POST/PUT/DELETE)
+    // o de GET, sin recargar la página. Guarda el summary AMPLIO para poblar el offcanvas.
     function applyPaymentSummary(summary) {
-        if (!summary || !reservationData.payment) return;
-        Object.assign(reservationData.payment, summary);
+        if (!summary) return;
+        latestSummary = summary;
+        if (reservationData.payment) Object.assign(reservationData.payment, summary);
+        else reservationData.payment = { ...summary };
         renderFinancialSummary();
+        renderPaymentsOffcanvas();
     }
 
-    document.getElementById('addPaymentBtn')?.addEventListener('click', () => renderPaymentForm(null));
-
-    // Flip the chevron with the actual collapse state (works whether it was toggled by the header
-    // click or programmatically via paymentsCollapseInstance()).
-    document.getElementById('paymentsCollapse')?.addEventListener('show.bs.collapse', () => {
-        document.getElementById('paymentsChevron')?.classList.replace('ti-chevron-down', 'ti-chevron-up');
+    // "Agregar pago" (header): abre el carrito y muestra el formulario de nuevo pago.
+    document.getElementById('addPaymentBtn')?.addEventListener('click', () => {
+        paymentsOffcanvasInstance()?.show();
+        renderPaymentForm(null);
     });
-    document.getElementById('paymentsCollapse')?.addEventListener('hide.bs.collapse', () => {
-        document.getElementById('paymentsChevron')?.classList.replace('ti-chevron-up', 'ti-chevron-down');
+    // "Registrar pago" (dentro del carrito): muestra el formulario de nuevo pago sin reabrir el panel.
+    document.getElementById('showPaymentFormBtn')?.addEventListener('click', () => renderPaymentForm(null));
+    // Cerrar el carrito (backdrop-click / Escape / botón) descarta el formulario en silencio (H5).
+    document.getElementById('paymentsOffcanvas')?.addEventListener('hidden.bs.offcanvas', () => {
+        const wrap = document.getElementById('paymentFormWrap');
+        if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
     });
 
     async function savePayment(paymentId) {

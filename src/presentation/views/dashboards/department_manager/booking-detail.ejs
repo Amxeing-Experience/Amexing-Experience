@@ -111,9 +111,14 @@
     <!-- Financial Summary Card (read-only) -->
     <div class="card border-0 shadow-sm mb-4" id="financialSummaryCard" style="display:none;">
         <div class="card-header" style="background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%); border: none;">
-            <h5 class="card-title mb-0 text-white">
-                <i class="ti ti-calculator me-2"></i>Resumen Financiero
-            </h5>
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-calculator me-2"></i>Resumen Financiero
+                </h5>
+                <button class="btn btn-sm btn-light d-none" id="viewPaymentsBtn">
+                    <i class="ti ti-cash me-1"></i>Ver pagos
+                </button>
+            </div>
         </div>
         <div class="card-body" id="financialSummaryBody"></div>
     </div>
@@ -174,7 +179,27 @@
     </div>
 </div>
 
+<!-- Pagos — Offcanvas de SOLO LECTURA (Bootstrap 5 nativo). Mismos chips / cobertura / saldo restante
+     por método / énfasis de descuento / historial que admin, pero SIN formulario de registro ni acciones
+     de editar/eliminar. Se abre con "Ver pagos". Ancho 680px; full-width bajo el breakpoint sm (576px). -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="paymentsOffcanvas" aria-labelledby="paymentsOffcanvasLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title mb-0" id="paymentsOffcanvasLabel"><i class="ti ti-cash me-2"></i>Pagos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="mb-3" id="paymentChips"></div>
+        <div class="border rounded p-3 mb-3" id="paymentCoverageCard"></div>
+        <div class="border rounded p-3 mb-3" id="paymentRemainingByMethod" style="display:none;"></div>
+        <div class="mb-3" id="paymentDiscountEmphasis" style="display:none;"></div>
+        <h6 class="fw-bold mb-2"><i class="ti ti-history me-1"></i>Historial de pagos</h6>
+        <div id="paymentsBody"></div>
+    </div>
+</div>
+
 <style>
+#paymentsOffcanvas { --bs-offcanvas-width: 680px; }
+@media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
@@ -384,6 +409,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Render services grouped by day
         renderServices(d.services);
         renderFinancialSummary();
+        loadPayments();
 
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('reservationContent').style.display = '';
@@ -400,6 +426,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // La tarjeta financiera se pinta SIEMPRE que haya datos de reservación, con o sin ajustes.
         // (Antes un early-return con 0 ajustes ocultaba también Subtotal/Total/Saldo — bug corregido.)
         card.style.display = '';
+        document.getElementById('viewPaymentsBtn')?.classList.remove('d-none');
 
         // Esta plantilla es SIEMPRE de agencia: los ajustes se enmarcan como cargo/ajuste, nunca como
         // "descuento".
@@ -431,11 +458,19 @@ document.addEventListener('DOMContentLoaded', async function() {
             <span class="fw-bold fs-5 text-success">${formatCurrency(d.totalAmount || 0, curr)}</span>
         </div>`;
 
-        // Bloque de pago (NUEVO en agencia/agente): Estado / Total a pagar / Pagado / Saldo.
-        // Sin comparativo de métodos, sin formulario de pago, sin historial (fuera de alcance).
+        // Bloque de pago (agencia/agente): Estado / Total a pagar / Pagado / Saldo. El "Saldo" se resuelve
+        // con resolveDisplayedBalance (0 cuando está pagado; línea de ahorro aparte si se pagó en un método
+        // más barato que el ancla). El detalle completo (chips, cobertura, saldo por método, descuento e
+        // historial) vive de solo lectura en #paymentsOffcanvas ("Ver pagos").
         const pay = d.payment;
         if (pay) {
-            const balanceCls = (pay.balance || 0) > 0 ? 'text-danger' : 'text-success';
+            const resolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
+            const balanceCls = resolved.displayedBalance > 0 ? 'text-danger' : 'text-success';
+            const savingsRow = resolved.savings
+                ? `<div class="py-2 border-top" style="color:#146c43;">
+                    <div class="fw-semibold"><i class="ti ti-discount-2 me-2"></i>${PaymentBreakdownHelpers.escapeHtml(resolved.savings.label)}</div>
+                    <div class="small">${PaymentBreakdownHelpers.escapeHtml(resolved.savings.sublabel)}</div>
+                </div>` : '';
             html += `<div class="border-top mt-2 pt-2">
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
@@ -451,13 +486,83 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2">
                     <span class="text-muted"><i class="ti ti-wallet me-2"></i>Saldo</span>
-                    <span class="fw-semibold ${balanceCls}">${formatCurrency(pay.balance, curr)}</span>
+                    <span class="fw-semibold ${balanceCls}">${formatCurrency(resolved.displayedBalance, curr)}</span>
                 </div>
+                ${savingsRow}
             </div>`;
         }
 
         body.innerHTML = html;
     }
+
+    // ===== PAGOS (solo lectura) =====
+
+    // Último summary AMPLIO de GET .../payments (coveragePercent/availableMethods/anchoredMethod/
+    // montoParaSaldar). El summary ANGOSTO de getReservationById NO los trae — el carrito se puebla solo
+    // desde aquí.
+    let latestSummary = null;
+
+    function paymentsOffcanvasInstance() {
+        const el = document.getElementById('paymentsOffcanvas');
+        return el ? bootstrap.Offcanvas.getOrCreateInstance(el) : null;
+    }
+
+    async function loadPayments() {
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/payments`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const result = await response.json();
+            const payments = result?.data?.payments || [];
+            if (result?.data?.summary) applyPaymentSummary(result.data.summary);
+            renderPaymentsHistory(payments);
+        } catch (err) {
+            console.error('Error loading payments:', err);
+        }
+    }
+
+    function renderPaymentsHistory(payments) {
+        const body = document.getElementById('paymentsBody');
+        if (!body) return;
+        const curr = reservationData?.currency || 'MXN';
+        body.innerHTML = PaymentBreakdownHelpers.buildPaymentsHistoryTable(payments, curr);
+    }
+
+    // Rellena las secciones del offcanvas (chips / cobertura / saldo restante / descuento) desde el
+    // summary AMPLIO. Los % de cada chip y la barra usan coveragePercent/remainingPercent del backend TAL
+    // CUAL (no re-derivar en cliente: rompería con ajustes manuales).
+    function renderPaymentsOffcanvas() {
+        if (!latestSummary) return;
+        const services = reservationData?.services || [];
+        const curr = reservationData?.currency || 'MXN';
+        const chips = document.getElementById('paymentChips');
+        const coverage = document.getElementById('paymentCoverageCard');
+        const remaining = document.getElementById('paymentRemainingByMethod');
+        const discount = document.getElementById('paymentDiscountEmphasis');
+        if (chips) chips.innerHTML = PaymentBreakdownHelpers.buildMethodChips(latestSummary, services, curr);
+        if (coverage) coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr);
+        if (remaining) {
+            const html = PaymentBreakdownHelpers.buildRemainingByMethod(latestSummary, curr);
+            remaining.innerHTML = html;
+            remaining.style.display = html ? '' : 'none';
+        }
+        if (discount) {
+            const html = PaymentBreakdownHelpers.buildDiscountEmphasis(latestSummary, services, curr);
+            discount.innerHTML = html;
+            discount.style.display = html ? '' : 'none';
+        }
+    }
+
+    function applyPaymentSummary(summary) {
+        if (!summary) return;
+        latestSummary = summary;
+        if (reservationData.payment) Object.assign(reservationData.payment, summary);
+        else reservationData.payment = { ...summary };
+        renderFinancialSummary();
+        renderPaymentsOffcanvas();
+    }
+
+    document.getElementById('viewPaymentsBtn')?.addEventListener('click', () => paymentsOffcanvasInstance()?.show());
 
     function getSubconceptDetails(svc) {
         const sub = svc.subconcept;

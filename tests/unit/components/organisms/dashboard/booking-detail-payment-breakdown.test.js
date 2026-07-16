@@ -69,9 +69,12 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).not.toContain('>Propina<');
   });
 
-  it.each(AGENCY_ROLES)('%s: framing de ajustes sin el ícono de descuento (ti-discount-2)', async (role) => {
+  it.each(AGENCY_ROLES)('%s: los AJUSTES se enmarcan neutrales (ti-plus/ti-minus), no como descuento', async (role) => {
+    // El ícono de descuento (ti-discount-2) ya NO está prohibido en toda la plantilla: la línea de
+    // AHORRO (Fase D+E, aprobada) sí lo usa. Lo que se conserva es el framing NEUTRAL de los ajustes.
     const html = await render(role);
-    expect(html).not.toContain('ti-discount-2');
+    expect(html).toContain('ti-plus text-danger');
+    expect(html).toContain('ti-minus text-success');
   });
 
   it.each(AGENCY_ROLES)('%s: SIN comparativo de 3 métodos (fuera de alcance)', async (role) => {
@@ -91,16 +94,31 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).not.toContain('remove-adj-btn');
   });
 
-  it.each(AGENCY_ROLES)('%s: formulario de registro de pago AUSENTE del DOM', async (role) => {
+  it.each(AGENCY_ROLES)('%s: formulario de registro de pago AUSENTE del DOM (offcanvas es SOLO LECTURA)', async (role) => {
     const html = await render(role);
     expect(html).not.toContain('id="paymentFormWrap"');
     expect(html).not.toContain('id="addPaymentBtn"');
     expect(html).not.toContain('id="savePaymentBtn"');
+    expect(html).not.toContain('id="showPaymentFormBtn"');
   });
 
-  it.each(AGENCY_ROLES)('%s: tabla de historial de pagos AUSENTE del DOM', async (role) => {
+  // INVERSIÓN Fase D: antes agencia/agente NO tenían historial de pagos; ahora SÍ (offcanvas de lectura).
+  it.each(AGENCY_ROLES)('%s: AHORA existe el historial de pagos (#paymentsBody); la tarjeta vieja nunca existió', async (role) => {
     const html = await render(role);
-    expect(html).not.toContain('id="paymentsBody"');
+    expect(html).toContain('id="paymentsBody"');
     expect(html).not.toContain('id="paymentsCard"');
+  });
+
+  it.each(AGENCY_ROLES)('%s: Offcanvas de solo lectura con chips/cobertura/saldo restante/descuento + botón "Ver pagos"', async (role) => {
+    const html = await render(role);
+    expect(html).toContain('id="paymentsOffcanvas"');
+    expect(html).toContain('offcanvas offcanvas-end');
+    expect(html).toContain('id="paymentChips"');
+    expect(html).toContain('id="paymentCoverageCard"');
+    expect(html).toContain('id="paymentRemainingByMethod"');
+    expect(html).toContain('id="paymentDiscountEmphasis"');
+    expect(html).toContain('id="viewPaymentsBtn"');
+    // Consume el endpoint AMPLIO (GET .../payments), no el objeto angosto de getReservationById.
+    expect(html).toContain('/payments');
   });
 });
