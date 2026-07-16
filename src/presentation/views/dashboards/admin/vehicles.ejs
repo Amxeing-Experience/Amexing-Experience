@@ -94,11 +94,21 @@ const menuItems = [
 
 /* Tabla en modo editorial (sin panel blanco ni header con gradiente) */
 .vehicles-wrap .vt-editorial{background:transparent;}
-.vehicles-wrap .vt-toolbar{margin:.2rem 0 1.1rem;}
+/* Toolbar solo-botón (tabla de Tipos, sin filtro) */
+.vehicles-wrap .vt-toolbar{margin:.2rem 0 1.2rem;}
+/* Fila superior: filtro por tarifa (chips) a la izquierda + botón Nuevo a la derecha */
+.vehicles-wrap .vt-topbar{display:flex;align-items:center;justify-content:space-between;gap:14px 20px;flex-wrap:wrap;margin:.2rem 0 1.2rem;}
+.vehicles-wrap .vt-filter-inline{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0;}
+.vehicles-wrap .vt-filter-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:700;white-space:nowrap;}
+.vehicles-wrap .vt-pills{display:flex;flex-wrap:wrap;gap:.4rem;}
+.vehicles-wrap .vt-pills .btn{border-radius:999px;border:1px solid var(--line);color:var(--muted);background:#fff;
+    font-weight:600;font-size:.76rem;padding:.32rem .9rem;box-shadow:none;transition:all .15s ease;}
+.vehicles-wrap .vt-pills .btn:hover{border-color:var(--olive);color:var(--olive-d);}
+.vehicles-wrap .vt-pills .btn-check:checked + .btn{background:var(--olive);border-color:var(--olive);color:#fff;}
+.vehicles-wrap .vt-pills .btn-check:focus-visible + .btn{outline:2px solid var(--olive);outline-offset:2px;}
 .vehicles-wrap .vt-btn-new{background:var(--olive);color:#fff;border:1px solid var(--olive);border-radius:10px;
-    font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.76rem;padding:.5rem 1rem;}
+    font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:.76rem;padding:.5rem 1rem;white-space:nowrap;}
 .vehicles-wrap .vt-btn-new:hover{background:var(--olive-d);color:#fff;}
-.vehicles-wrap .vt-filter{margin:0 0 1rem;padding:0;}
 .vehicles-wrap .vt-table{padding:0;}
 </style>
 

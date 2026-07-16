@@ -25,19 +25,35 @@ const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
 %>
 
 <div class="<%= editorialFlat ? 'vt-editorial' : 'card border-0 shadow-sm' %>">
-    <div class="<%= editorialFlat ? 'vt-toolbar' : 'card-header text-white' %>"<% if (!editorialFlat) { %> style="background: var(--brand-gradient); border: none;"<% } %>>
+<% if (editorialFlat) { %>
+    <!-- Editorial: filtro por tarifa (chips) + botón Nuevo, en el mismo row -->
+    <div class="vt-topbar">
+        <div class="vt-filter-inline">
+            <span class="vt-filter-label"><i class="ti ti-filter me-1"></i>Tarifa</span>
+            <div class="vt-pills" id="rateFilterPills" role="group" aria-label="Filtro por tarifa">
+                <input type="radio" class="btn-check" name="rateFilter" id="rateFilterAll" value="" checked>
+                <label class="btn btn-sm" for="rateFilterAll">Todas</label>
+                <!-- Pills de tarifas cargadas dinámicamente -->
+            </div>
+        </div>
+        <% if (canCreate) { %>
+        <button type="button" class="btn btn-sm vt-btn-new" id="createVehicleBtn">
+            <i class="ti ti-plus me-1"></i>Nuevo Vehículo
+        </button>
+        <% } %>
+    </div>
+<% } else { %>
+    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
         <div class="row align-items-center">
             <div class="col">
-                <% if (!editorialFlat) { %>
                 <h5 class="card-title mb-0 text-white">
                     <i class="ti ti-car me-2"></i>Flota de Vehículos
                 </h5>
                 <small class="text-white" style="opacity: 0.9;">Gestión completa del inventario de vehículos</small>
-                <% } %>
             </div>
             <div class="col-auto">
                 <% if (canCreate) { %>
-                    <button type="button" class="btn btn-sm <%= editorialFlat ? 'vt-btn-new' : 'btn-light' %>" id="createVehicleBtn">
+                    <button type="button" class="btn btn-light btn-sm" id="createVehicleBtn">
                         <i class="ti ti-plus me-1"></i>Nuevo Vehículo
                     </button>
                 <% } %>
@@ -46,7 +62,7 @@ const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
     </div>
 
     <!-- Filtro por tarifa (pills) -->
-    <div class="<%= editorialFlat ? 'vt-filter' : 'card-body border-bottom bg-light' %>">
+    <div class="card-body border-bottom bg-light">
         <label class="form-label fw-semibold d-block mb-2">Filtrar por Tarifa</label>
         <div class="d-flex flex-wrap gap-2" id="rateFilterPills" role="group" aria-label="Filtro por tarifa">
             <input type="radio" class="btn-check" name="rateFilter" id="rateFilterAll" value="" checked>
@@ -54,6 +70,7 @@ const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
             <!-- Pills de tarifas cargadas dinámicamente -->
         </div>
     </div>
+<% } %>
 
     <div class="<%= editorialFlat ? 'vt-table' : 'card-body' %>" id="vehicles-content">
         <div class="table-responsive">
