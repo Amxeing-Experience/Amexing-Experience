@@ -26,6 +26,8 @@ const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
 const dtCompact = typeof compact !== 'undefined' ? compact : false;
 // Init diferido (lazy): no inicializa el DataTable en carga; la vista lo llama al mostrarlo.
 const dtDeferInit = typeof deferInit !== 'undefined' ? deferInit : false;
+// Lista de tarjetas: 1 columna que renderiza cada tipo como tarjeta (reusa el CRUD/modal). Ideal en panel.
+const dtCardList = typeof cardList !== 'undefined' ? cardList : false;
 %>
 
 <div class="<%= editorialFlat ? 'vt-editorial' : 'card border-0 shadow-sm' %>">
@@ -54,14 +56,18 @@ const dtDeferInit = typeof deferInit !== 'undefined' ? deferInit : false;
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
                     <tr>
-                        <th>Nombre</th>
-                        <th>Capacidad</th>
-                        <th>Carry-on</th>
-                        <% if (dtUserRole !== 'department_manager') { %>
-                            <th>Estado</th>
-                        <% } %>
-                        <% if (dtShowActions) { %>
-                            <th class="text-center">Acciones</th>
+                        <% if (dtCardList) { %>
+                            <th>Tipos de Vehículo</th>
+                        <% } else { %>
+                            <th>Nombre</th>
+                            <th>Capacidad</th>
+                            <th>Carry-on</th>
+                            <% if (dtUserRole !== 'department_manager') { %>
+                                <th>Estado</th>
+                            <% } %>
+                            <% if (dtShowActions) { %>
+                                <th class="text-center">Acciones</th>
+                            <% } %>
                         <% } %>
                     </tr>
                 </thead>
@@ -205,6 +211,7 @@ const dtDeferInit = typeof deferInit !== 'undefined' ? deferInit : false;
         const canDelete = <%= canDelete %>;
         const userRole = '<%= dtUserRole %>';
         const isCompact = <%= dtCompact ? 'true' : 'false' %>;
+        const isCardList = <%= dtCardList ? 'true' : 'false' %>;
 
         // DataTable Configuration
         const dataTable = $(`#${tableId}`).DataTable({
@@ -221,7 +228,37 @@ const dtDeferInit = typeof deferInit !== 'undefined' ? deferInit : false;
                     showErrorAlert('Error al cargar los tipos de vehículo');
                 }
             },
-            columns: [
+            columns: isCardList ? [
+                {
+                    data: null,
+                    orderable: false,
+                    render: function (row) {
+                        const id = row.objectId || row.id;
+                        const cap = (row.defaultCapacity != null) ? row.defaultCapacity : '-';
+                        const carry = (row.trunkCapacity != null) ? row.trunkCapacity : null;
+                        const active = !!row.active;
+                        let acts = '';
+                        if (canEdit) {
+                            acts += `<button type="button" class="tcard-btn edit-type-btn" data-id="${id}" title="Editar"><i class="ti ti-edit"></i></button>`;
+                            const si = active ? 'ti-archive' : 'ti-archive-off';
+                            acts += `<button type="button" class="tcard-btn toggle-status-btn" data-id="${id}" data-current-status="${active}" data-name="${row.name}" title="${active ? 'Desactivar' : 'Activar'}"><i class="ti ${si}"></i></button>`;
+                        }
+                        if (canDelete) {
+                            acts += `<button type="button" class="tcard-btn danger delete-type-btn" data-id="${id}" data-name="${row.name}" title="Eliminar"><i class="ti ti-trash"></i></button>`;
+                        }
+                        const tag = active ? '' : ' <span class="tcard-tag">Inactivo</span>';
+                        const meta = `${cap} pasajeros${carry != null ? ' · ' + carry + ' equipaje' : ''}${row.description ? ' · ' + row.description : ''}`;
+                        return `<div class="tcard${active ? '' : ' off'}">
+                            <div class="tcard-ic"><i class="ti ti-car"></i></div>
+                            <div class="tcard-body">
+                                <div class="tcard-name">${row.name || '-'}${tag}</div>
+                                <div class="tcard-meta">${meta}</div>
+                            </div>
+                            <div class="tcard-actions">${acts}</div>
+                        </div>`;
+                    }
+                }
+            ] : [
                 {
                     data: null,
                     render: function(data) {
@@ -314,11 +351,11 @@ const dtDeferInit = typeof deferInit !== 'undefined' ? deferInit : false;
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando tipos...'
             },
-            order: [[0, 'asc']], // Sort by name by default
-            pageLength: isCompact ? 100 : 10,
+            order: isCardList ? [] : [[0, 'asc']], // Sort by name by default
+            pageLength: (isCompact || isCardList) ? 100 : 10,
             searchDelay: 300,
-            // Compacto: solo la tabla (sin length/search/info/paginación). Ideal para pocos registros.
-            dom: isCompact ? 't' : '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+            // Compacto/tarjetas: solo la tabla (sin length/search/info/paginación).
+            dom: (isCompact || isCardList) ? 't' : '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
                  '<"row"<"col-sm-12"tr>>' +
                  '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
             drawCallback: function() {
