@@ -200,25 +200,13 @@ class PaymentController {
         }
       }
 
-      // Reconcile reservation.paymentType against this payment's real method (Fase 0): updates
-      // paymentType cleanly when nothing to reconcile, or writes a single tagged adjustment when a
-      // prior payment used a different tier. Non-fatal: the payment is already saved.
-      let methodWarning = null;
-      try {
-        const decision = await PaymentService.resolvePaymentMethodChange(id, {
-          method: payment.getMethod(),
-          amountMXN: payment.getAmount(),
-          currentPaymentId: payment.id,
-        });
-        methodWarning = decision.warning;
-      } catch (reconErr) {
-        logger.warn('Payment saved but method reconciliation failed', {
-          reservationId: id, paymentId: payment.id, error: reconErr.message,
-        });
-      }
-
+      // Modelo de saldo mixto: reservation.paymentType es inmutable (heredado de la cotización) y ya no
+      // hay re-anclaje ni ajuste automático que reconciliar. recalculate() recalcula el rollup desde
+      // cero sobre todo el historial con el motor nuevo (paymentStatus por cobertura equivalente-ancla).
       const summary = await PaymentService.recalculate(id);
-      const warning = [methodWarning, receiptWarning].filter(Boolean).join(' ') || null;
+      // `warning` se conserva en la respuesta (contrato estable del frontend); ya no lo alimenta ningún
+      // aviso de método — solo el fallo no fatal de subida de comprobante. null en el caso normal.
+      const warning = receiptWarning || null;
 
       logger.info('Payment registered', {
         reservationId: id,
@@ -332,25 +320,13 @@ class PaymentController {
       payment.set('modifiedBy', req.user);
       await payment.save(null, { useMasterKey: true });
 
-      // Reconcile against the (possibly changed) method/amount. Runs on every edit — including an
-      // amount-only change — so the tagged adjustment stays correct and never leaves a phantom
-      // balance against money already collected. Non-fatal: the payment edit is already saved.
-      let methodWarning = null;
-      try {
-        const decision = await PaymentService.resolvePaymentMethodChange(id, {
-          method: payment.getMethod(),
-          amountMXN: payment.getAmount(),
-          currentPaymentId: payment.id,
-        });
-        methodWarning = decision.warning;
-      } catch (reconErr) {
-        logger.warn('Payment updated but method reconciliation failed', {
-          reservationId: id, paymentId, error: reconErr.message,
-        });
-      }
-
+      // Modelo de saldo mixto: editar monto/método recalcula el rollup desde CERO sobre todo el
+      // historial (nunca un delta incremental) — paymentType queda inmutable, sin re-anclaje ni ajuste
+      // automático que reconciliar.
       const summary = await PaymentService.recalculate(id);
-      const warning = [methodWarning, receiptWarning].filter(Boolean).join(' ') || null;
+      // `warning` se conserva en la respuesta (contrato estable); solo lo alimenta el fallo no fatal de
+      // subida de comprobante. null en el caso normal.
+      const warning = receiptWarning || null;
 
       logger.info('Payment updated', { reservationId: id, paymentId, performedBy: req.userId });
 
@@ -400,17 +376,8 @@ class PaymentController {
         }
       }
 
-      // Reconcile over the remaining payments (no current payment): recomputes the tagged adjustment
-      // from scratch and removes it when the reservation is consistent again, so deleting a
-      // cross-tier payment never leaves a phantom balance. Non-fatal: the payment is already deleted.
-      try {
-        await PaymentService.resolvePaymentMethodChange(id, {});
-      } catch (reconErr) {
-        logger.warn('Payment deleted but method reconciliation failed', {
-          reservationId: id, paymentId, error: reconErr.message,
-        });
-      }
-
+      // Modelo de saldo mixto: recalculate() recalcula el rollup desde CERO sobre el historial
+      // restante — eliminar un pago cross-tier no deja residuo, sin paso de reconciliación aparte.
       const summary = await PaymentService.recalculate(id);
 
       logger.info('Payment deleted', { reservationId: id, paymentId, performedBy: req.userId });

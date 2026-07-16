@@ -47,11 +47,6 @@ describe('Booking Detail Fase 3 — admin (nivel 6+)', () => {
     expect(html).not.toContain('Sin responsable asignado');
   });
 
-  it('renderiza el badge [Automático] con su tooltip para ajustes de reconciliación', () => {
-    expect(html).toContain('Automático');
-    expect(html).toContain('Generado automáticamente al detectar un cambio de método de pago');
-  });
-
   it('conserva el botón de agregar ajuste (regresión: sigue siendo admin-only)', () => {
     expect(html).toContain('id="addAdjustmentBtn"');
   });
@@ -72,12 +67,6 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).not.toContain('id="tipByServiceBreakdown"');
     expect(html).not.toContain('Ver propina por servicio');
     expect(html).not.toContain('>Propina<');
-  });
-
-  it.each(AGENCY_ROLES)('%s: badge [Automático] presente para ajustes de reconciliación', async (role) => {
-    const html = await render(role);
-    expect(html).toContain('Automático');
-    expect(html).toContain('Generado automáticamente al detectar un cambio de método de pago');
   });
 
   it.each(AGENCY_ROLES)('%s: framing de ajustes sin el ícono de descuento (ti-discount-2)', async (role) => {

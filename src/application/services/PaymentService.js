@@ -30,11 +30,6 @@ const logger = require('../../infrastructure/logger');
 // Solo se importa el redondeo a efectivo (múltiplo de 5). No se modifica el motor.
 const { applyCashRounding } = require('../../domain/pricing/pricingEngine');
 
-// Tag del único ajuste que este servicio crea/reemplaza al reconciliar el método de pago.
-// Distingue el ajuste automático de los ajustes que el staff agrega a mano (sin `source`),
-// para poder encontrarlo y reemplazarlo sin tocar los manuales.
-const RECON_SOURCE = 'payment-method-reconciliation';
-
 /**
  * Round to 2 decimals (currency precision).
  * @param {number} n - Value to round.
@@ -132,20 +127,121 @@ class PaymentService {
   }
 
   /**
-   * Derive payment status from amount due vs amount paid. Overpay is allowed
+   * Total a cobrar por un método (solo servicios, sin ajustes): computeTotals(...).servicesTotal.
+   * Función pura reutilizable — recibe serviceItems/currency explícitos, sin capturar estado externo.
+   * @param {Array<object>} serviceItems - Plain items { includeInTotal, pricesByType, total }.
+   * @param {string} method - Método (efectivo|transferencia|tarjeta).
+   * @param {string} [currency] - Moneda (MXN aplica redondeo a efectivo).
+   * @returns {number} Total de servicios por ese método.
+   * @example
+   * PaymentService.totalForMethod([{ pricesByType: { tarjeta: 121 } }], 'tarjeta') // 121
+   */
+  static totalForMethod(serviceItems, method, currency = 'MXN') {
+    return this.computeTotals(serviceItems, method, 0, currency).servicesTotal;
+  }
+
+  /**
+   * Tolerancia de cierre de saldo: $5 MXN (única fuente de desvío es el redondeo de efectivo a
+   * múltiplo de 5); $0.01 para USD o cualquier combinación sin efectivo.
+   * @param {string} currency - Moneda de la reservación.
+   * @returns {number} Tolerancia en la moneda de cobro.
+   * @example
+   * PaymentService.resolveTolerance('MXN') // 5
+   */
+  static resolveTolerance(currency) {
+    return String(currency).toUpperCase() === 'MXN' ? 5 : 0.01;
+  }
+
+  /**
+   * Convierte un pago a pesos-equivalentes del método ANCLA de la reservación (heredado de la
+   * cotización). Un pago en un método más caro que el ancla cubre MENOS base; uno más barato cubre
+   * MÁS. SIEMPRE re-basado al ancla real (nunca hardcodeado a efectivo). Guardas: monto no finito
+   * (Infinity/NaN) -> 0 (fail-safe); base del ancla <= 0 (sin servicios cobrables) -> 0; método
+   * corrupto o tier del método <= 0 -> 1:1 sin convertir.
+   * @param {object} payment - Pago { amount, method }.
+   * @param {object} opts - Contexto de conversión.
+   * @param {Array<object>} opts.serviceItems - Plain service items.
+   * @param {string} opts.anchoredMethod - Método ancla (reservation.paymentType).
+   * @param {string} [opts.currency] - Moneda.
+   * @param {Array<string>} [opts.validMethods] - Métodos aceptados.
+   * @returns {number} Cobertura del pago en pesos del ancla.
+   * @example
+   * PaymentService.baseEquivalente({ amount: 121, method: 'tarjeta' }, { serviceItems, anchoredMethod: 'tarjeta' }) // 121
+   */
+  static baseEquivalente(payment, {
+    serviceItems, anchoredMethod, currency = 'MXN', validMethods = ['efectivo', 'transferencia', 'tarjeta'],
+  }) {
+    const amt = Number.isFinite(payment?.amount) ? payment.amount : 0;
+    const baseTotal = this.totalForMethod(serviceItems, anchoredMethod, currency);
+    if (!Number.isFinite(baseTotal) || baseTotal <= 0) return 0;
+    const method = payment?.method;
+    const isValid = validMethods.includes(method);
+    const tierTotal = isValid ? this.totalForMethod(serviceItems, method, currency) : null;
+    if (tierTotal === null || !Number.isFinite(tierTotal) || tierTotal <= 0) return amt;
+    return amt * (baseTotal / tierTotal);
+  }
+
+  /**
+   * Desglose de saldo restante medido contra el ancla (Requisito 8): deuda total, cobertura
+   * equivalente-ancla de los pagos, saldo base restante (clamp a 0 dentro de tolerancia, nunca
+   * negativo), su % y cuánto costaría saldarlo en cada método. El ratio de conversión entre métodos
+   * usa SIEMPRE servicesTotal (nunca .total con ajustes): los ajustes manuales son pesos fijos sin
+   * tarifa por método — se suman una sola vez al totalDue/remainingBase, sin volver a convertirlos.
+   * @param {Array<object>} payments - Pagos { amount, method }.
+   * @param {object} opts - Contexto de conversión.
+   * @param {Array<object>} opts.serviceItems - Plain service items.
+   * @param {string} opts.anchoredMethod - Método ancla (reservation.paymentType).
+   * @param {string} [opts.currency] - Moneda.
+   * @param {number} [opts.adjustmentsNet] - Ajustes netos (cargos − descuentos), pesos finales.
+   * @param {Array<string>} [opts.validMethods] - Métodos aceptados.
+   * @returns {object} { totalDue, coverageAmount, remainingBase, remainingPercent, montoParaSaldar }.
+   * @example
+   * PaymentService.remainingBreakdown(payments, { serviceItems, anchoredMethod: 'efectivo' })
+   */
+  static remainingBreakdown(payments, {
+    serviceItems, anchoredMethod, currency = 'MXN', adjustmentsNet = 0, validMethods = ['efectivo', 'transferencia', 'tarjeta'],
+  }) {
+    const baseTotal = this.totalForMethod(serviceItems, anchoredMethod, currency);
+    const totalDue = Math.max(0, round2(baseTotal + (Number(adjustmentsNet) || 0)));
+    const coverageAmount = round2((payments || []).reduce(
+      (sum, p) => sum + this.baseEquivalente(p, {
+        serviceItems, anchoredMethod, currency, validMethods,
+      }),
+      0
+    ));
+    const tolerance = this.resolveTolerance(currency);
+    const rawRemaining = round2(totalDue - coverageAmount);
+    // Clamp: un residuo dentro de la tolerancia (redondeo de efectivo) se cierra en 0; nunca negativo.
+    const remainingBase = Math.abs(rawRemaining) <= tolerance ? 0 : Math.max(0, rawRemaining);
+    const remainingPercent = totalDue > 0 ? round2((remainingBase / totalDue) * 100) : 0;
+    const montoParaSaldar = {};
+    validMethods.forEach((m) => {
+      montoParaSaldar[m] = baseTotal > 0
+        ? round2(remainingBase * (this.totalForMethod(serviceItems, m, currency) / baseTotal))
+        : 0;
+    });
+    return {
+      totalDue, coverageAmount, remainingBase, remainingPercent, montoParaSaldar,
+    };
+  }
+
+  /**
+   * Derive payment status from amount due vs amount covered. Overpay is allowed
    * (balance may go negative -> still 'paid'). 'refunded' is set explicitly by
-   * the cancellation flow, never derived here.
+   * the cancellation flow, never derived here. La tolerancia (default 0.01) permite cerrar como
+   * 'paid' dentro del margen de redondeo de efectivo ($5 MXN) sin exigir centavo exacto.
    * @param {number} total - Amount due (con IVA).
-   * @param {number} paidAmount - Amount paid (MXN).
+   * @param {number} paidAmount - Amount covered (equivalente-ancla o pagado, según el llamador).
+   * @param {number} [tolerance] - Margen de cierre (0.01 preserva el comportamiento estricto previo).
    * @returns {string} Pending|partial|paid.
    * @example
    * PaymentService.deriveStatus(100, 40) // 'partial'
    */
-  static deriveStatus(total, paidAmount) {
+  static deriveStatus(total, paidAmount, tolerance = 0.01) {
     const due = round2(total);
     const paid = round2(paidAmount);
     if (paid <= 0) return 'pending';
-    if (paid < due) return 'partial';
+    if (due - paid > tolerance) return 'partial';
     return 'paid';
   }
 
@@ -219,38 +315,69 @@ class PaymentService {
 
     const paymentRows = payments.map((payment) => ({
       amount: payment.get('amount'),
+      method: payment.get('method'),
     }));
     const totals = this.computeTotals(serviceItems, paymentType, adjustmentsNet, currency);
 
     const paidGlobal = this.sumPayments(paymentRows);
 
+    // serviceItems/paymentType/currency/paymentRows viajan para que buildSummary derive la cobertura
+    // equivalente-ancla (paymentStatus) y el desglose de saldo restante sin recargar nada (ADR-1b).
     return {
-      reservation, services, totals, paidGlobal,
+      reservation, services, totals, paidGlobal, serviceItems, paymentType, currency, paymentRows,
     };
   }
 
   /**
-   * Build the payment summary (grand-total rollup) from computed data. Payments are
-   * exact money amounts subtracted from the reservation total: balance = total − paid.
+   * Build the payment summary (grand-total rollup) from computed data.
+   *
+   * ADR-1b: paidAmount/balance NO cambian de fórmula — siguen siendo dinero físico real
+   * (paidAmount = Σ payment.amount crudo; balance = total − paidAmount). Lo ÚNICO que cambia de base
+   * es paymentStatus, que ahora deriva de la cobertura equivalente-ancla (coverageAmount) en vez de
+   * comparar el pagado crudo contra el total — así un pago en un método distinto al ancla ya no
+   * bloquea el badge en 'partial'. Los campos coverageAmount/coveragePercent (sin truncar a 100) y el
+   * desglose de saldo restante (remainingBase/remainingPercent/montoParaSaldar) son ADITIVOS,
+   * calculados en cada lectura (no persistidos), igual que subtotal/iva/total.
    * @param {string} reservationId - Reservation objectId.
-   * @param {object} computed - { totals, paidGlobal }.
-   * @returns {object} Summary { paymentStatus, paidAmount, balance, subtotal, adjustments, iva, total }.
+   * @param {object} computed - { totals, paidGlobal, serviceItems, paymentType, currency, paymentRows }.
+   * @returns {object} Summary con los campos viejos MÁS los aditivos de cobertura/saldo restante.
    * @example
    * PaymentService.buildSummary(id, await PaymentService.loadAndCompute(id))
    */
   static buildSummary(reservationId, computed) {
-    const { totals, paidGlobal } = computed;
+    const {
+      totals, paidGlobal, serviceItems = [], paymentType = 'efectivo',
+      currency = 'MXN', paymentRows = [],
+    } = computed;
     const paid = round2(paidGlobal);
+
+    const breakdown = this.remainingBreakdown(paymentRows, {
+      serviceItems,
+      anchoredMethod: paymentType,
+      currency,
+      adjustmentsNet: totals.adjustments || 0,
+    });
+    const tolerance = this.resolveTolerance(currency);
+    // coveragePercent se expone CRUDO (puede superar 100 con sobrepago en un método más barato que el
+    // ancla — hueco #1 resuelto): la capa de presentación (Fase D) decide cómo visualizarlo.
+    const coveragePercent = totals.total > 0
+      ? round2((breakdown.coverageAmount / totals.total) * 100)
+      : 0;
 
     return {
       reservationId,
-      paymentStatus: this.deriveStatus(totals.total, paid),
+      paymentStatus: this.deriveStatus(totals.total, breakdown.coverageAmount, tolerance),
       paidAmount: paid,
       balance: round2(totals.total - paid),
       subtotal: totals.subtotal,
       adjustments: totals.adjustments,
       iva: totals.iva,
       total: totals.total,
+      coverageAmount: breakdown.coverageAmount,
+      coveragePercent,
+      remainingBase: breakdown.remainingBase,
+      remainingPercent: breakdown.remainingPercent,
+      montoParaSaldar: breakdown.montoParaSaldar,
     };
   }
 
@@ -303,278 +430,6 @@ class PaymentService {
       });
       throw error;
     }
-  }
-
-  /**
-   * Pure decision logic that reconciles reservation.paymentType against the real
-   * method of the payments being registered. No Parse I/O — trivially unit-testable.
-   *
-   * WHY the tier ratio is derived from THIS reservation's own pricesByType/computeTotals
-   * and never from fixed 1.00/1.16/1.21 constants: pricesByType can carry a negotiated
-   * ("dirty") price that does NOT follow base×1.16/×1.21, and AgencyRate/TransferRate are
-   * configurable rates that may have changed since the quote was frozen. The only correct
-   * cross-tier ratio is the real per-method total of this reservation.
-   *
-   * WHY the adjustment is recomputed in full from the whole payment history and REPLACES a
-   * single tagged adjustment (never stacks): computing an incremental delta per payment
-   * over-counts partial payments (each delta wrongly assumed the payment settled the entire
-   * remaining base), leaving a phantom balance. Recomputing the total target adjustment from
-   * scratch every call is idempotent by construction and self-corrects any inconsistent state.
-   * @param {object} input - Plain inputs (no Parse objects).
-   * @param {Array<object>} input.serviceItems - Plain service items for computeTotals.
-   * @param {string} [input.currency] - Reservation currency (MXN applies cash rounding).
-   * @param {string} [input.anchoredMethod] - Current reservation.paymentType.
-   * @param {Array<object>} [input.priorPayments] - Existing payments { method, amount }, excluding the current one.
-   * @param {object|null} [input.currentPayment] - Payment being registered { method, amount }, or null (delete/recalc).
-   * @param {object|null} [input.existingReconciliationAdjustment] - The current tagged adjustment, or null.
-   * @param {Array<string>} [input.validMethods] - Accepted method tokens (Payment.METHODS).
-   * @param {string} [input.reconciliationDescription] - Base text for the auto adjustment description.
-   * @param {boolean} [input.isAgency] - True SOLO para agencias (re-ancla el total al nuevo tier). Cliente directo o indeterminado = false (fail-closed): nunca re-ancla, resuelve con el ajuste acotado ('complex'). Default false.
-   * @returns {object} Decision { scenario, expectedCeiling, warning, paymentTypeUpdate, reconciliationAdjustment }.
-   * @example
-   * PaymentService.decidePaymentMethodChange({ serviceItems, anchoredMethod: 'efectivo', currentPayment: { method: 'tarjeta', amount: 121 }, isAgency: true });
-   */
-  static decidePaymentMethodChange(input) {
-    const {
-      serviceItems = [],
-      currency = 'MXN',
-      anchoredMethod = 'efectivo',
-      priorPayments = [],
-      currentPayment = null,
-      existingReconciliationAdjustment = null,
-      validMethods = ['efectivo', 'transferencia', 'tarjeta'],
-      reconciliationDescription = 'Ajuste por método de pago',
-      isAgency = false,
-    } = input || {};
-
-    // Fix 1 (hallazgo crítico del council): el re-anclaje automático de paymentType solo es correcto
-    // para AGENCIAS. Para un cliente directo la referencia SIEMPRE es tarjeta y NUNCA debe re-anclarse
-    // (un pago de $1 no puede repriciar la reservación completa). Fail-closed: cualquier valor que no
-    // sea exactamente true (indeterminado incluido) se trata como NO-agencia → fuerza 'complex'.
-    const agency = isAgency === true;
-
-    const isValid = (m) => validMethods.includes(m);
-    const totalForMethod = (m) => this.computeTotals(serviceItems, m, 0, currency).servicesTotal;
-    const baseTotal = totalForMethod('efectivo');
-
-    // Escenario: comparar el método del pago actual contra TODOS los pagos previos. Un pago previo con
-    // método corrupto/legacy (null/vacío/inválido) fuerza el camino conservador 'complex'; un cliente
-    // directo (no-agencia) también lo fuerza SIEMPRE (nunca re-ancla el tier de precio).
-    const currentMethod = currentPayment ? currentPayment.method : anchoredMethod;
-    const corruptPrior = priorPayments.filter((p) => !isValid(p.method));
-    const hasDifferentValidPrior = priorPayments.some((p) => isValid(p.method) && p.method !== currentMethod);
-    const scenario = (!agency || corruptPrior.length > 0 || hasDifferentValidPrior) ? 'complex' : 'none';
-
-    // El paymentType solo se reescribe en el caso simple (solo agencia), cuando llega un pago REAL de
-    // servicios con método distinto. Un pago solo-propina (amount 0) NUNCA ancla el tier: no tiene
-    // dinero de servicios sobre el cual decidir el método de precio de la reservación.
-    let paymentTypeUpdate = null;
-    const currentAmount = currentPayment ? (Number(currentPayment.amount) || 0) : 0;
-    if (scenario === 'none' && currentPayment && currentAmount > 0 && isValid(currentMethod) && currentMethod !== anchoredMethod) {
-      paymentTypeUpdate = currentMethod;
-    }
-    // El ancla contra la que se mide la reconciliación: el método ya actualizado en el caso simple.
-    const reconAnchor = paymentTypeUpdate || anchoredMethod;
-
-    const warnings = [];
-    if (corruptPrior.length > 0) {
-      warnings.push(`${corruptPrior.length} pago(s) con método inválido forzaron la reconciliación; revisar manualmente.`);
-    }
-
-    const remove = () => (existingReconciliationAdjustment
-      ? {
-        action: 'remove', type: null, amount: null, description: null, source: RECON_SOURCE,
-      }
-      : {
-        action: 'noop', type: null, amount: null, description: null, source: RECON_SOURCE,
-      });
-
-    // Guarda de división entre cero: reservación sin servicios cobrables (todo es propina/ajustes).
-    // Sin base no hay relación entre tiers que reconciliar; se limpia cualquier ajuste taggeado viejo.
-    if (!Number.isFinite(baseTotal) || baseTotal <= 0) {
-      return {
-        scenario,
-        expectedCeiling: 0,
-        warning: warnings.length ? warnings.join(' ') : null,
-        paymentTypeUpdate,
-        reconciliationAdjustment: remove(),
-      };
-    }
-
-    const anchorTotal = totalForMethod(reconAnchor);
-    // baseEquivalente(p) = p.amount × (T(efectivo) / T(p.method)). Un método corrupto se trata con el
-    // tier del ancla, de modo que no aporta ni resta al ajuste (ni penaliza ni beneficia).
-    const baseEquivalente = (row) => {
-      const amt = Number(row.amount) || 0;
-      const tierTotal = isValid(row.method) ? totalForMethod(row.method) : anchorTotal;
-      if (!Number.isFinite(tierTotal) || tierTotal <= 0) return amt;
-      return amt * (baseTotal / tierTotal);
-    };
-
-    // Mecanismo (a): techo esperado SOLO para el pago que se está registrando. Advierte, no bloquea.
-    let expectedCeiling = 0;
-    if (currentPayment) {
-      const sumBaseBefore = priorPayments.reduce((s, p) => s + baseEquivalente(p), 0);
-      const remainingBaseBefore = baseTotal - sumBaseBefore;
-      const ratioCurrent = totalForMethod(currentMethod) / baseTotal;
-      expectedCeiling = round2(remainingBaseBefore * ratioCurrent);
-      const captured = Number(currentPayment.amount) || 0;
-      const overage = round2(captured - expectedCeiling);
-      // Efectivo tolera hasta $5 (redondeo físico a múltiplo de 5); tarjeta/transferencia solo $0.01.
-      const tolerance = currentMethod === 'efectivo' ? 5 : 0.01;
-      if (overage > tolerance) {
-        warnings.push(`El monto capturado (${captured}) excede el máximo esperado (${expectedCeiling}) para saldar en ${currentMethod}.`);
-      }
-    }
-
-    // Reconciliación (7.5): recalcular el ajuste TOTAL desde el historial completo (incluyendo el pago
-    // actual) y reemplazar el único ajuste taggeado. Idempotente: dos llamadas seguidas dan lo mismo.
-    const allPayments = currentPayment ? priorPayments.concat([currentPayment]) : priorPayments;
-    const sumAmount = allPayments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
-    const sumBaseEquivalente = allPayments.reduce((s, p) => s + baseEquivalente(p), 0);
-    const ratioAnchor = anchorTotal / baseTotal;
-    const targetAdjustment = round2(sumAmount - sumBaseEquivalente * ratioAnchor);
-
-    let reconciliationAdjustment;
-    if (Math.abs(targetAdjustment) < 0.005) {
-      reconciliationAdjustment = remove();
-    } else {
-      reconciliationAdjustment = {
-        action: existingReconciliationAdjustment ? 'replace' : 'create',
-        type: targetAdjustment > 0 ? 'charge' : 'discount',
-        amount: Math.abs(targetAdjustment),
-        description: `${reconciliationDescription} (${reconAnchor})`.slice(0, 150),
-        source: RECON_SOURCE,
-      };
-    }
-
-    return {
-      scenario,
-      expectedCeiling,
-      warning: warnings.length ? warnings.join(' ') : null,
-      paymentTypeUpdate,
-      reconciliationAdjustment,
-    };
-  }
-
-  /**
-   * Reconcile reservation.paymentType against the real payment method: load the
-   * reservation/services/payments, compute the pure decision, then persist the
-   * paymentType update and/or the single tagged reconciliation adjustment. The
-   * balance rollup itself is recomputed separately by recalculate(). Non-persisting
-   * for the balance — only paymentType and the adjustments array are written here.
-   * @param {string} reservationId - Reservation objectId.
-   * @param {object} [options] - { method, amountMXN, currentPaymentId }.
-   * @param {string} [options.method] - Method of the payment being registered/edited (omit for delete).
-   * @param {number} [options.amountMXN] - Amount (MXN) of that payment, already converted from its currency.
-   * @param {string} [options.currentPaymentId] - Id of the payment being edited/added, excluded from priors.
-   * @returns {Promise<object>} The decision returned by decidePaymentMethodChange.
-   * @example
-   * await PaymentService.resolvePaymentMethodChange(id, { method: 'tarjeta', amountMXN: 4840, currentPaymentId });
-   */
-  static async resolvePaymentMethodChange(reservationId, options = {}) {
-    const { method, amountMXN, currentPaymentId } = options;
-    const Reservation = require('../../domain/models/Reservation');
-    const Payment = require('../../domain/models/Payment');
-
-    // .include('clientPtr') es OBLIGATORIO: sin él clientPtr llega como pointer sin datos y
-    // clientPtr.get('role') devolvería undefined SIEMPRE, resolviendo isAgency mal en todos los casos.
-    const reservationQuery = new Parse.Query(Reservation);
-    reservationQuery.include('clientPtr');
-    const reservation = await reservationQuery.get(reservationId, { useMasterKey: true });
-
-    const reservationPtr = new Reservation();
-    reservationPtr.id = reservationId;
-    const servicesQuery = BaseModel.queryExisting('ReservationService');
-    servicesQuery.equalTo('reservationPtr', reservationPtr);
-    servicesQuery.limit(1000);
-    const services = await servicesQuery.find({ useMasterKey: true });
-    const serviceItems = this.toServiceItems(services);
-
-    const currency = reservation.get('currency') || 'MXN';
-    const anchoredMethod = reservation.get('paymentType') || 'efectivo';
-
-    // isAgency del DUEÑO de la reservación, con el MISMO criterio exacto que PublicReservationController:
-    // rol string barato del pointer (o clientCategory), sin fetch extra de Role. clientPtr null o
-    // huérfano (usuario borrado) => '' => isAgency false (fail-closed, no re-ancla). La limitación
-    // conocida (roleId sin string `role`) es deuda preexistente documentada, fuera de alcance.
-    const clientPtr = reservation.get('clientPtr');
-    const clientRole = (clientPtr && typeof clientPtr.get === 'function') ? (clientPtr.get('role') || '') : '';
-    const clientCategory = (clientPtr && typeof clientPtr.get === 'function') ? (clientPtr.get('clientCategory') || '') : '';
-    const isAgency = clientRole === 'department_manager' || clientCategory === 'agency';
-
-    const payments = await Payment.getExistingForReservation(reservationId);
-    const priorPayments = payments
-      .filter((p) => p.id !== currentPaymentId)
-      .map((p) => ({ method: p.get('method'), amount: p.get('amount') }));
-
-    const currentPayment = (method !== undefined && method !== null)
-      ? { method, amount: Number(amountMXN) || 0 }
-      : null;
-
-    const adjustments = reservation.get('adjustments') || [];
-    const existingIdx = adjustments.findIndex((a) => a && a.source === RECON_SOURCE);
-    const existing = existingIdx >= 0 ? adjustments[existingIdx] : null;
-
-    const decision = this.decidePaymentMethodChange({
-      serviceItems,
-      currency,
-      anchoredMethod,
-      priorPayments,
-      currentPayment,
-      existingReconciliationAdjustment: existing,
-      validMethods: Payment.METHODS,
-      isAgency,
-    });
-
-    let mutated = false;
-    if (decision.paymentTypeUpdate) {
-      reservation.set('paymentType', decision.paymentTypeUpdate);
-      mutated = true;
-    }
-
-    const recon = decision.reconciliationAdjustment;
-    // NOTA (7.7, sub-pregunta 2): este ajuste automático se crea sin importar el nivel RBAC del actor
-    // que registró el pago (agencia/agente nivel 4+ incluido), a diferencia de POST /adjustments que es
-    // admin-only. Es un ajuste calculado por el sistema, no discrecional, atado a dinero que ese actor ya
-    // está autorizado a cobrar. Marcado como decisión de seguridad pendiente del visto bueno del dueño.
-    if (recon.action === 'remove' && existingIdx >= 0) {
-      adjustments.splice(existingIdx, 1);
-      reservation.set('adjustments', adjustments);
-      mutated = true;
-    } else if (recon.action === 'create' || recon.action === 'replace') {
-      const entry = {
-        id: existing ? existing.id : `adj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        type: recon.type,
-        description: recon.description,
-        amount: recon.amount,
-        percentage: null,
-        createdAt: existing ? existing.createdAt : new Date().toISOString(),
-        source: RECON_SOURCE,
-      };
-      if (existingIdx >= 0) {
-        adjustments[existingIdx] = entry;
-      } else {
-        adjustments.push(entry);
-      }
-      reservation.set('adjustments', adjustments);
-      mutated = true;
-    }
-
-    if (mutated) {
-      await reservation.save(null, { useMasterKey: true });
-    }
-
-    logger.info('Payment method reconciliation resolved', {
-      reservationId,
-      isAgency,
-      scenario: decision.scenario,
-      action: recon.action,
-      paymentTypeUpdate: decision.paymentTypeUpdate,
-      hasWarning: !!decision.warning,
-    });
-
-    return decision;
   }
 }
 

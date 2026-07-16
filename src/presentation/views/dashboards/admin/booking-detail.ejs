@@ -1615,12 +1615,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         const finalTotal = Math.max(0, servicesSubtotal + chargesTotal - discountsTotal);
         const curr = d.currency || 'MXN';
 
-        // Badge [Automático] sobre ajustes generados por la reconciliación de método de pago
-        // (source === 'payment-method-reconciliation'); los manuales van sin badge.
-        const autoBadge = (adj) => (PaymentBreakdownHelpers.hasAutoReconciliationBadge(adj)
-            ? ' <span class="badge bg-info-subtle text-info" title="Generado automáticamente al detectar un cambio de método de pago">Automático</span>'
-            : '');
-
         let html = '';
         // Subtotal line
         html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -1633,7 +1627,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
                 <div>
                     <i class="ti ti-plus text-danger me-1"></i>
-                    <span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span>${autoBadge(adj)}
+                    <span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
@@ -1648,7 +1642,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
                 <div>
                     <i class="ti ti-discount-2 text-success me-1"></i>
-                    <span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}${pctLabel}</span>${autoBadge(adj)}
+                    <span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}${pctLabel}</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>

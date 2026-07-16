@@ -589,9 +589,9 @@ class PublicReservationController {
     // Sin ningún pricesByType no se puede armar el desglose por método: se cae al render legado.
     const hasPricesByType = totalItems.some((it) => it.pricesByType && typeof it.pricesByType === 'object');
 
-    // Ajustes de la reservación (cargos/descuentos), itemizados en la vista. El ajuste automático
-    // de reconciliación (source payment-method-reconciliation) ya trae descripción neutral: se
-    // renderiza verbatim. Se normaliza fuera del try/catch para que sobreviva a un fallo de summarize.
+    // Ajustes de la reservación (cargos/descuentos), itemizados en la vista. Se renderizan verbatim
+    // (la descripción ya viene lista) y se normalizan fuera del try/catch para que sobrevivan a un
+    // fallo de summarize.
     const rawAdjustments = reservation.get('adjustments');
     const adjustments = (Array.isArray(rawAdjustments) ? rawAdjustments : []).map((a) => ({
       id: (a && a.id) ? a.id : '',

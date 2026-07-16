@@ -12,10 +12,6 @@
  */
 
 const PaymentBreakdownHelpers = (() => {
-  // Ajustes generados por el mecanismo de reconciliacion de metodo de pago (Fase 0). Los
-  // ajustes manuales del staff no llevan source.
-  const AUTO_RECONCILIATION_SOURCE = 'payment-method-reconciliation';
-
   // Entidades HTML para neutralizar texto controlado por el usuario (referencia/notas de pago,
   // descripcion de ajuste) antes de interpolarlo en innerHTML / atributo / <textarea>. Un solo
   // pase por regex evita el doble-escape de '&'.
@@ -127,20 +123,7 @@ const PaymentBreakdownHelpers = (() => {
     return `<span class="badge ${s.cls}" title="Estado de pago">${s.label}</span>`;
   }
 
-  /**
-   * True si el ajuste fue generado por la reconciliacion automatica de metodo de pago (source
-   * === 'payment-method-reconciliation'). Los ajustes manuales del staff (sin source) dan false.
-   * @param {object} adjustment - Ajuste { source }.
-   * @returns {boolean} True para el ajuste automatico, false en cualquier otro caso.
-   * @example
-   * hasAutoReconciliationBadge({ source: 'payment-method-reconciliation' }) // true
-   */
-  function hasAutoReconciliationBadge(adjustment) {
-    return !!(adjustment && adjustment.source === AUTO_RECONCILIATION_SOURCE);
-  }
-
   return {
-    AUTO_RECONCILIATION_SOURCE,
     PAYMENT_STATUS_MAP,
     round2,
     escapeHtml,
@@ -148,7 +131,6 @@ const PaymentBreakdownHelpers = (() => {
     getServicePriceByType,
     computeServicesSubtotalByType,
     getPaymentStatusBadge,
-    hasAutoReconciliationBadge,
   };
 })();
 

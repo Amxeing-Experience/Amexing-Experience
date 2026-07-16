@@ -3,7 +3,7 @@
  *
  * Cubre TODA la matriz de "Lógica" de test-designer sobre el módulo compartido puro que consumen
  * las 3 plantillas booking-detail.ejs: comparativo por método (incluyendo $0 legítimo vs ausente vs
- * Infinity/NaN/string corrupto y el fix de paridad Number.isFinite), badge automático, badge de
+ * Infinity/NaN/string corrupto y el fix de paridad Number.isFinite), badge de
  * estado, escapeHtml (stored XSS), moneda MXN vs USD, 0 servicios, y
  * que el redondeo a efectivo solo aplica en MXN. TestEnvironment 'node', sin DOM.
  */
@@ -108,21 +108,6 @@ describe('PaymentBreakdownHelpers.getPaymentStatusBadge', () => {
     expect(H.getPaymentStatusBadge(null)).toBe('');
     expect(H.getPaymentStatusBadge(undefined)).toBe('');
     expect(H.getPaymentStatusBadge('')).toBe('');
-  });
-});
-
-describe('PaymentBreakdownHelpers.hasAutoReconciliationBadge', () => {
-  it('true solo para source === payment-method-reconciliation', () => {
-    expect(H.hasAutoReconciliationBadge({ source: 'payment-method-reconciliation' })).toBe(true);
-  });
-
-  it('false para ajustes manuales (source ausente/null/""/otro valor)', () => {
-    expect(H.hasAutoReconciliationBadge({})).toBe(false);
-    expect(H.hasAutoReconciliationBadge({ source: null })).toBe(false);
-    expect(H.hasAutoReconciliationBadge({ source: '' })).toBe(false);
-    expect(H.hasAutoReconciliationBadge({ source: 'manual' })).toBe(false);
-    expect(H.hasAutoReconciliationBadge(null)).toBe(false);
-    expect(H.hasAutoReconciliationBadge(undefined)).toBe(false);
   });
 });
 

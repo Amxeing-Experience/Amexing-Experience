@@ -6,18 +6,15 @@
  * isAgency resolution (agency via role WITHOUT clientCategory, clientCategory-set-but-role-
  * different OR condition, end_client without roleId not crashing, missing/broken clientPtr
  * defaulting to false), the summarize()-throws architecture (framing/adjustment rows still
- * render while paid/balance/status fall back to raw reservation fields), rendering of the
- * Fase 0 reconciliation adjustment, the efectivo cash-rounding NOT falsely opening the IVA
- * row, USD currency, and the itinerary route (out of scope for payment info) still
- * rendering 200 with no regression.
+ * render while paid/balance/status fall back to raw reservation fields), the efectivo
+ * cash-rounding NOT falsely opening the IVA row, USD currency, and the itinerary route
+ * (out of scope for payment info) still rendering 200 with no regression.
  */
 
 const request = require('supertest');
 const Parse = require('parse/node');
 const AuthTestHelper = require('../../helpers/authTestHelper');
 const PaymentService = require('../../../src/application/services/PaymentService');
-
-const RECON_SOURCE = 'payment-method-reconciliation';
 
 describe('Public reservation payment breakdown (integration)', () => {
   let app;
@@ -206,35 +203,6 @@ describe('Public reservation payment breakdown (integration)', () => {
       const res = await getPublic(folio);
       expect(res.status).toBe(200);
       expect(/\bIVA\b/.test(paySection(res.text))).toBe(false);
-    });
-  });
-
-  describe('Fase 0 reconciliation adjustment rendering', () => {
-    it('renders the Fase-0 reconciliation adjustment (neutral description) in the itemized breakdown', async () => {
-      const { id, folio } = await makeReservation({ services: CLEAN, paymentType: 'efectivo', clientPtr: null });
-
-      // Two payments in different methods trigger the single tagged reconciliation adjustment (Fase 0).
-      const p1 = await request(app).post(`/api/reservations/${id}/payments`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ amount: 2320, currency: 'MXN', method: 'transferencia' });
-      expect(p1.status).toBe(200);
-      createdPaymentIds.push(p1.body.data.payment.id);
-
-      const p2 = await request(app).post(`/api/reservations/${id}/payments`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ amount: 4840, currency: 'MXN', method: 'tarjeta' });
-      expect(p2.status).toBe(200);
-      createdPaymentIds.push(p2.body.data.payment.id);
-
-      const reservation = await new Parse.Query('Reservation').get(id, { useMasterKey: true });
-      const recon = (reservation.get('adjustments') || []).filter((a) => a && a.source === RECON_SOURCE);
-      expect(recon).toHaveLength(1); // Fase 0 produced exactly one tagged adjustment
-
-      const res = await getPublic(folio);
-      expect(res.status).toBe(200);
-      const s = paySection(res.text);
-      expect(s).toContain('Subtotal servicios');
-      expect(s).toContain('Ajuste por método de pago'); // neutral description rendered verbatim
     });
   });
 
