@@ -86,18 +86,17 @@ class PaymentService {
 
   /**
    * Compute reservation totals from plain service items: se suma pricesByType[paymentType]
-   * por servicio (el valor ya aprobado en la cotización), + net adjustments + tip. Efectivo
+   * por servicio (el valor ya aprobado en la cotización), + net adjustments. Efectivo
    * en MXN se redondea a múltiplo de 5 (regla física del efectivo, no afecta tarjeta/transferencia).
    * @param {Array<object>} serviceItems - Plain items { id, includeInTotal, pricesByType, total }.
    * @param {string} paymentType - Método (efectivo|transferencia|tarjeta).
-   * @param {number} [reservationTip] - Reservation-level tip, added on top.
    * @param {number} [adjustmentsNet] - Net reservation adjustments (charges − discounts), pesos finales.
    * @param {string} [currency] - Moneda (MXN aplica redondeo a efectivo).
-   * @returns {object} { subtotal, adjustments, iva, surcharge, servicesTotal, tip, total, paymentType }.
+   * @returns {object} { subtotal, adjustments, iva, surcharge, servicesTotal, total, paymentType }.
    * @example
    * PaymentService.computeTotals([{ id: 'a', pricesByType: { efectivo: 100, tarjeta: 121 } }], 'tarjeta') // total 121
    */
-  static computeTotals(serviceItems, paymentType, reservationTip = 0, adjustmentsNet = 0, currency = 'MXN') {
+  static computeTotals(serviceItems, paymentType, adjustmentsNet = 0, currency = 'MXN') {
     const items = Array.isArray(serviceItems) ? serviceItems : [];
     let base = 0;
     let chargeSum = 0;
@@ -113,11 +112,10 @@ class PaymentService {
       servicesTotal = round2(applyCashRounding(servicesTotal));
     }
 
-    // Ajustes (cargos/descuentos) y propina se suman como pesos finales (sin factor).
+    // Ajustes (cargos/descuentos) se suman como pesos finales (sin factor).
     const adjustments = round2(Number(adjustmentsNet) || 0);
-    const tip = round2(reservationTip);
     // El total nunca es negativo: un descuento mayor al monto lo deja en 0 (no se debe "menos que nada").
-    const total = Math.max(0, round2(servicesTotal + adjustments + tip));
+    const total = Math.max(0, round2(servicesTotal + adjustments));
     // Recargo agregado por el método (IVA, o IVA + tarjeta). Se expone también como `iva`
     // por compatibilidad con los consumidores existentes del summary.
     const surcharge = round2(servicesTotal - base);
@@ -128,7 +126,6 @@ class PaymentService {
       iva: surcharge,
       surcharge,
       servicesTotal,
-      tip,
       total,
       paymentType,
     };
@@ -138,7 +135,7 @@ class PaymentService {
    * Derive payment status from amount due vs amount paid. Overpay is allowed
    * (balance may go negative -> still 'paid'). 'refunded' is set explicitly by
    * the cancellation flow, never derived here.
-   * @param {number} total - Amount due (con IVA + tip).
+   * @param {number} total - Amount due (con IVA).
    * @param {number} paidAmount - Amount paid (MXN).
    * @returns {string} Pending|partial|paid.
    * @example
@@ -188,22 +185,6 @@ class PaymentService {
   }
 
   /**
-   * Sum every payment tip into the global tip total. Sister to sumPayments; tips are
-   * real money received, separate from the services amount and never surcharged by
-   * payment method. Non-numeric/missing tip counts as 0 (same defensiveness as sumPayments).
-   * @param {Array<object>} rows - Plain rows { tip }.
-   * @returns {number} Total tip (MXN), rounded to cents.
-   * @example
-   * PaymentService.sumTips([{ tip: 100 }, { tip: 50 }]) // 150
-   */
-  static sumTips(rows) {
-    const list = Array.isArray(rows) ? rows : [];
-    let tipGlobal = 0;
-    for (const row of list) tipGlobal += Number(row.tip) || 0;
-    return round2(tipGlobal);
-  }
-
-  /**
    * Load a reservation, its existing services and payments, and compute the
    * totals + global paid amount (without persisting). Shared by summarize/recalculate.
    * @param {string} reservationId - Reservation objectId.
@@ -236,19 +217,12 @@ class PaymentService {
     }, 0);
     const serviceItems = this.toServiceItems(services);
 
-    // Tip is aggregated from the real payments (Payment.tip), not Reservation.tip — a dead field
-    // nothing writes. Each row carries its own amount + tip for the global rollup.
     const paymentRows = payments.map((payment) => ({
       amount: payment.get('amount'),
-      tip: payment.get('tip'),
     }));
-    const tipTotal = this.sumTips(paymentRows);
-    const totals = this.computeTotals(serviceItems, paymentType, tipTotal, adjustmentsNet, currency);
+    const totals = this.computeTotals(serviceItems, paymentType, adjustmentsNet, currency);
 
-    // paidGlobal MUST include the tip: both the services amount AND the tip are real money received.
-    // computeTotals folds the tip into `total`, so excluding it here would leave a phantom pending
-    // balance exactly equal to the tip (e.g. a 100%-tip payment). Net effect: tip is balance-neutral.
-    const paidGlobal = round2(this.sumPayments(paymentRows) + tipTotal);
+    const paidGlobal = this.sumPayments(paymentRows);
 
     return {
       reservation, services, totals, paidGlobal,
@@ -260,7 +234,7 @@ class PaymentService {
    * exact money amounts subtracted from the reservation total: balance = total − paid.
    * @param {string} reservationId - Reservation objectId.
    * @param {object} computed - { totals, paidGlobal }.
-   * @returns {object} Summary { paymentStatus, paidAmount, balance, subtotal, adjustments, iva, tip, total }.
+   * @returns {object} Summary { paymentStatus, paidAmount, balance, subtotal, adjustments, iva, total }.
    * @example
    * PaymentService.buildSummary(id, await PaymentService.loadAndCompute(id))
    */
@@ -276,7 +250,6 @@ class PaymentService {
       subtotal: totals.subtotal,
       adjustments: totals.adjustments,
       iva: totals.iva,
-      tip: totals.tip,
       total: totals.total,
     };
   }
@@ -381,7 +354,7 @@ class PaymentService {
     const agency = isAgency === true;
 
     const isValid = (m) => validMethods.includes(m);
-    const totalForMethod = (m) => this.computeTotals(serviceItems, m, 0, 0, currency).servicesTotal;
+    const totalForMethod = (m) => this.computeTotals(serviceItems, m, 0, currency).servicesTotal;
     const baseTotal = totalForMethod('efectivo');
 
     // Escenario: comparar el método del pago actual contra TODOS los pagos previos. Un pago previo con

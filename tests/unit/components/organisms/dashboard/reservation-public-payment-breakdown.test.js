@@ -285,7 +285,9 @@ describe('reservation-public payment breakdown (Fase 2)', () => {
   });
 
   describe('Total/Saldo reconciliation regression (Total a pagar must equal payment.total)', () => {
-    test('tarjeta $1,210 + tip $100, paid $1,310 => Total $1,310 (not $1,210) and Saldo "Pagado en su totalidad"', async () => {
+    test('tarjeta $1,210 + cargo manual $100, paid $1,310 => Total $1,310 (not $1,210) and Saldo "Pagado en su totalidad"', async () => {
+      // El +$100 lo aporta un ajuste manual (antes lo aportaba la propina): la regresión que preserva
+      // es que "Total a pagar" refleje payment.total (servicios + ajustes), no el total de solo-servicios.
       const html = await render(quote({
         isAgency: false,
         serviceItems: {
@@ -296,18 +298,17 @@ describe('reservation-public payment breakdown (Fase 2)', () => {
           methodTotals: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 },
           days: [{ date: '2026-07-20', subconcepts: [service({ pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 }, total: 1210 })] }],
         },
+        adjustments: [{
+          id: 'c1', type: 'charge', description: 'Cargo extra', amount: 100, source: null,
+        }],
         payment: {
-          paymentStatus: 'paid', paidAmount: 1310, balance: 0, tip: 100, total: 1310,
+          paymentStatus: 'paid', paidAmount: 1310, balance: 0, total: 1310,
         },
       }));
       const s = paySection(html);
       expect(/Total a pagar<\/span><span class="v">\$1,310/.test(s)).toBe(true);
       expect(/Total a pagar<\/span><span class="v">\$1,210/.test(s)).toBe(false);
       expect(s).toContain('Pagado en su totalidad');
-      // Propina row appears BEFORE the bold Total row.
-      expect(s.indexOf('Propina')).toBeGreaterThan(-1);
-      expect(s.indexOf('Propina')).toBeLessThan(s.indexOf('Total a pagar'));
-      expect(/\$100/.test(s.slice(s.indexOf('Propina'), s.indexOf('Total a pagar')))).toBe(true);
     });
   });
 

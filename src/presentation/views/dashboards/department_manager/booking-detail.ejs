@@ -434,12 +434,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             <span class="fw-bold fs-5 text-success">${formatCurrency(d.totalAmount || 0, curr)}</span>
         </div>`;
 
-        // Bloque de pago (NUEVO en agencia/agente): Estado / Total a pagar / Pagado / Propina / Saldo.
+        // Bloque de pago (NUEVO en agencia/agente): Estado / Total a pagar / Pagado / Saldo.
         // Sin comparativo de métodos, sin formulario de pago, sin historial (fuera de alcance).
         const pay = d.payment;
         if (pay) {
             const balanceCls = (pay.balance || 0) > 0 ? 'text-danger' : 'text-success';
-            const tip = pay.tip || 0;
             html += `<div class="border-top mt-2 pt-2">
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
@@ -452,10 +451,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <span class="text-muted"><i class="ti ti-check me-2"></i>Pagado</span>
                     <span class="fw-semibold text-success">${formatCurrency(pay.paidAmount, curr)}</span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <span class="text-muted"><i class="ti ti-coin me-2"></i>Propina</span>
-                    <span class="fw-semibold">${formatCurrency(tip, curr)}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2">
                     <span class="text-muted"><i class="ti ti-wallet me-2"></i>Saldo</span>

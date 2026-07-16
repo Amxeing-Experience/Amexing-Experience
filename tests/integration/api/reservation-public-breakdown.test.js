@@ -1,15 +1,15 @@
 /**
- * Public reservation breakdown — integration tests (Fase 2).
+ * Public reservation breakdown — integration tests.
  *
  * Hits GET /reservations/:folio (public, no session) over the real app + Parse +
  * mongodb-memory-server, asserting the rendered HTML for: the corrected roleName-based
  * isAgency resolution (agency via role WITHOUT clientCategory, clientCategory-set-but-role-
  * different OR condition, end_client without roleId not crashing, missing/broken clientPtr
  * defaulting to false), the summarize()-throws architecture (framing/adjustment rows still
- * render while tip/paid/balance/status fall back to raw reservation fields), cross-phase
- * rendering of Fase 0's reconciliation adjustment and Fase 1's real tip, the efectivo cash-
- * rounding NOT falsely opening the IVA row, USD currency, and the itinerary route (out of
- * scope for payment info) still rendering 200 with no regression.
+ * render while paid/balance/status fall back to raw reservation fields), rendering of the
+ * Fase 0 reconciliation adjustment, the efectivo cash-rounding NOT falsely opening the IVA
+ * row, USD currency, and the itinerary route (out of scope for payment info) still
+ * rendering 200 with no regression.
  */
 
 const request = require('supertest');
@@ -163,13 +163,13 @@ describe('Public reservation payment breakdown (integration)', () => {
   });
 
   describe('summarize() throws — degraded architecture', () => {
-    it('framing/discount rows render, tip/paid/balance fall back, y Total a pagar = balance + paidAmount', async () => {
+    it('framing/discount rows render, paid/balance fall back, y Total a pagar = balance + paidAmount', async () => {
       const { folio } = await makeReservation({
         services: CLEAN,
         paymentType: 'efectivo',
         clientPtr: null, // cliente directo
         raw: {
-          tip: 77, paidAmount: 33, balance: 88, paymentStatus: 'partial',
+          paidAmount: 33, balance: 88, paymentStatus: 'partial',
         },
       });
 
@@ -181,8 +181,6 @@ describe('Public reservation payment breakdown (integration)', () => {
         // Computed OUTSIDE the try/catch: the discount framing survives the failure.
         expect(s).toContain('Descuento pago efectivo');
         // Fell back to the raw reservation fields inside the catch.
-        expect(s).toContain('Propina');
-        expect(/Propina<\/span><span class="v">\$77/.test(s)).toBe(true);
         expect(/Pagado<\/span><span class="v">\$33/.test(s)).toBe(true);
         // Fix Fase 2: en el fallback el Total a pagar deriva de balance + paidAmount (88 + 33 = 121),
         // NUNCA del total de solo-servicios (CLEAN efectivo = 10000), que contradecía el desglose de
@@ -211,7 +209,7 @@ describe('Public reservation payment breakdown (integration)', () => {
     });
   });
 
-  describe('Cross-phase rendering (Fase 0 reconciliation adjustment + Fase 1 real tip)', () => {
+  describe('Fase 0 reconciliation adjustment rendering', () => {
     it('renders the Fase-0 reconciliation adjustment (neutral description) in the itemized breakdown', async () => {
       const { id, folio } = await makeReservation({ services: CLEAN, paymentType: 'efectivo', clientPtr: null });
 
@@ -237,25 +235,6 @@ describe('Public reservation payment breakdown (integration)', () => {
       const s = paySection(res.text);
       expect(s).toContain('Subtotal servicios');
       expect(s).toContain('Ajuste por método de pago'); // neutral description rendered verbatim
-    });
-
-    it('renders the Fase-1 real aggregated tip (from Payment.tip, not the dead Reservation.tip)', async () => {
-      const { id, folio } = await makeReservation({
-        services: CLEAN, paymentType: 'tarjeta', clientPtr: null, raw: { tip: 0 },
-      });
-
-      const pay = await request(app).post(`/api/reservations/${id}/payments`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          amount: 12100, currency: 'MXN', method: 'tarjeta', tip: 100,
-        });
-      expect(pay.status).toBe(200);
-      createdPaymentIds.push(pay.body.data.payment.id);
-
-      const res = await getPublic(folio);
-      expect(res.status).toBe(200);
-      const s = paySection(res.text);
-      expect(/Propina<\/span><span class="v">\$100/.test(s)).toBe(true);
     });
   });
 

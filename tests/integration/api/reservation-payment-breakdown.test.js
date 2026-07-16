@@ -1,21 +1,17 @@
 /**
- * GET /api/reservations/:id — desglose de pagos en el payload (Fase 3, integration).
+ * GET /api/reservations/:id — desglose de pagos en el payload (integration).
  *
- * End-to-end sobre Parse + mongodb-memory-server: payment.tip viaja igual para admin/
- * department_manager/client (sin filtrar por rol) y el payload ya NO incluye tipByService, el RBAC no
- * regresiona (agencia/agente siguen sin poder POST/DELETE /adjustments pero sí POST /payments; nivel 3
- * sigue con 403 en GET /:id; superadmin sigue en el allowlist de /adjustments), reconciliación de Fase 0
- * + propina real de Fase 1 se ven juntas en el payload, una reservación cancelada sigue exponiendo el
- * payload completo (el modo solo-lectura es de UI, no de backend), y el fallback de summarize() fallido
- * expone total = balance + paidAmount.
+ * End-to-end sobre Parse + mongodb-memory-server: el RBAC no regresiona (agencia/agente siguen sin
+ * poder POST/DELETE /adjustments pero sí POST /payments; nivel 3 sigue con 403 en GET /:id; superadmin
+ * sigue en el allowlist de /adjustments), el fallback de summarize() fallido expone
+ * total = balance + paidAmount, y — tras quitar la propina general — dos pagos parciales del mismo
+ * método saldan el balance exacto, un pago de monto 0 se rechaza (400) y el DTO ya no expone `tip`.
  */
 
 const request = require('supertest');
 const Parse = require('parse/node');
 const AuthTestHelper = require('../../helpers/authTestHelper');
 const PaymentService = require('../../../src/application/services/PaymentService');
-
-const RECON_SOURCE = 'payment-method-reconciliation';
 
 describe('GET /api/reservations/:id — payment breakdown (integration)', () => {
   let app;
@@ -30,9 +26,6 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
   // daría 404 a agencia/agente sobre estas reservaciones.
   let agencyOwner;
   let clientQuote;
-
-  // Clean pricesByType (base × 1.16 / × 1.21).
-  const CLEAN = [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 } }];
 
   const createReservation = async (services, paymentType = 'efectivo', opts = {}) => {
     const reservation = new Parse.Object('Reservation');
@@ -115,40 +108,6 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
     if (clientQuote) await destroy(clientQuote);
   });
 
-  describe('payment.tip viaja igual para los 3 roles (sin filtrar por rol)', () => {
-    it('admin, department_manager y client reciben el MISMO payment.tip agregado', async () => {
-      const { id } = await createReservation([{ total: 1000, concept: 'Traslado' }]);
-      await postPayment(id, { amount: 1000, tip: 80, method: 'efectivo' });
-
-      const [asAdmin, asManager, asClient] = await Promise.all([
-        getReservation(id, adminToken),
-        getReservation(id, managerToken),
-        getReservation(id, clientToken),
-      ]);
-
-      expect(asAdmin.status).toBe(200);
-      expect(asManager.status).toBe(200);
-      expect(asClient.status).toBe(200);
-
-      // El tip agregado es idéntico entre roles.
-      expect(asAdmin.body.data.payment.tip).toBe(80);
-      expect(asManager.body.data.payment.tip).toBe(80);
-      expect(asClient.body.data.payment.tip).toBe(80);
-    });
-  });
-
-  describe('N1 — el payload ya NO expone tipByService (payment.tip sí)', () => {
-    it('un pago con tip > 0 devuelve payment.tipByService undefined y payment.tip correcto (200)', async () => {
-      const { id } = await createReservation([{ total: 500 }]);
-      await postPayment(id, { amount: 500, tip: 60, method: 'efectivo' });
-
-      const res = await getReservation(id, managerToken);
-      expect(res.status).toBe(200);
-      expect(res.body.data.payment.tipByService).toBeUndefined();
-      expect(res.body.data.payment.tip).toBe(60);
-    });
-  });
-
   describe('RBAC sin regresión', () => {
     it('un employee (nivel 3) sigue con 403 en GET /:id', async () => {
       const { id } = await createReservation([{ total: 100 }]);
@@ -191,45 +150,6 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
     });
   });
 
-  describe('cross-fase — reconciliación (Fase 0) + propina real (Fase 1) juntas en el payload', () => {
-    it('un cruce de tier genera el ajuste automático Y la propina se ve, ambos en GET /:id', async () => {
-      const { id } = await createReservation(CLEAN, 'transferencia');
-
-      await postPayment(id, { amount: 2320, tip: 50, method: 'transferencia' });
-      await postPayment(id, { amount: 9680, tip: 70, method: 'tarjeta' });
-
-      const res = await getReservation(id, adminToken);
-      expect(res.status).toBe(200);
-      const { payment, adjustments } = res.body.data;
-
-      // Fase 0: ajuste de reconciliación visible.
-      const recon = (adjustments || []).filter((a) => a && a.source === RECON_SOURCE);
-      expect(recon).toHaveLength(1);
-      expect(recon[0].amount).toBe(400);
-      expect(recon[0].type).toBe('charge');
-
-      // Fase 1: propina agregada real, visible en el mismo payload.
-      expect(payment.tip).toBe(120); // 50 + 70
-    });
-  });
-
-  describe('reservación cancelada sigue exponiendo el payload completo (solo-lectura es de UI)', () => {
-    it('GET /:id sobre una cancelada devuelve payment.total/tip igual', async () => {
-      const { id } = await createReservation(
-        [{ total: 1000, concept: 'Traslado' }],
-        'efectivo',
-        { status: 'cancelled' }
-      );
-      await postPayment(id, { amount: 1000, tip: 40, method: 'efectivo' });
-
-      const res = await getReservation(id, managerToken);
-      expect(res.status).toBe(200);
-      expect(res.body.data.status).toBe('cancelled');
-      expect(res.body.data.payment.total).toBeGreaterThan(0);
-      expect(res.body.data.payment.tip).toBe(40);
-    });
-  });
-
   describe('fallback — summarize() falla', () => {
     it('deriva total = balance + paidAmount (no crashea)', async () => {
       const { id } = await createReservation([{ total: 1000 }], 'efectivo', {
@@ -245,6 +165,36 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
       } finally {
         spy.mockRestore();
       }
+    });
+  });
+
+  describe('sin propina — balance, validación y DTO', () => {
+    it('(a) dos pagos parciales del mismo método sin propina => balance exacto', async () => {
+      const { id } = await createReservation([{ total: 1000 }], 'efectivo');
+      await postPayment(id, { amount: 400, method: 'efectivo' });
+      await postPayment(id, { amount: 600, method: 'efectivo' });
+
+      const res = await getReservation(id, adminToken);
+      expect(res.status).toBe(200);
+      expect(res.body.data.payment.paidAmount).toBe(1000);
+      expect(res.body.data.payment.balance).toBe(0);
+      expect(res.body.data.payment.paymentStatus).toBe('paid');
+    });
+
+    it('(b) POST /payments {amount:0} => 400 con el mensaje exacto revertido', async () => {
+      const { id } = await createReservation([{ total: 1000 }], 'efectivo');
+      const res = await postPayment(id, { amount: 0, method: 'efectivo' });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('El monto debe ser un número mayor a 0');
+    });
+
+    it('(c) el DTO de GET /reservations/:id NO expone la clave tip', async () => {
+      const { id } = await createReservation([{ total: 1000 }], 'efectivo');
+      await postPayment(id, { amount: 500, method: 'efectivo' });
+
+      const res = await getReservation(id, adminToken);
+      expect(res.status).toBe(200);
+      expect(Object.keys(res.body.data.payment)).not.toContain('tip');
     });
   });
 });

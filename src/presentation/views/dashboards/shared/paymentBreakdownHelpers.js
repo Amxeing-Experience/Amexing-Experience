@@ -139,35 +139,6 @@ const PaymentBreakdownHelpers = (() => {
     return !!(adjustment && adjustment.source === AUTO_RECONCILIATION_SOURCE);
   }
 
-  /**
-   * Deriva el monto aplicado a servicios de un pago a partir del total recibido y la propina, con
-   * el estado de validacion del formulario (Fase 4). serviceAmount = round2(total - tip). Entradas
-   * no finitas/NaN/vacias se tratan como 0 (Number(x) + guard Number.isFinite, igual que el resto del
-   * motor), nunca se propaga NaN/Infinity. No impone el techo AMOUNT_MAX: ese se valida por campo
-   * (totalReceived/tip) por separado, nunca sobre la suma ni sobre este derivado.
-   * @param {number} totalReceived - Monto total recibido capturado por el staff.
-   * @param {number} tip - Propina capturada (parte de ese total).
-   * @returns {{serviceAmount:number, state:('ok'|'warning'|'blocked')}} Monto de servicios + estado.
-   * @example
-   * deriveServiceAmount(500, 100) // { serviceAmount: 400, state: 'ok' }
-   */
-  function deriveServiceAmount(totalReceived, tip) {
-    const totalNum = Number(totalReceived);
-    const tipNum = Number(tip);
-    const total = Number.isFinite(totalNum) ? totalNum : 0;
-    const t = Number.isFinite(tipNum) ? tipNum : 0;
-    const serviceAmount = round2(total - t);
-    let state = 'ok';
-    if (t > total) {
-      // La propina excede el total recibido: serviceAmount seria negativo (sin sentido) -> bloquea.
-      state = 'blocked';
-    } else if (t > serviceAmount) {
-      // Propina mayor al monto de servicios (t > total/2) pero <= total: solo advierte, no bloquea.
-      state = 'warning';
-    }
-    return { serviceAmount, state };
-  }
-
   return {
     AUTO_RECONCILIATION_SOURCE,
     PAYMENT_STATUS_MAP,
@@ -178,7 +149,6 @@ const PaymentBreakdownHelpers = (() => {
     computeServicesSubtotalByType,
     getPaymentStatusBadge,
     hasAutoReconciliationBadge,
-    deriveServiceAmount,
   };
 })();
 

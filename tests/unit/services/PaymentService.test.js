@@ -103,23 +103,16 @@ describe('PaymentService pure helpers', () => {
 
     it('redondea el efectivo a múltiplo de 5 (MXN)', () => {
       // 101 → 100 (decimal ≤ 0.50 baja); 103.6 → 105 (> 0.50 sube)
-      expect(PaymentService.computeTotals([{ total: 101 }], 'efectivo', 0, 0, 'MXN').total).toBe(100);
-      expect(PaymentService.computeTotals([{ total: 103.6 }], 'efectivo', 0, 0, 'MXN').total).toBe(105);
+      expect(PaymentService.computeTotals([{ total: 101 }], 'efectivo', 0, 'MXN').total).toBe(100);
+      expect(PaymentService.computeTotals([{ total: 103.6 }], 'efectivo', 0, 'MXN').total).toBe(105);
     });
 
     it('no redondea a múltiplo de 5 cuando la moneda es USD', () => {
-      expect(PaymentService.computeTotals([{ total: 101 }], 'efectivo', 0, 0, 'USD').total).toBe(101);
-    });
-
-    it('adds the reservation-level tip on top (no cambia por método)', () => {
-      const t = PaymentService.computeTotals(items, 'transferencia', 30);
-      expect(t.tip).toBe(30);
-      expect(t.servicesTotal).toBe(166);
-      expect(t.total).toBe(196);
+      expect(PaymentService.computeTotals([{ total: 101 }], 'efectivo', 0, 'USD').total).toBe(101);
     });
 
     it('adds net adjustments as final pesos (no cambia por método)', () => {
-      const t = PaymentService.computeTotals(items, 'transferencia', 0, 20);
+      const t = PaymentService.computeTotals(items, 'transferencia', 20);
       expect(t.adjustments).toBe(20);
       expect(t.total).toBe(186); // 166 + 20
     });
@@ -160,12 +153,12 @@ describe('PaymentService pure helpers', () => {
     });
 
     it('el ajuste NO se multiplica ni se ve afectado por el método (se suma como pesos finales)', () => {
-      const t = PaymentService.computeTotals([{ pricesByType: { efectivo: 1000, tarjeta: 1210 } }], 'tarjeta', 0, 100);
+      const t = PaymentService.computeTotals([{ pricesByType: { efectivo: 1000, tarjeta: 1210 } }], 'tarjeta', 100);
       expect(t.total).toBe(1310); // 1210 + 100
     });
 
     it('un ajuste de descuento (neto negativo) baja el total', () => {
-      const t = PaymentService.computeTotals([{ pricesByType: { efectivo: 1000, tarjeta: 1210 } }], 'tarjeta', 0, -200);
+      const t = PaymentService.computeTotals([{ pricesByType: { efectivo: 1000, tarjeta: 1210 } }], 'tarjeta', -200);
       expect(t.adjustments).toBe(-200);
       expect(t.total).toBe(1010); // 1210 - 200
     });
@@ -182,12 +175,12 @@ describe('PaymentService pure helpers', () => {
 
     it('un descuento mayor al total lo clampa a 0 (nunca negativo)', () => {
       // 1000 de servicios − 1500 de descuento -> 0 (no -500).
-      const t = PaymentService.computeTotals([{ pricesByType: { efectivo: 1000 } }], 'efectivo', 0, -1500);
+      const t = PaymentService.computeTotals([{ pricesByType: { efectivo: 1000 } }], 'efectivo', -1500);
       expect(t.total).toBe(0);
     });
 
     it('el redondeo a múltiplo de 5 no distingue mayúsculas en la moneda (mxn/MXN)', () => {
-      expect(PaymentService.computeTotals([{ pricesByType: { efectivo: 101 } }], 'efectivo', 0, 0, 'mxn').total).toBe(100);
+      expect(PaymentService.computeTotals([{ pricesByType: { efectivo: 101 } }], 'efectivo', 0, 'mxn').total).toBe(100);
     });
 
     it('método desconocido o vacío cae al fallback de total (sin pricesByType[ese método])', () => {
@@ -251,7 +244,7 @@ describe('PaymentService pure helpers', () => {
   describe('buildSummary', () => {
     const computed = {
       totals: {
-        subtotal: 200, adjustments: 0, iva: 32, tip: 0, total: 232,
+        subtotal: 200, adjustments: 0, iva: 32, total: 232,
       },
       paidGlobal: 100,
     };
@@ -277,86 +270,6 @@ describe('PaymentService pure helpers', () => {
       const over = PaymentService.buildSummary('r1', { totals: { total: 232 }, paidGlobal: 300 });
       expect(over.paymentStatus).toBe('paid');
       expect(over.balance).toBe(-68);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Fase 1 — agregación real de propina desde Payment.tip (no Reservation.tip),
-  // desglose por servicio y neutralidad de la propina sobre el balance.
-  // ---------------------------------------------------------------------------
-  describe('sumTips', () => {
-    it('sums every payment tip into a single global total', () => {
-      expect(PaymentService.sumTips([{ tip: 100 }, { tip: 50 }, { tip: 200 }])).toBe(350);
-    });
-
-    it('treats a missing or non-numeric tip as 0 (same defensiveness as sumPayments)', () => {
-      expect(PaymentService.sumTips([{ tip: 100 }, {}, { tip: 'abc' }, { tip: null }])).toBe(100);
-    });
-
-    it('rounds the total to cents', () => {
-      expect(PaymentService.sumTips([{ tip: 33.333 }, { tip: 0.007 }])).toBe(33.34);
-    });
-
-    it('handles empty/invalid input', () => {
-      expect(PaymentService.sumTips([])).toBe(0);
-      expect(PaymentService.sumTips(null)).toBe(0);
-    });
-  });
-
-  describe('propina agregada — el arreglo del saldo fantasma (fix crítico)', () => {
-    // Reproduce lo que hace loadAndCompute: la propina se toma de sumTips(rows) y paidGlobal
-    // DEBE incluirla (sumPayments + sumTips), o quedaría un saldo fantasma igual a la propina.
-    const compose = (serviceItems, paymentType, rows, currency = 'MXN') => {
-      const tipTotal = PaymentService.sumTips(rows);
-      const totals = PaymentService.computeTotals(serviceItems, paymentType, tipTotal, 0, currency);
-      const paidGlobal = Math.round((PaymentService.sumPayments(rows) + tipTotal) * 100) / 100;
-      return PaymentService.buildSummary('r', { totals, paidGlobal });
-    };
-
-    it('pago 100% propina (servicios = $0) queda paid, balance 0 — sin saldo fantasma', () => {
-      const summary = compose([], 'efectivo', [{ amount: 0, tip: 100, reservationServiceId: null }]);
-      expect(summary.total).toBe(100);
-      expect(summary.paidAmount).toBe(100);
-      expect(summary.balance).toBe(0);
-      expect(summary.paymentStatus).toBe('paid');
-      expect(summary.tip).toBe(100);
-    });
-
-    it('la propina es neutral al balance de servicios (pago parcial de servicios + propina)', () => {
-      // servicesTotal (tarjeta) = 400; pago amount 200 (servicios) + tip 100.
-      const summary = compose([{ pricesByType: { efectivo: 331, tarjeta: 400 } }], 'tarjeta', [
-        { amount: 200, tip: 100, reservationServiceId: null },
-      ]);
-      expect(summary.total).toBe(500); // 400 servicios + 100 propina
-      expect(summary.paidAmount).toBe(300); // 200 servicios + 100 propina
-      expect(summary.balance).toBe(200); // 400 − 200 de servicios; la propina no mueve el balance
-      expect(summary.paymentStatus).toBe('partial');
-      expect(summary.tip).toBe(100);
-    });
-
-    it('pago 0% propina se comporta exactamente igual que sin propina', () => {
-      const summary = compose([{ total: 1000 }], 'efectivo', [{ amount: 1000, tip: 0, reservationServiceId: null }]);
-      expect(summary.tip).toBe(0);
-      expect(summary.balance).toBe(0);
-      expect(summary.paymentStatus).toBe('paid');
-    });
-  });
-
-  describe('el redondeo a múltiplo de 5 del efectivo NUNCA toca la porción de propina', () => {
-    it('los servicios en efectivo se redondean (102.6 -> 105) pero la propina se suma exacta (2.4)', () => {
-      // servicesTotal efectivo 102.6 -> 105 (múltiplo de 5); tip 2.4 se agrega crudo, sin redondear.
-      const t = PaymentService.computeTotals([{ pricesByType: { efectivo: 102.6 } }], 'efectivo', 2.4, 0, 'MXN');
-      expect(t.servicesTotal).toBe(105); // redondeado a múltiplo de 5
-      expect(t.tip).toBe(2.4); // exacto, sin redondeo a múltiplo de 5
-      // Si el redondeo se aplicara al total (107.4 -> 105) la propina se perdería; 107.4 lo descarta.
-      expect(t.total).toBe(107.4); // 105 + 2.4, el total NO se vuelve múltiplo de 5
-    });
-
-    it('la propina no recibe el factor de método (16%/21%) en ningún método', () => {
-      const base = [{ pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } }];
-      expect(PaymentService.computeTotals(base, 'efectivo', 100).tip).toBe(100);
-      expect(PaymentService.computeTotals(base, 'transferencia', 100).tip).toBe(100);
-      expect(PaymentService.computeTotals(base, 'tarjeta', 100).tip).toBe(100);
     });
   });
 
@@ -468,7 +381,7 @@ describe('PaymentService pure helpers', () => {
         expect(d.scenario).toBe('complex');
         expect(d.reconciliationAdjustment.amount).toBe(1320); // 11320 − 10000
         // Convergencia: total anclado a efectivo + ajuste == dinero cobrado.
-        const total = PaymentService.computeTotals(clean, 'efectivo', 0, 1320).total;
+        const total = PaymentService.computeTotals(clean, 'efectivo', 1320).total;
         expect(total - (3000 + 3480 + 4840)).toBe(0);
       });
     });
@@ -515,7 +428,7 @@ describe('PaymentService pure helpers', () => {
         expect(s3.reconciliationAdjustment.amount).toBe(200);
 
         // Verificación end-to-end: total (transferencia + $200) == dinero cobrado -> balance 0 exacto.
-        const total = PaymentService.computeTotals(clean, 'transferencia', 0, 200).total;
+        const total = PaymentService.computeTotals(clean, 'transferencia', 200).total;
         const paid = 2320 + 4840 + 4640;
         expect(total).toBe(11800);
         expect(total - paid).toBe(0);
@@ -736,7 +649,7 @@ describe('PaymentService pure helpers', () => {
         expect(d.reconciliationAdjustment.type).toBe('discount'); // se muestra como descuento (Fase 2)
         expect(d.reconciliationAdjustment.amount).toBe(2100); // 12100 (tarjeta) − 10000 (efectivo)
         // El total anclado a tarjeta + el descuento == exactamente lo cobrado (balance 0), sin fantasma.
-        const { total } = PaymentService.computeTotals(clean, 'tarjeta', 0, -2100);
+        const { total } = PaymentService.computeTotals(clean, 'tarjeta', -2100);
         expect(total).toBe(10000);
       });
 
@@ -753,7 +666,7 @@ describe('PaymentService pure helpers', () => {
         expect(d.reconciliationAdjustment.type).toBe('charge');
         expect(d.reconciliationAdjustment.amount).toBeCloseTo(0.17, 2); // 1 − 1×(50000/60500)
         // El total efectivo + el ajuste de centavos NO salta al total tarjeta (60500): sigue ≈50000.
-        const { total } = PaymentService.computeTotals(big, 'efectivo', 0, d.reconciliationAdjustment.amount);
+        const { total } = PaymentService.computeTotals(big, 'efectivo', d.reconciliationAdjustment.amount);
         expect(total).toBeCloseTo(50000.17, 2);
         expect(total).not.toBeCloseTo(60500, 0);
       });

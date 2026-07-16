@@ -942,14 +942,13 @@ class ReservationController {
           adjustments: reservation.get('adjustments') || [],
           currency: reservation.get('currency'),
           paymentType: reservation.get('paymentType'),
-          // Payment rollup (con IVA + propina): paymentStatus pending|partial|paid|refunded.
+          // Payment rollup (con IVA): paymentStatus pending|partial|paid|refunded.
           payment: paymentSummary ? {
             paymentStatus: paymentSummary.paymentStatus,
             paidAmount: paymentSummary.paidAmount,
             balance: paymentSummary.balance,
             subtotal: paymentSummary.subtotal,
             iva: paymentSummary.iva,
-            tip: paymentSummary.tip,
             total: paymentSummary.total,
           } : {
             // Fallback (summarize() lanzó): deriva total = balance + paidAmount para que la UI de
@@ -957,7 +956,6 @@ class ReservationController {
             paymentStatus: reservation.get('paymentStatus') || 'pending',
             paidAmount: reservation.get('paidAmount') || 0,
             balance: reservation.get('balance'),
-            tip: reservation.get('tip') || 0,
             total: Math.round(
               ((Number(reservation.get('balance')) || 0) + (Number(reservation.get('paidAmount')) || 0)) * 100
             ) / 100,

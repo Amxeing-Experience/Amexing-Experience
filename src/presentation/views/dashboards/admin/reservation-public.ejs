@@ -175,7 +175,6 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
             var payStatus = pay.paymentStatus || 'pending';
             var payPaid = Number(pay.paidAmount) || 0;
             var payBalance = (pay.balance === null || pay.balance === undefined) ? null : Number(pay.balance);
-            var payTip = Number(pay.tip) || 0;
             var PAY_STATUS_LABELS = { pending: 'Pendiente de pago', partial: 'Pago parcial', paid: 'Pagado', refunded: 'Reembolsado' };
             var payStatusLabel = PAY_STATUS_LABELS[payStatus] || PAY_STATUS_LABELS.pending;
             // Framing por tipo de cliente. isAgency sin resolver (undefined) se trata como false
@@ -187,7 +186,7 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
             // Descuento (cliente directo) = precio de lista (tarjeta) − total del método activo.
             var discountAmount = (isFinite(tarjetaTotal) && isFinite(Number(sumTotal))) ? (tarjetaTotal - Number(sumTotal)) : 0;
             var adjustments = Array.isArray(quote.adjustments) ? quote.adjustments : [];
-            // Total a pagar EXACTO = payment.total (servicios + ajustes + propina), la misma cifra
+            // Total a pagar EXACTO = payment.total (servicios + ajustes), la misma cifra
             // que PaymentService.summarize; si no vino, cae al total de servicios activo.
             var payTotalDue = (pay.total === null || pay.total === undefined || !isFinite(Number(pay.total)))
                 ? (isFinite(Number(sumTotal)) ? Number(sumTotal) : null)
@@ -419,9 +418,6 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                     <div class="rc-pay-row"><span class="l"><i class="ti ti-discount-2 rc-adj-discount" aria-hidden="true"></i><%= adj.description || 'Ajuste' %></span><span class="v rc-adj-discount">-<%= fmtMoney(adj.amount) %></span></div>
                     <% } %>
                 <% }); %>
-            <% } %>
-            <% if (payTip > 0) { %>
-            <div class="rc-pay-row"><span class="l">Propina</span><span class="v"><%= fmtMoney(payTip) %></span></div>
             <% } %>
             <% if (payTotalDue !== null) { %>
             <div class="rc-pay-row rc-pay-total"><span class="l">Total a pagar</span><span class="v"><%= fmtMoney(payTotalDue) %></span></div>

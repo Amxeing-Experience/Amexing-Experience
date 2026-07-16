@@ -232,7 +232,6 @@ class Payment extends BaseModel {
       exchangeRate: payment.get('exchangeRate') || null,
       method: payment.get('method') || '',
       reference: payment.get('reference') || '',
-      tip: payment.get('tip') || 0,
       paidAt: payment.get('paidAt') || null,
       notes: payment.get('notes') || '',
       reservationServiceId: service ? service.id : null,

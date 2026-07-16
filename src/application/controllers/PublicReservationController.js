@@ -563,8 +563,8 @@ class PublicReservationController {
         totalItems.push({ includeInTotal: sc.includeInTotal, pricesByType: sc.pricesByType, total: sc.total });
       }
     }
-    // Servicios solos (sin ajustes ni propina) para el desglose Subtotal/recargo/Total de la vista.
-    const dispTotals = PaymentService.computeTotals(totalItems, paymentType, 0, 0, currency);
+    // Servicios solos (sin ajustes) para el desglose Subtotal/recargo/Total de la vista.
+    const dispTotals = PaymentService.computeTotals(totalItems, paymentType, 0, currency);
     const { subtotal } = dispTotals; // base (efectivo)
     const { iva } = dispTotals; // recargo por método (IVA, o IVA + comisión de tarjeta)
     const total = dispTotals.servicesTotal; // base × factor
@@ -582,9 +582,9 @@ class PublicReservationController {
     // descuento/IVA. Se computa junto a dispTotals (FUERA del try/catch de summarize) para que
     // el desglose/framing siga renderizando aunque summarize() falle.
     const methodTotals = {
-      efectivo: PaymentService.computeTotals(totalItems, 'efectivo', 0, 0, currency).servicesTotal,
-      transferencia: PaymentService.computeTotals(totalItems, 'transferencia', 0, 0, currency).servicesTotal,
-      tarjeta: PaymentService.computeTotals(totalItems, 'tarjeta', 0, 0, currency).servicesTotal,
+      efectivo: PaymentService.computeTotals(totalItems, 'efectivo', 0, currency).servicesTotal,
+      transferencia: PaymentService.computeTotals(totalItems, 'transferencia', 0, currency).servicesTotal,
+      tarjeta: PaymentService.computeTotals(totalItems, 'tarjeta', 0, currency).servicesTotal,
     };
     // Sin ningún pricesByType no se puede armar el desglose por método: se cae al render legado.
     const hasPricesByType = totalItems.some((it) => it.pricesByType && typeof it.pricesByType === 'object');
@@ -602,15 +602,14 @@ class PublicReservationController {
     }));
 
     // Payment rollup (fresh, non-persisting): amount paid, balance and status.
-    // payment.total includes the reservation tip (the full amount due); serviceItems.total does not.
+    // payment.total es el monto total a pagar (servicios + ajustes); serviceItems.total es solo servicios.
     let payment = {
       paymentStatus: reservation.get('paymentStatus') || 'pending',
       paidAmount: reservation.get('paidAmount') || 0,
       balance: reservation.get('balance'),
-      tip: reservation.get('tip') || 0,
       // Fallback (summarize() lanzó): deriva total = balance + paidAmount (los campos que sobreviven
       // al fallo) para que el Total no se contradiga con el desglose de ajustes ya renderizado —
-      // usar dispTotals.servicesTotal ignoraba ajustes/propina. Mismo fix que
+      // usar dispTotals.servicesTotal ignoraba ajustes. Mismo fix que
       // ReservationController.getReservationById (Fase 3); Fase 2 no lo tenía.
       total: Math.round(
         ((Number(reservation.get('balance')) || 0) + (Number(reservation.get('paidAmount')) || 0)) * 100
@@ -622,7 +621,6 @@ class PublicReservationController {
         paymentStatus: summary.paymentStatus,
         paidAmount: summary.paidAmount,
         balance: summary.balance,
-        tip: summary.tip,
         total: summary.total,
       };
     } catch (payErr) {

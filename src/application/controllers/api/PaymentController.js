@@ -25,7 +25,7 @@ const { validateDate } = require('../../utils/dateValidation');
 const CURRENCIES = ['MXN', 'USD'];
 const REFERENCE_MAX = 100;
 const NOTES_MAX = 300;
-// Upper bound for a single payment amount / tip — blocks absurd values (e.g. 1e19).
+// Upper bound for a single payment amount — blocks absurd values (e.g. 1e19).
 const AMOUNT_MAX = 100000000; // 100,000,000
 
 // Payment receipt (proof of payment) — base64-in-JSON upload, same caps/MIME as client documents.
@@ -118,7 +118,7 @@ class PaymentController {
 
   /**
    * POST /api/reservations/:id/payments — Register a payment, then recalculate.
-   * @param {object} req - Express request; body { amount, currency, method, reference, notes, tip, paidAt, reservationServiceId, paymentInfoId }.
+   * @param {object} req - Express request; body { amount, currency, method, reference, notes, paidAt, reservationServiceId, paymentInfoId }.
    * @param {object} res - Express response.
    * @returns {Promise<object>} JSON { success, data: { payment, summary } }.
    * @example
@@ -128,12 +128,12 @@ class PaymentController {
     try {
       const { id } = req.params;
       const {
-        amount, currency, method, reference, notes, tip, paidAt,
+        amount, currency, method, reference, notes, paidAt,
         reservationServiceId, paymentInfoId, fileBase64, fileName, mimeType,
       } = req.body || {};
 
       const validation = PaymentController.validatePaymentInput({
-        amount, currency, method, tip,
+        amount, currency, method,
       });
       if (validation.error) {
         return res.status(400).json({ success: false, error: validation.error });
@@ -157,9 +157,6 @@ class PaymentController {
       if (paidAtError) return res.status(400).json({ success: false, error: paidAtError });
 
       const { amountMXN, rate } = await PaymentController.toMXN(validation.amount, validation.currency);
-      // Tip converts with the SAME snapshot rate as the amount (both are money from this one
-      // payment): never surcharged, but a non-MXN tip must land in MXN like the amount does.
-      const tipMXN = Math.round(validation.tip * rate * 100) / 100;
 
       const payment = new Payment();
       payment.setReservationPtr(reservation);
@@ -171,7 +168,6 @@ class PaymentController {
       payment.setMethod(method);
       if (reference) payment.setReference(String(reference).slice(0, REFERENCE_MAX));
       if (notes) payment.setNotes(String(notes).slice(0, NOTES_MAX));
-      payment.setTip(tipMXN);
       payment.setPaidAt(paidAt ? new Date(paidAt) : new Date());
       payment.setRegisteredBy(req.user);
       if (paymentInfoId) {
@@ -256,7 +252,7 @@ class PaymentController {
     try {
       const { id, paymentId } = req.params;
       const {
-        amount, currency, method, reference, notes, tip, paidAt, reservationServiceId,
+        amount, currency, method, reference, notes, paidAt, reservationServiceId,
         fileBase64, fileName, mimeType,
       } = req.body || {};
 
@@ -274,9 +270,8 @@ class PaymentController {
       const nextCurrency = currency !== undefined ? currency : payment.getOrigCurrency();
       const nextAmount = amount !== undefined ? amount : payment.getOrigAmount();
       const nextMethod = method !== undefined ? method : payment.getMethod();
-      const nextTip = tip !== undefined ? tip : payment.getTip();
       const validation = PaymentController.validatePaymentInput({
-        amount: nextAmount, currency: nextCurrency, method: nextMethod, tip: nextTip,
+        amount: nextAmount, currency: nextCurrency, method: nextMethod,
       });
       if (validation.error) {
         return res.status(400).json({ success: false, error: validation.error });
@@ -288,25 +283,16 @@ class PaymentController {
         if (paidAtError) return res.status(400).json({ success: false, error: paidAtError });
       }
 
-      let tipRate = null;
       if (amount !== undefined || currency !== undefined) {
         const { amountMXN, rate } = await PaymentController.toMXN(validation.amount, validation.currency);
         payment.setAmount(amountMXN);
         payment.setOrigAmount(validation.amount);
         payment.setOrigCurrency(validation.currency);
         payment.setExchangeRate(rate);
-        tipRate = rate;
       }
       if (method !== undefined) payment.setMethod(validation.method);
       if (reference !== undefined) payment.setReference(String(reference || '').slice(0, REFERENCE_MAX));
       if (notes !== undefined) payment.setNotes(String(notes || '').slice(0, NOTES_MAX));
-      if (tip !== undefined) {
-        // When only the tip changes (no amount/currency in the payload), reuse the rate ALREADY
-        // snapshotted on this payment — never a fresh current rate — so amount and tip on the same
-        // Payment are never computed at different rates from being edited at different times.
-        const rateForTip = tipRate !== null ? tipRate : (payment.getExchangeRate() || 1);
-        payment.setTip(Math.round(validation.tip * rateForTip * 100) / 100);
-      }
       if (paidAt !== undefined) payment.setPaidAt(paidAt ? new Date(paidAt) : new Date());
       if (reservationServiceId !== undefined) {
         await PaymentController.applyServicePointer(payment, reservationServiceId, reservation, res);
@@ -622,23 +608,20 @@ class PaymentController {
 
   /**
    * Validate and normalize payment input shared by create/update.
-   * @param {object} input - { amount, currency, method, tip }.
+   * @param {object} input - { amount, currency, method }.
    * @param input.amount
    * @param input.currency
    * @param input.method
-   * @param input.tip
-   * @returns {object} { error } or { amount, currency, method, tip }.
+   * @returns {object} { error } or { amount, currency, method }.
    * @example
    * PaymentController.validatePaymentInput({ amount: 100, currency: 'MXN', method: 'efectivo' });
    */
   static validatePaymentInput({
-    amount, currency, method, tip,
+    amount, currency, method,
   }) {
     const amountNum = Number(amount);
-    // Floor relaxed from > 0 to >= 0 so a tip-only payment (amount 0, tip > 0) is allowed. A
-    // negative amount stays rejected regardless of tip: a positive tip never rescues it.
-    if (!Number.isFinite(amountNum) || amountNum < 0) {
-      return { error: 'El monto debe ser un número mayor o igual a 0' };
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      return { error: 'El monto debe ser un número mayor a 0' };
     }
     if (amountNum > AMOUNT_MAX) {
       return { error: `El monto no puede exceder ${AMOUNT_MAX.toLocaleString('es-MX')}` };
@@ -650,23 +633,8 @@ class PaymentController {
     if (!CURRENCIES.includes(cur)) {
       return { error: `Moneda inválida. Use: ${CURRENCIES.join(', ')}` };
     }
-    const tipNum = tip === undefined || tip === null || tip === '' ? 0 : Number(tip);
-    if (!Number.isFinite(tipNum) || tipNum < 0) {
-      return { error: 'La propina debe ser un número mayor o igual a 0' };
-    }
-    if (tipNum > AMOUNT_MAX) {
-      return { error: `La propina no puede exceder ${AMOUNT_MAX.toLocaleString('es-MX')}` };
-    }
-    // Reject a fully-empty payment (no services, no tip). amount > 0 || tip > 0 is required.
-    if (amountNum === 0 && tipNum === 0) {
-      return { error: 'El pago debe incluir un monto o una propina mayor a 0' };
-    }
-    // TODO (Fase 4, future form): the planned "monto total recibido" + "de los cuales, propina" UI
-    // must prevent tip from exceeding the captured total (which would compute a negative services
-    // amount). The backend contract here is independent-additive (amount = services, tip separate),
-    // so it needs no such rule today — this is a form-only constraint for whoever builds Fase 4.
     return {
-      amount: amountNum, currency: cur, method, tip: tipNum,
+      amount: amountNum, currency: cur, method,
     };
   }
 
