@@ -1778,6 +1778,13 @@ class QuoteService {
       reservation.set('totalAmount', total);
       reservation.set('servicesSubtotal', serviceItems.subtotal ?? total);
       if (serviceItems.currency) reservation.set('currency', serviceItems.currency);
+      // Tipo de cambio congelado: SOLO se fija si la reservación todavía no tiene snapshot. Una reservación
+      // ya creada (posiblemente con pagos registrados) NUNCA cambia su tasa aunque la cotización de origen
+      // se re-edite/sincronice después. Cubre el caso legacy (reservación previa a este cambio que adquiere
+      // su primer snapshot en una sincronización), pero jamás pisa uno ya existente.
+      if (serviceItems.exchangeRateSnapshot && !reservation.get('exchangeRateSnapshot')) {
+        reservation.set('exchangeRateSnapshot', serviceItems.exchangeRateSnapshot);
+      }
       // Defensa en profundidad: el ancla persistida siempre es un método válido. Un token corrupto
       // (dato legacy u otro path) cae al default en vez de propagarse a la reservación, donde habilitaría
       // stored XSS en el desglose y bloquearía el registro de pagos (council L3F0/L0F1).
@@ -2038,6 +2045,11 @@ class QuoteService {
       reservation.set('servicesSubtotal', serviceItems.total || 0);
       reservation.set('adjustments', []);
       reservation.set('currency', serviceItems.currency || 'MXN');
+      // Tipo de cambio congelado: la reservación es nueva, así que hereda el snapshot que la cotización
+      // capturó en USD. A partir de aquí queda fijo (el motor de pagos lo prefiere sobre la tasa vigente).
+      if (serviceItems.exchangeRateSnapshot) {
+        reservation.set('exchangeRateSnapshot', serviceItems.exchangeRateSnapshot);
+      }
       // Defensa en profundidad (igual que syncReservationFromQuote): el ancla persistida siempre es un
       // método válido; un token corrupto de una cotización legacy cae al default en vez de propagarse.
       reservation.set('paymentType', Payment.isValidMethod(serviceItems.paymentType)

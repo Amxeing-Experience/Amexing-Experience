@@ -336,13 +336,15 @@ class PaymentService {
    * motor de cobertura (baseEquivalente/remainingBreakdown/paidAmount) compare contra pricesByType y
    * totalDue, que ya vienen en esa moneda, sin mezclar unidades. Reservación MXN: se usa `amount` tal
    * cual (misma cifra que antes; Fase B intacta). Reservación USD: un pago capturado en USD usa su
-   * snapshot exacto (origAmount); un pago capturado en MXN se reconvierte con la tasa actual (la tasa
-   * snapshot del pago es 1 para una captura en MXN, así que no sirve para MXN->USD) — introduce a lo
-   * sumo un error menor de redondeo, nunca un desajuste de unidades (bug del council L5F0: $10 USD se
-   * contaba como ~$185 y disparaba coverage ~183% / status 'paid' con cobertura real ~10%).
+   * snapshot exacto (origAmount); un pago capturado en MXN se reconvierte con la tasa que pasa el llamador
+   * (la tasa snapshot del pago es 1 para una captura en MXN, así que no sirve para MXN->USD) — introduce a
+   * lo sumo un error menor de redondeo, nunca un desajuste de unidades (bug del council L5F0: $10 USD se
+   * contaba como ~$185 y disparaba coverage ~183% / status 'paid' con cobertura real ~10%). La tasa la
+   * resuelve loadAndCompute: prefiere el snapshot CONGELADO de la reservación (exchangeRateSnapshot) y solo
+   * cae a la vigente para reservaciones legacy sin snapshot.
    * @param {object} payment - Pago plano { amount, origAmount, origCurrency }.
    * @param {string} currency - Moneda de la reservación (MXN|USD).
-   * @param {number} [currentRate] - Tasa USD/MXN vigente (para pagos MXN contra reservación USD).
+   * @param {number} [currentRate] - Tasa USD/MXN de la reservación (snapshot congelado, o vigente en legacy).
    * @returns {number} Monto del pago en la moneda de la reservación.
    * @example
    * PaymentService.paymentAmountInCurrency({ amount: 185, origAmount: 10, origCurrency: 'USD' }, 'USD') // 10
@@ -394,9 +396,13 @@ class PaymentService {
     // Reservación USD: los pagos se almacenan en MXN pero el motor de cobertura trabaja en la moneda de
     // la reservación (pricesByType/totalDue en USD). Se resuelve la tasa UNA vez y solo cuando hace falta
     // (pago MXN contra reservación USD); un pago USD usa su snapshot exacto sin tocar la tasa (council L5F0).
+    // Tipo de cambio CONGELADO: se prefiere la tasa que la reservación fijó al crearse (exchangeRateSnapshot)
+    // para que el saldo no "respire" cuando la tasa del sistema cambie después. Fallback a la tasa vigente
+    // solo para reservaciones legacy (creadas antes de este cambio, sin snapshot) o un snapshot corrupto.
     let usdRate = 0;
     if (String(currency).toUpperCase() === 'USD') {
-      usdRate = await ExchangeRate.getCurrentValue();
+      const snapshot = Number(reservation.get('exchangeRateSnapshot'));
+      usdRate = Number.isFinite(snapshot) && snapshot > 0 ? snapshot : await ExchangeRate.getCurrentValue();
     }
 
     const paymentRows = payments.map((payment) => ({

@@ -8,6 +8,7 @@ const Quote = require('../../../domain/models/Quote');
 const QuoteOwnership = require('../../../domain/models/QuoteOwnership');
 const ReservationService = require('../../../domain/models/ReservationService');
 const Payment = require('../../../domain/models/Payment');
+const ExchangeRate = require('../../../domain/models/ExchangeRate');
 const QuoteService = require('../../services/QuoteService');
 const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
 const QuoteCollaborationService = require('../../services/QuoteCollaborationService');
@@ -2291,6 +2292,14 @@ class QuoteController {
         currency,
         paymentType,
       };
+
+      // Congelamiento del tipo de cambio: en cotizaciones USD se captura la tasa vigente que produjo
+      // los pricesByType actuales, y viaja dentro del mismo blob serviceItems. Se re-captura en cada
+      // guardado (los precios también se recalculan con la tasa vigente en cada edición del wizard); el
+      // congelamiento real ocurre al pasar de cotización a reservación (QuoteService no pisa uno existente).
+      if (String(currency).toUpperCase() === 'USD') {
+        serviceItems.exchangeRateSnapshot = await ExchangeRate.getCurrentValue();
+      }
 
       quote.set('serviceItems', serviceItems);
 
