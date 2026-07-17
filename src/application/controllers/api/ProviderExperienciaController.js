@@ -79,6 +79,7 @@ class ProviderExperienciaController {
       query.equalTo('active', true);
       query.equalTo('exists', true);
       query.include('provider');
+      query.include('provider.destinationPOI'); // el destino vive en el proveedor/establecimiento
       query.ascending('provider');
       query.ascending('name');
       query.limit(1000); // Get many for selection
@@ -281,6 +282,14 @@ class ProviderExperienciaController {
               id: exp.get('provider').id,
               name: exp.get('provider').get('name'),
               type: exp.get('provider').get('type'),
+            }
+            : null,
+          // El destino de una experiencia de proveedor vive en el proveedor/establecimiento.
+          // Se expone como destinationPOI top-level para que el front lo trate igual que las regulares.
+          destinationPOI: (exp.get('provider') && exp.get('provider').get('destinationPOI'))
+            ? {
+              id: exp.get('provider').get('destinationPOI').id,
+              name: exp.get('provider').get('destinationPOI').get('name'),
             }
             : null,
           createdAt: exp.createdAt,
