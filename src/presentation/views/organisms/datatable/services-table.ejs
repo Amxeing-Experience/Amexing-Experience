@@ -244,6 +244,8 @@ table.dataTable thead th:nth-child(2) select {
 .exp-catalog .exp-field select { width: 100%; font-size: 0.9rem; color: var(--exp-dark); background: rgba(255,255,255,0.45); border: 1px solid var(--exp-border); border-radius: 6px; padding: 11px 38px 11px 14px; appearance: none; -webkit-appearance: none; outline: none; }
 .exp-catalog .exp-field select:focus { border-color: var(--exp-olive); background: #fff; }
 .exp-catalog .exp-field__caret { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--exp-muted); pointer-events: none; font-size: 0.9rem; }
+.svc-popular-badge { display: inline-flex; align-items: center; gap: 4px; background: #e11d1d; color: #fff; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+.svc-popular-badge i { font-size: 0.72rem; }
 </style>
 
 <div class="exp-catalog">
@@ -270,6 +272,16 @@ table.dataTable thead th:nth-child(2) select {
                     <label class="form-check-label" for="greeterToggle-<%= dtTableId %>" id="greeterLabel-<%= dtTableId %>">Sin Greeter</label>
                 </div>
             </div>
+            <% if (typeof endClientCaps === 'undefined' || !endClientCaps || endClientCaps.catalogScope !== 'popular') { %>
+            <div class="segwrap">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="popularToggle-<%= dtTableId %>">
+                    <label class="form-check-label" for="popularToggle-<%= dtTableId %>" id="popularLabel-<%= dtTableId %>">
+                        <i class="ti ti-heart-filled" style="color:#e11d1d;"></i> Solo populares
+                    </label>
+                </div>
+            </div>
+            <% } %>
         </div>
         <div class="segbar__right">
             <div class="exp-field exp-field--select">
@@ -1098,6 +1110,12 @@ table.dataTable thead th:nth-child(2) select {
                 }
             }
             
+            // "Solo populares": filtro ortogonal al tipo; se aplica aquí para que todos los
+            // redraws (pills, toggles, reset) lo respeten sin duplicar lógica.
+            if ($(`#popularToggle-${tableId}`).is(':checked')) {
+                return filtered.filter(s => s && s.popular === true);
+            }
+
             // Return filtered results
             return filtered;
         }
@@ -1117,7 +1135,10 @@ table.dataTable thead th:nth-child(2) select {
                         const origin = row.originPOI?.name || null;
                         const destination = row.destinationPOI?.name || 'Destino';
                         const destinationPoiId = row.destinationPOI?.id || row.destinationPOI?.objectId || null;
-                        
+                        const popularMark = row.popular === true
+                            ? '<div class="text-center mb-1"><span class="svc-popular-badge"><i class="ti ti-heart-filled"></i> Popular</span></div>'
+                            : '';
+
                         if (type === 'sort') {
                             // For sorting, use the full destination name for more natural ordering
                             return destination;
@@ -1132,16 +1153,18 @@ table.dataTable thead th:nth-child(2) select {
                             // For services without specific origin (like local services)
                             return `
                                 <div class="d-flex flex-column" data-destination-poi-id="${destinationPoiId}">
+                                    ${popularMark}
                                     <div class="fw-semibold text-center" style="font-size: 1rem;">
                                         ${destination}
                                     </div>
                                 </div>
                             `;
                         }
-                        
+
                         // Show bidirectional route for services with both origin and destination
                         return `
                             <div class="d-flex flex-column" data-destination-poi-id="${destinationPoiId}">
+                                ${popularMark}
                                 <div class="fw-semibold text-center" style="font-size: 1rem;">
                                     ${origin}
                                 </div>
@@ -1362,6 +1385,23 @@ table.dataTable thead th:nth-child(2) select {
                                             data-bs-placement="top"
                                             title="Ver Historial de Precios">
                                             <i class="ti ti-chart-line"></i>
+                                        </button>`;
+
+                            // Toggle "popular" (quick-view curation) button - brand heart
+                            const isPopular = data.popular === true;
+                            const heartColor = isPopular ? '#e11d1d' : '#c7c7c7';
+                            const popularTitle = isPopular ? 'Quitar de populares' : 'Marcar como popular';
+                            const routeName = `${data.originPOI?.name || ''} → ${data.destinationPOI?.name || ''}`;
+
+                            actions += `<button type="button"
+                                            class="btn btn-light toggle-popular-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-current-popular="${isPopular}"
+                                            data-name="${routeName}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="${popularTitle}">
+                                            <span class="popular-heart" style="display:inline-block;width:16px;height:16px;background-color:${heartColor};-webkit-mask:url('/images/heart_black.png') center/contain no-repeat;mask:url('/images/heart_black.png') center/contain no-repeat;vertical-align:-2px;"></span>
                                         </button>`;
 
                             // Toggle status button - usar iconos más descriptivos
@@ -1639,7 +1679,17 @@ table.dataTable thead th:nth-child(2) select {
             // Show/hide table container based on results
             if (filteredData.length === 0) {
             }
-            
+
+        });
+
+        // "Solo populares" toggle: re-aplica el filtro de tipo activo (filterServicesByType ya
+        // considera el estado del checkbox) y redibuja.
+        $(`#popularToggle-${tableId}`).on('change', function() {
+            const activeFilter = $('.filter-pill.active').data('filter') || 'airport';
+            filteredData = filterServicesByType(activeFilter);
+            dataTable.clear();
+            dataTable.rows.add(filteredData);
+            dataTable.draw();
         });
 
         // Load rates for header filter dropdown
@@ -2972,6 +3022,11 @@ table.dataTable thead th:nth-child(2) select {
             deleteService(serviceId, origin, destination);
         });
 
+        // Toggle popular
+        $(`#${tableId}`).on('click', '.toggle-popular-btn', function() {
+            toggleServicePopular($(this).data('id'), $(this).data('current-popular'), $(this).data('name'), this);
+        });
+
         // Save service
         $('#saveServiceBtn').on('click', function() {
             saveService();
@@ -4128,6 +4183,50 @@ table.dataTable thead th:nth-child(2) select {
                         showAlert('danger', error);
                     }
                 });
+            });
+        }
+
+        function toggleServicePopular(serviceId, currentPopular, routeName, btnEl) {
+            // data-current-popular arrives as boolean or the string "true"/"false"
+            const isPopular = currentPopular === true || currentPopular === 'true';
+            const newPopular = !isPopular;
+
+            // Loader: swap the heart for a spinner and lock the button while it saves.
+            const $btn = btnEl ? $(btnEl) : null;
+            let originalHtml = null;
+            if ($btn && !$btn.prop('disabled')) {
+                originalHtml = $btn.html();
+                $btn.prop('disabled', true)
+                    .html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width:14px;height:14px;"></span>');
+            }
+            const restoreBtn = function() {
+                if ($btn && originalHtml !== null) {
+                    $btn.prop('disabled', false).html(originalHtml);
+                }
+            };
+
+            $.ajax({
+                url: `${apiEndpoint.split('?')[0]}/${serviceId}/popular`,
+                type: 'PATCH',
+                contentType: 'application/json',
+                data: JSON.stringify({ popular: newPopular }),
+                success: function(response) {
+                    if (response.success) {
+                        // initializeTable redraws with fresh data (heart color updates).
+                        initializeTable();
+                        showAlert('success', newPopular
+                            ? `"${routeName}" marcado como popular`
+                            : `"${routeName}" removido de populares`);
+                    } else {
+                        restoreBtn();
+                        showAlert('danger', response.error || 'Error al actualizar el estado popular');
+                    }
+                },
+                error: function(xhr) {
+                    restoreBtn();
+                    const error = xhr.responseJSON?.error || 'Error al actualizar el estado popular';
+                    showAlert('danger', error);
+                }
             });
         }
 
