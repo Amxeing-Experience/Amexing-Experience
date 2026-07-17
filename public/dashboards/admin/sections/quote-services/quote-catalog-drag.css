@@ -81,6 +81,21 @@
     color: #fff;
 }
 
+/* Buscador (más grande) y filtro por destino */
+#catalogOffcanvas .catalog-search-input {
+    font-size: 0.95rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: 9px;
+}
+
+#catalogOffcanvas .catalog-filter-select {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 9px;
+    color: #4f5838;
+    background-color: #fbfbf9;
+}
+
 /* Drag Items */
 .catalog-drag-item {
     display: flex;

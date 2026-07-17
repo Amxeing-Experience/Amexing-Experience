@@ -41,9 +41,12 @@
             <!-- Experiences Tab -->
             <div class="tab-pane fade show active" id="catalogPaneExperiences" role="tabpanel">
                 <div class="p-3 pb-2">
-                    <input type="text" class="form-control form-control-sm" id="catalogSearchExperiences" placeholder="Buscar experiencia...">
+                    <input type="text" class="form-control catalog-search-input mb-2" id="catalogSearchExperiences" placeholder="Buscar experiencia...">
+                    <select class="form-select catalog-filter-select" id="catalogFilterDestination" title="Filtrar por destino">
+                        <option value="all">Todos los destinos</option>
+                    </select>
                 </div>
-                <div class="catalog-drag-items-list px-3 pb-3" id="catalogExperiencesList" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+                <div class="catalog-drag-items-list px-3 pb-3" id="catalogExperiencesList" style="max-height: calc(100vh - 270px); overflow-y: auto;">
                     <div class="text-center text-muted py-3">
                         <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
                     </div>

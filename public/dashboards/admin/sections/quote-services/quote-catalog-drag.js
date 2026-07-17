@@ -19,6 +19,7 @@ class DragCatalogManager {
     this.transportServicesCache = [];
     this.tourTypeFilter = 'all'; // Track current tour filter
     this.tourSearchQuery = ''; // Track current search query
+    this.destinationFilter = 'all'; // Filtro por destino (experiencias)
 
     if (!this.offcanvasEl) {
       return;
@@ -104,14 +105,14 @@ class DragCatalogManager {
     let html = '';
     let count = 0;
 
-    // Collect all experiences (regulares + de proveedor) con su categoría.
+    // Collect all experiences (regulares + de proveedor) con su categoría y destino.
     const allExps = [];
 
     // Regular experiences (type === 'Experience')
     const experiences = this.builder.experiencesCache.get('all') || [];
     experiences.forEach((exp) => {
       if (!exp.name || exp.active === false || exp.type !== 'Experience') return;
-      allExps.push({ id: exp.objectId || exp.id, name: exp.name, subLabel: null, category: exp.experience_category || '' });
+      allExps.push({ id: exp.objectId || exp.id, name: exp.name, subLabel: null, category: exp.experience_category || '', destination: (exp.destinationPOI && exp.destinationPOI.name) || '' });
     });
 
     // Provider experiences
@@ -120,13 +121,24 @@ class DragCatalogManager {
       if (!exp.name || !exp.provider || !exp.provider.name) return;
       // Only admin and superadmin can see provider names
       const showProvider = window.userRole === 'admin' || window.userRole === 'superadmin';
-      allExps.push({ id: exp.objectId || exp.id, name: exp.name, subLabel: showProvider ? exp.provider.name : null, category: exp.experience_category || '' });
+      allExps.push({ id: exp.objectId || exp.id, name: exp.name, subLabel: showProvider ? exp.provider.name : null, category: exp.experience_category || '', destination: (exp.destinationPOI && exp.destinationPOI.name) || '' });
+    });
+
+    // Poblar el filtro de destino con los destinos distintos (preserva la selección).
+    this.populateDestinationFilter(allExps);
+
+    // Filtrar por destino seleccionado.
+    const df = this.destinationFilter || 'all';
+    const filtered = allExps.filter((e) => {
+      if (df === 'all') return true;
+      if (df === '__nodest__') return !e.destination;
+      return e.destination === df;
     });
 
     // Agrupar por categoría (experience_category). Las sin categoría van al final.
     const NONE = '__none__';
     const groups = new Map();
-    allExps.forEach((e) => {
+    filtered.forEach((e) => {
       const key = e.category || NONE;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(e);
@@ -147,8 +159,34 @@ class DragCatalogManager {
       });
     });
 
-    container.innerHTML = html || '<div class="catalog-empty-state">No hay experiencias disponibles</div>';
+    container.innerHTML = html || '<div class="catalog-empty-state">No hay experiencias para este filtro</div>';
     this.updateBadge('catalogExpCount', count);
+
+    // Re-aplicar la búsqueda de texto vigente sobre lo recién renderizado.
+    const searchEl = document.getElementById('catalogSearchExperiences');
+    if (searchEl && searchEl.value) this.filterItems(searchEl.value, 'catalogExperiencesList');
+  }
+
+  /**
+   * Puebla el <select> de filtro por destino con los destinos distintos de las experiencias.
+   * Solo reconstruye si el set de destinos cambió (para no perder la selección).
+   * @param {Array<object>} allExps - Experiencias con { destination }.
+   * @returns {void}
+   */
+  populateDestinationFilter(allExps) {
+    const sel = document.getElementById('catalogFilterDestination');
+    if (!sel) return;
+    const dests = [...new Set(allExps.map((e) => e.destination).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const hasNoDest = allExps.some((e) => !e.destination);
+    const signature = dests.join('|') + (hasNoDest ? '|__nodest__' : '');
+    if (sel.dataset.built !== signature) {
+      let opts = '<option value="all">Todos los destinos</option>';
+      dests.forEach((d) => { opts += `<option value="${this.escapeHtml(d)}">${this.escapeHtml(d)}</option>`; });
+      if (hasNoDest) opts += '<option value="__nodest__">Sin destino</option>';
+      sel.innerHTML = opts;
+      sel.dataset.built = signature;
+    }
+    sel.value = this.destinationFilter || 'all';
   }
 
   renderTours() {
@@ -374,7 +412,16 @@ class DragCatalogManager {
         el.addEventListener('input', (e) => this.filterItems(e.target.value, container));
       }
     });
-    
+
+    // Filtro por destino (experiencias) — re-renderiza la lista de experiencias.
+    const destSel = document.getElementById('catalogFilterDestination');
+    if (destSel) {
+      destSel.addEventListener('change', (e) => {
+        this.destinationFilter = e.target.value;
+        this.renderExperiences();
+      });
+    }
+
     // Initialize tour type filter buttons
     this.initTourTypeFilter();
   }
