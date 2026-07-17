@@ -66,4 +66,10 @@ router.put('/providers/:providerId/experiencias/reorder', (req, res) => controll
  */
 router.get('/provider-experiences/:id', (req, res) => controller.getProviderExperienciaById(req, res));
 
+/**
+ * PATCH /api/provider-experiencias/:id/popular
+ * Toggle the "popular" curation flag (admin, level 6+).
+ */
+router.patch('/provider-experiencias/:id/popular', jwtMiddleware.requireRoleLevel(6), (req, res) => controller.togglePopular(req, res));
+
 module.exports = router;
