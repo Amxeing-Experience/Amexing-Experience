@@ -784,13 +784,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('infoStartDate').textContent = formatDate(d.startDate);
         document.getElementById('infoEndDate').textContent = formatDate(d.endDate);
         document.getElementById('infoPaymentType').textContent = d.paymentType || '—';
-        // Total recomputed from each service's pricesByType[paymentType] when available so
-        // the reservation reflects the quote's per-service breakdown for the current
-        // payment type. Falls back to the stored d.totalAmount only if no service has
-        // pricesByType (very old data).
-        const headerServicesSubtotal = computeServicesSubtotalByType(d.services, d.paymentType);
-        const headerTotal = headerServicesSubtotal > 0 ? headerServicesSubtotal : (d.totalAmount || 0);
-        document.getElementById('infoTotal').textContent = formatCurrency(headerTotal, d.currency);
+        // Total del encabezado = d.totalAmount persistido (misma fuente que usan agencia/cliente
+        // en su #infoTotal). Ese campo YA incluye los ajustes de reservación —recalculateTotal lo
+        // mantiene en sync con adjustments y el motor de pagos lo actualiza—, así que los 3 roles
+        // muestran el MISMO número. El desglose por método de pago (pricesByType) vive en la card
+        // "Resumen Financiero", no en este encabezado informativo (council L0F0).
+        document.getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency);
 
         // Assignment counter
         const totalSvc = (d.services || []).length;

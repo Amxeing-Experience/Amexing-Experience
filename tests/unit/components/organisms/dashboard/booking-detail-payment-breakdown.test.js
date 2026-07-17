@@ -23,6 +23,23 @@ describe('Booking Detail Fase 3 — módulo compartido', () => {
   });
 });
 
+// council L0F0: el encabezado #infoTotal debe salir de la MISMA fuente en los 3 roles (d.totalAmount,
+// el valor persistido que ya incluye ajustes) para que una reservación con un ajuste muestre el mismo
+// número a admin, agencia y agente. El script embebido no se ejecuta en el cascarón, así que se
+// verifica el literal de la asignación en el HTML renderizado.
+describe('Booking Detail — #infoTotal consistente entre roles (council L0F0)', () => {
+  it.each(['admin', 'department_manager', 'client'])('%s: #infoTotal se llena desde d.totalAmount', async (role) => {
+    const html = await render(role);
+    expect(html).toContain("getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency)");
+  });
+
+  it('admin: el encabezado ya NO recomputa el total sin ajustes (headerTotal eliminado)', async () => {
+    const html = await render('admin');
+    expect(html).not.toContain('const headerTotal =');
+    expect(html).not.toContain("getElementById('infoTotal').textContent = formatCurrency(headerTotal");
+  });
+});
+
 describe('Booking Detail Fase 3 — admin (nivel 6+)', () => {
   let html;
 

@@ -1774,9 +1774,19 @@ class QuoteService {
     // are provided (i.e. called from the service-items save).
     if (serviceItems) {
       reservation.set('serviceItemsSnapshot', serviceItems);
-      const total = serviceItems.total || 0;
-      reservation.set('totalAmount', total);
-      reservation.set('servicesSubtotal', serviceItems.subtotal ?? total);
+      // servicesSubtotal = total de servicios (IVA incluido) que sirve de BASE a los ajustes de
+      // reservación — misma semántica que createReservationFromQuote (servicesSubtotal =
+      // serviceItems.total). recalculateTotal luego netea los ajustes YA EXISTENTES de la
+      // reservación (cargos − descuentos) sobre ese base para producir totalAmount, así una
+      // re-sincronización de una cotización editada NUNCA borra un ajuste aplicado después de crear
+      // la reservación (council L0F1). Se reutiliza la MISMA función que usan addAdjustment/
+      // removeAdjustment para que el campo cacheado quede idéntico por cualquier vía; el motor de
+      // pagos (loadAndCompute) sigue neteando adjustments por su cuenta e ignora este campo, así que
+      // el saldo cobrado nunca dependió de este bug. require diferido: el ciclo con
+      // ReservationController se rompe al ejecutar (no en la carga del módulo).
+      const ReservationController = require('../controllers/api/ReservationController');
+      reservation.set('servicesSubtotal', serviceItems.total || 0);
+      ReservationController.recalculateTotal(reservation);
       if (serviceItems.currency) reservation.set('currency', serviceItems.currency);
       // Tipo de cambio congelado: SOLO se fija si la reservación todavía no tiene snapshot. Una reservación
       // ya creada (posiblemente con pagos registrados) NUNCA cambia su tasa aunque la cotización de origen

@@ -138,6 +138,32 @@ describe('Tipo de cambio USD congelado (integration)', () => {
   const putServiceItems = (quoteId, body) => request(app)
     .put(`/api/quotes/${quoteId}/service-items`).set('Authorization', `Bearer ${adminToken}`).send(body);
 
+  const addAdjustment = (id, body) => request(app)
+    .post(`/api/reservations/${id}/adjustments`).set('Authorization', `Bearer ${adminToken}`).send(body);
+
+  // serviceItems MXN con un `total` de servicios controlable, para verificar el neteo de ajustes en
+  // syncReservationFromQuote (sin la conversión de moneda del caso USD). pricesByType = total en los
+  // 3 métodos para que el precio no dependa del método.
+  const mxnServiceItems = (total) => ({
+    paymentType: 'efectivo',
+    currency: 'MXN',
+    subtotal: total,
+    iva: 0,
+    total,
+    days: [{
+      dayNumber: 1,
+      date: '2026-09-10',
+      concept: 'Día 1',
+      subconcepts: [{
+        type: 'traslado',
+        concept: 'Traslado',
+        total,
+        includeInTotal: true,
+        pricesByType: { efectivo: total, transferencia: total, tarjeta: total },
+      }],
+    }],
+  });
+
   beforeAll(async () => {
     app = require('../../../src/index');
     await new Promise((resolve) => { setTimeout(resolve, 1000); });
@@ -290,6 +316,57 @@ describe('Tipo de cambio USD congelado (integration)', () => {
 
       reservation = await fetchReservation(created.id);
       expect(reservation.get('exchangeRateSnapshot')).toBe(19.25);
+    });
+
+    it('syncReservationFromQuote respeta un ajuste YA existente: totalAmount = nuevoTotal − ajuste (council L0F1)', async () => {
+      const quoteService = new QuoteService();
+      const adminUser = await AuthTestHelper.getUserByRole('admin');
+      // Reservación MXN de $1000 creada desde una cotización.
+      const quote = await createQuoteWithServiceItems(mxnServiceItems(1000));
+      const created = await quoteService.createReservationFromQuote(quote, adminUser);
+
+      let reservation = await fetchReservation(created.id);
+      expect(reservation.get('totalAmount')).toBe(1000);
+      expect(reservation.get('servicesSubtotal')).toBe(1000);
+
+      // Se aplica un descuento de $500 DESPUÉS de crear la reservación (vía el endpoint real, que es
+      // quien llama recalculateTotal). Total esperado: 1000 − 500 = 500.
+      const adj = await addAdjustment(created.id, { type: 'discount', amount: 500, description: 'Cortesía' });
+      expect(adj.status).toBe(200);
+      reservation = await fetchReservation(created.id);
+      expect(reservation.get('totalAmount')).toBe(500);
+
+      // La cotización de origen se re-edita: los servicios ahora suman $1200. Al sincronizar, el
+      // total NO debe volver al crudo $1200 (bug previo): debe conservar el descuento existente
+      // -> 1200 − 500 = 700. Y servicesSubtotal (base con IVA para ajustes) debe reflejar el nuevo $1200.
+      const reedited = mxnServiceItems(1200);
+      quote.set('serviceItems', reedited);
+      await quote.save(null, { useMasterKey: true });
+      const syncResult = await quoteService.syncReservationFromQuote(quote, reedited);
+      expect(syncResult.synced).toBe(true);
+
+      reservation = await fetchReservation(created.id);
+      expect(reservation.get('servicesSubtotal')).toBe(1200);
+      expect(reservation.get('totalAmount')).toBe(700);
+      // El array de ajustes sigue intacto (no se borró, solo se re-neteó sobre el nuevo subtotal).
+      expect((reservation.get('adjustments') || []).length).toBe(1);
+    });
+
+    it('syncReservationFromQuote sin ajustes: totalAmount = total crudo de la cotización (sin regresión)', async () => {
+      const quoteService = new QuoteService();
+      const adminUser = await AuthTestHelper.getUserByRole('admin');
+      const quote = await createQuoteWithServiceItems(mxnServiceItems(800));
+      const created = await quoteService.createReservationFromQuote(quote, adminUser);
+
+      // Re-edición a $950 sin ningún ajuste aplicado: el total sincronizado es el crudo, igual que antes.
+      const reedited = mxnServiceItems(950);
+      quote.set('serviceItems', reedited);
+      await quote.save(null, { useMasterKey: true });
+      await quoteService.syncReservationFromQuote(quote, reedited);
+
+      const reservation = await fetchReservation(created.id);
+      expect(reservation.get('servicesSubtotal')).toBe(950);
+      expect(reservation.get('totalAmount')).toBe(950);
     });
   });
 });
