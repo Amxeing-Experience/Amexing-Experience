@@ -797,6 +797,16 @@ class ItineraryBuilder {
 
     // Experience selection handler
     document.getElementById('experienceSelect')?.addEventListener('change', (e) => {
+      // Nueva experiencia → limpiar los precios por persona para que se autollenen con los del
+      // catálogo de la experiencia seleccionada (el autollenado en handleExperienceSelection es
+      // solo-si-vacío; sin esto quedaban los precios de la experiencia anterior mientras el
+      // "Lista AAAA" sí mostraba los nuevos). No se toca en la restauración de edición.
+      if (!this._restoringExperienceData) {
+        ['adultPrice', 'childPrice', 'noAlcoholPrice'].forEach((id) => {
+          const f = document.getElementById(id);
+          if (f) f.value = '';
+        });
+      }
       this.handleExperienceSelection(e.target.value);
     });
 
