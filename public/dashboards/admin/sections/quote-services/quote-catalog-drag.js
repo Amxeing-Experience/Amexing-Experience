@@ -290,8 +290,10 @@ class DragCatalogManager {
       : '';
     return `
       <div class="catalog-drag-item" draggable="true" data-catalog-id="${id}" data-catalog-type="${type}" title="${this.escapeHtml(name)}">
-        <span class="catalog-drag-name">${this.escapeHtml(name)}</span>
-        ${sub}
+        <div class="catalog-drag-meta">
+          <span class="catalog-drag-name">${this.escapeHtml(name)}</span>
+          ${sub}
+        </div>
         <i class="ti ti-grip-vertical catalog-drag-handle" aria-hidden="true"></i>
       </div>
     `;

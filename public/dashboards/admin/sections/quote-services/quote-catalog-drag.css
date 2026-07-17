@@ -71,8 +71,16 @@
     order: 3;
 }
 
-.catalog-drag-item .catalog-drag-name {
+/* Nombre + proveedor apilados; el bloque ocupa el ancho y deja el grip a la derecha */
+.catalog-drag-item .catalog-drag-meta {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.catalog-drag-item .catalog-drag-name {
     min-width: 0;
     font-size: 0.92rem;
     font-weight: 600;
@@ -84,16 +92,14 @@
     overflow: hidden;
 }
 
-/* Proveedor / establecimiento — texto verde (solo experiencias de proveedor) */
+/* Proveedor / establecimiento — texto verde, en su propia línea y COMPLETO (envuelve si es largo) */
 .catalog-drag-item .catalog-drag-sub {
-    flex-shrink: 0;
-    max-width: 180px;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: #6E7A50;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 /* Encabezado de categoría (agrupación de experiencias por tipo) */
