@@ -16246,9 +16246,19 @@ class ItineraryBuilder {
       // (con split de recargo) y podía diverger del precio guardado; ahora coincide 1:1.
       items.push(...this.collectServiceBreakdownItemsFromDev());
 
-      // Indicador de precios personalizados (si aplica)
-      const isPriceOverride = document.getElementById('experienceOverridePrices')?.checked || false;
-      if (isPriceOverride && this.canEditPrices) {
+      // Indicador de precios personalizados: SOLO si algún precio por persona difiere del
+      // catálogo/lista. (El override está forzado ON por "precio siempre editable", así que no
+      // sirve como señal.) Misma detección que computeServiceIsCustomPrice; campo vacío = no custom.
+      const expCat = (this.calculatedPrices && this.calculatedPrices.experience) || {};
+      const expDiff = (a, b) => a != null && b != null && Math.abs(Number(a) - Number(b)) > 0.01;
+      const expVal = (id) => {
+        const v = document.getElementById(id)?.value;
+        return (v === '' || v == null) ? null : parseFloat(v);
+      };
+      const expIsCustom = expDiff(expVal('adultPrice'), expCat.adult)
+        || expDiff(expVal('childPrice'), expCat.child)
+        || expDiff(expVal('noAlcoholPrice'), expCat.noAlcohol);
+      if (expIsCustom && this.canEditPrices) {
         items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precios personalizados</span>', amountMXN: 0 });
       }
     } else if (serviceType === 'a-disposicion') {
