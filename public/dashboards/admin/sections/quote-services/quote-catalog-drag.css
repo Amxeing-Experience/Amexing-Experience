@@ -207,14 +207,14 @@
 }
 
 .catalog-transport-route {
-    font-size: 0.85rem;
+    font-size: 0.92rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .catalog-transport-origin {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: #6c757d;
     white-space: nowrap;
     overflow: hidden;
@@ -222,8 +222,8 @@
 }
 
 .catalog-transport-destination {
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-size: 0.92rem;
+    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
