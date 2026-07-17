@@ -104,14 +104,14 @@ class DragCatalogManager {
     let html = '';
     let count = 0;
 
-    // Collect all experiences into a single array for sorting
+    // Collect all experiences (regulares + de proveedor) con su categoría.
     const allExps = [];
 
     // Regular experiences (type === 'Experience')
     const experiences = this.builder.experiencesCache.get('all') || [];
     experiences.forEach((exp) => {
       if (!exp.name || exp.active === false || exp.type !== 'Experience') return;
-      allExps.push({ id: exp.objectId || exp.id, name: exp.name, icon: 'ti-beach', subLabel: null });
+      allExps.push({ id: exp.objectId || exp.id, name: exp.name, subLabel: null, category: exp.experience_category || '' });
     });
 
     // Provider experiences
@@ -120,15 +120,31 @@ class DragCatalogManager {
       if (!exp.name || !exp.provider || !exp.provider.name) return;
       // Only admin and superadmin can see provider names
       const showProvider = window.userRole === 'admin' || window.userRole === 'superadmin';
-      allExps.push({ id: exp.objectId || exp.id, name: exp.name, icon: 'ti-beach', subLabel: showProvider ? exp.provider.name : null });
+      allExps.push({ id: exp.objectId || exp.id, name: exp.name, subLabel: showProvider ? exp.provider.name : null, category: exp.experience_category || '' });
     });
 
-    // Sort alphabetically A-Z
-    allExps.sort((a, b) => a.name.localeCompare(b.name));
+    // Agrupar por categoría (experience_category). Las sin categoría van al final.
+    const NONE = '__none__';
+    const groups = new Map();
+    allExps.forEach((e) => {
+      const key = e.category || NONE;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(e);
+    });
+    const labelOf = (k) => (k === NONE ? 'Sin categoría' : this.categoryLabel(k));
+    const keys = [...groups.keys()].sort((a, b) => {
+      if (a === NONE) return 1;
+      if (b === NONE) return -1;
+      return labelOf(a).localeCompare(labelOf(b));
+    });
 
-    allExps.forEach((exp) => {
-      html += this.renderDraggableItem(exp.id, exp.name, 'experience', exp.icon, exp.subLabel);
-      count++;
+    keys.forEach((k) => {
+      const items = groups.get(k).sort((a, b) => a.name.localeCompare(b.name));
+      html += `<div class="catalog-cat-header">${this.escapeHtml(labelOf(k))}<span class="catalog-cat-count">${items.length}</span></div>`;
+      items.forEach((e) => {
+        html += this.renderDraggableItem(e.id, e.name, 'experience', null, e.subLabel);
+        count++;
+      });
     });
 
     container.innerHTML = html || '<div class="catalog-empty-state">No hay experiencias disponibles</div>';
@@ -267,17 +283,41 @@ class DragCatalogManager {
   }
 
   renderDraggableItem(id, name, type, icon, subLabel) {
-    const badge = subLabel
-      ? `<span class="catalog-drag-badge badge bg-light text-muted">${subLabel}</span>`
+    // Estilo lista: nombre truncado a 1 línea (tooltip con el nombre completo), sublabel y
+    // grip a la derecha. Sin ícono decorativo a la izquierda. `icon` se conserva por firma.
+    const sub = subLabel
+      ? `<span class="catalog-drag-sub">${this.escapeHtml(subLabel)}</span>`
       : '';
     return `
       <div class="catalog-drag-item" draggable="true" data-catalog-id="${id}" data-catalog-type="${type}" title="${this.escapeHtml(name)}">
-        <i class="ti ti-grip-vertical catalog-drag-handle"></i>
-        <i class="ti ${icon} catalog-drag-icon"></i>
         <span class="catalog-drag-name">${this.escapeHtml(name)}</span>
-        ${badge}
+        ${sub}
+        <i class="ti ti-grip-vertical catalog-drag-handle" aria-hidden="true"></i>
       </div>
     `;
+  }
+
+  /**
+   * Etiqueta legible del tipo de experiencia (experience_category). Prefiere el nombre
+   * dinámico (window.ExperienceCategories, si está cargado) y cae a un mapa estático.
+   * @param {string} value - Código de categoría.
+   * @returns {string} Etiqueta.
+   */
+  categoryLabel(value) {
+    if (window.ExperienceCategories && typeof window.ExperienceCategories.labelFor === 'function') {
+      const dyn = window.ExperienceCategories.labelFor(value);
+      if (dyn) return dyn;
+    }
+    const LABELS = {
+      catas: 'Catas',
+      arte: 'Arte',
+      historia_arquitectura: 'Historia y Arquitectura',
+      gastronomicas: 'Gastronómicas',
+      aventura: 'Aventura',
+      naturaleza: 'Naturaleza',
+      de_temporada: 'De Temporada',
+    };
+    return LABELS[value] || value;
   }
 
   updateBadge(elementId, count) {
