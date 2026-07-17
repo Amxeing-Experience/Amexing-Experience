@@ -155,6 +155,7 @@ class AdminController extends RoleBasedController {
         email: client.email || client.get?.('email'),
         username: client.username || client.get?.('username'),
         phone: client.phone || client.get?.('phone'),
+        phoneCountry: client.phoneCountry || client.get?.('phoneCountry') || null,
         active: typeof client.active !== 'undefined' ? client.active : client.get?.('active'),
         companyName:
           client.companyName
