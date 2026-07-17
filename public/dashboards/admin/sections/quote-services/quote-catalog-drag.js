@@ -176,13 +176,29 @@ class DragCatalogManager {
   populateDestinationFilter(allExps) {
     const sel = document.getElementById('catalogFilterDestination');
     if (!sel) return;
-    const dests = [...new Set(allExps.map((e) => e.destination).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-    const hasNoDest = allExps.some((e) => !e.destination);
-    const signature = dests.join('|') + (hasNoDest ? '|__nodest__' : '');
+
+    // Contar experiencias por destino (solo destinos con al menos una).
+    const counts = new Map();
+    let noDest = 0;
+    allExps.forEach((e) => {
+      if (e.destination) counts.set(e.destination, (counts.get(e.destination) || 0) + 1);
+      else noDest += 1;
+    });
+    const dests = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+
+    // Sin destinos reales, el filtro no aporta → ocultarlo.
+    if (dests.length === 0) {
+      sel.style.display = 'none';
+      this.destinationFilter = 'all';
+      return;
+    }
+    sel.style.display = '';
+
+    const signature = dests.map((d) => `${d}:${counts.get(d)}`).join('|') + (noDest ? `|__nodest__:${noDest}` : '');
     if (sel.dataset.built !== signature) {
       let opts = '<option value="all">Todos los destinos</option>';
-      dests.forEach((d) => { opts += `<option value="${this.escapeHtml(d)}">${this.escapeHtml(d)}</option>`; });
-      if (hasNoDest) opts += '<option value="__nodest__">Sin destino</option>';
+      dests.forEach((d) => { opts += `<option value="${this.escapeHtml(d)}">${this.escapeHtml(d)} (${counts.get(d)})</option>`; });
+      if (noDest) opts += `<option value="__nodest__">Sin destino (${noDest})</option>`;
       sel.innerHTML = opts;
       sel.dataset.built = signature;
     }
