@@ -20,6 +20,7 @@ class DragCatalogManager {
     this.tourTypeFilter = 'all'; // Track current tour filter
     this.tourSearchQuery = ''; // Track current search query
     this.destinationFilter = 'all'; // Filtro por destino (experiencias)
+    this.transportTypeFilter = 'all'; // Filtro por tipo de transporte (aeropuerto/punto-a-punto/local)
 
     if (!this.offcanvasEl) {
       return;
@@ -296,6 +297,7 @@ class DragCatalogManager {
 
     Object.entries(groups).forEach(([groupKey, group]) => {
       if (group.items.length === 0) return;
+      if (this.transportTypeFilter !== 'all' && groupKey !== this.transportTypeFilter) return;
 
       html += `<div class="catalog-transport-group-header"><i class="ti ${group.icon} me-1"></i>${group.label}</div>`;
 
@@ -305,8 +307,12 @@ class DragCatalogManager {
       });
     });
 
-    container.innerHTML = html || '<div class="catalog-empty-state">No hay servicios de transporte disponibles</div>';
+    container.innerHTML = html || '<div class="catalog-empty-state">No hay servicios de transporte para este filtro</div>';
     this.updateBadge('catalogTransportCount', totalCount);
+
+    // Re-aplicar la búsqueda de texto vigente sobre lo recién renderizado.
+    const searchEl = document.getElementById('catalogSearchTransport');
+    if (searchEl && searchEl.value) this.filterItems(searchEl.value, 'catalogTransportList');
   }
 
   renderTransportItem(service, isLocal = false) {
@@ -448,6 +454,15 @@ class DragCatalogManager {
       button.addEventListener('change', (e) => {
         this.tourTypeFilter = e.target.value;
         this.renderTours();
+      });
+    });
+
+    // Filtro por tipo de transporte (aeropuerto / punto-a-punto / local)
+    const transportFilterButtons = document.querySelectorAll('input[name="transportTypeFilter"]');
+    transportFilterButtons.forEach((button) => {
+      button.addEventListener('change', (e) => {
+        this.transportTypeFilter = e.target.value;
+        this.renderTransportServices();
       });
     });
   }

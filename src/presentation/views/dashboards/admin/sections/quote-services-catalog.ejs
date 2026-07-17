@@ -86,8 +86,22 @@
             <div class="tab-pane fade" id="catalogPaneTransport" role="tabpanel">
                 <div class="p-3 pb-2">
                     <input type="text" class="form-control catalog-search-input" id="catalogSearchTransport" placeholder="Buscar transporte...">
+                    <!-- Transport Type Filter -->
+                    <div class="btn-group btn-group-sm w-100 mt-2" role="group" aria-label="Filtro de transporte">
+                        <input type="radio" class="btn-check" name="transportTypeFilter" id="transportFilterAll" value="all" checked>
+                        <label class="btn btn-outline-secondary" for="transportFilterAll"><i class="ti ti-list me-1"></i>Todos</label>
+
+                        <input type="radio" class="btn-check" name="transportTypeFilter" id="transportFilterAeropuerto" value="aeropuerto">
+                        <label class="btn btn-outline-secondary" for="transportFilterAeropuerto"><i class="ti ti-plane me-1"></i>Aeropuerto</label>
+
+                        <input type="radio" class="btn-check" name="transportTypeFilter" id="transportFilterPunto" value="punto-a-punto">
+                        <label class="btn btn-outline-secondary" for="transportFilterPunto"><i class="ti ti-arrows-exchange me-1"></i>Punto a Punto</label>
+
+                        <input type="radio" class="btn-check" name="transportTypeFilter" id="transportFilterLocal" value="local">
+                        <label class="btn btn-outline-secondary" for="transportFilterLocal"><i class="ti ti-map-pin me-1"></i>Local</label>
+                    </div>
                 </div>
-                <div class="catalog-drag-items-list px-3 pb-3" id="catalogTransportList" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+                <div class="catalog-drag-items-list px-3 pb-3" id="catalogTransportList" style="max-height: calc(100vh - 240px); overflow-y: auto;">
                     <div class="text-center text-muted py-3">
                         <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
                     </div>
