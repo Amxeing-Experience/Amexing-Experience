@@ -182,4 +182,19 @@ router.delete(
   (req, res) => ExperienceController.deleteExperience(req, res)
 );
 
+/**
+ * PATCH /api/experiences/:id/popular - Toggle "popular" curation flag.
+ *
+ * Access: Admin (level 6+)
+ * Body: { popular: boolean }
+ * Returns: { id, popular }
+ */
+router.patch(
+  '/:id/popular',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ExperienceController.togglePopular(req, res)
+);
+
 module.exports = router;

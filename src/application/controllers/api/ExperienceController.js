@@ -352,6 +352,71 @@ class ExperienceController {
   }
 
   /**
+   * PATCH /api/experiences/:id/popular - Toggle the "popular" flag (admin curation).
+   * Popular items are surfaced as a quick-view section for certain end clients.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   */
+  async togglePopular(req, res) {
+    try {
+      const currentUser = req.user;
+      const experienceId = req.params.id;
+
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      if (!experienceId) {
+        return this.sendError(res, 'Experience ID is required', 400);
+      }
+
+      const popular = req.body && (req.body.popular === true || req.body.popular === 'true');
+
+      const query = new Parse.Query('Experience');
+      query.equalTo('exists', true);
+      // Only touch the current (non-versioned) record - price versioning
+      query.doesNotExist('valid_until');
+
+      const experience = await query.get(experienceId, { useMasterKey: true });
+
+      if (!experience) {
+        return this.sendError(res, 'Experience not found', 404);
+      }
+
+      experience.set('popular', popular);
+      await experience.save(null, { useMasterKey: true });
+
+      logger.info('Experience popular flag toggled', {
+        experienceId,
+        popular,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: { id: experience.id, popular },
+      });
+    } catch (error) {
+      logger.error('Error in ExperienceController.togglePopular', {
+        error: error.message,
+        experienceId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      if (error.code === Parse.Error.OBJECT_NOT_FOUND) {
+        return this.sendError(res, 'Experience not found', 404);
+      }
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to update experience',
+        500
+      );
+    }
+  }
+
+  /**
    * POST /api/experiences - Create new experience.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
@@ -1980,6 +2045,7 @@ class ExperienceController {
       totalItemCount: includedExperiences.length + includedProviderExperiences.length + includedTours.length,
       availability: experience.get('availability') || null,
       fixed_schedule: experience.get('fixed_schedule') === true,
+      popular: experience.get('popular') === true,
       photos,
       active: experience.get('active'),
       createdAt: experience.createdAt,
