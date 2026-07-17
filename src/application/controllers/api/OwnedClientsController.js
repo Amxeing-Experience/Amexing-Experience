@@ -98,6 +98,7 @@ class OwnedClientsController {
       // 'amexing' para clientes directos de Amexing.
       organizationId: data.organizationId || 'amexing',
       phone: data.phone,
+      phoneCountry: data.phoneCountry, // ISO del país del teléfono (p. ej. 'MX')
       birthDate: data.birthDate,
       notes: data.notes,
       contextualData: {},
@@ -290,6 +291,7 @@ class OwnedClientsController {
           // lanza "Requested unknown parameter 'phone'" cuando el campo está vacío).
           email: client.get('email') || '',
           phone: client.get('phone') || '',
+          phoneCountry: client.get('phoneCountry') || '',
           contactPerson: client.get('contactPerson') || '',
           companyType: client.get('companyType') || '',
           active: client.get('active') === true,
@@ -356,6 +358,7 @@ class OwnedClientsController {
         email: client.get('email') || '',
         contactPerson: client.get('contactPerson') || '',
         phone: client.get('phone') || '',
+        phoneCountry: client.get('phoneCountry') || '',
       }));
 
       return res.json({
@@ -414,6 +417,7 @@ class OwnedClientsController {
         lastName: client.get('lastName') || '',
         email: client.get('email') || '',
         phone: client.get('phone') || '',
+        phoneCountry: client.get('phoneCountry') || '',
         contactFirstName: client.get('contactFirstName') || '',
         contactLastName: client.get('contactLastName') || '',
         emergencyContactName: client.get('emergencyContactName') || '',
@@ -505,7 +509,7 @@ class OwnedClientsController {
         // Name fields (separated)
         firstName, lastName,
         // Contact fields
-        email, phone,
+        email, phone, phoneCountry,
         contactFirstName, contactLastName,
         emergencyContactName, emergencyContactPhone,
         // Company fields
@@ -579,6 +583,7 @@ class OwnedClientsController {
           lastName,
           email,
           phone,
+          phoneCountry,
           contactFirstName,
           contactLastName,
           emergencyContactName,
@@ -889,7 +894,7 @@ class OwnedClientsController {
         // Name fields (separated)
         firstName, lastName,
         // Contact fields
-        email, phone,
+        email, phone, phoneCountry,
         contactFirstName, contactLastName,
         emergencyContactName, emergencyContactPhone,
         // Company fields
@@ -967,6 +972,7 @@ class OwnedClientsController {
       if (name !== undefined) client.set('name', name);
       if (email !== undefined) client.set('email', email);
       if (phone !== undefined) client.set('phone', phone);
+      if (phoneCountry !== undefined) client.set('phoneCountry', phoneCountry);
       if (contactPerson !== undefined) client.set('contactPerson', contactPerson);
       if (companyName !== undefined) client.set('companyName', companyName);
       if (companyType !== undefined) client.set('companyType', companyType);
