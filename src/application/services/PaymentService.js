@@ -31,6 +31,7 @@ const ExchangeRate = require('../../domain/models/ExchangeRate');
 const logger = require('../../infrastructure/logger');
 // Solo se importa el redondeo a efectivo (múltiplo de 5). No se modifica el motor.
 const { applyCashRounding } = require('../../domain/pricing/pricingEngine');
+const { withReservationLock } = require('../../infrastructure/concurrency/reservationLock');
 
 /**
  * Round to 2 decimals (currency precision).
@@ -526,32 +527,38 @@ class PaymentService {
    * await PaymentService.recalculate(reservationId);
    */
   static async recalculate(reservationId) {
-    try {
-      const computed = await this.loadAndCompute(reservationId);
-      const { reservation } = computed;
-      const summary = this.buildSummary(reservationId, computed);
+    // Serializa el read-compute-write por reservación: dos recálculos casi simultáneos para la MISMA
+    // reservación corren en fila (no en paralelo), de modo que el último lee el estado ya persistido
+    // por el anterior y ningún pago se pierde por un last-write-wins. Distintas reservaciones no se
+    // bloquean entre sí. Lock in-process (ver reservationLock: no cubre PM2 cluster multi-worker).
+    return withReservationLock(reservationId, async () => {
+      try {
+        const computed = await this.loadAndCompute(reservationId);
+        const { reservation } = computed;
+        const summary = this.buildSummary(reservationId, computed);
 
-      reservation.set('paidAmount', summary.paidAmount);
-      reservation.set('balance', summary.balance);
-      reservation.set('paymentStatus', summary.paymentStatus);
+        reservation.set('paidAmount', summary.paidAmount);
+        reservation.set('balance', summary.balance);
+        reservation.set('paymentStatus', summary.paymentStatus);
 
-      await reservation.save(null, { useMasterKey: true });
+        await reservation.save(null, { useMasterKey: true });
 
-      logger.info('Reservation payment status recalculated', {
-        reservationId,
-        paidAmount: summary.paidAmount,
-        total: summary.total,
-        paymentStatus: summary.paymentStatus,
-      });
+        logger.info('Reservation payment status recalculated', {
+          reservationId,
+          paidAmount: summary.paidAmount,
+          total: summary.total,
+          paymentStatus: summary.paymentStatus,
+        });
 
-      return summary;
-    } catch (error) {
-      logger.error('Error recalculating reservation payment status', {
-        reservationId,
-        error: error.message,
-      });
-      throw error;
-    }
+        return summary;
+      } catch (error) {
+        logger.error('Error recalculating reservation payment status', {
+          reservationId,
+          error: error.message,
+        });
+        throw error;
+      }
+    });
   }
 }
 

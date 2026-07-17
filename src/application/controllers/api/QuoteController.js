@@ -24,6 +24,11 @@ const fileStorageService = new FileStorageService({
   presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
 });
 
+// Tolerancia (MXN) de divergencia entre lo que el front envía y lo que el motor de precios recalcula
+// al guardar service-items (costura #1). Hasta $1.00 se acepta como redondeo normal (solo se loggea);
+// una divergencia mayor rechaza el guardado, porque esos centavos se acumulan en pérdidas reales.
+const PRICE_MISMATCH_TOLERANCE = 1.00;
+
 /**
  * Batch fetch primary images for a list of item IDs.
  * Works with TourImage, ExperienceImage, VehicleImage, etc.
@@ -2189,59 +2194,43 @@ class QuoteController {
         }
       }
 
-      // Consistencia de totales (costura #1 — backend, motor único). SOLO OBSERVA: re-verifica
-      // con el motor que los números del front sean consistentes y loggea divergencias; NO
-      // cambia valores ni bloquea el guardado (prioridad: que funcione). Usa solo los datos del
-      // payload (sin fetches extra a la BD) para no afectar el rendimiento.
+      // Consistencia de totales (costura #1 — backend, motor único). Re-verifica con el motor que los
+      // números del front cuadren, usando solo los datos del payload (sin fetches extra a la BD).
+      // Divergencias de centavos (redondeo normal) solo se loggean y siguen guardando; una divergencia
+      // mayor a PRICE_MISMATCH_TOLERANCE ($1.00) RECHAZA el guardado — ocurre ANTES del query/save de
+      // la cotización, así que nada se persiste si se rechaza.
       try {
-        const pricingEngine = require('../../../domain/pricing/pricingEngine');
-        const r2 = pricingEngine.round2;
-
-        // 1) Subtotal vs suma de los totales de los subconcepts (lo que realmente se cobra),
-        //    y por-subconcept que su total coincida con pricesByType[forma de pago].
-        let sumOfSubconceptTotals = 0;
-        let subconceptMismatches = 0;
-        days.forEach((day) => {
-          (day.subconcepts || []).forEach((sc) => {
-            if (sc.includeInTotal === false) return;
-            const scTotal = parseFloat(sc.total) || 0;
-            sumOfSubconceptTotals += scTotal;
-            if (sc.pricesByType && typeof sc.pricesByType === 'object') {
-              const expected = parseFloat(sc.pricesByType[paymentType]);
-              if (!Number.isNaN(expected) && Math.abs(r2(expected) - r2(scTotal)) > 0.01) {
-                subconceptMismatches += 1;
-              }
-            }
-          });
+        const consistency = this.evaluateTotalsConsistency({
+          days, subtotal, iva, total, paymentType,
         });
-        sumOfSubconceptTotals = r2(sumOfSubconceptTotals);
-        const subtotalRounded = r2(subtotal);
-        if (Math.abs(sumOfSubconceptTotals - subtotalRounded) > 0.01) {
+
+        if (consistency.subtotalDiff > 0.01) {
           logger.warn('⚠️ Inconsistencia de subtotal (front vs suma de subconcepts)', {
             quoteId,
-            subtotalRecibido: subtotalRounded,
-            sumaSubconcepts: sumOfSubconceptTotals,
-            diferencia: r2(subtotalRounded - sumOfSubconceptTotals),
+            subtotalRecibido: consistency.subtotalRounded,
+            sumaSubconcepts: consistency.sumOfSubconceptTotals,
+            diferencia: consistency.subtotalSignedDiff,
             paymentType,
             currency,
           });
         }
-        if (subconceptMismatches > 0) {
+        if (consistency.subconceptMismatches > 0) {
           logger.warn('⚠️ Subconcepts cuyo total no coincide con pricesByType[formaPago]', {
-            quoteId, count: subconceptMismatches, paymentType,
+            quoteId, count: consistency.subconceptMismatches, paymentType,
+          });
+        }
+        if (consistency.totalDiff > 0.01) {
+          logger.warn('⚠️ Inconsistencia de total (subtotal + IVA vs total recibido)', {
+            quoteId,
+            subtotal: consistency.subtotalRounded,
+            iva: consistency.ivaRounded,
+            totalEsperado: consistency.totalEsperado,
+            totalRecibido: consistency.totalRecibido,
           });
         }
 
-        // 2) total = subtotal + IVA (coherencia del agregado).
-        const totalEsperado = r2(subtotalRounded + (parseFloat(iva) || 0));
-        if (Math.abs(totalEsperado - r2(total)) > 0.01) {
-          logger.warn('⚠️ Inconsistencia de total (subtotal + IVA vs total recibido)', {
-            quoteId,
-            subtotal: subtotalRounded,
-            iva: r2(parseFloat(iva) || 0),
-            totalEsperado,
-            totalRecibido: r2(total),
-          });
+        if (consistency.rejectMessage) {
+          return this.sendError(res, consistency.rejectMessage, 400);
         }
       } catch (calcErr) {
         logger.warn('No se pudo verificar la consistencia de totales con el motor', { error: calcErr.message });
@@ -4553,6 +4542,89 @@ class QuoteController {
       success: false,
       error,
     });
+  }
+
+  /**
+   * Evalúa la consistencia de totales del payload de service-items contra el motor de precios
+   * (costura #1). Compara el subtotal recibido contra la suma de los totales de subconceptos, y cada
+   * subconcepto contra pricesByType[paymentType]. Es pura: no toca Parse ni loggea. Divergencias de
+   * hasta 0.01 se ignoran; entre 0.01 y PRICE_MISMATCH_TOLERANCE ($1.00) se reportan como warning
+   * (subtotalDiff / subconceptMismatches / totalDiff, para que el controller loggee igual que antes);
+   * una divergencia MAYOR a la tolerancia produce `rejectMessage`, que el controller convierte en 400
+   * sin guardar nada. El límite es inclusivo del lado "está bien": exactamente $1.00 no rechaza.
+   * @param {object} params - Payload numérico ya validado.
+   * @param {Array<object>} params.days - Días con `subconcepts`.
+   * @param {number} params.subtotal - Subtotal recibido del front.
+   * @param {number} params.iva - IVA recibido del front.
+   * @param {number} params.total - Total recibido del front.
+   * @param {string} params.paymentType - Método de pago ancla (llave de pricesByType).
+   * @returns {object} Métricas de divergencia + `rejectMessage` (string|null).
+   * @example
+   * this.evaluateTotalsConsistency({ days, subtotal, iva, total, paymentType });
+   */
+  evaluateTotalsConsistency({
+    days, subtotal, iva, total, paymentType,
+  }) {
+    const pricingEngine = require('../../../domain/pricing/pricingEngine');
+    const r2 = pricingEngine.round2;
+
+    let sumOfSubconceptTotals = 0;
+    let subconceptMismatches = 0;
+    let subconceptHardMismatch = null; // primer subconcepto que supera la tolerancia
+    (Array.isArray(days) ? days : []).forEach((day) => {
+      ((day && day.subconcepts) || []).forEach((sc) => {
+        if (!sc || sc.includeInTotal === false) return;
+        const scTotal = parseFloat(sc.total) || 0;
+        sumOfSubconceptTotals += scTotal;
+        if (sc.pricesByType && typeof sc.pricesByType === 'object') {
+          const expected = parseFloat(sc.pricesByType[paymentType]);
+          if (!Number.isNaN(expected)) {
+            const diff = Math.abs(r2(expected) - r2(scTotal));
+            if (diff > 0.01) {
+              subconceptMismatches += 1;
+              if (diff > PRICE_MISMATCH_TOLERANCE && !subconceptHardMismatch) {
+                subconceptHardMismatch = { concept: sc.concept, diff: r2(diff) };
+              }
+            }
+          }
+        }
+      });
+    });
+
+    sumOfSubconceptTotals = r2(sumOfSubconceptTotals);
+    const subtotalRounded = r2(subtotal);
+    const subtotalSignedDiff = r2(subtotalRounded - sumOfSubconceptTotals);
+    const subtotalDiff = Math.abs(subtotalSignedDiff);
+
+    const ivaRounded = r2(parseFloat(iva) || 0);
+    const totalEsperado = r2(subtotalRounded + ivaRounded);
+    const totalRecibido = r2(total);
+    const totalDiff = Math.abs(totalEsperado - totalRecibido);
+
+    // Se prefiere el mensaje específico del subconcepto (más accionable); si no, el del subtotal.
+    let rejectMessage = null;
+    if (subconceptHardMismatch) {
+      const label = subconceptHardMismatch.concept ? `"${subconceptHardMismatch.concept}"` : 'un servicio';
+      rejectMessage = `El precio de ${label} no coincide con lo calculado `
+        + `(diferencia de $${subconceptHardMismatch.diff.toFixed(2)}). Verifica el precio antes de guardar.`;
+    } else if (subtotalDiff > PRICE_MISMATCH_TOLERANCE) {
+      rejectMessage = `El subtotal ($${subtotalRounded.toFixed(2)}) no coincide con la suma de los servicios `
+        + `($${sumOfSubconceptTotals.toFixed(2)}), diferencia de $${subtotalDiff.toFixed(2)}. `
+        + 'Verifica los precios antes de guardar.';
+    }
+
+    return {
+      subtotalRounded,
+      sumOfSubconceptTotals,
+      subtotalSignedDiff,
+      subtotalDiff,
+      subconceptMismatches,
+      ivaRounded,
+      totalEsperado,
+      totalRecibido,
+      totalDiff,
+      rejectMessage,
+    };
   }
 }
 
