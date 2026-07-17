@@ -818,6 +818,7 @@ const currentPath = '/dashboard/admin/clients';
                     password: document.getElementById('clientPassword').value.trim(),
                     companyName: document.getElementById('companyName').value.trim(),
                     phone: document.getElementById('clientPhone').value.trim() || undefined,
+                    phoneCountry: document.getElementById('clientPhone_country_btn')?.dataset.selectedCountry || undefined,
                     taxId: document.getElementById('clientTaxId').value.trim() || undefined,
                     website: document.getElementById('clientWebsite').value.trim() || undefined,
                     address: {
@@ -858,6 +859,7 @@ const currentPath = '/dashboard/admin/clients';
                     // Contraseña opcional: si se define, el cliente directo podrá iniciar sesión.
                     password: document.getElementById('directClientPassword')?.value || undefined,
                     phone: document.getElementById('directClientPhone').value.trim() || undefined,
+                    phoneCountry: document.getElementById('directClientPhone_country_btn')?.dataset.selectedCountry || undefined,
                     birthDate: document.getElementById('directClientBirthDate')?.value || undefined,
 
                     // Contact information
@@ -1180,6 +1182,19 @@ const currentPath = '/dashboard/admin/clients';
         }
         if (form.querySelector('#editPhone')) {
             form.querySelector('#editPhone').value = clientData.phone || '';
+        }
+        // Restaurar el país del teléfono en el selector (bandera + código + data-selected-country
+        // para que el guardado lo lea). Se lee de la opción del dropdown (no depende del JS del componente).
+        if (clientData.phoneCountry) {
+            const opt = form.querySelector('#editPhone_country_dropdown [data-country="' + clientData.phoneCountry + '"]');
+            const btn = form.querySelector('#editPhone_country_btn');
+            if (opt && btn) {
+                btn.dataset.selectedCountry = clientData.phoneCountry;
+                const flagEl = btn.querySelector('.country-flag');
+                const codeEl = btn.querySelector('.country-code');
+                if (flagEl && opt.dataset.flag) flagEl.textContent = opt.dataset.flag;
+                if (codeEl && opt.dataset.code) codeEl.textContent = opt.dataset.code;
+            }
         }
         
         // Contact Information
@@ -1511,6 +1526,10 @@ const currentPath = '/dashboard/admin/clients';
                 data[key] = value;
             }
         }
+
+        // País del teléfono: el selector es un botón, no un campo del form → leerlo aparte.
+        const editCountryBtn = document.getElementById('editPhone_country_btn');
+        if (editCountryBtn) data.phoneCountry = editCountryBtn.dataset.selectedCountry || undefined;
 
         // Show loading state
         saveBtn.disabled = true;
