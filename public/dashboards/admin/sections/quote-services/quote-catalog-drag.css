@@ -19,20 +19,66 @@
     background: #fff;
 }
 
-/* Tab Styling */
-#catalogTabs .nav-link {
-    font-size: 0.8rem;
-    padding: 0.4rem 0.6rem;
-    color: #6c757d;
+/* Tabs — control segmentado */
+#catalogTabs.catalog-seg {
+    flex-wrap: nowrap;
+    gap: 4px;
+    background: #f1f2ec;
+    border: 1px solid #e6e4dd;
+    border-radius: 12px;
+    padding: 4px;
+    margin: 14px 16px 4px;
 }
 
-#catalogTabs .nav-link.active {
+#catalogTabs.catalog-seg .nav-item {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+#catalogTabs.catalog-seg .nav-link {
+    width: 100%;
+    border: none;
+    border-radius: 9px;
+    font-size: 0.92rem;
     font-weight: 600;
+    padding: 0.5rem 0.4rem;
+    color: #6b7256;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: all 0.12s ease;
 }
 
-#catalogTabs .badge {
-    font-size: 0.65rem;
-    padding: 0.15em 0.4em;
+#catalogTabs.catalog-seg .nav-link i {
+    font-size: 1rem;
+}
+
+#catalogTabs.catalog-seg .nav-link:hover {
+    color: #4f5838;
+    background: rgba(110, 122, 80, 0.08);
+}
+
+#catalogTabs.catalog-seg .nav-link.active {
+    background: #6E7A50;
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(79, 88, 56, 0.25);
+}
+
+#catalogTabs.catalog-seg .badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 0.15em 0.5em;
+    background: rgba(79, 88, 56, 0.12);
+    color: #4f5838;
+}
+
+#catalogTabs.catalog-seg .nav-link.active .badge {
+    background: rgba(255, 255, 255, 0.28);
+    color: #fff;
 }
 
 /* Drag Items */
