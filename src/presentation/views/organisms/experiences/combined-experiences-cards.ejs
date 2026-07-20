@@ -253,10 +253,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Helper function to format experience duration (stored as decimal hours, e.g.
     // 1.5 or 0.75) into a readable "Xh Ymin" string instead of showing ".5h"/".75".
-    function formatDuration(hours) {
-        const h = parseFloat(hours);
-        if (!h || isNaN(h)) return 'No especificada';
-        const totalMinutes = Math.round(h * 60);
+    // Duración de experiencia ahora en MINUTOS (estandarizado; regulares + proveedor/establecimiento).
+    function formatDuration(minutes) {
+        const totalMinutes = Math.round(parseFloat(minutes));
+        if (!totalMinutes || isNaN(totalMinutes)) return 'No especificada';
         const hh = Math.floor(totalMinutes / 60);
         const mm = totalMinutes % 60;
         if (hh > 0 && mm > 0) return `${hh}h ${mm}min`;

@@ -872,8 +872,16 @@ function populateWalkingTourForm(tourData) {
     
     // Set basic fields
     setFieldValue('walkingTourDescription', tour.description || '');
-    setFieldValue('walkingDuration', tour.time ? (tour.time / 60) : '');
-    setFieldValue('walkingAdvanceTime', tour.anticipation || tour.advance_booking_time || '');
+    // Pickers de tiempo (minutos): setear la UI del picker, no solo el input hidden.
+    const setWalkTimePicker = (id, minutes) => {
+        const hidden = document.getElementById(id);
+        const picker = hidden ? hidden.closest('.advance-time-picker') : null;
+        const val = parseInt(minutes, 10) || 0;
+        if (picker && window.AdvanceTimePicker) window.AdvanceTimePicker.set(picker, val);
+        else if (hidden) hidden.value = val || '';
+    };
+    setWalkTimePicker('walkingDuration', tour.time);
+    setWalkTimePicker('walkingAdvanceTime', tour.anticipation || tour.advance_booking_time);
     
     // Walking tour pricing
     setFieldValue('walkingPriceSmall', tour.walkingPriceSmall || tour.walking_price_small || tour.priceSmall || tour.price_small || tour.smallPrice || '');
@@ -882,7 +890,7 @@ function populateWalkingTourForm(tourData) {
     
     // New fields (matching vehicle tour modal)
     setFieldValue('walkingTourType', tour.type || '');
-    setFieldValue('walkingTravelDuration', tour.travel_duration || '');
+    setWalkTimePicker('walkingTravelDuration', tour.travel_duration);
     setFieldValue('walkingMinPeople', tour.min_people || '');
     setFieldValue('walkingMaxPeople', tour.max_people || '');
     setFieldValue('walkingInternalNotes', tour.internal_notes || '');

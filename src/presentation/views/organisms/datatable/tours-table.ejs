@@ -26,6 +26,9 @@ const isDepartmentManager = dtUserRole === 'department_manager';
 const isClient = dtUserRole === 'client';
 %>
 
+<!-- Friendly time picker util (duración / trayecto / anticipación) -->
+<script src="/dashboard/js/utils/advance-time-picker.js"></script>
+
 <style>
 /* Global font size increase for all datatable elements */
 #<%= dtTableId %>,
@@ -448,27 +451,24 @@ table.dataTable tbody tr.hover {
                     <!-- Campos de tiempo -->
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Duración (hrs) <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="tourDuration" min="0" step="0.5"
-                                   placeholder="2.5">
+                            <label class="form-label form-label-sm fw-medium text-success">Duración <span class="text-danger">*</span></label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'tourDuration', showDays: false, presets: [{ label: '2 h', minutes: 120 }, { label: '4 h', minutes: 240 }, { label: '6 h', minutes: 360 }, { label: '8 h', minutes: 480 }] }) %>
                             <div class="form-text">
                                 <small>Tiempo total del tour</small>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Duración Trayecto (min)</label>
-                            <input type="number" class="form-control" id="tourTravelDuration" min="0" step="1" 
-                                   placeholder="60">
+                            <label class="form-label form-label-sm fw-medium text-success">Duración Trayecto</label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'tourTravelDuration', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
                             <div class="form-text">
                                 <small>Tiempo traslado</small>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación (min)</label>
-                            <input type="number" class="form-control" id="tourAdvanceTime" min="0" step="1" 
-                                   placeholder="1440">
+                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación</label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'tourAdvanceTime' }) %>
                             <div class="form-text">
-                                <small>Ej: 1440 = 24hrs</small>
+                                <small>Anticipación mínima para reservar</small>
                             </div>
                         </div>
                     </div>
@@ -2447,6 +2447,10 @@ async function getAccessToken() {
 
             $('#tourModal').modal('show');
             $('#tourForm')[0].reset();
+            // reset() no limpia la UI visible de los pickers de tiempo; forzar a 0.
+            if (window.AdvanceTimePicker) {
+                document.querySelectorAll('#tourForm .advance-time-picker').forEach((p) => window.AdvanceTimePicker.set(p, 0));
+            }
             $('#tourId').val('');
             $('#modalTitle').text(isEdit ? 'Editar Tour' : 'Crear Nuevo Tour');
 
@@ -3320,15 +3324,21 @@ async function getAccessToken() {
                         $('#tourPrice').val(tour.price || '');
                         $('#tourPriceNoAlcohol').val(tour.price_no_alcohol || '');
                         $('#tourPriceChild').val(tour.price_child || '');
-                        $('#tourTravelDuration').val(tour.travel_duration || '');
-                        $('#tourAdvanceTime').val(tour.advance_booking_time || '');
+                        // Helper: setear un picker de tiempo (minutos) preservando fallback.
+                        const setTourTimePicker = (sel, minutes) => {
+                            const hidden = document.querySelector(sel);
+                            const picker = hidden ? hidden.closest('.advance-time-picker') : null;
+                            const val = parseInt(minutes, 10) || 0;
+                            if (picker && window.AdvanceTimePicker) window.AdvanceTimePicker.set(picker, val);
+                            else if (hidden) hidden.value = val || '';
+                        };
+                        setTourTimePicker('#tourTravelDuration', tour.travel_duration);
+                        setTourTimePicker('#tourAdvanceTime', tour.advance_booking_time);
                         $('#tourMinPeople').val(tour.min_people || '');
                         $('#tourMaxPeople').val(tour.max_people || '');
 
-                        // Set time (convert from minutes to hours)
-                        const totalMinutes = tour.time || 0;
-                        const hours = totalMinutes / 60;
-                        $('#tourDuration').val(hours || '');
+                        // Duración total en MINUTOS (picker amigable)
+                        setTourTimePicker('#tourDuration', tour.time);
 
                         // Set array fields
                         if (tour.includes && Array.isArray(tour.includes)) {
@@ -3577,8 +3587,8 @@ async function getAccessToken() {
                     }
                 });
 
-                // Get duration in hours
-                const duration = $('#tourDuration').val() ? parseFloat($('#tourDuration').val()) : null;
+                // Duración total en MINUTOS (picker amigable)
+                const duration = $('#tourDuration').val() ? parseInt($('#tourDuration').val(), 10) : null;
 
                 const tourData = {
                     destinationPOI: destinationPOI,
@@ -3587,7 +3597,7 @@ async function getAccessToken() {
                     price: $('#tourPrice').val() ? parseFloat($('#tourPrice').val()) : null,
                     price_no_alcohol: $('#tourPriceNoAlcohol').val() ? parseFloat($('#tourPriceNoAlcohol').val()) : null,
                     price_child: $('#tourPriceChild').val() ? parseFloat($('#tourPriceChild').val()) : null,
-                    time: duration ? Math.round(duration * 60) : null, // Convert hours to minutes for backend
+                    time: duration ? Math.round(duration) : null, // Ya en minutos (picker)
                     travel_duration: $('#tourTravelDuration').val() ? parseInt($('#tourTravelDuration').val()) : null,
                     advance_booking_time: $('#tourAdvanceTime').val() ? parseInt($('#tourAdvanceTime').val()) : null,
                     min_people: $('#tourMinPeople').val() ? parseInt($('#tourMinPeople').val()) : null,
@@ -5816,6 +5826,17 @@ function openWalkingTourModal() {
         }
     });
 
+    // reset() / value='' no limpian la UI de los pickers de tiempo; forzar a 0 y aplicar defaults.
+    if (window.AdvanceTimePicker) {
+        document.querySelectorAll('#walkingTourForm .advance-time-picker').forEach((p) => window.AdvanceTimePicker.set(p, 0));
+        const wDur = document.getElementById('walkingDuration');
+        const wDurPicker = wDur ? wDur.closest('.advance-time-picker') : null;
+        if (wDurPicker) window.AdvanceTimePicker.set(wDurPicker, 120); // default 2 h
+        const wAdv = document.getElementById('walkingAdvanceTime');
+        const wAdvPicker = wAdv ? wAdv.closest('.advance-time-picker') : null;
+        if (wAdvPicker) window.AdvanceTimePicker.set(wAdvPicker, 1440); // default 24 h
+    }
+
     // Reset availability
     document.querySelectorAll('.walking-day-btn').forEach(btn => {
         btn.classList.remove('active', 'btn-primary');
@@ -5956,7 +5977,7 @@ async function saveWalkingTour() {
         const formData = {
             destinationPOI: destinationPOI,
             description: getFieldValue('walkingTourDescription'),
-            time: parseFloat(getFieldValue('walkingDuration') || '0') * 60, // Convert hours to minutes
+            time: parseInt(getFieldValue('walkingDuration') || '0', 10), // Ya en minutos (picker)
             anticipation: parseInt(getFieldValue('walkingAdvanceTime') || '1440'),
             advance_booking_time: parseInt(getFieldValue('walkingAdvanceTime') || '1440'), // Alternative field name
             walkingPriceSmall: parseFloat(getFieldValue('walkingPriceSmall') || '0'),
@@ -6379,27 +6400,24 @@ function updateWalkingDaySchedules() {
                     <!-- Campos de tiempo -->
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Duracion (hrs) minima <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="walkingDuration" min="0.5" step="0.5"
-                                   placeholder="2" value="2" required>
+                            <label class="form-label form-label-sm fw-medium text-success">Duracion minima <span class="text-danger">*</span></label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'walkingDuration', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
                             <div class="form-text">
                                 <small>Tiempo total del tour a pie</small>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Duracion Trayecto (min)</label>
-                            <input type="number" class="form-control" id="walkingTravelDuration" min="0" step="1"
-                                   placeholder="60">
+                            <label class="form-label form-label-sm fw-medium text-success">Duracion Trayecto</label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'walkingTravelDuration', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
                             <div class="form-text">
                                 <small>Tiempo traslado</small>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipacion (min)</label>
-                            <input type="number" class="form-control" id="walkingAdvanceTime" min="0" step="1"
-                                   placeholder="1440" value="1440">
+                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipacion</label>
+                            <%- include('../../molecules/forms/advance-time-picker', { hiddenId: 'walkingAdvanceTime' }) %>
                             <div class="form-text">
-                                <small>Ej: 1440 = 24hrs</small>
+                                <small>Anticipación mínima para reservar</small>
                             </div>
                         </div>
                     </div>

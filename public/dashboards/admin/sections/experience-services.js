@@ -4347,8 +4347,15 @@ class ExperienceServicesBuilder {
     if (link) {
       link.onclick = (e) => {
         e.preventDefault();
-        const input = document.getElementById('experienceDuration');
-        if (input) input.value = suggested;
+        // La duración ahora se guarda en MINUTOS (picker amigable); la sugerida se calcula en horas.
+        const suggestedMinutes = Math.round(suggested * 60);
+        const hidden = document.getElementById('experienceDuration');
+        const picker = hidden ? hidden.closest('.advance-time-picker') : null;
+        if (picker && window.AdvanceTimePicker) {
+          window.AdvanceTimePicker.set(picker, suggestedMinutes);
+        } else if (hidden) {
+          hidden.value = suggestedMinutes;
+        }
       };
     }
   }
