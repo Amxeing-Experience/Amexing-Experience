@@ -465,19 +465,6 @@ function showErrorAlert(message) {
 // ============================================================================
 
 /**
- * Edit client - open edit modal and populate with client data
- * @param {string} clientId - Client ID
- * @param {string} clientType - Client type (agency or client)
- */
-function editClient(clientId, clientType) {
-    // Dispatch custom event to parent page to handle modal opening
-    // The parent page (admin/clients.ejs) will handle the modal logic
-    document.dispatchEvent(new CustomEvent('openEditClientModal', {
-        detail: { clientId, clientType }
-    }));
-}
-
-/**
  * Toggle client active status
  * @param {string} clientId - Client ID
  * @param {boolean} currentStatus - Current active status
@@ -693,14 +680,6 @@ function setupEventDelegation() {
             const clientType = target.getAttribute('data-client-type');
             const currentStatus = target.getAttribute('data-current-status') === 'true';
             toggleClientStatus(clientId, currentStatus, clientType);
-            return;
-        }
-
-        // Edit button
-        if (target.classList.contains('btn-edit-client')) {
-            const clientId = target.getAttribute('data-client-id');
-            const clientType = target.getAttribute('data-client-type');
-            editClient(clientId, clientType);
             return;
         }
 
