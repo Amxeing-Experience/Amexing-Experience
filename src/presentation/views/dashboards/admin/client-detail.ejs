@@ -20,6 +20,7 @@ const clientData = {
     lastName: client.lastName || '',
     email: client.email || '',
     phone: client.phone || '',
+    phoneCountry: client.phoneCountry || '',
     active: typeof client.active !== 'undefined' ? client.active : true,
     companyName: client.companyName || getNestedProperty(client, 'contextualData.companyName', ''),
     taxId: client.taxId || getNestedProperty(client, 'contextualData.taxId', ''),
