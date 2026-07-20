@@ -14175,7 +14175,8 @@ class ItineraryBuilder {
   fillExperienceFields(experience) {
     // Duración de catálogo de la experiencia — referencia para comparar contra la duración real
     // derivada del horario (updateExperienceDurationFromSchedule).
-    this._experienceCatalogDuration = experience.duration;
+    // El catálogo guarda duración en MINUTOS; el quote builder trabaja en horas → convertir.
+    this._experienceCatalogDuration = experience.duration ? (experience.duration / 60) : experience.duration;
     // Al (re)seleccionar experiencia se limpia el aviso de duración real (el restore lo re-muestra
     // si hay horario que difiere).
     document.getElementById('experienceRealDuration')?.classList.add('d-none');
@@ -14207,7 +14208,8 @@ class ItineraryBuilder {
       // Duración: autollenar del catálogo de la experiencia (editable). Solo NEW; en edición la
       // restauración pone la guardada.
       const expDurationField = document.getElementById('experienceDuration');
-      if (expDurationField) expDurationField.value = experience.duration || '';
+      // Catálogo en MINUTOS → el campo canónico del modal es horas decimales.
+      if (expDurationField) expDurationField.value = experience.duration ? (experience.duration / 60) : '';
       this._syncExperienceDurationInputs(); // reflejar en Horas/Minutos visibles
     } else {
 
@@ -14217,7 +14219,7 @@ class ItineraryBuilder {
     this.buildDetailsCard('experience', {
       title: experience.title || experience.name || '',
       description: experience.description || '',
-      duration: experience.duration ? `${experience.duration} horas` : null,
+      duration: experience.duration ? this.formatMinutesToHoursAndMinutes(experience.duration) : null,
       advanceBooking: experience.advance_booking_time ? this.formatMinutesToHoursAndMinutes(experience.advance_booking_time) : null,
       availabilitySchedule: this.extractAvailabilitySchedule(experience),
       languages: Array.isArray(experience.languages) ? experience.languages.join(', ') : experience.languages,

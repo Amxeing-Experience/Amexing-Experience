@@ -288,7 +288,8 @@ class ExperienceServicesBuilder {
 
     // Duración editable del header: al cambiarla, recalcular en vivo las guías de los
     // tours a pie cobrados "por toda la experiencia" y repintar tarjetas/total/sugerida.
-    document.getElementById('experienceDuration')?.addEventListener('input', () => {
+    // El picker de duración actualiza el hidden y despacha 'change' (no 'input').
+    document.getElementById('experienceDuration')?.addEventListener('change', () => {
       this.recomputeWalkingTourExperienceGuides();
       this.renderServices();
     });
@@ -2547,7 +2548,7 @@ class ExperienceServicesBuilder {
   getWalkingTourHours() {
     const mode = document.getElementById('guideDurationMode')?.value || 'tour';
     if (mode === 'experience') {
-      return parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours();
+      return (parseFloat(document.getElementById('experienceDuration')?.value) / 60) || this.getSuggestedDurationHours();
     }
     return parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
   }
@@ -3842,7 +3843,7 @@ class ExperienceServicesBuilder {
   recomputeWalkingTourExperienceGuides() {
     // Duración del header si está puesta; si no, la duración total sugerida (suma
     // de todos los servicios) — así siempre cubre toda la experiencia.
-    const globalDur = parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours();
+    const globalDur = (parseFloat(document.getElementById('experienceDuration')?.value) / 60) || this.getSuggestedDurationHours();
     this.services.forEach((s) => {
       if (s.type === 'tour' && s.isWalkingTour && s.guideDurationMode === 'experience') {
         const perGroup = parseFloat(s.walkingPerGroup) || 0;
@@ -3948,7 +3949,7 @@ class ExperienceServicesBuilder {
     let svcDurationHours = this.getServiceDurationHours(service);
     let svcDurationLabel = `${svcDurationHours} h`;
     if (service.type === 'tour' && service.isWalkingTour && service.guideDurationMode === 'experience') {
-      const expDur = parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours();
+      const expDur = (parseFloat(document.getElementById('experienceDuration')?.value) / 60) || this.getSuggestedDurationHours();
       svcDurationHours = expDur;
       svcDurationLabel = `${expDur} h (toda la experiencia)`;
     }
@@ -4112,7 +4113,7 @@ class ExperienceServicesBuilder {
     const peopleCount = Math.max(1, parseInt(service.walkingPeopleCount, 10) || 1);
     // Horas del multiplicador: por toda la experiencia (duración global) o por el tour.
     const hours = service.guideDurationMode === 'experience'
-      ? (parseFloat(document.getElementById('experienceDuration')?.value) || this.getSuggestedDurationHours())
+      ? ((parseFloat(document.getElementById('experienceDuration')?.value) / 60) || this.getSuggestedDurationHours())
       : (parseFloat(service.hours) || 1);
     const priceOf = (svc, fb) => (parseFloat(svc) || parseFloat(fb) || 0);
     const tiers = [
