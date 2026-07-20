@@ -114,6 +114,7 @@ class UserManagementService {
         'departmentId',
         'contextualData',
         'phone',
+        'phoneCountry',
         'notes',
         'address',
         'createdAt',
