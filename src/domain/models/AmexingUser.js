@@ -160,6 +160,9 @@ class AmexingUser extends BaseModel {
     if (userData.phone) {
       user.set('phone', userData.phone);
     }
+    if (userData.phoneCountry) {
+      user.set('phoneCountry', userData.phoneCountry); // ISO del país del teléfono (p. ej. 'MX')
+    }
 
     // Additional information
     if (userData.notes) {
