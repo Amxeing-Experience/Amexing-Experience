@@ -328,6 +328,18 @@
         set('directClientLastName', d.lastName);
         set('directClientEmail', d.email);
         set('directClientPhone', d.phone);
+        // Restaurar el país del teléfono en el selector (bandera + código + data-selected-country).
+        if (d.phoneCountry) {
+            var dcBtn = document.getElementById('directClientPhone_country_btn');
+            var dcOpt = document.getElementById('directClientPhone_country_dropdown') && document.getElementById('directClientPhone_country_dropdown').querySelector('[data-country="' + d.phoneCountry + '"]');
+            if (dcBtn && dcOpt) {
+                dcBtn.dataset.selectedCountry = d.phoneCountry;
+                var dcFlag = dcBtn.querySelector('.country-flag');
+                var dcCode = dcBtn.querySelector('.country-code');
+                if (dcFlag && dcOpt.dataset.flag) dcFlag.textContent = dcOpt.dataset.flag;
+                if (dcCode && dcOpt.dataset.code) dcCode.textContent = dcOpt.dataset.code;
+            }
+        }
         if (d.birthDate) { var bd = new Date(d.birthDate); if (!isNaN(bd)) set('directClientBirthDate', bd.toISOString().split('T')[0]); }
         set('directClientContactFirstName', d.contactFirstName);
         set('directClientContactLastName', d.contactLastName);

@@ -41,7 +41,7 @@ var agencyBirth = (data.birthDate && !isNaN(new Date(data.birthDate)))
         </div>
         <div class="row">
             <div class="col-md-6">
-                <%- include('../../atoms/common/phone-input', { name: 'phone', id: 'agencyPhone', label: 'Teléfono', required: false, countryCode: 'MX', placeholder: '999 123 4567', value: data.phone || '' }) %>
+                <%- include('../../atoms/common/phone-input', { name: 'phone', id: 'agencyPhone', label: 'Teléfono', required: false, countryCode: (data && data.phoneCountry) || 'MX', placeholder: '999 123 4567', value: data.phone || '' }) %>
             </div>
             <div class="col-md-6">
                 <%- include('../../atoms/form/datepicker', { name: 'birthDate', id: 'agencyBirthDate', label: 'Fecha de nacimiento', required: false, min: '1900-01-01', max: new Date().toISOString().split('T')[0], value: agencyBirth }) %>
