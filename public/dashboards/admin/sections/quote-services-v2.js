@@ -3984,10 +3984,10 @@ class ItineraryBuilder {
     qsDevLog(document.getElementById('additionalSegmentSelect')?.value || null)
     qsDevLog(document.getElementById('additionalVehicleSelect')?.value || null)
 
-    // Fase 1: descuento por servicio — sobre el precio base efectivo; luego el recargo por forma
-    // de pago. Modifica SOLO pricesByType (fuente de verdad del total/tarjeta vía
-    // getServiceDisplayPrice); los campos de precio y basePrice se quedan SIN descontar para
-    // restaurar bien al editar y no compoundear en re-guardados.
+    // Fase 1: descuento por servicio. SOLO se computa el monto (en efectivo); NO se toca
+    // pricesByType, que queda como base pura. El descuento se resta al mostrar/guardar vía
+    // getServiceDisplayPrice, de modo que la base intacta permite reeditar sin compoundear y el
+    // total guardado/reserva/PDF reflejan el descuento igual que la pantalla.
     let serviceDiscountType = null;
     let serviceDiscountValue = 0;
     let serviceDiscountAmount = 0;
@@ -4001,12 +4001,6 @@ class ItineraryBuilder {
         if (serviceDiscountAmount > 0) {
           serviceDiscountType = dt;
           serviceDiscountValue = dv;
-          const discountedBase = Math.max(0, efBase - serviceDiscountAmount);
-          pricesByType = {
-            efectivo: discountedBase,
-            transferencia: this.getDisplayPriceForType(discountedBase, 'transferencia'),
-            tarjeta: this.getDisplayPriceForType(discountedBase, 'tarjeta'),
-          };
         }
       }
     }
@@ -4015,8 +4009,8 @@ class ItineraryBuilder {
       type,
       price: finalServicePrice,
       basePrice: basePriceEfectivo, // Base efectivo price for recalculation (backward compatibility)
-      pricesByType, // All 3 payment type prices for easy switching (ya con descuento aplicado)
-      // Descuento por servicio (Fase 1): sobre el precio base; el desglose/tarjeta/resumen lo muestran.
+      pricesByType, // All 3 payment type prices for easy switching (base pura, SIN descuento)
+      // Descuento por servicio (Fase 1): se resta al mostrar/guardar (getServiceDisplayPrice).
       discountType: serviceDiscountType, // 'percent' | 'amount' | null
       discountValue: serviceDiscountValue, // valor capturado (10 = 10% o $10)
       discountAmount: serviceDiscountAmount, // monto efectivo descontado (para mostrar)
@@ -20330,8 +20324,11 @@ class ItineraryBuilder {
           const service = this.services.get(serviceId);
           if (!service) return null;
 
-          // Use the price directly from the service - it's already the final calculated price from the modal
-          const servicePrice = service.price || 0;
+          // Precio a guardar = precio de display (pricesByType[forma] menos el descuento por
+          // servicio). Antes se usaba service.price (base SIN descuento), lo que dejaba el total
+          // guardado, el PDF y la reserva sin reflejar el descuento. getServiceDisplayPrice es la
+          // misma fuente que usa el total en pantalla → lo guardado == lo mostrado.
+          const servicePrice = this.getServiceDisplayPrice(service);
           const serviceTotal = servicePrice;
           dayTotal += serviceTotal;
 

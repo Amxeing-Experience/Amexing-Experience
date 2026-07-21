@@ -2127,13 +2127,23 @@
 
         // Helper: Get service price
         getServicePrice(service) {
-            // Use pricesByType if available
+            // pricesByType es la base PURA (sin descuento). El descuento por servicio (Fase 1) se
+            // guarda en efectivo (discountAmount) y se resta aquí, escalado a la forma de pago
+            // (recargo multiplicativo), para que el resumen/reserva muestren el precio descontado.
             if (service.pricesByType && typeof service.pricesByType === 'object' && this.paymentType) {
-                const price = service.pricesByType[this.paymentType];
-                if (price !== undefined) return price;
+                const base = service.pricesByType[this.paymentType];
+                if (base !== undefined) {
+                    const discEf = Number(service.discountAmount) || 0;
+                    const efBase = Number(service.pricesByType.efectivo) || 0;
+                    if (discEf > 0 && efBase > 0) {
+                        const factor = Number(base) / efBase;
+                        return Math.max(0, Number(base) - Math.round(discEf * factor * 100) / 100);
+                    }
+                    return base;
+                }
             }
 
-            // Fallback to base price
+            // Fallback: service.total ya viene con el descuento aplicado al guardar.
             return service.price || service.total || 0;
         }
 
