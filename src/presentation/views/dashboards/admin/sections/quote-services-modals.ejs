@@ -1362,6 +1362,30 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                     </div>
                     <% } %>
 
+                    <!-- Propina por servicio (Fase 2; común a todos los tipos; se suma al total). -->
+                    <% if (canEditPrices) { %>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="applyServiceTip">
+                            <label class="form-check-label" for="applyServiceTip"><i class="ti ti-coin me-1"></i>Agregar propina</label>
+                        </div>
+                        <div id="serviceTipFields" class="d-none mt-2">
+                            <div class="input-group input-group-lg" style="max-width: 460px;">
+                                <select class="form-select" id="serviceTipType" style="max-width: 130px;">
+                                    <option value="percent" selected>%</option>
+                                    <option value="amount">$ MXN</option>
+                                </select>
+                                <input type="number" class="form-control" id="serviceTipValue" placeholder="0" step="0.01" min="0">
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="serviceTipMandatory">
+                                <label class="form-check-label" for="serviceTipMandatory">Propina obligatoria <small class="text-muted">(bloqueada para agentes/clientes)</small></label>
+                            </div>
+                            <small class="text-muted d-block mt-1">El porcentaje se calcula sobre el precio del servicio (ya con descuento) y sube según la forma de pago.</small>
+                        </div>
+                    </div>
+                    <% } %>
+
                     <div id="servicePriceBreakdown" class="d-none mb-3 p-2 bg-light rounded small">
                         <div id="desgloseTitle" class="fw-semibold mb-1 text-muted"><i class="ti ti-list-details me-1"></i>Desglose</div>
                         <div id="breakdownItems"></div>

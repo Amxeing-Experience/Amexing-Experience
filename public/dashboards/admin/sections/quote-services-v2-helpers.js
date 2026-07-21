@@ -809,6 +809,46 @@ ItineraryBuilder.prototype.getServiceDisplayPrice = function (service) {
     return Math.max(0, base - disc);
 };
 
+// Propina por servicio (Fase 2) en la forma de pago dada. Es ADITIVA (se suma al total) y se
+// muestra como línea aparte; NO se hornea en pricesByType. Porcentaje: sobre el precio neto del
+// servicio (ya con descuento) en la forma de pago → escala solo. Monto fijo (capturado en
+// efectivo): TAMBIÉN escala con los mismos recargos que los precios (getDisplayPriceForType).
+ItineraryBuilder.prototype.getServiceTipInPaymentType = function (service, paymentType) {
+    const pt = paymentType || (document.getElementById('priceTypeSelect')?.value || 'efectivo');
+    const type = service && service.tipType;
+    const val = Number(service && service.tipValue) || 0;
+    if (!type || val <= 0) return 0;
+    if (type === 'percent') {
+      const pbt = service.pricesByType;
+      const base = (pbt && pbt[pt] !== undefined) ? (Number(pbt[pt]) || 0) : (Number(service.price) || 0);
+      const net = Math.max(0, base - this.getServiceDiscountInPaymentType(service, pt));
+      return Math.round(net * (val / 100) * 100) / 100;
+    }
+    // Monto fijo (efectivo) escalado a la forma de pago.
+    const scaled = this.getDisplayPriceForType ? this.getDisplayPriceForType(val, pt) : val;
+    return Math.round(scaled * 100) / 100;
+};
+
+// Propina por servicio en EFECTIVO (para persistir como metadata, análogo a discountAmount).
+ItineraryBuilder.prototype.getServiceTipEfectivo = function (service) {
+    return this.getServiceTipInPaymentType(service, 'efectivo');
+};
+
+// Propina GLOBAL de la cotización (Fase 2b). Se lee de this.globalTip ({type, value, mandatory})
+// para que aplique también a no-admins (los controles son admin-only). Base: el subtotal NETO
+// (con descuentos, SIN las propinas por servicio → no se cobra propina sobre propina). El % escala
+// solo (netSubtotal ya está en la forma de pago); el monto fijo se escala con los recargos.
+ItineraryBuilder.prototype.getGlobalTipAmount = function (netSubtotal, paymentType) {
+    const g = this.globalTip;
+    if (!g || !g.type) return 0;
+    const val = Number(g.value) || 0;
+    if (val <= 0) return 0;
+    if (g.type === 'percent') return Math.round((Number(netSubtotal) || 0) * (val / 100) * 100) / 100;
+    const pt = paymentType || (document.getElementById('priceTypeSelect')?.value || 'efectivo');
+    const scaled = this.getDisplayPriceForType ? this.getDisplayPriceForType(val, pt) : val;
+    return Math.round(scaled * 100) / 100;
+};
+
 ItineraryBuilder.prototype.getCorrectPriceForPaymentType = function (subconcept, backendPaymentType = null) {
     // Priority 1: Use backend payment type if provided
     // Priority 2: Use dropdown value

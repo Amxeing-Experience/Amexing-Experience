@@ -1180,6 +1180,76 @@ class ItineraryBuilder {
       });
     });
 
+    // Propina por servicio (Fase 2): toggle de campos + recálculo del desglose.
+    document.getElementById('applyServiceTip')?.addEventListener('change', (e) => {
+      this.serviceModified = true;
+      document.getElementById('serviceTipFields')?.classList.toggle('d-none', !e.target.checked);
+      this.updateServicePriceBreakdown();
+    });
+    ['serviceTipType', 'serviceTipValue', 'serviceTipMandatory'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => {
+        this.serviceModified = true;
+        this.updateServicePriceBreakdown();
+      });
+      document.getElementById(id)?.addEventListener('change', () => {
+        this.serviceModified = true;
+        this.updateServicePriceBreakdown();
+      });
+    });
+
+    // Propina GLOBAL de la cotización (Fase 2b): sincroniza this.globalTip y recalcula el total.
+    const syncGlobalTip = () => {
+      const apply = document.getElementById('applyGlobalTip')?.checked;
+      document.getElementById('globalTipFields')?.classList.toggle('d-none', !apply);
+      if (apply) {
+        const type = document.getElementById('globalTipType')?.value === 'amount' ? 'amount' : 'percent';
+        const value = parseFloat(document.getElementById('globalTipValue')?.value || 0) || 0;
+        const mandatory = document.getElementById('globalTipMandatory')?.checked || false;
+        this.globalTip = value > 0 ? { type, value, mandatory } : null;
+      } else {
+        this.globalTip = null;
+      }
+      this.updateTotals();
+      // Marcar cambios y agendar el autosave: sin esto, la propina global vivía solo en memoria y
+      // no se persistía (al navegar al resumen o recargar se perdía).
+      this.hasUnsavedChanges = true;
+      if (this.scheduleAutoSave) this.scheduleAutoSave();
+    };
+    ['applyGlobalTip', 'globalTipType', 'globalTipValue', 'globalTipMandatory'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('change', syncGlobalTip);
+      document.getElementById(id)?.addEventListener('input', syncGlobalTip);
+    });
+    // El template de totales no recibe canEditPrices; mostramos el control de propina general
+    // solo si el rol puede editar precios (los demás roles ven el efecto en el total, no el control).
+    if (this.canEditPrices) {
+      document.getElementById('globalTipSection')?.classList.remove('d-none');
+      // Fase 2c: el admin puede editar el % sugerido y aplicarlo como propina general.
+      document.getElementById('suggestedTipPctEdit')?.classList.remove('d-none');
+      document.getElementById('suggestedTipPctLabel')?.classList.add('d-none');
+      document.getElementById('applySuggestedTipBtn')?.classList.remove('d-none');
+    }
+    // Fase 2c: cambiar el % sugerido (admin) → persistir y recalcular la nota.
+    const onSuggestedPct = () => {
+      const v = parseFloat(document.getElementById('suggestedTipPct')?.value || 0);
+      this.suggestedTipPct = (Number.isFinite(v) && v >= 0) ? v : 10;
+      this.hasUnsavedChanges = true;
+      if (this.scheduleAutoSave) this.scheduleAutoSave();
+      this.updateTotals();
+    };
+    document.getElementById('suggestedTipPct')?.addEventListener('input', onSuggestedPct);
+    document.getElementById('suggestedTipPct')?.addEventListener('change', onSuggestedPct);
+    // Botón "Aplicar": convierte la sugerencia en propina general (%), reusando el flujo global.
+    document.getElementById('applySuggestedTipBtn')?.addEventListener('click', () => {
+      const pct = Number(this.suggestedTipPct) || 10;
+      const applyEl = document.getElementById('applyGlobalTip');
+      const typeEl = document.getElementById('globalTipType');
+      const valEl = document.getElementById('globalTipValue');
+      if (applyEl) applyEl.checked = true;
+      if (typeEl) typeEl.value = 'percent';
+      if (valEl) valEl.value = pct;
+      syncGlobalTip();
+    });
+
     // Tour start time listener - auto-calculate end time
     document.getElementById('tourStartTime')?.addEventListener('change', () => {
       this.calculateTourEndTime();
@@ -3177,6 +3247,13 @@ class ItineraryBuilder {
       // esto cada pierna heredaba el descuento completo vía {...serviceData} y descontaba de más.
       const splitDiscountAmount = Math.round((Math.abs(parseFloat(serviceData.discountAmount) || 0) / 2) * 100) / 100;
 
+      // Propina por servicio (Fase 2): el % se mantiene igual por pierna (se recalcula sobre el
+      // precio ya /2). El MONTO FIJO sí se divide /2 (es absoluto). tipAmount (efectivo) también /2.
+      const splitTipValue = serviceData.tipType === 'amount'
+        ? Math.round((Math.abs(parseFloat(serviceData.tipValue) || 0) / 2) * 100) / 100
+        : (serviceData.tipValue || 0);
+      const splitTipAmount = Math.round((Math.abs(parseFloat(serviceData.tipAmount) || 0) / 2) * 100) / 100;
+
       // Validation: Check if split prices add up to original (with small tolerance for rounding)
       const priceValidation = {
         originalTotal: originalPrice,
@@ -3218,6 +3295,9 @@ class ItineraryBuilder {
         pricesByType: { ...splitPricesByType },
         // Descuento repartido por pierna (el % se mantiene vía {...serviceData}).
         discountAmount: splitDiscountAmount,
+        // Propina repartida por pierna (tipType/tipMandatory se mantienen vía {...serviceData}).
+        tipValue: splitTipValue,
+        tipAmount: splitTipAmount,
         // Ensure quantity is appropriate for single leg (usually 1)
         quantity: 1,
       };
@@ -3252,6 +3332,9 @@ class ItineraryBuilder {
         pricesByType: { ...splitPricesByType },
         // Descuento repartido por pierna (el % se mantiene vía {...serviceData}).
         discountAmount: splitDiscountAmount,
+        // Propina repartida por pierna (tipType/tipMandatory se mantienen vía {...serviceData}).
+        tipValue: splitTipValue,
+        tipAmount: splitTipAmount,
         // Ensure quantity is appropriate for single leg (usually 1)
         quantity: 1,
       };
@@ -4017,6 +4100,44 @@ class ItineraryBuilder {
       }
     }
 
+    // Fase 2: propina por servicio. Metadata (tipo/valor/obligatoria) + monto efectivo para
+    // mostrar. Es ADITIVA (se suma al total, línea aparte); NO toca pricesByType. El porcentaje va
+    // sobre el precio neto (ya con descuento); el monto fijo se captura en efectivo.
+    let serviceTipType = null;
+    let serviceTipValue = 0;
+    let serviceTipMandatory = false;
+    let serviceTipAmount = 0;
+    if (this.canEditPrices && document.getElementById('applyServiceTip')?.checked) {
+      const tt = document.getElementById('serviceTipType')?.value === 'amount' ? 'amount' : 'percent';
+      const tv = parseFloat(document.getElementById('serviceTipValue')?.value || 0) || 0;
+      if (tv > 0) {
+        serviceTipType = tt;
+        serviceTipValue = tv;
+        serviceTipMandatory = document.getElementById('serviceTipMandatory')?.checked || false;
+        const efBase = Number(pricesByType && pricesByType.efectivo) || 0;
+        const netEf = Math.max(0, efBase - serviceDiscountAmount);
+        serviceTipAmount = tt === 'percent'
+          ? Math.round(netEf * (tv / 100) * 100) / 100
+          : Math.round(tv * 100) / 100;
+      }
+    }
+
+    // Fase 2d: los no-admins NO editan descuento/propina (los controles son admin-only). Al editar
+    // un servicio existente, preservar los valores guardados para que no se pierdan/quiten (una
+    // propina "obligatoria" no se puede eliminar por un no-admin).
+    if (!this.canEditPrices && this.currentServiceId) {
+      const existingSvc = this.services.get(this.currentServiceId);
+      if (existingSvc) {
+        serviceDiscountType = existingSvc.discountType || null;
+        serviceDiscountValue = existingSvc.discountValue || 0;
+        serviceDiscountAmount = existingSvc.discountAmount || 0;
+        serviceTipType = existingSvc.tipType || null;
+        serviceTipValue = existingSvc.tipValue || 0;
+        serviceTipMandatory = existingSvc.tipMandatory || false;
+        serviceTipAmount = existingSvc.tipAmount || 0;
+      }
+    }
+
     const data = {
       type,
       price: finalServicePrice,
@@ -4026,6 +4147,11 @@ class ItineraryBuilder {
       discountType: serviceDiscountType, // 'percent' | 'amount' | null
       discountValue: serviceDiscountValue, // valor capturado (10 = 10% o $10)
       discountAmount: serviceDiscountAmount, // monto efectivo descontado (para mostrar)
+      // Propina por servicio (Fase 2): aditiva; se suma al total y se muestra como línea aparte.
+      tipType: serviceTipType, // 'percent' | 'amount' | null
+      tipValue: serviceTipValue, // valor capturado (10 = 10% o $10)
+      tipMandatory: serviceTipMandatory, // obligatoria → bloqueada para no-admins
+      tipAmount: serviceTipAmount, // monto efectivo de la propina (para mostrar)
       devBreakdowns, // Development breakdown text for each payment type
       // Tour formula components
       vehicleRatePerHour, // Base vehicle rate per hour (efectivo)
@@ -5351,6 +5477,20 @@ class ItineraryBuilder {
       if (dTypeR) dTypeR.value = service.discountType === 'amount' ? 'amount' : 'percent';
       const dValR = document.getElementById('serviceDiscountValue');
       if (dValR) dValR.value = hasDiscount ? service.discountValue : '';
+    }
+
+    // Fase 2: restaurar la propina por servicio guardada.
+    if (this.canEditPrices) {
+      const hasTip = !!(service.tipType && Number(service.tipValue) > 0);
+      const tApplyR = document.getElementById('applyServiceTip');
+      if (tApplyR) tApplyR.checked = hasTip;
+      document.getElementById('serviceTipFields')?.classList.toggle('d-none', !hasTip);
+      const tTypeR = document.getElementById('serviceTipType');
+      if (tTypeR) tTypeR.value = service.tipType === 'amount' ? 'amount' : 'percent';
+      const tValR = document.getElementById('serviceTipValue');
+      if (tValR) tValR.value = hasTip ? service.tipValue : '';
+      const tMandR = document.getElementById('serviceTipMandatory');
+      if (tMandR) tMandR.checked = !!service.tipMandatory;
     }
 
     // Apply price override toggle effects (toggle is already checked earlier)
@@ -8033,10 +8173,11 @@ class ItineraryBuilder {
                             <span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span>
                             ` : ''}
                             <div class="fw-semibold ${service.includeInTotal === false ? 'text-muted text-decoration-line-through' : 'text-primary'}">
-                                ${this.formatCurrency(this.getServiceDisplayPrice(service))}
+                                ${this.formatCurrency(this.getServiceDisplayPrice(service) + this.getServiceTipInPaymentType(service))}
                                 ${this.getPriceTypeLabel()}
                             </div>
                             ${Number(service.discountAmount) > 0 ? `<div class="small text-success mt-1" title="Descuento aplicado"><i class="ti ti-discount-2 me-1"></i>Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>` : ''}
+                            ${this.getServiceTipInPaymentType(service) > 0 ? `<div class="small text-info mt-1" title="Propina"><i class="ti ti-coin me-1"></i>Propina ${service.tipType === 'percent' ? service.tipValue + '%' : ''} +${this.formatCurrency(this.getServiceTipInPaymentType(service))}${service.tipMandatory ? ' <span class="badge bg-info-subtle text-info ms-1">obligatoria</span>' : ''}</div>` : ''}
                             ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
                                     data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
@@ -11912,6 +12053,11 @@ class ItineraryBuilder {
   updateTotals() {
     // CRITICAL FIX: Use getServiceDisplayPrice to respect pricesByType (like day totals and preview do)
     let totalMXN = 0;
+    // Fase 2b: subtotal NETO (precios con descuento, SIN propinas por servicio) — base de la
+    // propina global (para no cobrar propina sobre propina).
+    let netSubtotalMXN = 0;
+    // Fase 2c: suma de propinas por servicio (para saber si ya hay alguna propina → nota sugerida).
+    let serviceTipsTotalMXN = 0;
     // Parte D: contar servicios con "precio pendiente" (ruta de transporte sin precio de catálogo).
     // Cuentan como $0 en el total (su precio ya es 0) hasta que el admin defina la tarifa.
     let pendingPriceCount = 0;
@@ -11922,17 +12068,55 @@ class ItineraryBuilder {
         if (service && service.includeInTotal !== false) {
           // FIXED: Use getServiceDisplayPrice to match day totals and preview calculations
           const serviceDisplayPrice = this.getServiceDisplayPrice(service);
-          totalMXN += serviceDisplayPrice;
+          // Fase 2: la propina por servicio es aditiva → se suma al total (línea aparte en la tarjeta).
+          const serviceTipAmount = this.getServiceTipInPaymentType ? this.getServiceTipInPaymentType(service) : 0;
+          netSubtotalMXN += serviceDisplayPrice;
+          serviceTipsTotalMXN += serviceTipAmount;
+          totalMXN += serviceDisplayPrice + serviceTipAmount;
           if (service.priceePending) pendingPriceCount += 1;
         }
       });
     });
 
+    // Fase 2b: propina global de la cotización (sobre el subtotal neto). Se suma al total y se
+    // muestra en su propia línea. Aplica también a no-admins (se lee de this.globalTip).
+    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    const globalTipAmount = this.getGlobalTipAmount ? this.getGlobalTipAmount(netSubtotalMXN, paymentType) : 0;
+    const globalTipRow = document.getElementById('globalTipRow');
+    const globalTipAmountEl = document.getElementById('globalTipAmount');
+    if (globalTipRow && globalTipAmountEl) {
+      if (globalTipAmount > 0) {
+        globalTipAmountEl.textContent = `+${this.formatCurrency(globalTipAmount)}${(this.globalTip && this.globalTip.mandatory) ? ' · obligatoria' : ''}`;
+        globalTipRow.classList.remove('d-none');
+      } else {
+        globalTipRow.classList.add('d-none');
+      }
+    }
+
+    // Fase 2c: nota de propina sugerida. Solo si NO hay ninguna propina (ni por servicio ni
+    // global) y hay subtotal. Solo informa: NO se suma al total.
+    const suggestedNotice = document.getElementById('suggestedTipNotice');
+    if (suggestedNotice) {
+      const hasAnyTip = globalTipAmount > 0 || serviceTipsTotalMXN > 0;
+      if (!hasAnyTip && netSubtotalMXN > 0) {
+        const suggestedPct = Number(this.suggestedTipPct) || 10;
+        const suggestedAmount = Math.round(netSubtotalMXN * (suggestedPct / 100) * 100) / 100;
+        const amtEl = document.getElementById('suggestedTipAmount');
+        if (amtEl) amtEl.textContent = this.formatCurrency(suggestedAmount);
+        const lblEl = document.getElementById('suggestedTipPctLabel');
+        if (lblEl) lblEl.textContent = `(${suggestedPct}%)`;
+        const pctInput = document.getElementById('suggestedTipPct');
+        if (pctInput && document.activeElement !== pctInput) pctInput.value = suggestedPct;
+        suggestedNotice.classList.remove('d-none');
+      } else {
+        suggestedNotice.classList.add('d-none');
+      }
+    }
+
     // Total now correctly uses pricesByType when available (consistent with preview)
-    const finalTotal = totalMXN;
+    const finalTotal = totalMXN + globalTipAmount;
 
     // Calculate IVA breakdown based on payment type
-    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
     const ivaRow = document.getElementById('ivaRow');
 
     let displaySubtotal; let
@@ -12134,6 +12318,16 @@ class ItineraryBuilder {
     if (dTypeReset) dTypeReset.value = 'percent';
     const dValReset = document.getElementById('serviceDiscountValue');
     if (dValReset) dValReset.value = '';
+    // Fase 2: limpiar la propina por servicio al abrir un modal nuevo.
+    const tApplyReset = document.getElementById('applyServiceTip');
+    if (tApplyReset) tApplyReset.checked = false;
+    document.getElementById('serviceTipFields')?.classList.add('d-none');
+    const tTypeReset = document.getElementById('serviceTipType');
+    if (tTypeReset) tTypeReset.value = 'percent';
+    const tValReset = document.getElementById('serviceTipValue');
+    if (tValReset) tValReset.value = '';
+    const tMandReset = document.getElementById('serviceTipMandatory');
+    if (tMandReset) tMandReset.checked = false;
     const aDispGivCont = document.getElementById('aDisposicionGreeterInVehicleContainer');
     if (aDispGivCont) aDispGivCont.classList.add('d-none');
   }
@@ -12273,6 +12467,28 @@ class ItineraryBuilder {
     this.days = [];
     this.services.clear();
 
+    // Fase 2b: restaurar la propina global de la cotización + sincronizar los controles (admin).
+    const gt = serviceItemsData.globalTip;
+    this.globalTip = (gt && gt.type && Number(gt.value) > 0)
+      ? { type: gt.type === 'amount' ? 'amount' : 'percent', value: Number(gt.value) || 0, mandatory: !!gt.mandatory }
+      : null;
+    const gtApply = document.getElementById('applyGlobalTip');
+    if (gtApply) {
+      gtApply.checked = !!this.globalTip;
+      document.getElementById('globalTipFields')?.classList.toggle('d-none', !this.globalTip);
+      const gtType = document.getElementById('globalTipType');
+      if (gtType) gtType.value = this.globalTip ? this.globalTip.type : 'percent';
+      const gtValue = document.getElementById('globalTipValue');
+      if (gtValue) gtValue.value = this.globalTip ? this.globalTip.value : '';
+      const gtMand = document.getElementById('globalTipMandatory');
+      if (gtMand) gtMand.checked = !!(this.globalTip && this.globalTip.mandatory);
+    }
+
+    // Fase 2c: restaurar el % de propina sugerida (default 10).
+    this.suggestedTipPct = Number(serviceItemsData.suggestedTipPct) > 0 ? Number(serviceItemsData.suggestedTipPct) : 10;
+    const stPct = document.getElementById('suggestedTipPct');
+    if (stPct) stPct.value = this.suggestedTipPct;
+
     // Process days and services
     serviceItemsData.days.forEach((day, index) => {
       const dayData = {
@@ -12298,6 +12514,11 @@ class ItineraryBuilder {
             discountType: subconcept.discountType || null,
             discountValue: subconcept.discountValue || 0,
             discountAmount: subconcept.discountAmount || 0,
+            // Propina por servicio (Fase 2).
+            tipType: subconcept.tipType || null,
+            tipValue: subconcept.tipValue || 0,
+            tipMandatory: subconcept.tipMandatory || false,
+            tipAmount: subconcept.tipAmount || 0,
             // Fase 2: restaura la solicitud de cambio pendiente (si hay) para el render.
             changeRequest: subconcept.changeRequest || null,
             type: subconcept.type || 'other',
@@ -15307,6 +15528,43 @@ class ItineraryBuilder {
   }
 
   /**
+   * Fase 2: línea de PROPINA para el desglose live (común a todos los tipos). ADITIVA: se suma al
+   * total (a diferencia del descuento, que resta). El % va sobre el total neto (ya con descuento);
+   * el monto fijo se escala a la forma de pago. Solo presentación.
+   * @param {number} netTotal - Total ya con descuento aplicado (en la forma de pago actual).
+   * @returns {{tipLineHTML: string, addedTotal: number}} Línea y total con la propina sumada.
+   * @example
+   * const { tipLineHTML, addedTotal } = this.buildModalTipLine(adjustedTotal);
+   */
+  buildModalTipLine(netTotal) {
+    let tipLineHTML = '';
+    let addedTotal = netTotal;
+    if (this.canEditPrices && document.getElementById('applyServiceTip')?.checked) {
+      const tt = document.getElementById('serviceTipType')?.value === 'amount' ? 'amount' : 'percent';
+      const tv = parseFloat(document.getElementById('serviceTipValue')?.value || 0) || 0;
+      if (tv > 0) {
+        let tip;
+        if (tt === 'percent') {
+          tip = Math.round(netTotal * (tv / 100) * 100) / 100;
+        } else {
+          const pt = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+          tip = this.getDisplayPriceForType ? Math.round(this.getDisplayPriceForType(tv, pt) * 100) / 100 : tv;
+        }
+        if (tip > 0) {
+          addedTotal = netTotal + tip;
+          const mand = document.getElementById('serviceTipMandatory')?.checked ? ' · obligatoria' : '';
+          const tLabel = tt === 'percent' ? `Propina (${tv}%)${mand}` : `Propina${mand}`;
+          tipLineHTML = `<div class="d-flex justify-content-between text-info">
+        <span><i class="ti ti-coin me-1"></i>${tLabel}</span>
+        <span>+${this.formatCurrency(tip)}</span>
+      </div>`;
+        }
+      }
+    }
+    return { tipLineHTML, addedTotal };
+  }
+
+  /**
    * Show an itemized price breakdown for walking tours by reading from dev breakdown.
    * @example
    */
@@ -15435,10 +15693,11 @@ class ItineraryBuilder {
       </div>`).join('');
 
     // Render the complete breakdown
-    // Fase 1: descuento por servicio en el desglose live (aplica también a tours).
+    // Fase 1+2: descuento y propina en el desglose live (aplica también a tours).
     const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(totalMXN);
-    itemsDiv.innerHTML = itemsHTML + discountLineHTML;
-    totalSpan.textContent = this.formatCurrency(adjustedTotal);
+    const { tipLineHTML, addedTotal } = this.buildModalTipLine(adjustedTotal);
+    itemsDiv.innerHTML = itemsHTML + discountLineHTML + tipLineHTML;
+    totalSpan.textContent = this.formatCurrency(addedTotal);
     container.classList.remove('d-none');
   }
 
@@ -15577,10 +15836,11 @@ class ItineraryBuilder {
       </div>`).join('');
 
     // Render the complete breakdown
-    // Fase 1: descuento por servicio en el desglose live (aplica también a tours).
+    // Fase 1+2: descuento y propina en el desglose live (aplica también a tours).
     const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(totalMXN);
-    itemsDiv.innerHTML = itemsHTML + discountLineHTML;
-    totalSpan.textContent = this.formatCurrency(adjustedTotal);
+    const { tipLineHTML, addedTotal } = this.buildModalTipLine(adjustedTotal);
+    itemsDiv.innerHTML = itemsHTML + discountLineHTML + tipLineHTML;
+    totalSpan.textContent = this.formatCurrency(addedTotal);
     container.classList.remove('d-none');
 
     qsDevLog('📊 VEHICLE TOUR DEVBREAKDOWN: Complete breakdown rendered', {
@@ -16664,14 +16924,15 @@ class ItineraryBuilder {
     // se compoundearía al guardar. El descuento de abajo es SOLO presentación del desglose.
     this.currentServiceTotal = displayTotal;
 
-    // Fase 1: descuento por servicio en el desglose live (helper común a todos los tipos).
+    // Fase 1+2: descuento y propina en el desglose live (helpers comunes a todos los tipos).
     const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(displayTotal);
+    const { tipLineHTML, addedTotal } = this.buildModalTipLine(adjustedTotal);
 
     // Render the complete breakdown (removed Subtotal and IVA lines)
-    itemsDiv.innerHTML = itemsHTML + discountLineHTML;
+    itemsDiv.innerHTML = itemsHTML + discountLineHTML + tipLineHTML;
 
-    // Show final total (con descuento si aplica)
-    totalSpan.textContent = this.formatCurrency(adjustedTotal);
+    // Show final total (con descuento y propina si aplican)
+    totalSpan.textContent = this.formatCurrency(addedTotal);
     container.classList.remove('d-none');
 
     // Update debug payment section with breakdown data
@@ -20373,7 +20634,11 @@ class ItineraryBuilder {
           // guardado, el PDF y la reserva sin reflejar el descuento. getServiceDisplayPrice es la
           // misma fuente que usa el total en pantalla → lo guardado == lo mostrado.
           const servicePrice = this.getServiceDisplayPrice(service);
-          const serviceTotal = servicePrice;
+          // Fase 2: la propina por servicio es aditiva → se hornea en el TOTAL guardado (no en
+          // unitPrice) para que dayTotal/serviceItems.total/reserva/PDF la incluyan. La propina
+          // se conserva además como metadata (tipAmount) para mostrarse como línea aparte.
+          const serviceTip = this.getServiceTipInPaymentType ? this.getServiceTipInPaymentType(service) : 0;
+          const serviceTotal = servicePrice + serviceTip;
           dayTotal += serviceTotal;
 
           qsDevLog('📊 Service total calculation:', {
@@ -20397,6 +20662,11 @@ class ItineraryBuilder {
             discountType: service.discountType || null,
             discountValue: service.discountValue || 0,
             discountAmount: service.discountAmount || 0,
+            // Propina por servicio (Fase 2).
+            tipType: service.tipType || null,
+            tipValue: service.tipValue || 0,
+            tipMandatory: service.tipMandatory || false,
+            tipAmount: service.tipAmount || 0,
             // Fase 2: solicitud de cambio (borrar/modificar) pendiente de aprobación del admin.
             changeRequest: service.changeRequest || null,
             concept: this.getServiceTitle(service),
@@ -20606,7 +20876,23 @@ class ItineraryBuilder {
     // For ALL payment types, the modal value IS the final value
     serviceItemsData.subtotal = Math.round(grandSubtotal * 100) / 100;
     serviceItemsData.iva = 0; // IVA is already included in the modal total
-    serviceItemsData.total = serviceItemsData.subtotal;
+    // Fase 2b: propina global sobre el subtotal NETO (sin propinas por servicio). Se hornea en el
+    // total guardado (→ reserva/PDF) y se persiste su metadata para restaurar los controles.
+    let netSubtotalForTip = 0;
+    this.days.forEach((day) => {
+      day.services.forEach((sid) => {
+        const svc = this.services.get(sid);
+        if (svc && svc.includeInTotal !== false) netSubtotalForTip += this.getServiceDisplayPrice(svc);
+      });
+    });
+    const paymentTypeSave = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    const globalTipSave = this.getGlobalTipAmount ? this.getGlobalTipAmount(netSubtotalForTip, paymentTypeSave) : 0;
+    serviceItemsData.globalTip = this.globalTip
+      ? { type: this.globalTip.type, value: this.globalTip.value, mandatory: !!this.globalTip.mandatory, amount: Math.round(globalTipSave * 100) / 100 }
+      : null;
+    // Fase 2c: % de propina sugerida (default 10; ajustable por admin). Solo informativo.
+    serviceItemsData.suggestedTipPct = Number(this.suggestedTipPct) > 0 ? Number(this.suggestedTipPct) : 10;
+    serviceItemsData.total = Math.round((serviceItemsData.subtotal + globalTipSave) * 100) / 100;
 
     // Get access token from cookie
     const accessToken = this.getAccessToken();
@@ -22258,7 +22544,9 @@ class ItineraryBuilder {
       const services = day.services.map((sid) => this.services.get(sid)).filter(Boolean);
       const dayTotalMXN = services.reduce((sum, service) => {
         if (service.includeInTotal === false) return sum;
-        return sum + (service.price || 0);
+        // Consistente con el total general: precio neto (con descuento) + propina.
+        const tip = this.getServiceTipInPaymentType ? this.getServiceTipInPaymentType(service) : 0;
+        return sum + this.getServiceDisplayPrice(service) + tip;
       }, 0);
       const dayTotal = dayTotalMXN;
       const perPerson = this.numberOfPeople > 0 ? dayTotal / this.numberOfPeople : 0;
