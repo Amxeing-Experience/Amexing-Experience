@@ -89,6 +89,7 @@ const menuItems = [
     // Agencies are entities (no personal profile); people-type clients get Perfil, agencies get Agentes.
     ...(!isAgency ? [{ label: 'Perfil', icon: 'address-book', section: 'profile', href: `/dashboard/admin/clients/${clientId}?section=profile` }] : []),
     ...(isAgency ? [{ label: 'Agentes', icon: 'users', section: 'employees', href: `/dashboard/admin/clients/${clientId}?section=employees` }] : []),
+    ...(isAgency ? [{ label: 'Clientes', icon: 'user-heart', section: 'clientes', href: `/dashboard/admin/clients/${clientId}?section=clientes` }] : []),
     { label: 'Trips', icon: 'plane', section: 'quotes', href: `/dashboard/admin/clients/${clientId}?section=quotes` },
     { label: 'Tarifario', icon: 'receipt-2', section: 'tarifario', href: `/dashboard/admin/clients/${clientId}?section=tarifario` }
 ];
@@ -816,6 +817,27 @@ document.addEventListener('DOMContentLoaded', function () {
             }) %>
             <% } else { %>
             <div class="alert alert-info mb-0"><i class="ti ti-info-circle me-2"></i>Solo las agencias tienen agentes.</div>
+            <% } %>
+        <% } else if (activeSection === 'clientes') { %>
+            <!-- Clientes de la agencia — solo agencias. Lista + abrir detalle (solo lectura aquí). -->
+            <% if (isAgency) { %>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="ti ti-user-heart me-2 text-primary"></i>Clientes de la agencia</h5>
+                    <p class="text-muted small mb-0 mt-1">Clientes dados de alta por esta agencia. Haz clic en uno para ver su detalle.</p>
+                </div>
+                <div class="card-body">
+                    <%- include('../../organisms/datatable/owned-clients-table', {
+                        tableId: 'agency-clients-table',
+                        apiEndpoint: `/api/owned-clients?agencyId=${clientId}`,
+                        userRole: 'admin',
+                        showActions: true,
+                        readOnly: true
+                    }) %>
+                </div>
+            </div>
+            <% } else { %>
+            <div class="alert alert-info mb-0"><i class="ti ti-info-circle me-2"></i>Solo las agencias tienen clientes.</div>
             <% } %>
         <% } else if (activeSection === 'quotes') { %>
             <!-- Trips: read-only quotes/reservations linked to this client. Loaded via AJAX. -->

@@ -19,6 +19,9 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'owned-clients-tabl
 const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/owned-clients';
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'client';
+// readOnly: solo muestra el enlace "Ver / Editar" (sin eliminar). Útil al embeber la tabla
+// en el detalle de una agencia (admin) para ver sus clientes sin gestionarlos desde ahí.
+const dtReadOnly = typeof readOnly !== 'undefined' ? readOnly : false;
 
 // All users with this view can manage their own clients
 const canEdit = true;
@@ -213,14 +216,16 @@ function initializeOwnedClientsDataTable() {
                             <i class="ti ti-edit"></i>
                         </a>`;
                     
+                    <% if (!dtReadOnly) { %>
                     actions += `
-                        <button type="button" class="btn btn-outline-danger btn-delete-client" 
+                        <button type="button" class="btn btn-outline-danger btn-delete-client"
                                 data-client-id="${row.id}"
                                 data-client-name="${(row.name || '').replace(/"/g, '&quot;')}"
                                 title="Eliminar">
                             <i class="ti ti-trash"></i>
                         </button>`;
-                    
+                    <% } %>
+
                     actions += '</div>';
                     return actions;
                 }
