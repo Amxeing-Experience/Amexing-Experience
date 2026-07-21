@@ -1160,6 +1160,23 @@ class ItineraryBuilder {
       });
     });
 
+    // Fase 1: descuento por servicio — mostrar/ocultar campos y recalcular el desglose en vivo.
+    document.getElementById('applyServiceDiscount')?.addEventListener('change', (e) => {
+      this.serviceModified = true;
+      document.getElementById('serviceDiscountFields')?.classList.toggle('d-none', !e.target.checked);
+      this.updateServicePriceBreakdown();
+    });
+    ['serviceDiscountType', 'serviceDiscountValue'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => {
+        this.serviceModified = true;
+        this.updateServicePriceBreakdown();
+      });
+      document.getElementById(id)?.addEventListener('change', () => {
+        this.serviceModified = true;
+        this.updateServicePriceBreakdown();
+      });
+    });
+
     // Tour start time listener - auto-calculate end time
     document.getElementById('tourStartTime')?.addEventListener('change', () => {
       this.calculateTourEndTime();
@@ -3967,11 +3984,42 @@ class ItineraryBuilder {
     qsDevLog(document.getElementById('additionalSegmentSelect')?.value || null)
     qsDevLog(document.getElementById('additionalVehicleSelect')?.value || null)
 
+    // Fase 1: descuento por servicio — sobre el precio base efectivo; luego el recargo por forma
+    // de pago. Modifica SOLO pricesByType (fuente de verdad del total/tarjeta vía
+    // getServiceDisplayPrice); los campos de precio y basePrice se quedan SIN descontar para
+    // restaurar bien al editar y no compoundear en re-guardados.
+    let serviceDiscountType = null;
+    let serviceDiscountValue = 0;
+    let serviceDiscountAmount = 0;
+    if (this.canEditPrices && document.getElementById('applyServiceDiscount')?.checked) {
+      const dt = document.getElementById('serviceDiscountType')?.value === 'amount' ? 'amount' : 'percent';
+      const dv = parseFloat(document.getElementById('serviceDiscountValue')?.value || 0) || 0;
+      const efBase = Number(pricesByType && pricesByType.efectivo) || Number(basePriceEfectivo) || 0;
+      if (dv > 0 && efBase > 0) {
+        const amt = Math.min(dt === 'percent' ? efBase * (dv / 100) : dv, efBase);
+        serviceDiscountAmount = Math.max(0, Math.round(amt * 100) / 100);
+        if (serviceDiscountAmount > 0) {
+          serviceDiscountType = dt;
+          serviceDiscountValue = dv;
+          const discountedBase = Math.max(0, efBase - serviceDiscountAmount);
+          pricesByType = {
+            efectivo: discountedBase,
+            transferencia: this.getDisplayPriceForType(discountedBase, 'transferencia'),
+            tarjeta: this.getDisplayPriceForType(discountedBase, 'tarjeta'),
+          };
+        }
+      }
+    }
+
     const data = {
       type,
       price: finalServicePrice,
       basePrice: basePriceEfectivo, // Base efectivo price for recalculation (backward compatibility)
-      pricesByType, // All 3 payment type prices for easy switching
+      pricesByType, // All 3 payment type prices for easy switching (ya con descuento aplicado)
+      // Descuento por servicio (Fase 1): sobre el precio base; el desglose/tarjeta/resumen lo muestran.
+      discountType: serviceDiscountType, // 'percent' | 'amount' | null
+      discountValue: serviceDiscountValue, // valor capturado (10 = 10% o $10)
+      discountAmount: serviceDiscountAmount, // monto efectivo descontado (para mostrar)
       devBreakdowns, // Development breakdown text for each payment type
       // Tour formula components
       vehicleRatePerHour, // Base vehicle rate per hour (efectivo)
@@ -5286,6 +5334,18 @@ class ItineraryBuilder {
 
     // Update capacity note after all checkboxes are set
     this.updateVehicleCapacityNote();
+
+    // Fase 1: restaurar el descuento por servicio guardado.
+    if (this.canEditPrices) {
+      const hasDiscount = !!(service.discountType && Number(service.discountValue) > 0);
+      const dApplyR = document.getElementById('applyServiceDiscount');
+      if (dApplyR) dApplyR.checked = hasDiscount;
+      document.getElementById('serviceDiscountFields')?.classList.toggle('d-none', !hasDiscount);
+      const dTypeR = document.getElementById('serviceDiscountType');
+      if (dTypeR) dTypeR.value = service.discountType === 'amount' ? 'amount' : 'percent';
+      const dValR = document.getElementById('serviceDiscountValue');
+      if (dValR) dValR.value = hasDiscount ? service.discountValue : '';
+    }
 
     // Apply price override toggle effects (toggle is already checked earlier)
     if (service.priceOverride) {
@@ -7958,6 +8018,7 @@ class ItineraryBuilder {
                                 ${this.formatCurrency(this.getServiceDisplayPrice(service))}
                                 ${this.getPriceTypeLabel()}
                             </div>
+                            ${Number(service.discountAmount) > 0 ? `<div class="small text-success mt-1" title="Descuento aplicado"><i class="ti ti-discount-2 me-1"></i>Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>` : ''}
                             ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
                                     data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
@@ -12044,6 +12105,14 @@ class ItineraryBuilder {
     // no toca classList, así que el container podría quedar visible de un servicio anterior.
     const aDispGiv = document.getElementById('aDisposicionGreeterInVehicle');
     if (aDispGiv) aDispGiv.checked = false;
+    // Fase 1: limpiar el descuento por servicio al abrir un modal nuevo.
+    const dApplyReset = document.getElementById('applyServiceDiscount');
+    if (dApplyReset) dApplyReset.checked = false;
+    document.getElementById('serviceDiscountFields')?.classList.add('d-none');
+    const dTypeReset = document.getElementById('serviceDiscountType');
+    if (dTypeReset) dTypeReset.value = 'percent';
+    const dValReset = document.getElementById('serviceDiscountValue');
+    if (dValReset) dValReset.value = '';
     const aDispGivCont = document.getElementById('aDisposicionGreeterInVehicleContainer');
     if (aDispGivCont) aDispGivCont.classList.add('d-none');
   }
@@ -12204,6 +12273,10 @@ class ItineraryBuilder {
             dayId: dayData.id,
             // Bloqueo por-servicio (Fase 1): restaura el candado guardado para el render.
             adminLocked: subconcept.adminLocked || false,
+            // Descuento por servicio (Fase 1).
+            discountType: subconcept.discountType || null,
+            discountValue: subconcept.discountValue || 0,
+            discountAmount: subconcept.discountAmount || 0,
             // Fase 2: restaura la solicitud de cambio pendiente (si hay) para el render.
             changeRequest: subconcept.changeRequest || null,
             type: subconcept.type || 'other',
@@ -20252,6 +20325,10 @@ class ItineraryBuilder {
             // Bloqueo por-servicio (Fase 1): true si un admin lo agregó/editó → solo lectura
             // para no-admins. Se persiste en el subconcepto para restaurarlo al recargar.
             adminLocked: service.adminLocked || false,
+            // Descuento por servicio (Fase 1).
+            discountType: service.discountType || null,
+            discountValue: service.discountValue || 0,
+            discountAmount: service.discountAmount || 0,
             // Fase 2: solicitud de cambio (borrar/modificar) pendiente de aprobación del admin.
             changeRequest: service.changeRequest || null,
             concept: this.getServiceTitle(service),
