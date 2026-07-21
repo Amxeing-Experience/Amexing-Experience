@@ -91,6 +91,7 @@ router.get('/superadmin/vehicles', dashboardAuth.requireRole('superadmin'), (req
 router.get('/superadmin/services', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.services(req, res));
 router.get('/superadmin/experiences', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.experiences(req, res));
 router.get('/superadmin/greeter', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.greeter(req, res));
+router.get('/superadmin/entradas', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.entradas(req, res));
 router.get('/superadmin/tarifario-export', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.tarifarioExport(req, res));
 
 // Admin Routes
@@ -117,6 +118,7 @@ router.get('/admin/a-disposicion', dashboardAuth.requireRole('admin'), (req, res
 router.get('/admin/pricing', dashboardAuth.requireRole('admin'), (req, res) => adminController.pricing(req, res));
 router.get('/admin/tours', dashboardAuth.requireRole('admin'), (req, res) => adminController.tours(req, res));
 router.get('/admin/greeter', dashboardAuth.requireRole('admin'), (req, res) => adminController.greeter(req, res));
+router.get('/admin/entradas', dashboardAuth.requireRole('admin'), (req, res) => adminController.entradas(req, res));
 router.get('/admin/quotes', dashboardAuth.requireRole('admin'), (req, res) => adminController.quotes(req, res));
 router.get('/admin/quotes/:id', dashboardAuth.requireRole('admin'), (req, res) => adminController.quoteDetail(req, res));
 router.get('/admin/invoices', dashboardAuth.requireRole('admin'), (req, res) => adminController.invoices(req, res));
