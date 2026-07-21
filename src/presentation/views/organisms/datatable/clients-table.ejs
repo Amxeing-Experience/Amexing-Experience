@@ -62,12 +62,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                     <input type="radio" class="btn-check" name="filterType" id="filterHomeOwner" value="home_owner">
                     <label class="btn btn-orange-pill" for="filterHomeOwner">Home Owner</label>
+
+                    <input type="radio" class="btn-check" name="filterType" id="filterSolicitudes" value="solicitudes">
+                    <label class="btn btn-orange-pill" for="filterSolicitudes">Solicitudes <span class="badge bg-danger ms-1 d-none" id="solicitudesBadge">0</span></label>
                 </div>
             </div>
         </div>
         
         <!-- DataTable Container -->
-        <div class="table-responsive">
+        <div class="table-responsive" id="clientsTableWrap">
             <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
                 <thead class="table-light">
                     <tr>
@@ -97,6 +100,44 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     </tr>
                 </tfoot>
             </table>
+        </div>
+
+        <!-- Partner Requests (Solicitudes de colaboradores) — se muestra al elegir la pill "Solicitudes" -->
+        <div class="table-responsive d-none" id="partnerRequestsWrap">
+            <table id="partner-requests-table" class="table table-hover data-table" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Solicitante</th>
+                        <th>Email</th>
+                        <th>Teléfono</th>
+                        <th>Tipo</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <div id="partnerRequestsEmpty" class="text-center text-muted py-4 d-none">
+                <i class="ti ti-inbox d-block mb-2" style="font-size:1.5rem;"></i>
+                <span class="small">No hay solicitudes.</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal detalle de solicitud -->
+<div class="modal fade" id="prtDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="ti ti-file-description me-2"></i>Detalle de la solicitud</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body" id="prtDetailBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
         </div>
     </div>
 </div>
@@ -426,9 +467,10 @@ function showSuccessAlert(message) {
     // Remove existing alerts
     document.querySelectorAll('.alert').forEach(el => el.remove());
 
-    // Insert new alert
-    const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
-    cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+    // Insert new alert (fallback robusto: esta página no usa .card-body)
+    const _alertAnchor = document.querySelector('#<%= dtTableId %>');
+    const cardBody = (_alertAnchor && _alertAnchor.closest('.card-body')) || document.querySelector('.clients-table-area') || document.body;
+    if (cardBody) cardBody.insertAdjacentHTML('afterbegin', alertHtml);
 
     // Auto-dismiss after 5 seconds
     setTimeout(() => {
@@ -455,9 +497,10 @@ function showErrorAlert(message) {
     // Remove existing alerts
     document.querySelectorAll('.alert').forEach(el => el.remove());
 
-    // Insert new alert
-    const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
-    cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+    // Insert new alert (fallback robusto: esta página no usa .card-body)
+    const _alertAnchor = document.querySelector('#<%= dtTableId %>');
+    const cardBody = (_alertAnchor && _alertAnchor.closest('.card-body')) || document.querySelector('.clients-table-area') || document.body;
+    if (cardBody) cardBody.insertAdjacentHTML('afterbegin', alertHtml);
 }
 
 // ============================================================================
@@ -698,6 +741,143 @@ function setupEventDelegation() {
 // 6. MODULE INITIALIZATION
 // ============================================================================
 
+// ============================================================================
+// PARTNER REQUESTS (Solicitudes de colaboradores)
+// ============================================================================
+
+// Cache de la última carga (para el modal de detalle y el convertir).
+let _prtItems = {};
+
+function prtGetToken() {
+    try { return (typeof getAccessToken === 'function' && getAccessToken()) || localStorage.getItem('accessToken') || localStorage.getItem('token'); } catch (e) { return null; }
+}
+async function prtFetch(url, opts) {
+    opts = opts || {};
+    const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    const t = prtGetToken();
+    if (t) headers['Authorization'] = 'Bearer ' + t;
+    return fetch(url, Object.assign({ credentials: 'same-origin' }, opts, { headers }));
+}
+function prtEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function prtDate(d) { if (!d) return '-'; try { return new Date(d).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }); } catch (e) { return '-'; } }
+function prtStatusBadge(s) { const m = { pending: ['warning', 'Pendiente'], approved: ['success', 'Aprobada'], rejected: ['secondary', 'Rechazada'] }; const [c, l] = m[s] || ['light', s || '-']; return `<span class="badge bg-${c}">${prtEsc(l)}</span>`; }
+
+function updateSolicitudesBadge(n) {
+    const b = document.getElementById('solicitudesBadge');
+    if (!b) return;
+    if (n > 0) { b.textContent = n; b.classList.remove('d-none'); } else { b.classList.add('d-none'); }
+}
+
+function switchToRequestsView(show) {
+    const clientsWrap = document.getElementById('clientsTableWrap');
+    const reqWrap = document.getElementById('partnerRequestsWrap');
+    if (!reqWrap || !clientsWrap) return;
+    if (show) { clientsWrap.classList.add('d-none'); reqWrap.classList.remove('d-none'); loadPartnerRequests(); }
+    else { reqWrap.classList.add('d-none'); clientsWrap.classList.remove('d-none'); }
+}
+
+async function loadPartnerRequests() {
+    const tbody = document.querySelector('#partner-requests-table tbody');
+    const empty = document.getElementById('partnerRequestsEmpty');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm"></span></td></tr>';
+    empty.classList.add('d-none');
+    try {
+        const res = await prtFetch('/api/partner-requests?limit=100');
+        const data = await res.json();
+        const items = (data && data.data) || [];
+        updateSolicitudesBadge(data.pendingCount || 0);
+        _prtItems = {};
+        items.forEach((r) => { _prtItems[r.id] = r; });
+        if (!items.length) { tbody.innerHTML = ''; empty.classList.remove('d-none'); return; }
+        tbody.innerHTML = items.map((r) => {
+            // Opción A: 'approved' solo cuenta si realmente se creó el cliente. Una "aprobada
+            // sin cliente" (p.ej. abortada antes o aprobada por correo legado) se trata como PENDIENTE.
+            const converted = r.status === 'approved' && !!r.convertedClientId;
+            const effective = (r.status === 'approved' && !r.convertedClientId) ? 'pending' : r.status;
+            const isPending = effective === 'pending';
+            const emailWarn = r.emailExists
+                ? ' <i class="ti ti-alert-triangle text-warning ms-1" title="Este correo ya existe como usuario"></i>'
+                : '';
+            const view = `<button type="button" class="btn btn-sm btn-outline-secondary prt-view" data-id="${prtEsc(r.id)}" title="Ver detalle"><i class="ti ti-eye me-1"></i>Ver</button>`;
+            const resolve = isPending
+                ? `<button type="button" class="btn btn-sm btn-outline-success prt-approve" data-id="${prtEsc(r.id)}" title="Aprobar y convertir a cliente"><i class="ti ti-check me-1"></i>Aprobar</button>
+                   <button type="button" class="btn btn-sm btn-outline-danger prt-reject" data-id="${prtEsc(r.id)}" data-name="${prtEsc(r.fullName)}" title="Rechazar"><i class="ti ti-x me-1"></i>Rechazar</button>`
+                : '';
+            const clientLink = converted
+                ? `<a href="/dashboard/admin/clients/${prtEsc(r.convertedClientId)}" class="btn btn-sm btn-outline-primary" title="Ver cliente creado"><i class="ti ti-external-link me-1"></i>Cliente</a>`
+                : '';
+            const statusHtml = converted ? '<span class="badge bg-success">Convertida</span>' : prtStatusBadge(effective);
+            return `<tr data-id="${prtEsc(r.id)}">
+                <td><strong>${prtEsc(r.fullName || '-')}</strong></td>
+                <td>${prtEsc(r.email || '-')}${emailWarn}</td>
+                <td>${prtEsc(r.phone || '-')}</td>
+                <td>${prtEsc(r.collaboratorType || '-')}</td>
+                <td>${prtDate(r.submittedAt)}</td>
+                <td>${statusHtml}</td>
+                <td><div class="btn-group btn-group-sm" role="group">${view}${resolve}${clientLink}</div></td>
+            </tr>`;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-3 small">Error al cargar solicitudes.</td></tr>';
+    }
+}
+
+// Carga solo el conteo de pendientes para el badge (sin cambiar de vista).
+async function loadSolicitudesBadge() {
+    try { const res = await prtFetch('/api/partner-requests?limit=1'); const data = await res.json(); updateSolicitudesBadge((data && data.pendingCount) || 0); } catch (e) { /* silencioso */ }
+}
+
+// --- Modal de detalle: toda la info de la solicitud ---
+function prtField(label, val) {
+    if (val == null || String(val) === '') return '';
+    return `<div class="col-md-6 mb-2"><div class="small text-muted">${prtEsc(label)}</div><div class="fw-medium">${prtEsc(val)}</div></div>`;
+}
+function showRequestDetail(id) {
+    const r = _prtItems[id];
+    if (!r) return;
+    const body = document.getElementById('prtDetailBody');
+    body.innerHTML = `<div class="row">
+        ${prtField('Nombre', r.fullName)}
+        ${prtField('Email', (r.email || '') + (r.emailExists ? '  ⚠ ya existe' : ''))}
+        ${prtField('Teléfono', r.phone)}
+        ${prtField('Tipo de colaborador', r.collaboratorType)}
+        ${prtField('Sitio web', r.website)}
+        ${prtField('Afiliación profesional', r.professionalAffiliation)}
+        ${prtField('¿Cómo nos conoció?', r.howDidYouHear)}
+        ${prtField('Idioma', r.preferredLanguage)}
+        ${prtField('Estado', (r.status === 'approved' && r.convertedClientId) ? 'Convertida' : ({ pending: 'Pendiente', approved: 'Pendiente', rejected: 'Rechazada' }[r.status] || r.status))}
+        ${prtField('Fecha', prtDate(r.submittedAt))}
+        ${(r.status === 'approved' && r.convertedClientId) ? prtField('Convertida', prtDate(r.convertedAt)) : ''}
+        ${(r.status === 'approved' && r.convertedClientId) ? `<div class="col-md-6 mb-2"><div class="small text-muted">Cliente creado</div><div><a href="/dashboard/admin/clients/${prtEsc(r.convertedClientId)}"><i class="ti ti-external-link me-1"></i>Ver cliente</a></div></div>` : ''}
+        ${r.comments ? `<div class="col-12 mb-1"><div class="small text-muted">Comentarios</div><div>${prtEsc(r.comments)}</div></div>` : ''}
+    </div>`;
+    const m = document.getElementById('prtDetailModal');
+    if (window.bootstrap && bootstrap.Modal) bootstrap.Modal.getOrCreateInstance(m).show();
+}
+
+// Opción A: "Aprobar" NO cambia el estado; solo lleva al alta prellenada. La solicitud
+// se marca aprobada + convertida cuando el cliente realmente se crea. Si abortas, sigue pendiente.
+function approveAndConvertRequest(id) {
+    const item = _prtItems[id] || {};
+    if (item.emailExists && !confirm('Este correo ya existe como usuario. Podrás cambiarlo en el alta antes de crear el cliente. ¿Continuar?')) return;
+    try { sessionStorage.setItem('prefillNewClient', JSON.stringify(Object.assign({ fromRequestId: id }, item))); } catch (e) { /* ignore */ }
+    window.location.href = '/dashboard/admin/clients/new?fromRequest=' + encodeURIComponent(id);
+}
+
+async function rejectRequest(id, name) {
+    if (!confirm('¿Rechazar la solicitud de "' + (name || '') + '"?')) return;
+    try {
+        const res = await prtFetch('/api/partner-requests/' + encodeURIComponent(id) + '/reject', { method: 'POST', body: JSON.stringify({}) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) throw new Error(data.error || 'Error al rechazar');
+        showSuccessAlert('Solicitud rechazada.');
+        loadPartnerRequests();
+    } catch (e) {
+        showErrorAlert(e.message || 'Error al rechazar la solicitud.');
+    }
+}
+
 /**
  * Setup pill filter event listeners
  */
@@ -706,6 +886,10 @@ function setupPillFilters() {
     
     filterButtons.forEach(button => {
         button.addEventListener('change', function() {
+            if (!this.checked) return;
+            // Vista de Solicitudes: intercambia la tabla de clientes por la de solicitudes.
+            if (this.value === 'solicitudes') { switchToRequestsView(true); return; }
+            switchToRequestsView(false);
             if (this.checked && window.clientsTable) {
                 // "Tipo de Cliente" is useful when rows mix types: "Todos" and "Clientes
                 // Directos" (which lumps all direct categories together). Hide it only in
@@ -728,6 +912,22 @@ document.addEventListener('DOMContentLoaded', function() {
     loadClientsAndInitializeTable();
     setupEventDelegation();
     setupPillFilters();
+
+    // Delegación de acciones en la tabla de solicitudes
+    const prtTbody = document.querySelector('#partner-requests-table tbody');
+    if (prtTbody) {
+        prtTbody.addEventListener('click', function(e) {
+            const vw = e.target.closest('.prt-view');
+            if (vw) { showRequestDetail(vw.getAttribute('data-id')); return; }
+            const ap = e.target.closest('.prt-approve');
+            if (ap) { approveAndConvertRequest(ap.getAttribute('data-id')); return; }
+            const rj = e.target.closest('.prt-reject');
+            if (rj) { rejectRequest(rj.getAttribute('data-id'), rj.getAttribute('data-name')); }
+        });
+    }
+
+    // Badge de pendientes (aunque no estés en la vista de solicitudes)
+    loadSolicitudesBadge();
 });
 
 </script>
