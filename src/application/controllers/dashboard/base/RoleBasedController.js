@@ -278,6 +278,84 @@ class RoleBasedController extends DashboardController {
   }
 
   /**
+   * GET /dashboard/{department_manager|client}/clients/:id — detalle de un cliente de agencia
+   * (propiedad del DM/agente). Reusa los mismos bloques del admin: Información, Facturación y
+   * Perfil de Viaje. Valida ownership (DM: organizationId===su id; agente: createdBy===su id).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   */
+  async ownedClientDetail(req, res) {
+    try {
+      const currentUser = req.user;
+      const clientId = req.params.id;
+      if (!currentUser) return this.handleError(res, new Error('Autenticación requerida'), 401);
+      if (!clientId) return this.handleError(res, new Error('ID de cliente no proporcionado'), 400);
+
+      const Parse = require('parse/node');
+      const client = await new Parse.Query('AmexingUser')
+        .include('createdBy')
+        .get(clientId, { useMasterKey: true })
+        .catch(() => null);
+      if (!client || client.get('exists') === false) {
+        return this.handleError(res, new Error('Cliente no encontrado'), 404);
+      }
+
+      // Ownership: el DM (agencia = organizationId del cliente) o el agente que lo creó.
+      const role = this.role || req.userRole;
+      let isOwner;
+      if (role === 'client') {
+        const createdBy = client.get('createdBy');
+        isOwner = !!(createdBy && createdBy.id === currentUser.id);
+      } else {
+        isOwner = client.get('organizationId') === currentUser.id;
+      }
+      if (!isOwner) {
+        return res.redirect(`/dashboard/${role}/clients`);
+      }
+
+      const clientData = {
+        id: client.id,
+        firstName: client.get('firstName') || '',
+        lastName: client.get('lastName') || '',
+        email: client.get('email') || '',
+        phone: client.get('phone') || '',
+        phoneCountry: client.get('phoneCountry') || null,
+        active: client.get('active') !== false,
+        clientCategory: client.get('clientCategory') || null,
+        companyName: client.get('companyName') || client.get('contextualData')?.companyName || '',
+        companyType: client.get('companyType') || null,
+        taxId: client.get('taxId') || '',
+        website: client.get('website') || '',
+        notes: client.get('notes') || '',
+        address: client.get('address') || {},
+        contactFirstName: client.get('contactFirstName') || '',
+        contactLastName: client.get('contactLastName') || '',
+        emergencyContactName: client.get('emergencyContactName') || '',
+        emergencyContactPhone: client.get('emergencyContactPhone') || '',
+        preferredLanguage: client.get('preferredLanguage') || 'es',
+        accessibilityRequirements: client.get('accessibilityRequirements') || '',
+        allergies: client.get('allergies') || [],
+        dietaryRestrictions: client.get('dietaryRestrictions') || [],
+        birthDate: client.get('birthDate') || null,
+      };
+
+      const displayName = clientData.companyName
+        || `${clientData.firstName} ${clientData.lastName}`.trim()
+        || clientData.email || 'Cliente';
+
+      await this.renderDashboard(req, res, 'dashboards/shared/owned-client-detail', {
+        title: `Cliente: ${displayName}`,
+        clientData,
+        ownerRole: role,
+        section: req.query.section || 'information',
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Get role-specific menu items.
    * @example
    * // GET endpoint example
