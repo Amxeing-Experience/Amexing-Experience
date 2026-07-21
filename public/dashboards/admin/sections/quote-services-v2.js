@@ -1210,6 +1210,10 @@ class ItineraryBuilder {
         this.globalTip = null;
       }
       this.updateTotals();
+      // Marcar cambios y agendar el autosave: sin esto, la propina global vivía solo en memoria y
+      // no se persistía (al navegar al resumen o recargar se perdía).
+      this.hasUnsavedChanges = true;
+      if (this.scheduleAutoSave) this.scheduleAutoSave();
     };
     ['applyGlobalTip', 'globalTipType', 'globalTipValue', 'globalTipMandatory'].forEach((id) => {
       document.getElementById(id)?.addEventListener('change', syncGlobalTip);
