@@ -74,11 +74,15 @@ describe('Payment endpoints — access by role (integration)', () => {
     }
   });
 
+  const TODAY = new Date().toISOString().slice(0, 10);
+
   it('lets a department_manager (agencia, level 4) register a payment', async () => {
     const response = await request(app)
       .post(`/api/reservations/${testReservationId}/payments`)
       .set('Authorization', `Bearer ${managerToken}`)
-      .send({ amount: 100, currency: 'MXN', method: 'efectivo' });
+      .send({
+        amount: 100, currency: 'MXN', method: 'efectivo', paidAt: TODAY, receivedBy: 'QA Cajero',
+      });
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
@@ -99,7 +103,9 @@ describe('Payment endpoints — access by role (integration)', () => {
     const response = await request(app)
       .post(`/api/reservations/${testReservationId}/payments`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ amount: 200, currency: 'MXN', method: 'tarjeta' });
+      .send({
+        amount: 200, currency: 'MXN', method: 'tarjeta', paidAt: TODAY,
+      });
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);

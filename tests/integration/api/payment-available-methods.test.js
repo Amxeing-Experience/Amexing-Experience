@@ -54,8 +54,13 @@ describe('Payment available methods — derivados de pricesByType (integration)'
 
   const fetchReservation = (id) => new Parse.Query('Reservation').get(id, { useMasterKey: true });
 
+  // paidAt es obligatorio y receivedBy lo es para efectivo: se inyectan por defecto (el body los puede
+  // sobreescribir) — este suite prueba disponibilidad de método, no esa validación. Los 400 esperados
+  // aquí (forma/método no disponible) ocurren ANTES de la validación de fecha/recibió.
+  const TODAY = new Date().toISOString().slice(0, 10);
   const postPayment = (id, body, token = adminToken) => request(app)
-    .post(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${token}`).send(body);
+    .post(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${token}`)
+    .send({ paidAt: TODAY, receivedBy: 'QA Cajero', ...body });
   const getPayments = (id, token = adminToken) => request(app)
     .get(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${token}`);
   const putPayment = (id, pid, body, token = adminToken) => request(app)

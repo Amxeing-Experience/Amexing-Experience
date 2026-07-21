@@ -60,4 +60,33 @@ describe('Booking Detail - Pagos Offcanvas (admin)', () => {
     expect(html).toContain('methodSelectHtml');
     expect(html).toContain('availableMethods');
   });
+
+  test('la fecha de pago es obligatoria (atributo required en #paymentPaidAt)', () => {
+    const paidAtInput = html.split('id="paymentPaidAt"')[1].split('>')[0];
+    expect(paidAtInput).toContain('required');
+  });
+
+  test('existe el campo "¿Quién recibió el efectivo?" con maxlength 100', () => {
+    expect(html).toContain('id="paymentReceivedByWrap"');
+    expect(html).toContain('id="paymentReceivedBy"');
+    expect(html).toContain('¿Quién recibió el efectivo?');
+    const receivedInput = html.split('id="paymentReceivedBy"')[1].split('>')[0];
+    expect(receivedInput).toContain('maxlength="100"');
+  });
+
+  test('el campo "recibió" está oculto por defecto salvo que el método sea efectivo (display condicional)', () => {
+    // El cascarón no ejecuta JS: se verifica el literal del template embebido — display none salvo efectivo.
+    expect(html).toContain("style=\"display:${method === 'efectivo' ? '' : 'none'};\"");
+    // y su required también es condicional al método efectivo.
+    expect(html).toContain("${method === 'efectivo' ? 'required' : ''}");
+  });
+
+  test('reacciona en vivo al cambiar el método (listener de change en #paymentMethod)', () => {
+    expect(html).toContain("methodSel.addEventListener('change', syncReceivedByVisibility)");
+    expect(html).toContain('function syncReceivedByVisibility');
+  });
+
+  test('pre-llena el receivedBy guardado al editar (mismo patrón que reference/notes, escapado)', () => {
+    expect(html).toContain("PaymentBreakdownHelpers.escapeHtml(existing?.receivedBy || '')");
+  });
 });

@@ -123,6 +123,14 @@ class Payment extends BaseModel {
     this.set('notes', notes);
   }
 
+  getReceivedBy() {
+    return this.get('receivedBy');
+  }
+
+  setReceivedBy(receivedBy) {
+    this.set('receivedBy', receivedBy);
+  }
+
   getRegisteredBy() {
     return this.get('registeredBy');
   }
@@ -234,6 +242,9 @@ class Payment extends BaseModel {
       reference: payment.get('reference') || '',
       paidAt: payment.get('paidAt') || null,
       notes: payment.get('notes') || '',
+      // Nombre de quien recibió físicamente el efectivo. Solo relevante cuando method === 'efectivo';
+      // vacío para transferencia/tarjeta. La UI lo muestra únicamente en filas de efectivo.
+      receivedBy: payment.get('receivedBy') || '',
       reservationServiceId: service ? service.id : null,
       paymentInfoId: paymentInfo ? paymentInfo.id : null,
       paymentInfoName: paymentInfo && paymentInfo.get ? paymentInfo.get('name') || '' : '',

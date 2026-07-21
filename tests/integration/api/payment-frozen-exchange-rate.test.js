@@ -61,8 +61,12 @@ describe('Tipo de cambio USD congelado (integration)', () => {
   const fetchReservation = (id) => new Parse.Query('Reservation').get(id, { useMasterKey: true });
   const fetchQuote = (id) => new Parse.Query('Quote').get(id, { useMasterKey: true });
 
+  // paidAt es obligatorio y receivedBy lo es para efectivo: se inyectan por defecto (el body los puede
+  // sobreescribir) — este suite prueba el tipo de cambio congelado, no esa validación.
+  const TODAY = new Date().toISOString().slice(0, 10);
   const postPayment = (id, body) => request(app)
-    .post(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${adminToken}`).send(body);
+    .post(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${adminToken}`)
+    .send({ paidAt: TODAY, receivedBy: 'QA Cajero', ...body });
   const getPayments = (id) => request(app)
     .get(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${adminToken}`);
 

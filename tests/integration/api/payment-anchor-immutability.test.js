@@ -69,8 +69,12 @@ describe('Payment anchor immutability — paymentType nunca cambia (integration)
   const adjustmentsOf = (reservation) => reservation.get('adjustments') || [];
   // Siempre como admin: admin ve cualquier reservación (sin scoping), aislando que la ÚNICA variable
   // bajo prueba es que el flujo de pago jamás reescribe paymentType (no el dueño de la reservación).
+  // paidAt es obligatorio y receivedBy lo es para efectivo: se inyectan por defecto (el body los puede
+  // sobreescribir) para no distraer a estos casos, centrados en la inmutabilidad del ancla.
+  const TODAY = new Date().toISOString().slice(0, 10);
   const postPayment = (id, body) => request(app)
-    .post(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${adminToken}`).send(body);
+    .post(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${adminToken}`)
+    .send({ paidAt: TODAY, receivedBy: 'QA Cajero', ...body });
   const putPayment = (id, pid, body) => request(app)
     .put(`/api/reservations/${id}/payments/${pid}`).set('Authorization', `Bearer ${adminToken}`).send(body);
   const delPayment = (id, pid) => request(app)

@@ -62,8 +62,12 @@ describe('Payment mixed-method coverage (integration)', () => {
   const fetchReservation = (id) => new Parse.Query('Reservation').get(id, { useMasterKey: true });
   const adjustmentsOf = (reservation) => reservation.get('adjustments') || [];
 
+  // paidAt es obligatorio y receivedBy lo es para efectivo: se inyectan por defecto (cualquier body los
+  // puede sobreescribir) para que estos casos —centrados en la cobertura, no en esa validación— pasen.
+  const TODAY = new Date().toISOString().slice(0, 10);
   const postPayment = (id, body, token = adminToken) => request(app)
-    .post(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${token}`).send(body);
+    .post(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${token}`)
+    .send({ paidAt: TODAY, receivedBy: 'QA Cajero', ...body });
   const getPayments = (id, token = adminToken) => request(app)
     .get(`/api/reservations/${id}/payments`).set('Authorization', `Bearer ${token}`);
   const putPayment = (id, pid, body, token = adminToken) => request(app)

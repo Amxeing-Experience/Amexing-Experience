@@ -278,13 +278,36 @@ describe('PaymentBreakdownHelpers.buildPaymentsHistoryTable (solo lectura, agenc
 
   it('renderiza filas SIN columna/acciones de editar/eliminar y escapa la referencia (XSS)', () => {
     const html = H.buildPaymentsHistoryTable([
-      { method: 'efectivo', amount: 1000, reference: '<img src=x onerror=alert(1)>', paidAt: '2026-07-15T00:00:00Z' },
+      { method: 'efectivo', amount: 1000, reference: '<img src=x onerror=alert(1)>', paidAt: '2026-07-15T00:00:00Z', receivedBy: 'Ana' },
     ], 'MXN');
     expect(html).toContain('$1,000.00');
     expect(html).not.toContain('edit-payment-btn');
     expect(html).not.toContain('delete-payment-btn');
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     expect(html).not.toContain('<img src=x');
+  });
+
+  it('tiene la columna "Recibió" y muestra el nombre solo en filas de efectivo', () => {
+    const html = H.buildPaymentsHistoryTable([
+      { method: 'efectivo', amount: 500, receivedBy: 'Ana López', paidAt: '2026-07-15T00:00:00Z' },
+    ], 'MXN');
+    expect(html).toContain('<th>Recibió</th>');
+    expect(html).toContain('Ana López');
+  });
+
+  it('NO muestra receivedBy en un pago que no es efectivo (guion, aunque el dato venga)', () => {
+    const html = H.buildPaymentsHistoryTable([
+      { method: 'tarjeta', amount: 500, receivedBy: 'Ana López', paidAt: '2026-07-15T00:00:00Z' },
+    ], 'MXN');
+    expect(html).not.toContain('Ana López');
+  });
+
+  it('escapa un receivedBy malicioso en efectivo (stored XSS, mismo vector que reference/notes)', () => {
+    const html = H.buildPaymentsHistoryTable([
+      { method: 'efectivo', amount: 500, receivedBy: '<script>alert(1)</script>', paidAt: '2026-07-15T00:00:00Z' },
+    ], 'MXN');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).not.toContain('<script>alert(1)</script>');
   });
 });
 

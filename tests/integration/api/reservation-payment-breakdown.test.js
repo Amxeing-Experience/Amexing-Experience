@@ -62,10 +62,13 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
   const getReservation = (id, token = adminToken) => request(app)
     .get(`/api/reservations/${id}`)
     .set('Authorization', `Bearer ${token}`);
+  // paidAt es obligatorio y receivedBy lo es para efectivo: se inyectan por defecto (el body los puede
+  // sobreescribir). El caso {amount:0} sigue devolviendo 400 porque el monto se valida ANTES.
+  const TODAY = new Date().toISOString().slice(0, 10);
   const postPayment = (id, body, token = adminToken) => request(app)
     .post(`/api/reservations/${id}/payments`)
     .set('Authorization', `Bearer ${token}`)
-    .send(body);
+    .send({ paidAt: TODAY, receivedBy: 'QA Cajero', ...body });
   const postAdjustment = (id, body, token) => request(app)
     .post(`/api/reservations/${id}/adjustments`)
     .set('Authorization', `Bearer ${token}`)

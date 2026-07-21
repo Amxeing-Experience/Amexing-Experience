@@ -1881,6 +1881,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const rows = paymentsCache.map((p) => {
             const ref = p.reference ? PaymentBreakdownHelpers.escapeHtml(p.reference) : '<span class="text-muted">—</span>';
+            // "Recibió" solo aplica al efectivo; en otros métodos es irrelevante y se muestra un guion.
+            const received = (p.method === 'efectivo' && p.receivedBy)
+                ? PaymentBreakdownHelpers.escapeHtml(p.receivedBy) : '<span class="text-muted">—</span>';
             const receipt = p.receiptUrl
                 ? `<a href="${PaymentBreakdownHelpers.escapeHtml(p.receiptUrl)}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
                 : '<span class="text-muted">—</span>';
@@ -1888,6 +1891,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 <td>${formatDate(p.paidAt || p.createdAt)}</td>
                 <td><span class="badge bg-secondary-subtle text-secondary">${PAYMENT_METHOD_LABELS[p.method] || p.method || '—'}</span></td>
                 <td>${ref}</td>
+                <td>${received}</td>
                 <td class="text-end">${formatCurrency(p.amount, curr)}</td>
                 <td>${p.origCurrency || curr}</td>
                 <td class="text-center">${receipt}</td>
@@ -1905,6 +1909,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         <th>Fecha</th>
                         <th>Método</th>
                         <th>Referencia</th>
+                        <th>Recibió</th>
                         <th class="text-end">Monto</th>
                         <th>Moneda</th>
                         <th class="text-center">Comprobante</th>
@@ -2003,11 +2008,15 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
-                    <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}">
+                    <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}" required>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
                     <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${PaymentBreakdownHelpers.escapeHtml(existing?.reference || '')}">
+                </div>
+                <div class="col-md-6" id="paymentReceivedByWrap" style="display:${method === 'efectivo' ? '' : 'none'};">
+                    <label class="form-label fw-semibold small" for="paymentReceivedBy">¿Quién recibió el efectivo?</label>
+                    <input type="text" class="form-control form-control-sm" id="paymentReceivedBy" maxlength="100" placeholder="Nombre de quien recibió" value="${PaymentBreakdownHelpers.escapeHtml(existing?.receivedBy || '')}" ${method === 'efectivo' ? 'required' : ''}>
                 </div>
                 <div class="col-12">
                     <label class="form-label fw-semibold small" for="paymentReceipt">Comprobante (imagen o PDF)</label>
@@ -2033,6 +2042,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('cancelPaymentBtn').addEventListener('click', () => { wrap.style.display = 'none'; wrap.innerHTML = ''; });
         saveBtn.addEventListener('click', () => savePayment(existing ? existing.id : ''));
         attachThousands(document.getElementById('paymentAmount'));
+
+        // "¿Quién recibió el efectivo?" es visible + required SOLO cuando el método es efectivo, y
+        // reacciona en vivo si el usuario cambia el método DESPUÉS de abrir el formulario.
+        const methodSel = document.getElementById('paymentMethod');
+        function syncReceivedByVisibility() {
+            const isCash = methodSel && methodSel.value === 'efectivo';
+            const wrapEl = document.getElementById('paymentReceivedByWrap');
+            const inputEl = document.getElementById('paymentReceivedBy');
+            if (wrapEl) wrapEl.style.display = isCash ? '' : 'none';
+            if (inputEl) inputEl.required = !!isCash;
+        }
+        if (methodSel) methodSel.addEventListener('change', syncReceivedByVisibility);
+        syncReceivedByVisibility();
     }
 
     // Refresh the Financial Summary numbers + el carrito desde un summary de respuesta (POST/PUT/DELETE)
@@ -2062,18 +2084,24 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function savePayment(paymentId) {
         const amount = parseAmount(document.getElementById('paymentAmount').value);
         const paidAt = document.getElementById('paymentPaidAt').value;
+        const method = document.getElementById('paymentMethod').value;
+        const receivedByEl = document.getElementById('paymentReceivedBy');
+        const receivedBy = receivedByEl ? receivedByEl.value.trim() : '';
 
         if (!amount || amount <= 0) { pmToast('El monto debe ser mayor a 0', 'warning'); return; }
         if (amount > 100000000) { pmToast('El monto no puede exceder 100,000,000', 'warning'); return; }
+        if (!paidAt) { pmToast('La fecha de pago es obligatoria', 'warning'); return; }
+        if (method === 'efectivo' && !receivedBy) { pmToast('Indica quién recibió el efectivo', 'warning'); return; }
 
         const payload = {
             amount,
             currency: document.getElementById('paymentCurrency').value,
-            method: document.getElementById('paymentMethod').value,
+            method,
             reference: document.getElementById('paymentReference').value.trim(),
             notes: document.getElementById('paymentNotes').value.trim(),
         };
         if (paidAt) payload.paidAt = paidAt;
+        if (receivedBy) payload.receivedBy = receivedBy;
 
         // Receipt (optional) — validated here but uploaded in a SEPARATE request AFTER the payment is
         // saved (see uploadReceipt). The receipt no longer travels inside the payment save, so a slow

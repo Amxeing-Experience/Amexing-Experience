@@ -37,6 +37,11 @@ describe('Booking Detail admin - escapa reference/notes/adj.description (XSS)', 
     expect(html).not.toContain("${existing?.notes || ''}");
   });
 
+  test('el "recibió efectivo" del formulario pasa por escapeHtml (mismo vector value="...")', () => {
+    expect(html).toContain("PaymentBreakdownHelpers.escapeHtml(existing?.receivedBy || '')");
+    expect(html).not.toContain("value=\"${existing?.receivedBy || ''}\"");
+  });
+
   test('la descripción de ajuste (cargo y descuento) pasa por escapeHtml', () => {
     expect(html).toContain('PaymentBreakdownHelpers.escapeHtml(adj.description)');
     expect(html).not.toContain('${adj.description}');

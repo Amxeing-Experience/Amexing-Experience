@@ -405,6 +405,9 @@ const PaymentBreakdownHelpers = (() => {
     if (!list.length) return '<div class="text-center py-3 text-muted">Sin pagos registrados</div>';
     const rows = list.map((p) => {
       const ref = p.reference ? escapeHtml(p.reference) : '<span class="text-muted">&mdash;</span>';
+      // "Recibió" solo aplica al efectivo: en otros métodos es irrelevante y se muestra un guion.
+      const received = (p.method === 'efectivo' && p.receivedBy)
+        ? escapeHtml(p.receivedBy) : '<span class="text-muted">&mdash;</span>';
       const receipt = p.receiptUrl
         ? `<a href="${escapeHtml(p.receiptUrl)}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
         : '<span class="text-muted">&mdash;</span>';
@@ -412,6 +415,7 @@ const PaymentBreakdownHelpers = (() => {
           <td>${formatDate(p.paidAt || p.createdAt)}</td>
           <td><span class="badge bg-secondary-subtle text-secondary">${escapeHtml(methodLabel(p.method))}</span></td>
           <td>${ref}</td>
+          <td>${received}</td>
           <td class="text-end">${formatMoney(p.amount, currency)}</td>
           <td>${escapeHtml(p.origCurrency || currency)}</td>
           <td class="text-center">${receipt}</td>
@@ -419,7 +423,7 @@ const PaymentBreakdownHelpers = (() => {
     }).join('');
     return `<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 small">
         <thead class="table-light"><tr>
-          <th>Fecha</th><th>Método</th><th>Referencia</th><th class="text-end">Monto</th><th>Moneda</th><th class="text-center">Comprobante</th>
+          <th>Fecha</th><th>Método</th><th>Referencia</th><th>Recibió</th><th class="text-end">Monto</th><th>Moneda</th><th class="text-center">Comprobante</th>
         </tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 

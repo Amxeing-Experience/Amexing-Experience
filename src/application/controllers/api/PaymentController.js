@@ -25,6 +25,8 @@ const { validateDate } = require('../../utils/dateValidation');
 const CURRENCIES = ['MXN', 'USD'];
 const REFERENCE_MAX = 100;
 const NOTES_MAX = 300;
+// Nombre de quien recibió el efectivo — mismo cap que reference (texto libre acotado).
+const RECEIVED_BY_MAX = 100;
 // Upper bound for a single payment amount — blocks absurd values (e.g. 1e19).
 const AMOUNT_MAX = 100000000; // 100,000,000
 
@@ -118,7 +120,8 @@ class PaymentController {
 
   /**
    * POST /api/reservations/:id/payments — Register a payment, then recalculate.
-   * @param {object} req - Express request; body { amount, currency, method, reference, notes, paidAt, reservationServiceId, paymentInfoId }.
+   * paidAt is required; receivedBy is required only when method === 'efectivo'.
+   * @param {object} req - Express request; body { amount, currency, method, reference, notes, paidAt, receivedBy, reservationServiceId, paymentInfoId }.
    * @param {object} res - Express response.
    * @returns {Promise<object>} JSON { success, data: { payment, summary } }.
    * @example
@@ -128,7 +131,7 @@ class PaymentController {
     try {
       const { id } = req.params;
       const {
-        amount, currency, method, reference, notes, paidAt,
+        amount, currency, method, reference, notes, paidAt, receivedBy,
         reservationServiceId, paymentInfoId, fileBase64, fileName, mimeType,
       } = req.body || {};
 
@@ -164,9 +167,21 @@ class PaymentController {
         }
       }
 
-      // Payment date — shared standard: future allowed (reservations later), 1900 .. today + 20y.
+      // Payment date — now REQUIRED: hay que SABER qué día se hizo el pago, nunca inferirlo en silencio.
+      if (paidAt === undefined || paidAt === null || String(paidAt).trim() === '') {
+        return res.status(400).json({ success: false, error: 'La fecha de pago es obligatoria.' });
+      }
+      // Shared standard: future allowed (reservations later), 1900 .. today + 20y.
       const paidAtError = validateDate(paidAt, { fieldName: 'Fecha de pago', allowFuture: true });
       if (paidAtError) return res.status(400).json({ success: false, error: paidAtError });
+
+      // Efectivo exige saber quién recibió físicamente el dinero. Para transferencia/tarjeta es
+      // irrelevante: no se exige, pero si llega se guarda (no se descarta).
+      const receivedByClean = receivedBy !== undefined && receivedBy !== null
+        ? String(receivedBy).trim().slice(0, RECEIVED_BY_MAX) : '';
+      if (validation.method === 'efectivo' && !receivedByClean) {
+        return res.status(400).json({ success: false, error: 'Indica quién recibió el efectivo.' });
+      }
 
       const { amountMXN, rate } = await PaymentController.toMXN(validation.amount, validation.currency);
 
@@ -180,7 +195,8 @@ class PaymentController {
       payment.setMethod(method);
       if (reference) payment.setReference(String(reference).slice(0, REFERENCE_MAX));
       if (notes) payment.setNotes(String(notes).slice(0, NOTES_MAX));
-      payment.setPaidAt(paidAt ? new Date(paidAt) : new Date());
+      if (receivedByClean) payment.setReceivedBy(receivedByClean);
+      payment.setPaidAt(new Date(paidAt));
       payment.setRegisteredBy(req.user);
       if (paymentInfoId) {
         const pi = new Parse.Object('PaymentInfo');
@@ -252,7 +268,7 @@ class PaymentController {
     try {
       const { id, paymentId } = req.params;
       const {
-        amount, currency, method, reference, notes, paidAt, reservationServiceId,
+        amount, currency, method, reference, notes, paidAt, receivedBy, reservationServiceId,
         fileBase64, fileName, mimeType,
       } = req.body || {};
 
@@ -290,10 +306,25 @@ class PaymentController {
         }
       }
 
-      // Payment date — shared standard (future allowed). Only validated when a new value is sent.
+      // Payment date — una edición parcial que NO toca la fecha (paidAt omitido) conserva la existente.
+      // Pero un paidAt presente y vacío/null = el usuario la borró a propósito: se rechaza, un pago nunca
+      // debe quedar sin fecha. Shared standard (future allowed) cuando sí llega un valor.
       if (paidAt !== undefined) {
+        if (paidAt === null || String(paidAt).trim() === '') {
+          return res.status(400).json({ success: false, error: 'La fecha de pago es obligatoria.' });
+        }
         const paidAtError = validateDate(paidAt, { fieldName: 'Fecha de pago', allowFuture: true });
         if (paidAtError) return res.status(400).json({ success: false, error: paidAtError });
+      }
+
+      // Efectivo sigue exigiendo quién recibió el dinero. Valor efectivo = el nuevo si llega, si no el
+      // almacenado; método efectivo = el nuevo si llega, si no el almacenado (nextMethod). Un pago que
+      // ya es/pasa a ser efectivo no puede quedarse sin este dato.
+      const nextReceivedBy = receivedBy !== undefined
+        ? String(receivedBy || '').trim().slice(0, RECEIVED_BY_MAX)
+        : (payment.getReceivedBy() || '');
+      if (nextMethod === 'efectivo' && !nextReceivedBy) {
+        return res.status(400).json({ success: false, error: 'Indica quién recibió el efectivo.' });
       }
 
       if (amount !== undefined || currency !== undefined) {
@@ -306,7 +337,8 @@ class PaymentController {
       if (method !== undefined) payment.setMethod(validation.method);
       if (reference !== undefined) payment.setReference(String(reference || '').slice(0, REFERENCE_MAX));
       if (notes !== undefined) payment.setNotes(String(notes || '').slice(0, NOTES_MAX));
-      if (paidAt !== undefined) payment.setPaidAt(paidAt ? new Date(paidAt) : new Date());
+      if (receivedBy !== undefined) payment.setReceivedBy(String(receivedBy || '').trim().slice(0, RECEIVED_BY_MAX));
+      if (paidAt !== undefined) payment.setPaidAt(new Date(paidAt));
       if (reservationServiceId !== undefined) {
         await PaymentController.applyServicePointer(payment, reservationServiceId, reservation, res);
         if (res.headersSent) return undefined;
