@@ -29,6 +29,18 @@ const Payment = require('../../domain/models/Payment');
 const { getEndClientCapabilities } = require('../config/endClientCapabilities');
 
 /**
+ * Redondeo a 2 decimales (moneda), con la misma corrección de punto flotante (Number.EPSILON) que
+ * PaymentService.round2, para que la propina general recalculada no divierja del motor de pagos por un centavo.
+ * @param {number} n - Valor a redondear.
+ * @returns {number} Valor con 2 decimales (0 para entradas no numéricas).
+ * @example
+ * round2(1.005) // 1.01
+ */
+function round2(n) {
+  return Math.round((Number(n) + Number.EPSILON || 0) * 100) / 100;
+}
+
+/**
  * QuoteService class implementing Quote business logic.
  */
 class QuoteService {
@@ -1812,6 +1824,68 @@ class QuoteService {
   }
 
   /**
+   * Recalcula la propina GENERAL de la cotización a pesos FIJOS en efectivo, desde serviceItems.globalTip.
+   * NO se confía en globalTip.amount persistido por el wizard: se calculó contra el método de pago que
+   * estuviera seleccionado y puede venir inflado con recargo de tarjeta (incluso para type 'amount'). Se
+   * recomputa contra la base en efectivo NETA de los servicios ACTIVOS (includeInTotal !== false), restando
+   * el discountAmount de cada servicio ANTES del %, con el mismo patrón que el tip por-servicio del wizard
+   * (ya correcto). type 'percent': base × value/100; type 'amount': value literal (nunca escala por método).
+   * Sin globalTip válido, valor <= 0 o no finito -> 0.
+   * @param {object} serviceItems - Snapshot de servicios de la cotización { globalTip, days }.
+   * @returns {number} Propina general en pesos (efectivo), a 2 decimales.
+   * @example
+   * this.computeGeneralTip({ globalTip: { type: 'percent', value: 10 }, days: [...] }); // 10% de la base neta
+   */
+  computeGeneralTip(serviceItems) {
+    const gt = serviceItems && serviceItems.globalTip;
+    if (!gt || (gt.type !== 'percent' && gt.type !== 'amount')) return 0;
+    const value = Number(gt.value);
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    // Monto fijo: literal en pesos, sin escalar por método (anti-regresión del bug del wizard).
+    if (gt.type === 'amount') return round2(value);
+    // Porcentaje: sobre la base en efectivo NETA (precio efectivo menos su descuento) de servicios activos.
+    const days = Array.isArray(serviceItems.days) ? serviceItems.days : [];
+    let netBaseEfectivo = 0;
+    for (const day of days) {
+      const subs = Array.isArray(day.subconcepts) ? day.subconcepts : [];
+      for (const sub of subs) {
+        if (sub && sub.includeInTotal !== false) {
+          const ef = Number(sub.pricesByType && sub.pricesByType.efectivo) || 0;
+          const disc = Number(sub.discountAmount) || 0;
+          netBaseEfectivo += Math.max(0, ef - disc);
+        }
+      }
+    }
+    return round2(netBaseEfectivo * (value / 100));
+  }
+
+  /**
+   * Suma la propina POR SERVICIO (subconcept.tipAmount, ya en pesos fijos por el wizard) de los servicios
+   * ACTIVOS del snapshot de la cotización. Un servicio excluido del total aporta $0 (igual que su precio).
+   * Solo se LEE tipAmount, nunca se recalcula. Mismo criterio que PaymentService.sumServiceTips (que suma
+   * desde los ReservationService); aquí se suma desde serviceItems.days porque en la sincronización los RS
+   * todavía no se han reconciliado.
+   * @param {object} serviceItems - Snapshot de servicios de la cotización { days }.
+   * @returns {number} Suma de propinas por servicio, a 2 decimales.
+   * @example
+   * this.sumServiceTipsFromDays({ days: [{ subconcepts: [{ tipAmount: 100 }] }] }); // 100
+   */
+  sumServiceTipsFromDays(serviceItems) {
+    const days = (serviceItems && Array.isArray(serviceItems.days)) ? serviceItems.days : [];
+    let total = 0;
+    for (const day of days) {
+      const subs = Array.isArray(day.subconcepts) ? day.subconcepts : [];
+      for (const sub of subs) {
+        if (sub && sub.includeInTotal !== false) {
+          const tip = Number(sub.tipAmount);
+          if (Number.isFinite(tip) && tip > 0) total += tip;
+        }
+      }
+    }
+    return round2(total);
+  }
+
+  /**
    * Keeps an existing reservation in sync when its source quote's serviceItems
    * change. No-op when the quote has no active reservation (reservations are only
    * created on a status change). Always syncs the denormalized general info
@@ -1853,19 +1927,24 @@ class QuoteService {
     // are provided (i.e. called from the service-items save).
     if (serviceItems) {
       reservation.set('serviceItemsSnapshot', serviceItems);
-      // servicesSubtotal = total de servicios (IVA incluido) que sirve de BASE a los ajustes de
-      // reservación — misma semántica que createReservationFromQuote (servicesSubtotal =
-      // serviceItems.total). recalculateTotal luego netea los ajustes YA EXISTENTES de la
-      // reservación (cargos − descuentos) sobre ese base para producir totalAmount, así una
-      // re-sincronización de una cotización editada NUNCA borra un ajuste aplicado después de crear
-      // la reservación (council L0F1). Se reutiliza la MISMA función que usan addAdjustment/
-      // removeAdjustment para que el campo cacheado quede idéntico por cualquier vía; el motor de
-      // pagos (loadAndCompute) sigue neteando adjustments por su cuenta e ignora este campo, así que
-      // el saldo cobrado nunca dependió de este bug. require diferido: el ciclo con
-      // ReservationController se rompe al ejecutar (no en la carga del módulo).
+      // servicesSubtotal = SUBTOTAL de servicios SIN la propina general horneada (serviceItems.subtotal,
+      // no .total). serviceItems.total incluye el globalTip (potencialmente escalado por el método de pago)
+      // y era la raíz del "tercer total": el header quedaba por encima del motor de pagos. El subtotal
+      // limpio es la BASE a la que recalculateTotal netea los ajustes YA EXISTENTES (cargos − descuentos)
+      // y suma la propina cobrada (general + por servicio) para producir totalAmount. Así una
+      // re-sincronización de una cotización editada NUNCA borra un ajuste aplicado después de crear la
+      // reservación (council L0F1). El motor de pagos (loadAndCompute) ignora este campo (recomputa desde
+      // los ReservationService), así que el saldo cobrado nunca dependió del bug. require diferido: el
+      // ciclo con ReservationController se rompe al ejecutar (no en la carga del módulo).
       const ReservationController = require('../controllers/api/ReservationController');
-      reservation.set('servicesSubtotal', serviceItems.total || 0);
-      ReservationController.recalculateTotal(reservation);
+      // Propina GENERAL recalculada (pesos fijos en efectivo) — se SOBREESCRIBE en cada sync (no es "solo
+      // si está vacío" como exchangeRateSnapshot): si el vendedor editó el %/monto o cambió servicios que
+      // afectan la base, el monto cobrado se actualiza. Un pago ya hecho no se toca; sólo cambia el saldo.
+      reservation.set('tip', this.computeGeneralTip(serviceItems));
+      reservation.set('servicesSubtotal', serviceItems.subtotal || 0);
+      // Propina POR SERVICIO recomputada desde el snapshot nuevo (los RS aún no se reconcilian en este
+      // punto): se pasa a recalculateTotal para que el header (totalAmount) cuadre con el motor de pagos.
+      await ReservationController.recalculateTotal(reservation, this.sumServiceTipsFromDays(serviceItems));
       if (serviceItems.currency) reservation.set('currency', serviceItems.currency);
       // Tipo de cambio congelado: SOLO se fija si la reservación todavía no tiene snapshot. Una reservación
       // ya creada (posiblemente con pagos registrados) NUNCA cambia su tasa aunque la cotización de origen
@@ -2086,6 +2165,15 @@ class QuoteService {
         // If cancelled, reactivate it and its services
         if (existing.get('status') === 'cancelled') {
           existing.set('status', 'pending');
+          // Propina + subtotal recalculados desde la cotización ACTUAL (no lo que quedó congelado al
+          // cancelar): si el vendedor editó la cotización mientras la reservación estaba cancelada (nadie
+          // la sincroniza en ese estado), reactivar debe reflejar la versión más reciente, igual que
+          // cualquier otra re-sincronización. Los ajustes manuales existentes se preservan (no se tocan).
+          existing.set('tip', this.computeGeneralTip(serviceItems));
+          existing.set('servicesSubtotal', serviceItems.subtotal || 0);
+          // eslint-disable-next-line global-require
+          const ReservationController = require('../controllers/api/ReservationController');
+          await ReservationController.recalculateTotal(existing, this.sumServiceTipsFromDays(serviceItems));
           await existing.save(null, { useMasterKey: true });
 
           const svcQuery = new Parse.Query('ReservationService');
@@ -2134,12 +2222,21 @@ class QuoteService {
       }
 
       // Create Reservation
+      // Propina cobrada (Fase 2): general recalculada (pesos fijos, sin escalar por método) + Σ propina
+      // por servicio del snapshot. servicesSubtotal = SUBTOTAL limpio (serviceItems.subtotal, sin la propina
+      // general horneada — .total sí la incluye y era la raíz del "tercer total"). totalAmount (header) se
+      // fija ya con la propina para no divergir del motor de pagos desde el primer render (sin ajustes aún).
+      const generalTip = this.computeGeneralTip(serviceItems);
+      const serviceTipsTotal = this.sumServiceTipsFromDays(serviceItems);
+      const cleanSubtotal = serviceItems.subtotal || 0;
+
       const reservation = new Reservation();
       reservation.set('quotePtr', quote);
       reservation.set('folio', folio);
       reservation.set('status', 'pending');
-      reservation.set('totalAmount', serviceItems.total || 0);
-      reservation.set('servicesSubtotal', serviceItems.total || 0);
+      reservation.set('tip', generalTip);
+      reservation.set('servicesSubtotal', cleanSubtotal);
+      reservation.set('totalAmount', round2(cleanSubtotal + generalTip + serviceTipsTotal));
       reservation.set('adjustments', []);
       reservation.set('currency', serviceItems.currency || 'MXN');
       // Tipo de cambio congelado: la reservación es nueva, así que hereda el snapshot que la cotización

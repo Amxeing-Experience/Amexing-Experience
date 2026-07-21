@@ -261,6 +261,10 @@ const PaymentBreakdownHelpers = (() => {
       return '<div class="text-muted small py-2">No hay métodos de pago disponibles para esta reservación.</div>';
     }
     const adjustments = round2(s.adjustments);
+    // Propina cobrada (Fase 2): pesos FIJOS iguales en los 3 chips (no escalan por método), igual que los
+    // ajustes. Como se suma la MISMA cantidad a cada chip, la DIFERENCIA entre chips de distinto método
+    // sigue siendo exactamente la diferencia de subtotales de servicios (property verificada en tests).
+    const tip = round2(s.tip);
     const coverage = round2(s.coveragePercent);
     const coverageWidth = Math.max(0, Math.min(100, coverage));
     const anchor = s.anchoredMethod;
@@ -268,8 +272,8 @@ const PaymentBreakdownHelpers = (() => {
     const showCheaper = cheapest && anchor && cheapest !== anchor;
     const chips = methods.map((m) => {
       // Clamp a 0 igual que computeTotals del servidor (Math.max(0, ...)): un descuento/ajuste mayor al
-      // subtotal de servicios no debe pintar un total negativo por método (council L4F1).
-      const methodTotal = Math.max(0, round2(computeServicesSubtotalByType(services, m, currency) + adjustments));
+      // subtotal de servicios + propina no debe pintar un total negativo por método (council L4F1).
+      const methodTotal = Math.max(0, round2(computeServicesSubtotalByType(services, m, currency) + adjustments + tip));
       // El badge "Cotizado" vive en la card de cobertura (junto a Total a pagar), no repetido aquí.
       const cheaperTag = (showCheaper && m === cheapest)
         ? `<span class="badge ms-1" style="background:${DISCOUNT_GREEN};color:#fff;">Más barato</span>` : '';

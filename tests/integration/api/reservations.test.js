@@ -59,12 +59,12 @@ describe('Reservation Controller Integration Tests', () => {
           draw: 1,
           start: 0,
           length: 10,
-          status: 'confirmed'
+          statusFilter: 'confirmed'
         });
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('data');
-      
+
       // If there are results, they should all have status 'confirmed'
       if (response.body.data.length > 0) {
         response.body.data.forEach(reservation => {

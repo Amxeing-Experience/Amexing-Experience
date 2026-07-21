@@ -203,6 +203,104 @@ describe('PaymentService pure helpers', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Fase 2 (propina cobrada) — la propina es un monto FIJO en pesos que NUNCA
+  // escala con el método de pago; se suma DESPUÉS del redondeo a efectivo y de
+  // los ajustes, dentro del clamp final, sin re-redondear a múltiplo de 5.
+  // ---------------------------------------------------------------------------
+  describe('computeTotals con propina (Fase 2)', () => {
+    // Precio limpio: efectivo 10000 / transferencia 11600 / tarjeta 12100.
+    const items = [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 } }];
+
+    it('la propina NO escala por método: se suma la MISMA cantidad plana al ancla efectivo y al ancla tarjeta', () => {
+      const ef = PaymentService.computeTotals(items, 'efectivo', 0, 'MXN', 300);
+      const tj = PaymentService.computeTotals(items, 'tarjeta', 0, 'MXN', 300);
+      expect(ef.tip).toBe(300);
+      expect(tj.tip).toBe(300); // NO 300*1.21
+      expect(ef.total).toBe(10300); // 10000 + 300
+      expect(tj.total).toBe(12400); // 12100 + 300 (plano)
+      // La propina no afecta servicesTotal (base de conversión entre métodos) ni el recargo.
+      expect(ef.servicesTotal).toBe(10000);
+      expect(tj.servicesTotal).toBe(12100);
+      expect(tj.surcharge).toBe(2100); // 12100 - 10000, intacto
+    });
+
+    it('tip=0 (default) es retro-compatible: total sin propina, campo tip = 0', () => {
+      const t = PaymentService.computeTotals(items, 'efectivo');
+      expect(t.tip).toBe(0);
+      expect(t.total).toBe(10000);
+    });
+
+    it('tip negativo / NaN / Infinity se clampan a 0 (nunca contaminan el total)', () => {
+      expect(PaymentService.computeTotals(items, 'efectivo', 0, 'MXN', -50).tip).toBe(0);
+      expect(PaymentService.computeTotals(items, 'efectivo', 0, 'MXN', NaN).tip).toBe(0);
+      expect(PaymentService.computeTotals(items, 'efectivo', 0, 'MXN', Infinity).tip).toBe(0);
+      expect(PaymentService.computeTotals(items, 'efectivo', 0, 'MXN', -50).total).toBe(10000);
+    });
+
+    it('redondea la propina a 2 decimales sin arrastre de punto flotante (1.005 -> 1.01)', () => {
+      const t = PaymentService.computeTotals([], 'efectivo', 0, 'USD', 1.005);
+      expect(t.tip).toBe(1.01);
+      expect(t.total).toBe(1.01);
+    });
+
+    it('ORDEN: el efectivo se redondea a múltiplo de 5 ANTES, la propina se suma DESPUÉS sin re-redondear', () => {
+      // efectivo 103 -> cash round 100; + propina 7 = 107 (NO se re-redondea a 105/110).
+      const t = PaymentService.computeTotals([{ pricesByType: { efectivo: 103 } }], 'efectivo', 0, 'MXN', 7);
+      expect(t.servicesTotal).toBe(100); // servicios redondeados a múltiplo de 5
+      expect(t.total).toBe(107); // 100 + 7, la propina NO se re-redondea
+    });
+
+    it('un ajuste-descuento mayor a servicios+propina deja el total en 0 (nunca negativo)', () => {
+      // 1000 servicios − 1500 descuento + 300 propina = −200 -> clamp 0.
+      const t = PaymentService.computeTotals([{ pricesByType: { efectivo: 1000 } }], 'efectivo', -1500, 'MXN', 300);
+      expect(t.total).toBe(0);
+    });
+
+    it('moneda USD: sin redondeo a múltiplo de 5, la propina se suma plana', () => {
+      const t = PaymentService.computeTotals([{ pricesByType: { efectivo: 101 } }], 'efectivo', 0, 'USD', 50);
+      expect(t.servicesTotal).toBe(101); // USD no redondea efectivo
+      expect(t.total).toBe(151); // 101 + 50
+    });
+
+    it('la propina convive con ajustes: servicios + ajuste neto + propina, todos planos', () => {
+      const t = PaymentService.computeTotals(items, 'tarjeta', 100, 'MXN', 300);
+      expect(t.adjustments).toBe(100);
+      expect(t.tip).toBe(300);
+      expect(t.total).toBe(12500); // 12100 + 100 + 300
+    });
+  });
+
+  describe('sumServiceTips (Fase 2 — suma la propina por servicio, solo lectura)', () => {
+    it('suma tipAmount de los servicios activos', () => {
+      expect(PaymentService.sumServiceTips([{ tipAmount: 100 }, { tipAmount: 300 }])).toBe(400);
+    });
+
+    it('excluye includeInTotal:false (aporta $0 igual que su precio)', () => {
+      expect(PaymentService.sumServiceTips([
+        { tipAmount: 100 },
+        { includeInTotal: false, tipAmount: 999 },
+      ])).toBe(100);
+    });
+
+    it('ignora tipAmount no finito o negativo (NaN/Infinity/negativo -> 0)', () => {
+      expect(PaymentService.sumServiceTips([
+        { tipAmount: NaN }, { tipAmount: Infinity }, { tipAmount: -50 }, { tipAmount: 200 },
+      ])).toBe(200);
+    });
+
+    it('suma exacta con muchos servicios, sin deriva de centavos', () => {
+      const items = Array.from({ length: 10 }, () => ({ tipAmount: 0.1 }));
+      expect(PaymentService.sumServiceTips(items)).toBe(1); // 10 × 0.10 = 1.00 exacto (round2)
+    });
+
+    it('un servicio sin tipAmount cuenta como 0; vacío/null -> 0', () => {
+      expect(PaymentService.sumServiceTips([{ total: 100 }, { tipAmount: 50 }])).toBe(50);
+      expect(PaymentService.sumServiceTips([])).toBe(0);
+      expect(PaymentService.sumServiceTips(null)).toBe(0);
+    });
+  });
+
   describe('deriveStatus', () => {
     it('is pending when nothing is paid', () => {
       expect(PaymentService.deriveStatus(174, 0)).toBe('pending');
@@ -606,6 +704,58 @@ describe('PaymentService pure helpers', () => {
       expect(summary.remainingBase).toBe(100000);
       expect(summary.remainingPercent).toBe(100);
       expect(summary.montoParaSaldar).toEqual({ efectivo: 100000, transferencia: 116300, tarjeta: 123200 });
+    });
+
+    // --- Fase 2 (propina cobrada): expuesta desglosada y sumada al total/saldo ---
+    // Mirror de loadAndCompute con propina: generalTip/serviceTipsTotal viajan en `computed`.
+    const buildTip = (serviceItems, paymentType, paymentRows, generalTip, serviceTipsTotal, currency = 'MXN') => {
+      const reservationTip = PaymentService.sumServiceTips([{ tipAmount: generalTip }, { tipAmount: serviceTipsTotal }]);
+      return {
+        totals: PaymentService.computeTotals(serviceItems, paymentType, 0, currency, reservationTip),
+        paidGlobal: PaymentService.sumPayments(paymentRows),
+        serviceItems,
+        paymentType,
+        currency,
+        paymentRows,
+        generalTip,
+        serviceTipsTotal,
+      };
+    };
+    const TIP_ITEMS = [{ pricesByType: { efectivo: 10000, tarjeta: 12100 } }];
+
+    it('expone tip/generalTip/serviceTipsTotal (Fase 2); su suma es siempre tip y el total ya la incluye', () => {
+      const summary = PaymentService.buildSummary('r1', buildTip(TIP_ITEMS, 'efectivo', [], 100, 300));
+      expect(summary.generalTip).toBe(100);
+      expect(summary.serviceTipsTotal).toBe(300);
+      expect(summary.tip).toBe(400);
+      expect(summary.generalTip + summary.serviceTipsTotal).toBe(summary.tip);
+      expect(summary.total).toBe(10400); // 10000 servicios + 400 propina
+      expect(summary.remainingBase).toBe(10400); // sin pagos, el saldo incluye la propina
+    });
+
+    it('retro-compatible: sin propina en computed, tip/generalTip/serviceTipsTotal = 0', () => {
+      const summary = PaymentService.buildSummary('r1', build(THREE, 'efectivo', []));
+      expect(summary.tip).toBe(0);
+      expect(summary.generalTip).toBe(0);
+      expect(summary.serviceTipsTotal).toBe(0);
+    });
+
+    it('pago que cubre SOLO los servicios deja el saldo = propina pendiente (partial)', () => {
+      const rows = [{ amount: 10000, method: 'efectivo' }];
+      const summary = PaymentService.buildSummary('r1', buildTip(TIP_ITEMS, 'efectivo', rows, 300, 0));
+      expect(summary.total).toBe(10300);
+      expect(summary.paidAmount).toBe(10000);
+      expect(summary.paymentStatus).toBe('partial'); // faltó la propina
+      expect(summary.balance).toBe(300); // exactamente la propina pendiente
+      expect(summary.remainingBase).toBe(300);
+    });
+
+    it('pago EXACTO de servicios+propina en el método ancla cierra en paid, saldo 0', () => {
+      const rows = [{ amount: 10300, method: 'efectivo' }];
+      const summary = PaymentService.buildSummary('r1', buildTip(TIP_ITEMS, 'efectivo', rows, 300, 0));
+      expect(summary.paymentStatus).toBe('paid');
+      expect(summary.balance).toBe(0);
+      expect(summary.remainingBase).toBe(0);
     });
   });
 

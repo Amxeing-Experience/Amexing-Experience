@@ -1673,10 +1673,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         const discounts = adjustments.filter(a => a.type === 'discount');
         const chargesTotal = charges.reduce((s, a) => s + (a.amount || 0), 0);
         const discountsTotal = discounts.reduce((s, a) => s + (a.amount || 0), 0);
-        // Final total = subtotal + charges - discounts (computed instead of using the stored
-        // d.totalAmount so payment-type changes recompute correctly).
-        // Nunca negativo: un descuento mayor al total lo deja en 0 (igual que el server).
-        const finalTotal = Math.max(0, servicesSubtotal + chargesTotal - discountsTotal);
+        const pay = d.payment;
+        // Propina cobrada (Fase 2): SIEMPRE del summary del servidor (d.payment), NUNCA de d.globalTip del
+        // snapshot bruto de la cotización (fuente no confiable) ni recalculada localmente. general +
+        // por servicio suman pay.tip; el motor de pagos ya la incluye en pay.total.
+        const generalTip = pay ? PaymentBreakdownHelpers.round2(pay.generalTip) : 0;
+        const serviceTipsTotal = pay ? PaymentBreakdownHelpers.round2(pay.serviceTipsTotal) : 0;
+        // Total Final = EXACTAMENTE el total del motor de pagos (ya con propina) cuando hay summary; si el
+        // summary falló, cae al cálculo local de servicios ± ajustes (sin propina). Nunca negativo.
+        const finalTotal = pay
+            ? PaymentBreakdownHelpers.round2(pay.total)
+            : Math.max(0, servicesSubtotal + chargesTotal - discountsTotal);
         const curr = d.currency || 'MXN';
 
         let html = '';
@@ -1715,6 +1722,22 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
         });
 
+        // Propina cobrada (Fase 2): líneas leídas del summary del servidor para que el Subtotal + ajustes +
+        // propina reconcilie con el Total Final. La general va en su línea; la de por-servicio se agrega
+        // (los tips por servicio también aparecen por servicio en el itinerario, aquí es el agregado).
+        if (generalTip > 0) {
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propina general</span></div>
+                <span class="text-info fw-semibold">+${formatCurrency(generalTip, curr)}</span>
+            </div>`;
+        }
+        if (serviceTipsTotal > 0) {
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propinas por servicio</span></div>
+                <span class="text-info fw-semibold">+${formatCurrency(serviceTipsTotal, curr)}</span>
+            </div>`;
+        }
+
         // Final total
         html += `<div class="d-flex justify-content-between align-items-center py-2 mt-1">
             <span class="fw-bold"><i class="ti ti-receipt me-2"></i>Total Final</span>
@@ -1726,7 +1749,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         // método más barato que el ancla de la cotización, el residuo físico aparece como línea de AHORRO
         // aparte (nunca restado del saldo). El detalle completo (chips, cobertura, desglose por método,
         // historial y registro) vive en #paymentsOffcanvas.
-        const pay = d.payment;
         if (pay) {
             const resolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
             const balanceCls = resolved.displayedBalance > 0 ? 'text-danger' : 'text-success';

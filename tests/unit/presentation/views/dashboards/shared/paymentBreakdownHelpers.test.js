@@ -231,6 +231,24 @@ describe('PaymentBreakdownHelpers.buildMethodChips (Requisito 3 — % del backen
     expect(html).not.toContain('-$');
     expect(html).toContain('$0.00');
   });
+
+  it('Fase 2: la propina (plana) se suma igual a los 3 chips; la DIFERENCIA entre métodos no cambia por el tip', () => {
+    const summary = {
+      availableMethods: ['efectivo', 'transferencia', 'tarjeta'], anchoredMethod: 'efectivo',
+      adjustments: 50, tip: 300, coveragePercent: 0,
+    };
+    const html = H.buildMethodChips(summary, services, 'MXN');
+    // Cada chip = subtotal de servicios del método + ajuste (50) + propina (300), PLANA por método.
+    expect(html).toContain('$1,350.00'); // efectivo 1000 + 50 + 300
+    expect(html).toContain('$1,510.00'); // transferencia 1160 + 50 + 300
+    expect(html).toContain('$1,560.00'); // tarjeta 1210 + 50 + 300
+    // PROPERTY: la diferencia tarjeta - efectivo (1560 - 1350 = 210) es EXACTA la de subtotales de
+    // servicios (1210 - 1000), invariante al tip/ajuste (que se suman por igual a todos los chips).
+    const diff = H.computeServicesSubtotalByType(services, 'tarjeta', 'MXN')
+      - H.computeServicesSubtotalByType(services, 'efectivo', 'MXN');
+    expect(diff).toBe(210);
+    expect(1560 - 1350).toBe(diff);
+  });
 });
 
 describe('PaymentBreakdownHelpers.buildCoverageCard + buildRemainingByMethod', () => {

@@ -445,6 +445,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         const adjustments = d.adjustments || [];
         const servicesSubtotal = d.servicesSubtotal || d.totalAmount || 0;
         const curr = d.currency || 'MXN';
+        const pay = d.payment;
+        // Propina cobrada (Fase 2): del summary del servidor (d.payment), NUNCA de d.globalTip del snapshot
+        // bruto ni recalculada localmente. d.totalAmount (Total Final) ya la incluye vía recalculateTotal.
+        const generalTip = pay ? PaymentBreakdownHelpers.round2(pay.generalTip) : 0;
+        const serviceTipsTotal = pay ? PaymentBreakdownHelpers.round2(pay.serviceTipsTotal) : 0;
 
         // La tarjeta financiera se pinta SIEMPRE que haya datos de reservación, con o sin ajustes.
         // (Antes un early-return con 0 ajustes ocultaba también Subtotal/Total/Saldo — bug corregido.)
@@ -476,16 +481,31 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
         });
 
+        // Propina cobrada (Fase 2): líneas del summary del servidor para que Subtotal + ajustes + propina
+        // reconcilie con el Total Final. La general en su línea; la de por-servicio agregada (los tips por
+        // servicio también aparecen por servicio en el itinerario, aquí es el agregado).
+        if (generalTip > 0) {
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propina general</span></div>
+                <span class="text-info fw-semibold">+${formatCurrency(generalTip, curr)}</span>
+            </div>`;
+        }
+        if (serviceTipsTotal > 0) {
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propinas por servicio</span></div>
+                <span class="text-info fw-semibold">+${formatCurrency(serviceTipsTotal, curr)}</span>
+            </div>`;
+        }
+
         html += `<div class="d-flex justify-content-between align-items-center py-2 mt-1">
             <span class="fw-bold"><i class="ti ti-receipt me-2"></i>Total Final</span>
-            <span class="fw-bold fs-5 text-success">${formatCurrency(d.totalAmount || 0, curr)}</span>
+            <span class="fw-bold fs-5 text-success">${formatCurrency(pay ? PaymentBreakdownHelpers.round2(pay.total) : (d.totalAmount || 0), curr)}</span>
         </div>`;
 
         // Bloque de pago (agencia/agente): Estado / Total a pagar / Pagado / Saldo. El "Saldo" se resuelve
         // con resolveDisplayedBalance (0 cuando está pagado; línea de ahorro aparte si se pagó en un método
         // más barato que el ancla). El detalle completo (chips, cobertura, saldo por método, descuento e
         // historial) vive de solo lectura en #paymentsOffcanvas ("Ver pagos").
-        const pay = d.payment;
         if (pay) {
             const resolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
             const balanceCls = resolved.displayedBalance > 0 ? 'text-danger' : 'text-success';

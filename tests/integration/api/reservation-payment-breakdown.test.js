@@ -191,13 +191,18 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
       expect(res.body.error).toBe('El monto debe ser un número mayor a 0');
     });
 
-    it('(c) el DTO de GET /reservations/:id NO expone la clave tip', async () => {
+    it('(c) Fase 2: el DTO de GET /reservations/:id expone la propina desglosada (0 sin propina)', async () => {
+      // Sin subconcept.tipAmount ni reservation.tip, la propina cobrada es 0 en las 3 claves.
       const { id } = await createReservation([{ total: 1000 }], 'efectivo');
       await postPayment(id, { amount: 500, method: 'efectivo' });
 
       const res = await getReservation(id, adminToken);
       expect(res.status).toBe(200);
-      expect(Object.keys(res.body.data.payment)).not.toContain('tip');
+      expect(res.body.data.payment.tip).toBe(0);
+      expect(res.body.data.payment.generalTip).toBe(0);
+      expect(res.body.data.payment.serviceTipsTotal).toBe(0);
+      // El total no cambia por una propina de 0 (retro-compatible con reservaciones sin propina).
+      expect(res.body.data.payment.total).toBe(1000);
     });
   });
 });

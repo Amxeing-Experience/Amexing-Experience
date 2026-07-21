@@ -955,6 +955,11 @@ class ReservationController {
             balance: paymentSummary.balance,
             subtotal: paymentSummary.subtotal,
             iva: paymentSummary.iva,
+            // Propina cobrada (Fase 2): combinada + desglosada (general vs por servicio) para la línea
+            // "Propina general" del Resumen Financiero. El total ya la incluye.
+            tip: paymentSummary.tip,
+            generalTip: paymentSummary.generalTip,
+            serviceTipsTotal: paymentSummary.serviceTipsTotal,
             total: paymentSummary.total,
           } : {
             // Fallback (summarize() lanzó): deriva total = balance + paidAmount para que la UI de
@@ -962,6 +967,9 @@ class ReservationController {
             paymentStatus: reservation.get('paymentStatus') || 'pending',
             paidAmount: reservation.get('paidAmount') || 0,
             balance: reservation.get('balance'),
+            tip: 0,
+            generalTip: 0,
+            serviceTipsTotal: 0,
             total: Math.round(
               ((Number(reservation.get('balance')) || 0) + (Number(reservation.get('paidAmount')) || 0)) * 100
             ) / 100,
@@ -1831,8 +1839,8 @@ class ReservationController {
         adjustments.push(adjustment);
         reservation.set('adjustments', adjustments);
 
-        // Recalculate total
-        ReservationController.recalculateTotal(reservation);
+        // Recalculate total (incluye la propina cobrada; carga los service-tips desde los RS activos)
+        await ReservationController.recalculateTotal(reservation);
 
         await reservation.save(null, { useMasterKey: true });
 
@@ -1915,8 +1923,8 @@ class ReservationController {
         const removed = adjustments.splice(idx, 1)[0];
         reservation.set('adjustments', adjustments);
 
-        // Recalculate total
-        ReservationController.recalculateTotal(reservation);
+        // Recalculate total (incluye la propina cobrada; carga los service-tips desde los RS activos)
+        await ReservationController.recalculateTotal(reservation);
 
         await reservation.save(null, { useMasterKey: true });
 
@@ -1965,11 +1973,46 @@ class ReservationController {
   }
 
   /**
-   * Recalculate totalAmount from servicesSubtotal and adjustments.
-   * @param {object} reservation - Parse Reservation object.
+   * Suma la propina POR SERVICIO (subconcept.tipAmount, ya en pesos fijos) de los ReservationService
+   * ACTIVOS de una reservación. Excluye los includeInTotal === false (aportan $0); los soft-eliminados no
+   * los devuelve la query (active/exists). Solo un tipAmount finito y positivo cuenta. Solo LEE el valor.
+   * @param {object} reservation - Parse Reservation object (ya cargado, con id).
+   * @returns {Promise<number>} Suma de propinas por servicio, a 2 decimales.
    * @example
+   * const svcTips = await ReservationController.sumActiveServiceTips(reservation);
    */
-  static recalculateTotal(reservation) {
+  static async sumActiveServiceTips(reservation) {
+    const svcQuery = new Parse.Query('ReservationService');
+    svcQuery.equalTo('reservationPtr', reservation);
+    svcQuery.equalTo('active', true);
+    svcQuery.equalTo('exists', true);
+    svcQuery.limit(1000);
+    const services = await svcQuery.find({ useMasterKey: true });
+    const sum = services.reduce((s, svc) => {
+      const sub = svc.get('subconcept') || {};
+      if (sub.includeInTotal === false) return s;
+      const tip = Number(sub.tipAmount);
+      return s + (Number.isFinite(tip) && tip > 0 ? tip : 0);
+    }, 0);
+    return Math.round((sum + Number.EPSILON) * 100) / 100;
+  }
+
+  /**
+   * Recalculate totalAmount from servicesSubtotal, adjustments and the collected tip.
+   *
+   * El header (totalAmount, que leen TODAS las vistas) debe cuadrar con el "Total a pagar" del motor de
+   * pagos, que ahora COBRA la propina. total = max(0, servicesSubtotal + cargos − descuentos + propina),
+   * donde propina = general (reservation.tip) + Σ propina por servicio de los servicios ACTIVOS. La propina
+   * son pesos fijos (no escalan por método), igual que los ajustes. serviceTipsTotal se PASA ya calculado
+   * desde la sincronización de cotización (los RS aún no se reconcilian en ese punto); en los demás
+   * llamadores (agregar/quitar ajuste) se omite y se carga aquí desde los ReservationService.
+   * @param {object} reservation - Parse Reservation object.
+   * @param {number|null} [serviceTipsTotal] - Propina por servicio ya calculada; null => se carga aquí.
+   * @returns {Promise<void>}
+   * @example
+   * await ReservationController.recalculateTotal(reservation);
+   */
+  static async recalculateTotal(reservation, serviceTipsTotal = null) {
     const servicesSubtotal = reservation.get('servicesSubtotal')
       || reservation.get('totalAmount') || 0;
     const adjustments = reservation.get('adjustments') || [];
@@ -1982,7 +2025,16 @@ class ReservationController {
       .filter((a) => a.type === 'discount')
       .reduce((sum, a) => sum + (a.amount || 0), 0);
 
-    const finalTotal = Math.max(0, servicesSubtotal + charges - discounts);
+    const generalTip = Number(reservation.get('tip')) || 0;
+    let svcTips = Number(serviceTipsTotal);
+    if (serviceTipsTotal === null || !Number.isFinite(svcTips)) {
+      svcTips = await ReservationController.sumActiveServiceTips(reservation);
+    }
+    const tip = Math.round(
+      (generalTip + (Number.isFinite(svcTips) && svcTips > 0 ? svcTips : 0) + Number.EPSILON) * 100
+    ) / 100;
+
+    const finalTotal = Math.max(0, servicesSubtotal + charges - discounts + tip);
     reservation.set('totalAmount', Math.round(finalTotal * 100) / 100);
   }
 

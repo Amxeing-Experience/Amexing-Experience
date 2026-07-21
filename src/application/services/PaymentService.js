@@ -93,11 +93,12 @@ class PaymentService {
    * @param {string} paymentType - Método (efectivo|transferencia|tarjeta).
    * @param {number} [adjustmentsNet] - Net reservation adjustments (charges − discounts), pesos finales.
    * @param {string} [currency] - Moneda (MXN aplica redondeo a efectivo).
-   * @returns {object} { subtotal, adjustments, iva, surcharge, servicesTotal, total, paymentType }.
+   * @param {number} [reservationTip] - Propina cobrada (general + por servicio), pesos FIJOS que no escalan por método.
+   * @returns {object} { subtotal, adjustments, iva, surcharge, servicesTotal, tip, total, paymentType }.
    * @example
    * PaymentService.computeTotals([{ id: 'a', pricesByType: { efectivo: 100, tarjeta: 121 } }], 'tarjeta') // total 121
    */
-  static computeTotals(serviceItems, paymentType, adjustmentsNet = 0, currency = 'MXN') {
+  static computeTotals(serviceItems, paymentType, adjustmentsNet = 0, currency = 'MXN', reservationTip = 0) {
     const items = Array.isArray(serviceItems) ? serviceItems : [];
     let base = 0;
     let chargeSum = 0;
@@ -115,8 +116,14 @@ class PaymentService {
 
     // Ajustes (cargos/descuentos) se suman como pesos finales (sin factor).
     const adjustments = round2(Number(adjustmentsNet) || 0);
-    // El total nunca es negativo: un descuento mayor al monto lo deja en 0 (no se debe "menos que nada").
-    const total = Math.max(0, round2(servicesTotal + adjustments));
+    // Propina = pesos FIJOS que NUNCA escalan por método de pago (mismo criterio que los ajustes). Se
+    // suma DESPUÉS del redondeo a efectivo de los servicios y DESPUÉS de los ajustes, dentro del clamp
+    // final; NO se re-redondea a múltiplo de 5, NO afecta servicesTotal (base de conversión entre
+    // métodos) ni surcharge. Guarda: solo un número finito y positivo cuenta (NaN/Infinity/negativo -> 0).
+    const rawTip = Number(reservationTip);
+    const tip = Number.isFinite(rawTip) && rawTip > 0 ? round2(rawTip) : 0;
+    // El total nunca es negativo: un descuento mayor a servicios+propina lo deja en 0 (no "menos que nada").
+    const total = Math.max(0, round2(servicesTotal + adjustments + tip));
     // Recargo agregado por el método (IVA, o IVA + tarjeta). Se expone también como `iva`
     // por compatibilidad con los consumidores existentes del summary.
     const surcharge = round2(servicesTotal - base);
@@ -127,6 +134,7 @@ class PaymentService {
       iva: surcharge,
       surcharge,
       servicesTotal,
+      tip,
       total,
       paymentType,
     };
@@ -199,16 +207,20 @@ class PaymentService {
    * @param {string} opts.anchoredMethod - Método ancla (reservation.paymentType).
    * @param {string} [opts.currency] - Moneda.
    * @param {number} [opts.adjustmentsNet] - Ajustes netos (cargos − descuentos), pesos finales.
+   * @param {number} [opts.reservationTip] - Propina cobrada (general + por servicio), pesos planos sin escalar por método.
    * @param {Array<string>} [opts.validMethods] - Métodos aceptados.
    * @returns {object} { totalDue, coverageAmount, remainingBase, remainingPercent, montoParaSaldar }.
    * @example
    * PaymentService.remainingBreakdown(payments, { serviceItems, anchoredMethod: 'efectivo' })
    */
   static remainingBreakdown(payments, {
-    serviceItems, anchoredMethod, currency = 'MXN', adjustmentsNet = 0, validMethods = ['efectivo', 'transferencia', 'tarjeta'],
+    serviceItems, anchoredMethod, currency = 'MXN', adjustmentsNet = 0, reservationTip = 0, validMethods = ['efectivo', 'transferencia', 'tarjeta'],
   }) {
     const baseTotal = this.totalForMethod(serviceItems, anchoredMethod, currency);
-    const totalDue = Math.max(0, round2(baseTotal + (Number(adjustmentsNet) || 0)));
+    // La propina entra al saldo como pesos planos, EXACTAMENTE igual que adjustmentsNet (no se re-convierte
+    // por método): se suma una sola vez a la deuda total, nunca por el ratio de montoParaSaldar.
+    const tipDue = Number.isFinite(Number(reservationTip)) && Number(reservationTip) > 0 ? round2(reservationTip) : 0;
+    const totalDue = Math.max(0, round2(baseTotal + (Number(adjustmentsNet) || 0) + tipDue));
     const coverageAmount = round2((payments || []).reduce(
       (sum, p) => sum + this.baseEquivalente(p, {
         serviceItems, anchoredMethod, currency, validMethods,
@@ -258,9 +270,11 @@ class PaymentService {
   }
 
   /**
-   * Map reservation services to plain pricing items for computeTotals().
+   * Map reservation services to plain pricing items for computeTotals(). Expone tipAmount (la propina
+   * por servicio, YA resuelta a pesos fijos por el wizard en subconcept.tipAmount) para que sumServiceTips
+   * la agregue; solo se LEE, nunca se recalcula aquí.
    * @param {Array<object>} services - ReservationService Parse objects.
-   * @returns {Array<object>} Plain items { id, includeInTotal, pricesByType, total }.
+   * @returns {Array<object>} Plain items { id, includeInTotal, pricesByType, total, tipAmount }.
    * @example
    * PaymentService.toServiceItems(services)
    */
@@ -268,13 +282,37 @@ class PaymentService {
     return (services || []).map((svc) => {
       const sub = svc.get('subconcept') || {};
       const rawTotal = Number(sub.total);
+      const rawTip = Number(sub.tipAmount);
       return {
         id: svc.id,
         includeInTotal: sub.includeInTotal !== false,
         pricesByType: sub.pricesByType || null,
         total: Number.isFinite(rawTotal) ? rawTotal : (Number(svc.get('total')) || 0),
+        tipAmount: Number.isFinite(rawTip) ? rawTip : 0,
       };
     });
+  }
+
+  /**
+   * Suma la propina por servicio (subconcept.tipAmount, ya en pesos fijos) de los servicios ACTIVOS.
+   * Un servicio excluido del total (includeInTotal === false) aporta $0 igual que su precio; los
+   * soft-eliminados ya los filtró queryExisting antes de llegar aquí. Solo un tipAmount finito y positivo
+   * cuenta (NaN/Infinity/negativo -> 0). No recalcula porcentajes ni montos: el valor final ya está resuelto.
+   * @param {Array<object>} items - Plain items { includeInTotal, tipAmount } (de toServiceItems).
+   * @returns {number} Suma de propinas por servicio, a 2 decimales.
+   * @example
+   * PaymentService.sumServiceTips([{ tipAmount: 100 }, { tipAmount: 300 }]) // 400
+   */
+  static sumServiceTips(items) {
+    const list = Array.isArray(items) ? items : [];
+    let total = 0;
+    for (const item of list) {
+      if (item && item.includeInTotal !== false) {
+        const tip = Number(item.tipAmount);
+        if (Number.isFinite(tip) && tip > 0) total += tip;
+      }
+    }
+    return round2(total);
   }
 
   /**
@@ -414,14 +452,32 @@ class PaymentService {
       }, currency, usdRate),
       method: payment.get('method'),
     }));
-    const totals = this.computeTotals(serviceItems, paymentType, adjustmentsNet, currency);
+
+    // Propina cobrada (Fase 2) = general (recalculada y persistida en reservation.tip por QuoteService) +
+    // Σ propina por servicio en vivo (subconcept.tipAmount de los servicios activos). Pesos fijos que NO
+    // escalan por método; se congelan sólo en el sentido de que la general vive en la reservación, no aquí.
+    const generalTip = Number(reservation.get('tip')) || 0;
+    const serviceTipsTotal = this.sumServiceTips(serviceItems);
+    const reservationTip = round2(generalTip + serviceTipsTotal);
+
+    const totals = this.computeTotals(serviceItems, paymentType, adjustmentsNet, currency, reservationTip);
 
     const paidGlobal = this.sumPayments(paymentRows);
 
     // serviceItems/paymentType/currency/paymentRows viajan para que buildSummary derive la cobertura
     // equivalente-ancla (paymentStatus) y el desglose de saldo restante sin recargar nada (ADR-1b).
+    // generalTip/serviceTipsTotal viajan aparte para exponer la propina desglosada en el summary.
     return {
-      reservation, services, totals, paidGlobal, serviceItems, paymentType, currency, paymentRows,
+      reservation,
+      services,
+      totals,
+      paidGlobal,
+      serviceItems,
+      paymentType,
+      currency,
+      paymentRows,
+      generalTip: round2(generalTip),
+      serviceTipsTotal,
     };
   }
 
@@ -465,15 +521,19 @@ class PaymentService {
   static buildSummary(reservationId, computed) {
     const {
       totals, paidGlobal, serviceItems = [], paymentType = 'efectivo',
-      currency = 'MXN', paymentRows = [],
+      currency = 'MXN', paymentRows = [], generalTip = 0, serviceTipsTotal = 0,
     } = computed;
     const paid = round2(paidGlobal);
+    // Propina combinada = general + por servicio (ya calculada en totals.tip). generalTip/serviceTipsTotal
+    // se exponen por separado (solo lectura, trazabilidad/auditoría); su suma es siempre `tip`.
+    const tip = round2(totals.tip || 0);
 
     const breakdown = this.remainingBreakdown(paymentRows, {
       serviceItems,
       anchoredMethod: paymentType,
       currency,
       adjustmentsNet: totals.adjustments || 0,
+      reservationTip: tip,
     });
     const tolerance = this.resolveTolerance(currency);
     // coveragePercent se expone CRUDO (puede superar 100 con sobrepago en un método más barato que el
@@ -490,6 +550,11 @@ class PaymentService {
       subtotal: totals.subtotal,
       adjustments: totals.adjustments,
       iva: totals.iva,
+      // Propina cobrada (Fase 2): combinada (tip) + desglosada de solo lectura (generalTip +
+      // serviceTipsTotal, que sumados dan tip). El total ya la incluye.
+      tip,
+      generalTip: round2(generalTip),
+      serviceTipsTotal: round2(serviceTipsTotal),
       total: totals.total,
       coverageAmount: breakdown.coverageAmount,
       coveragePercent,
