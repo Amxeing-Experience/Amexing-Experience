@@ -638,6 +638,8 @@ class OwnedClientsController {
         dietaryRestrictions: processedDietaryRestrictions,
         // Agency clients are people too, so they carry a birthday.
         birthDate,
+        // Contraseña opcional: si el DM/agencia la asigna (con email), el cliente puede entrar.
+        password,
         clientCategory: 'agency_client',
         organizationId: agencyId,
         createdBy: currentUser.id,
@@ -906,6 +908,8 @@ class OwnedClientsController {
         preferredLanguage, accessibilityRequirements,
         allergies, dietaryRestrictions,
         notes, active,
+        // Contraseña opcional (solo para clientes que pueden iniciar sesión = AmexingUser end_client).
+        password,
         // Legacy address field for backward compatibility
         address,
       } = req.body;
@@ -999,6 +1003,29 @@ class OwnedClientsController {
       if (processedAllergies !== undefined) client.set('allergies', processedAllergies);
       if (processedDietaryRestrictions !== undefined) client.set('dietaryRestrictions', processedDietaryRestrictions);
       if (req.body.clientCategory !== undefined) client.set('clientCategory', req.body.clientCategory);
+
+      // Contraseña (opcional): solo para clientes que inician sesión (AmexingUser end_client).
+      // Vacía = conservar la actual. Con valor: requiere email y actualiza el acceso.
+      if (password && typeof password === 'string' && password.trim()) {
+        // La query devuelve un Parse.Object genérico (AmexingUser no está registrado como
+        // subclase), así que replicamos AmexingUser.setPassword (bcrypt + mismos campos).
+        if (client.className !== 'AmexingUser') {
+          return this.sendError(res, 'Este cliente no admite contraseña (registro heredado).', 400);
+        }
+        const effectiveEmail = ((email !== undefined ? email : client.get('email')) || '').trim();
+        if (!effectiveEmail) {
+          return this.sendError(res, 'Para asignar una contraseña, el cliente debe tener email.', 400);
+        }
+        const bcrypt = require('bcrypt');
+        const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+        const hashedPassword = await bcrypt.hash(password.trim(), saltRounds);
+        client.set('password', hashedPassword);
+        client.set('passwordHash', hashedPassword);
+        client.set('passwordChangedAt', new Date());
+        client.set('mustChangePassword', false);
+        client.set('loginAttempts', 0);
+        client.set('lockedUntil', null);
+      }
 
       client.set('modifiedBy', currentUser);
       await client.save(null, { useMasterKey: true });
