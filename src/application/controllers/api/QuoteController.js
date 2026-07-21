@@ -2197,6 +2197,7 @@ class QuoteController {
       const {
         days = [], subtotal = 0, iva = 0, total = 0,
         currency = 'MXN', paymentType = 'efectivo',
+        globalTip = null, // Fase 2b: propina global de la cotización (persistir tal cual).
       } = req.body;
 
       // Validate serviceItems structure
@@ -2430,6 +2431,7 @@ class QuoteController {
         total,
         currency,
         paymentType,
+        globalTip, // Fase 2b: propina global de la cotización.
       };
 
       // Asegura un id estable por subconcepto ANTES de guardar. Los servicios agregados desde
