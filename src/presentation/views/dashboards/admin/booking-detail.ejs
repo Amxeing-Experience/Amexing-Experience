@@ -93,10 +93,6 @@
                     <small class="text-muted d-block">Tipo de Pago</small>
                     <span id="infoPaymentType">&mdash;</span>
                 </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Total</small>
-                    <strong id="infoTotal" class="text-success fs-5">&mdash;</strong>
-                </div>
             </div>
             <hr>
             <div class="row g-3">
@@ -737,13 +733,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('infoStartDate').textContent = formatDate(d.startDate);
         document.getElementById('infoEndDate').textContent = formatDate(d.endDate);
         document.getElementById('infoPaymentType').textContent = d.paymentType || '—';
-        // Total recomputed from each service's pricesByType[paymentType] when available so
-        // the reservation reflects the quote's per-service breakdown for the current
-        // payment type. Falls back to the stored d.totalAmount only if no service has
-        // pricesByType (very old data).
-        const headerServicesSubtotal = computeServicesSubtotalByType(d.services, d.paymentType);
-        const headerTotal = headerServicesSubtotal > 0 ? headerServicesSubtotal : (d.totalAmount || 0);
-        document.getElementById('infoTotal').textContent = formatCurrency(headerTotal, d.currency);
+        // El total del header se quitó por redundante: el "Total Final" del resumen financiero
+        // (abajo) es la fuente única e incluye ajustes + propina global.
 
         // Assignment counter
         const totalSvc = (d.services || []).length;
