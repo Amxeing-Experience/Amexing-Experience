@@ -16599,14 +16599,41 @@ class ItineraryBuilder {
     // totalMXN is already the properly calculated total (no additional surcharging needed)
     const displayTotal = totalMXN;
 
-    // Store the display total for use when saving
+    // Store the display total for use when saving. OJO: sin descuento — collectServiceData
+    // aplica el descuento por su cuenta (sobre pricesByType); si aquí lo descontáramos también
+    // se compoundearía al guardar. El descuento de abajo es SOLO presentación del desglose.
     this.currentServiceTotal = displayTotal;
 
-    // Render the complete breakdown (removed Subtotal and IVA lines)
-    itemsDiv.innerHTML = itemsHTML;
+    // Fase 1: descuento por servicio en el desglose live (solo admin). Espeja la misma
+    // matemática de collectServiceData: descuenta sobre la base efectivo y lo lleva a la forma
+    // de pago actual de forma proporcional (el recargo es multiplicativo). No toca los items ni
+    // currentServiceTotal, solo agrega una línea "Descuento" y ajusta el total mostrado.
+    let discountLineHTML = '';
+    let displayTotalAfterDiscount = displayTotal;
+    if (this.canEditPrices && document.getElementById('applyServiceDiscount')?.checked) {
+      const dt = document.getElementById('serviceDiscountType')?.value === 'amount' ? 'amount' : 'percent';
+      const dv = parseFloat(document.getElementById('serviceDiscountValue')?.value || 0) || 0;
+      const efBaseTotal = this.getBasePriceFromCurrent ? this.getBasePriceFromCurrent(displayTotal) : displayTotal;
+      if (dv > 0 && efBaseTotal > 0) {
+        const discEf = Math.min(dt === 'percent' ? efBaseTotal * (dv / 100) : dv, efBaseTotal);
+        const factor = efBaseTotal > 0 ? (displayTotal / efBaseTotal) : 1;
+        const discInPt = Math.round(discEf * factor * 100) / 100;
+        if (discInPt > 0) {
+          displayTotalAfterDiscount = Math.max(0, displayTotal - discInPt);
+          const dLabel = dt === 'percent' ? `Descuento (${dv}%)` : 'Descuento';
+          discountLineHTML = `<div class="d-flex justify-content-between text-success">
+        <span><i class="ti ti-discount-2 me-1"></i>${dLabel}</span>
+        <span>−${this.formatCurrency(discInPt)}</span>
+      </div>`;
+        }
+      }
+    }
 
-    // Show final total
-    totalSpan.textContent = this.formatCurrency(displayTotal);
+    // Render the complete breakdown (removed Subtotal and IVA lines)
+    itemsDiv.innerHTML = itemsHTML + discountLineHTML;
+
+    // Show final total (con descuento si aplica)
+    totalSpan.textContent = this.formatCurrency(displayTotalAfterDiscount);
     container.classList.remove('d-none');
 
     // Update debug payment section with breakdown data

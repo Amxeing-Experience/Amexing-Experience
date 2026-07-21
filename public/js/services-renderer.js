@@ -599,6 +599,11 @@
                 } else {
                     html += `<div class="service-price">${this.formatCurrency(price)}</div>`;
                 }
+                // Fase 1: descuento por servicio. El precio de arriba ya viene con descuento (pricesByType);
+                // esta línea lo hace visible en el resumen. El monto se muestra en efectivo (como la tarjeta).
+                if (Number(service.discountAmount) > 0) {
+                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>`;
+                }
                 html += '</div>';
             }
 
@@ -1197,6 +1202,10 @@
                     html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
                 } else {
                     html += `<div class="service-price">${this.formatCurrency(price)}</div>`;
+                }
+                // Fase 1: descuento por servicio (transporte). El precio ya viene con descuento (pricesByType).
+                if (Number(service.discountAmount) > 0) {
+                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>`;
                 }
                 html += '</div>';
             }
