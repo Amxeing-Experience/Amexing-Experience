@@ -3169,6 +3169,11 @@ class ItineraryBuilder {
         };
       }
 
+      // Descuento por servicio (Fase 1): el monto (efectivo) se reparte por pierna igual que el
+      // precio; el TIPO y el VALOR (%/$) se quedan iguales (el % es el mismo por pierna). Sin
+      // esto cada pierna heredaba el descuento completo vía {...serviceData} y descontaba de más.
+      const splitDiscountAmount = Math.round((Math.abs(parseFloat(serviceData.discountAmount) || 0) / 2) * 100) / 100;
+
       // Validation: Check if split prices add up to original (with small tolerance for rounding)
       const priceValidation = {
         originalTotal: originalPrice,
@@ -3208,6 +3213,8 @@ class ItineraryBuilder {
         price: splitPrice,
         basePrice: splitBasePrice,
         pricesByType: { ...splitPricesByType },
+        // Descuento repartido por pierna (el % se mantiene vía {...serviceData}).
+        discountAmount: splitDiscountAmount,
         // Ensure quantity is appropriate for single leg (usually 1)
         quantity: 1,
       };
@@ -3240,6 +3247,8 @@ class ItineraryBuilder {
         price: splitPrice,
         basePrice: splitBasePrice,
         pricesByType: { ...splitPricesByType },
+        // Descuento repartido por pierna (el % se mantiene vía {...serviceData}).
+        discountAmount: splitDiscountAmount,
         // Ensure quantity is appropriate for single leg (usually 1)
         quantity: 1,
       };
