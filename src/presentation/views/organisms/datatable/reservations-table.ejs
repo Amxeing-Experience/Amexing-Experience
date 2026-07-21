@@ -223,6 +223,21 @@ const canManageReservations = !!(locals && locals.canManageReservations);
                     </select>
                     <div class="form-text">Datos fiscales (RFC, razón social…) que se imprimen en el recibo</div>
                 </div>
+                <!-- Desglose por servicio: mostrar u ocultar propinas/descuentos (los totales NO cambian).
+                     Por ahora solo para el admin; otros roles usan el default (mostrar ambos). -->
+                <% if (basePath === 'admin') { %>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="receiptShowTips" checked>
+                        <label class="form-check-label" for="receiptShowTips">Mostrar propinas en el recibo</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="receiptShowDiscounts" checked>
+                        <label class="form-check-label" for="receiptShowDiscounts">Mostrar descuentos en el recibo</label>
+                    </div>
+                    <div class="form-text">Si los ocultas, los totales igual incluyen propinas y descuentos; solo no se desglosan.</div>
+                </div>
+                <% } %>
                 <div class="alert alert-info d-flex align-items-start" id="receiptInfoAlert" role="alert">
                     <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                     <div>
@@ -1067,11 +1082,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Perfil de facturación elegido (los 3 roles).
         const billingSel = document.getElementById('billingProfileSelect');
         const billingProfileId = (billingSel && billingSel.value) ? billingSel.value : null;
+        // Desglose por servicio en el recibo (default: mostrar). No afecta los totales.
+        const showTips = document.getElementById('receiptShowTips')?.checked !== false;
+        const showDiscounts = document.getElementById('receiptShowDiscounts')?.checked !== false;
 
         fetch(`/api/quotes/${quoteId}/generate-receipt`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ includePaymentInfo, paymentInfoId: selectedPaymentInfoId, billingProfileId, force: force === true })
+            body: JSON.stringify({ includePaymentInfo, paymentInfoId: selectedPaymentInfoId, billingProfileId, showTips, showDiscounts, force: force === true })
         })
         .then((response) => {
             // Reservación no saldada: mantener el modal abierto y mostrar el saldo pendiente.
