@@ -84,14 +84,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (tableContainer) {
         // Delegate click events for edit buttons
         tableContainer.addEventListener('click', function(e) {
-            const editBtn = e.target.closest('.btn-edit-client');
-            if (editBtn) {
-                const clientId = editBtn.getAttribute('data-client-id');
-                if (typeof editClient === 'function') {
-                    editClient(clientId);
-                }
-            }
-            
             const deleteBtn = e.target.closest('.btn-delete-client');
             if (deleteBtn) {
                 const clientId = deleteBtn.getAttribute('data-client-id');
@@ -214,13 +206,12 @@ function initializeOwnedClientsDataTable() {
                 orderable: false,
                 render: function(data, type, row) {
                     let actions = '<div class="btn-group btn-group-sm" role="group">';
-                    
+
                     actions += `
-                        <button type="button" class="btn btn-outline-info btn-edit-client" 
-                                data-client-id="${row.id}"
-                                title="Editar">
+                        <a href="/dashboard/<%= dtUserRole %>/clients/${row.id}" class="btn btn-outline-info"
+                           title="Ver / Editar">
                             <i class="ti ti-edit"></i>
-                        </button>`;
+                        </a>`;
                     
                     actions += `
                         <button type="button" class="btn btn-outline-danger btn-delete-client" 

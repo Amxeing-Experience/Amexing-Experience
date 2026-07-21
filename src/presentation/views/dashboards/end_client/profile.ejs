@@ -191,9 +191,9 @@ const formatRoleName = (role) => {
       </div>
 
       <% /* Perfil de viaje (pasaportes, direcciones, preferencias, documentos, lealtad):
-            autoservicio SOLO para cliente directo por ahora. Usa /api/agents/:id (AmexingUser). */ %>
+            autoservicio para cliente directo y de agencia. Usa /api/agents/:id (AmexingUser). */ %>
       <% var travelProfileUserId = (typeof userId !== 'undefined' && userId) ? userId : ((user && user.id) ? user.id : ''); %>
-      <% if (typeof clientCategory !== 'undefined' && clientCategory === 'direct_client' && travelProfileUserId) { %>
+      <% if (typeof clientCategory !== 'undefined' && ['direct_client', 'agency_client'].includes(clientCategory) && travelProfileUserId) { %>
       <!-- 03 · Perfil de Viaje -->
       <div class="profile-section">
         <div class="section-head section-head--left">

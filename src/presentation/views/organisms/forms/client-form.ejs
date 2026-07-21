@@ -388,5 +388,16 @@ const passwordHelp = locals.passwordHelp || '';
                 }) %>
             </div>
         </div>
+
+        <% if (typeof showActive !== 'undefined' && showActive) { %>
+        <div class="row">
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="<%= idPrefix %>Active" name="active" checked>
+                    <label class="form-check-label" for="<%= idPrefix %>Active">Cliente activo</label>
+                </div>
+            </div>
+        </div>
+        <% } %>
     </div>
 </form>
