@@ -16,12 +16,16 @@
          consistently — 'Segoe UI' isn't installed on the server that runs puppeteer. -->
     <link rel="stylesheet" href="/css/fonts.css">
 
+    <!-- Fuentes embebidas (TTF base64) para el PDF: títulos Arpona, cuerpo/subtítulos Myriad Pro. -->
+    <style><%- typeof arponaEmbedCss !== 'undefined' ? arponaEmbedCss : '' %></style>
+    <style><%- typeof myriadEmbedCss !== 'undefined' ? myriadEmbedCss : '' %></style>
+
     <!-- Custom favicon -->
     <link rel="icon" type="image/png" href="/images/heart_black.png">
 
     <style>
         body {
-            font-family: var(--font-myriad, 'Myriad Pro'), 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'MyriadPDF', var(--font-myriad, 'Myriad Pro'), 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #f5f5f5;
             padding: 2rem 0;
         }
@@ -64,7 +68,7 @@
             margin: 0;
             display: block;
             border-radius: 0;
-            font-family: var(--font-myriad, 'Myriad Pro'), 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'ArponaPDF', var(--font-myriad, 'Myriad Pro'), 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             width: 100%;
             text-align: center;
         }

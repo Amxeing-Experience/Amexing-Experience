@@ -912,6 +912,8 @@ class ReservationController {
           totalAmount: reservation.get('totalAmount'),
           servicesSubtotal: reservation.get('servicesSubtotal') || reservation.get('totalAmount'),
           adjustments: reservation.get('adjustments') || [],
+          // Fase 2d: propina global de la cotización (del snapshot) para mostrarla en el detalle.
+          globalTip: snapshot.globalTip || null,
           currency: reservation.get('currency'),
           paymentType: reservation.get('paymentType'),
           // Payment rollup (con IVA + propina): paymentStatus pending|partial|paid|refunded.

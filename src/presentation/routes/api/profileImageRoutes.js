@@ -27,6 +27,16 @@ router.post(
 );
 
 /**
+ * POST /api/profile/company-logo
+ * Upload and optimize the company (agency) logo for current user.
+ */
+router.post(
+  '/company-logo',
+  profileImageController.getUploadMiddleware(),
+  profileImageController.uploadCompanyLogo.bind(profileImageController)
+);
+
+/**
  * GET /api/profile/image
  * Get optimized profile image URL for current user.
  */

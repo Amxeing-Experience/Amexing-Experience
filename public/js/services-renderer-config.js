@@ -331,6 +331,15 @@
             price: service.price || service.total || 0,
             total: service.total || service.price || 0,
             pricesByType: service.pricesByType,
+            // Descuento por servicio (Fase 1) y propina por servicio (Fase 2). Sin estos, el unified
+            // renderer no podía restar el descuento ni sumar la propina en el resumen/reserva.
+            discountType: service.discountType || null,
+            discountValue: service.discountValue || 0,
+            discountAmount: service.discountAmount || 0,
+            tipType: service.tipType || null,
+            tipValue: service.tipValue || 0,
+            tipMandatory: service.tipMandatory || false,
+            tipAmount: service.tipAmount || 0,
             adultPrice: service.adultPrice || 0,
             childPrice: service.childPrice || 0,
             noAlcoholPrice: service.noAlcoholPrice || 0,

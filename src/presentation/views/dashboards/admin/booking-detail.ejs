@@ -93,10 +93,6 @@
                     <small class="text-muted d-block">Tipo de Pago</small>
                     <span id="infoPaymentType">&mdash;</span>
                 </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Total</small>
-                    <strong id="infoTotal" class="text-success fs-5">&mdash;</strong>
-                </div>
             </div>
             <hr>
             <div class="row g-3">
@@ -338,10 +334,25 @@ document.addEventListener('DOMContentLoaded', async function() {
     // svc.total. Using pricesByType when available makes the booking totals match the
     // quote regardless of which payment type the reservation is currently on.
     function getServicePriceByType(svc, paymentType) {
-        const pbt = svc?.subconcept?.pricesByType;
+        const sub = (svc && svc.subconcept) || {};
+        const pbt = sub.pricesByType;
         if (pbt && typeof pbt === 'object' && pbt[paymentType] != null) {
-            const v = Number(pbt[paymentType]);
-            if (!Number.isNaN(v)) return v;
+            const base = Number(pbt[paymentType]);
+            if (!Number.isNaN(base)) {
+                // Fase 2d: pricesByType es la base pura → restar descuento y sumar propina por
+                // servicio, escalados a la forma de pago (mismo cálculo que la cotización).
+                const ef = Number(pbt.efectivo) || 0;
+                const factor = ef > 0 ? base / ef : 1;
+                const disc = (Number(sub.discountAmount) || 0) * factor;
+                const net = Math.max(0, base - disc);
+                let tip = 0;
+                if (sub.tipType && Number(sub.tipValue) > 0) {
+                    tip = sub.tipType === 'percent'
+                        ? net * (Number(sub.tipValue) / 100)
+                        : (Number(sub.tipValue) || 0) * factor;
+                }
+                return Math.round((net + tip) * 100) / 100;
+            }
         }
         return Number(svc?.total) || 0;
     }
@@ -722,13 +733,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('infoStartDate').textContent = formatDate(d.startDate);
         document.getElementById('infoEndDate').textContent = formatDate(d.endDate);
         document.getElementById('infoPaymentType').textContent = d.paymentType || '—';
-        // Total recomputed from each service's pricesByType[paymentType] when available so
-        // the reservation reflects the quote's per-service breakdown for the current
-        // payment type. Falls back to the stored d.totalAmount only if no service has
-        // pricesByType (very old data).
-        const headerServicesSubtotal = computeServicesSubtotalByType(d.services, d.paymentType);
-        const headerTotal = headerServicesSubtotal > 0 ? headerServicesSubtotal : (d.totalAmount || 0);
-        document.getElementById('infoTotal').textContent = formatCurrency(headerTotal, d.currency);
+        // El total del header se quitó por redundante: el "Total Final" del resumen financiero
+        // (abajo) es la fuente única e incluye ajustes + propina global.
 
         // Assignment counter
         const totalSvc = (d.services || []).length;
@@ -968,6 +974,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         const otrosItems = [];
         if (svc.type === 'a-disposicion' && sub.discountPercent) {
             otrosItems.push(detailLine('discount-2', `${sub.discountPercent}% descuento`));
+        }
+        // Fase 2d: descuento y propina por servicio (ya reflejados en el total del servicio).
+        if (Number(sub.discountAmount) > 0) {
+            const dPct = (sub.discountType === 'percent' && sub.discountValue) ? ` ${sub.discountValue}%` : '';
+            otrosItems.push(detailLine('discount-2', `Descuento${dPct} −${formatCurrency(sub.discountAmount, reservationData.currency)}`));
+        }
+        if (Number(sub.tipAmount) > 0) {
+            const tPct = (sub.tipType === 'percent' && sub.tipValue) ? ` ${sub.tipValue}%` : '';
+            const tMand = sub.tipMandatory ? ' (obligatoria)' : '';
+            otrosItems.push(detailLine('coin', `Propina${tPct} +${formatCurrency(sub.tipAmount, reservationData.currency)}${tMand}`));
         }
 
         // UBICACIONES — direcciones de pick-up / drop-off (cuando existan).
@@ -1598,9 +1614,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         const discounts = adjustments.filter(a => a.type === 'discount');
         const chargesTotal = charges.reduce((s, a) => s + (a.amount || 0), 0);
         const discountsTotal = discounts.reduce((s, a) => s + (a.amount || 0), 0);
-        // Final total = subtotal + charges - discounts (computed instead of using
+        // Fase 2d: propina global de la cotización (del snapshot).
+        const globalTip = d.globalTip;
+        const globalTipAmount = (globalTip && Number(globalTip.amount) > 0) ? Number(globalTip.amount) : 0;
+        // Final total = subtotal + charges - discounts + propina global (computed instead of using
         // the stored d.totalAmount so payment-type changes recompute correctly).
-        const finalTotal = servicesSubtotal + chargesTotal - discountsTotal;
+        const finalTotal = servicesSubtotal + chargesTotal - discountsTotal + globalTipAmount;
         const curr = d.currency || 'MXN';
 
         let html = '';
@@ -1638,6 +1657,16 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
             </div>`;
         });
+
+        // Fase 2d: propina general de la cotización (ya incluida en el Total Final).
+        if (globalTipAmount > 0) {
+            const gtPct = (globalTip.type === 'percent' && globalTip.value) ? ` (${globalTip.value}%)` : '';
+            const gtMand = globalTip.mandatory ? ' · obligatoria' : '';
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propina general${gtPct}${gtMand}</span></div>
+                <span class="text-info fw-semibold">+${formatCurrency(globalTipAmount, curr)}</span>
+            </div>`;
+        }
 
         // Final total
         html += `<div class="d-flex justify-content-between align-items-center py-2 mt-1">

@@ -1,0 +1,138 @@
+<%
+/**
+ * Company Logo Upload Component
+ * Reusable: subida/reemplazo del logo de la empresa (agencia) con optimización (S3).
+ * Basado en profile-image-upload, pero rectangular y contra /api/profile/company-logo.
+ * Params: logoUrl (string, url actual o ''), companyName (string, para alt).
+ * Created by Denisse Maldonado
+ */
+const clLogoUrl = (typeof logoUrl !== 'undefined' && logoUrl) ? logoUrl : '';
+const clCompanyName = (typeof companyName !== 'undefined' && companyName) ? companyName : 'Empresa';
+%>
+
+<div class="company-logo-upload">
+  <div id="companyLogoContainer" class="company-logo-box">
+    <img src="<%= clLogoUrl %>"
+         alt="<%= clCompanyName %>"
+         id="companyLogoImage"
+         class="company-logo-img<%= clLogoUrl ? '' : ' d-none' %>">
+    <div id="companyLogoPlaceholder" class="company-logo-placeholder<%= clLogoUrl ? ' d-none' : '' %>">
+      <i class="ti ti-building-store"></i>
+      <span>Sin logo</span>
+    </div>
+  </div>
+
+  <div class="company-logo-actions">
+    <button type="button" id="companyLogoUploadButton" class="btn btn-outline-primary btn-sm">
+      <i class="ti ti-upload me-1"></i><span id="companyLogoBtnText"><%= clLogoUrl ? 'Cambiar logo' : 'Subir logo' %></span>
+    </button>
+    <div class="form-text mb-0">JPG, PNG, WebP o AVIF · máx 10&nbsp;MB</div>
+  </div>
+
+  <input type="file" id="companyLogoInput" class="d-none"
+         accept="image/jpeg,image/png,image/gif,image/webp,image/avif">
+
+  <div id="companyLogoProgress" class="mt-2 d-none" style="max-width: 260px;">
+    <div class="progress" style="height: 5px;">
+      <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+    </div>
+    <small class="text-muted">Subiendo y optimizando…</small>
+  </div>
+</div>
+
+<style>
+  .company-logo-upload { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  .company-logo-box { width: 160px; height: 96px; border: 1px solid var(--line, #e6e2d8); border-radius: 10px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+  .company-logo-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .company-logo-placeholder { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted, #9a9a8e); font-size: .8rem; }
+  .company-logo-placeholder i { font-size: 1.6rem; }
+  .company-logo-actions { display: flex; flex-direction: column; gap: 6px; }
+</style>
+
+<script>
+(function () {
+  document.addEventListener('DOMContentLoaded', function () {
+    const input = document.getElementById('companyLogoInput');
+    const btn = document.getElementById('companyLogoUploadButton');
+    const btnText = document.getElementById('companyLogoBtnText');
+    const img = document.getElementById('companyLogoImage');
+    const placeholder = document.getElementById('companyLogoPlaceholder');
+    const progress = document.getElementById('companyLogoProgress');
+    if (!input || !btn) return;
+
+    // Fallback al placeholder si el logo no carga (URL S3 presignada expirada → 403).
+    if (img) {
+      const showPlaceholder = function () {
+        img.classList.add('d-none');
+        if (placeholder) placeholder.classList.remove('d-none');
+      };
+      img.addEventListener('error', showPlaceholder);
+      if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) showPlaceholder();
+    }
+
+    btn.addEventListener('click', function (e) { e.preventDefault(); input.click(); });
+
+    input.addEventListener('change', async function () {
+      const file = input.files[0];
+      if (!file) return;
+
+      if (file.size > 10 * 1024 * 1024) { showCompanyLogoAlert('error', 'El archivo debe pesar menos de 10 MB'); return; }
+      const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
+      if (!allowed.includes(file.type)) { showCompanyLogoAlert('error', 'Solo se permiten imágenes JPG, PNG, GIF, WebP o AVIF'); return; }
+
+      progress.classList.remove('d-none');
+      const bar = progress.querySelector('.progress-bar');
+      bar.style.width = '0%';
+
+      const formData = new FormData();
+      formData.append('profileImage', file); // el multer del endpoint espera 'profileImage'
+
+      try {
+        let p = 0;
+        const iv = setInterval(function () { p += 10; if (p <= 90) bar.style.width = p + '%'; }, 200);
+
+        const response = await fetch('/api/profile/company-logo', {
+          method: 'POST',
+          credentials: 'same-origin',
+          body: formData
+        });
+
+        clearInterval(iv);
+        bar.style.width = '100%';
+
+        if (!response.ok) { const err = await response.json().catch(function () { return {}; }); throw new Error(err.error || 'Error al subir el logo'); }
+        const result = await response.json();
+
+        if (result.success) {
+          if (img) { img.src = result.data.url; img.classList.remove('d-none'); }
+          if (placeholder) placeholder.classList.add('d-none');
+          if (btnText) btnText.textContent = 'Cambiar logo';
+          showCompanyLogoAlert('success', 'Logo de la empresa actualizado.');
+          setTimeout(function () { progress.classList.add('d-none'); bar.style.width = '0%'; }, 1000);
+        }
+      } catch (error) {
+        showCompanyLogoAlert('error', error.message || 'Error al subir el logo');
+        progress.classList.add('d-none');
+      }
+      input.value = '';
+    });
+
+    function showCompanyLogoAlert(type, message) {
+      const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+      const icon = type === 'success' ? 'ti-check' : 'ti-alert-circle';
+      const html = '<div class="alert ' + alertClass + ' alert-dismissible fade show" role="alert">'
+        + '<i class="ti ' + icon + ' me-2"></i>' + message
+        + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+      let container = document.querySelector('.profile-alerts');
+      if (!container) {
+        container = document.createElement('div');
+        container.className = 'profile-alerts';
+        const pageContent = document.querySelector('.container-fluid') || document.body;
+        pageContent.insertBefore(container, pageContent.firstChild);
+      }
+      container.innerHTML = html;
+      setTimeout(function () { const a = container.querySelector('.alert'); if (a) { a.classList.remove('show'); setTimeout(function () { a.remove(); }, 150); } }, 5000);
+    }
+  });
+})();
+</script>

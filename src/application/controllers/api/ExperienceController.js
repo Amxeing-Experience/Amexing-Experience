@@ -65,6 +65,9 @@ class ExperienceController {
 
       // Parse the includeInactive parameter (for admin views)
       const includeInactive = req.query.includeInactive === 'true';
+      // Solo el admin (tablas de Proveedores/Establecimientos) manda searchChildren=true
+      // para que la búsqueda también encuentre por nombre de experiencia hija.
+      const searchChildren = req.query.searchChildren === 'true';
 
       // Get total records count
       const totalQuery = this.buildBaseQuery(params.typeFilter, null, null, includeInactive);
@@ -72,12 +75,13 @@ class ExperienceController {
 
       // Build filtered query (with day-of-week filtering if dayDate provided)
       const filteredQuery = params.searchValue
-        ? this.buildSearchQuery(
+        ? await this.buildSearchQuery(
           params.searchValue,
           params.typeFilter,
           params.excludeId,
           params.dayDate,
-          includeInactive
+          includeInactive,
+          searchChildren
         )
         : this.buildBaseQuery(params.typeFilter, params.excludeId, params.dayDate, includeInactive);
 
@@ -297,6 +301,8 @@ class ExperienceController {
       query.include('tours');
       query.include('vehicleType');
       query.include('destinationPOI');
+      query.include('entradas');
+      query.include('entradas.destino');
 
       const experience = await query.get(experienceId, { useMasterKey: true });
 
@@ -318,6 +324,22 @@ class ExperienceController {
         vehicleType,
         destinationPOI
       );
+
+      // Entradas asociadas (boletos de acceso). NO ligadas al destino de la experiencia.
+      const entradas = experience.get('entradas') || [];
+      data.entradas = entradas
+        .filter((e) => e && e.id)
+        .map((e) => {
+          const destino = e.get('destino');
+          const priceVal = e.get('price');
+          return {
+            id: e.id,
+            name: e.get('name') || '',
+            price: typeof priceVal === 'number' ? priceVal : Number(priceVal) || 0,
+            destinoId: destino ? destino.id : null,
+            destinoName: destino ? destino.get('name') || '' : '',
+          };
+        });
 
       // Debug logging
       logger.info('Experience getById - Returning data', {
@@ -357,6 +379,7 @@ class ExperienceController {
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
+   * @example
    */
   async togglePopular(req, res) {
     try {
@@ -821,6 +844,18 @@ class ExperienceController {
       const poiPointer = new Parse.Object('POI');
       poiPointer.id = destinationPOI.trim();
       experienceObj.set('destinationPOI', poiPointer);
+    }
+
+    // Entradas asociadas (boletos de acceso; NO ligadas al destino de la experiencia)
+    if (Array.isArray(data.entradas)) {
+      const entradaPointers = data.entradas
+        .filter((id) => id && String(id).trim() !== '')
+        .map((id) => {
+          const p = new Parse.Object('Entrada');
+          p.id = String(id).trim();
+          return p;
+        });
+      experienceObj.set('entradas', entradaPointers);
     }
 
     return experienceObj;
@@ -1326,7 +1361,29 @@ class ExperienceController {
    * @example
    */
   async updateExperienceRelationships(experienceObj, experienceId, data) {
-    const { experiences, providerExperiences, tours } = data;
+    const {
+      experiences, providerExperiences, tours, entradas,
+    } = data;
+
+    // Update entradas array (boletos de acceso asociados; NO ligados al destino)
+    if (entradas !== undefined) {
+      if (Array.isArray(entradas) && entradas.length > 0) {
+        const entradaPointers = [];
+        for (const entId of entradas) {
+          try {
+            const entQuery = new Parse.Query('Entrada');
+            entQuery.notEqualTo('exists', false);
+            const ent = await entQuery.get(entId, { useMasterKey: true });
+            if (ent) entradaPointers.push(ent);
+          } catch (err) {
+            // Ignora entradas inexistentes en lugar de fallar todo el guardado.
+          }
+        }
+        experienceObj.set('entradas', entradaPointers);
+      } else {
+        experienceObj.set('entradas', []);
+      }
+    }
 
     // Update experiences array
     if (experiences !== undefined) {
@@ -1882,11 +1939,19 @@ class ExperienceController {
    * @param {string} excludeId - ID to exclude.
    * @param {string} dayDate - Date in YYYY-MM-DD format for day-of-week filtering.
    * @param {boolean} includeInactive - Whether to include inactive experiences (default: false).
+   * @param includeChildren
    * @returns {Parse.Query} Filtered query.
    * @private
    * @example
    */
-  buildSearchQuery(searchValue, typeFilter, excludeId, dayDate, includeInactive = false) {
+  async buildSearchQuery(
+    searchValue,
+    typeFilter,
+    excludeId,
+    dayDate,
+    includeInactive = false,
+    includeChildren = false
+  ) {
     const nameQuery = new Parse.Query('Experience');
     nameQuery.equalTo('exists', true);
 
@@ -1925,7 +1990,38 @@ class ExperienceController {
       }
     }
 
-    return Parse.Query.or(nameQuery, descQuery);
+    const queries = [nameQuery, descQuery];
+
+    // Rama opcional (solo admin): incluir padres cuyas experiencias hijas
+    // (ProviderExperiencia) coinciden por nombre. Cubre Proveedores y Establecimientos.
+    if (includeChildren) {
+      const childQuery = new Parse.Query('ProviderExperiencia');
+      childQuery.equalTo('exists', true);
+      childQuery.matches('name', searchValue, 'i');
+      childQuery.select('provider');
+      childQuery.limit(1000);
+      const children = await childQuery.find({ useMasterKey: true });
+      const parentIds = [
+        ...new Set(children.map((c) => (c.get('provider') ? c.get('provider').id : null)).filter(Boolean)),
+      ];
+
+      const byExperiencia = new Parse.Query('Experience');
+      byExperiencia.equalTo('exists', true);
+      if (!includeInactive) byExperiencia.equalTo('active', true);
+      byExperiencia.doesNotExist('valid_until');
+      if (typeFilter) byExperiencia.equalTo('type', typeFilter);
+      if (excludeId) byExperiencia.notEqualTo('objectId', excludeId);
+      if (dayDate) {
+        const QuoteServiceHelper = require('../../services/QuoteServiceHelper');
+        const dayCode = QuoteServiceHelper.getDayOfWeekCode(dayDate);
+        if (dayCode !== null) byExperiencia.equalTo('availability.day', dayCode);
+      }
+      // Si no hubo coincidencias, un id imposible evita traer todo por error.
+      byExperiencia.containedIn('objectId', parentIds.length ? parentIds : ['__none_match__']);
+      queries.push(byExperiencia);
+    }
+
+    return Parse.Query.or(...queries);
   }
 
   /**

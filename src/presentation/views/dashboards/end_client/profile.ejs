@@ -175,20 +175,75 @@ const formatRoleName = (role) => {
         </div>
       </div>
 
-      <!-- 02 · Perfiles de Facturación (solo lectura) -->
+      <!-- 02 · Perfiles de Facturación -->
       <div class="profile-section">
         <div class="section-head section-head--left">
           <span class="section-num">02</span>
           <span class="section-title">Perfiles de Facturación</span>
         </div>
-        <p class="section-subtitle mb-4">Perfiles de facturación asociados a tu cuenta (solo lectura).</p>
+        <p class="section-subtitle mb-4">Administra tus perfiles de facturación para diferentes entidades fiscales.</p>
         <%- include('../../organisms/billing/billing-profiles-section', {
           userRole: typeof userRole !== 'undefined' ? userRole : 'client',
-          readOnly: true,
-          targetUserId: dashboardClientId,
+          readOnly: false,
+          targetUserId: '',
           showHeader: false
         }) %>
       </div>
+
+      <% /* Perfil de viaje (pasaportes, direcciones, preferencias, documentos, lealtad):
+            autoservicio para cliente directo y de agencia. Usa /api/agents/:id (AmexingUser). */ %>
+      <% var travelProfileUserId = (typeof userId !== 'undefined' && userId) ? userId : ((user && user.id) ? user.id : ''); %>
+      <% if (typeof clientCategory !== 'undefined' && ['direct_client', 'agency_client'].includes(clientCategory) && travelProfileUserId) { %>
+      <!-- 03 · Perfil de Viaje -->
+      <div class="profile-section">
+        <div class="section-head section-head--left">
+          <span class="section-num">03</span>
+          <span class="section-title">Perfil de Viaje</span>
+        </div>
+        <p class="section-subtitle mb-4">Administra tus pasaportes, direcciones, preferencias de viaje, documentos y programas de lealtad.</p>
+        <div id="profileRoot" data-client-id="<%= travelProfileUserId %>" data-owner-base="/api/agents/<%= travelProfileUserId %>">
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="ti ti-id me-2 text-primary"></i>Pasaportes</h5>
+              <button type="button" class="btn btn-sm btn-primary" id="addPassportBtn"><i class="ti ti-plus me-1"></i>Agregar Pasaporte</button>
+            </div>
+            <div class="card-body"><div id="passportsContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+          </div>
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="ti ti-map-pin me-2 text-primary"></i>Direcciones</h5>
+              <button type="button" class="btn btn-sm btn-primary" id="addAddressBtn"><i class="ti ti-plus me-1"></i>Agregar Dirección</button>
+            </div>
+            <div class="card-body"><div id="addressesContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+          </div>
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="ti ti-plane me-2 text-primary"></i>Preferencias de Viaje</h5>
+              <button type="button" class="btn btn-sm btn-primary" id="addPreferenceBtn"><i class="ti ti-edit me-1"></i>Editar preferencias</button>
+            </div>
+            <div class="card-body"><div id="preferencesContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+          </div>
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="ti ti-files me-2 text-primary"></i>Documentos</h5>
+              <button type="button" class="btn btn-sm btn-primary" id="addDocumentBtn"><i class="ti ti-plus me-1"></i>Agregar documento</button>
+            </div>
+            <div class="card-body">
+              <div id="documentFormWrap" class="border rounded p-3 mb-3 bg-light" style="display:none"></div>
+              <div id="documentsContainer"><p class="text-muted mb-0">Cargando…</p></div>
+            </div>
+          </div>
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="ti ti-star me-2 text-primary"></i>Programas de Lealtad</h5>
+              <button type="button" class="btn btn-sm btn-primary" id="addLoyaltyBtn"><i class="ti ti-plus me-1"></i>Agregar Programa</button>
+            </div>
+            <div class="card-body"><div id="loyaltyContainer"><p class="text-muted mb-0">Cargando…</p></div></div>
+          </div>
+        </div>
+        <%- include('../admin/sections/client-profile-section') %>
+      </div>
+      <% } %>
     </div>
   </div>
 </div>

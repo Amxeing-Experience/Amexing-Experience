@@ -553,6 +553,8 @@ class ProviderExperiencia extends BaseModel {
 
       const query = BaseModel.queryActive('ProviderExperiencia');
       query.equalTo('provider', providerPointer);
+      query.include('entradas');
+      query.include('entradas.destino');
       query.ascending('displayOrder');
       query.ascending('name');
 

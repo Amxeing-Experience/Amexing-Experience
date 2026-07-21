@@ -57,7 +57,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <div id="establishmentDetailBody" style="display: none;">
                 <div class="card-header d-flex justify-content-between align-items-center" style="background: var(--brand-gradient);">
                     <h5 class="mb-0 text-white">
-                        <i class="ti ti-building me-2"></i><span id="establishmentModalTitle">Crear Nuevo Establecimiento</span>
+                        <i class="ti ti-edit me-2"></i><span id="establishmentModalTitle">Crear Nuevo Establecimiento</span>
                     </h5>
                     <button type="button" class="btn-close btn-close-white" id="closeEstablishmentDetailBtn" title="Cerrar" aria-label="Cerrar"></button>
                 </div>
@@ -275,7 +275,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <div class="mb-4">
                         <h6 class="fw-bold text-success border-bottom pb-2 mb-3">
                             <i class="ti ti-sparkles me-1"></i>
-                            Experiencias del Establecimiento
+                            Experiencias
                         </h6>
 
                         <!-- Lista de experiencias editables inline -->
@@ -298,7 +298,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <button type="button" class="btn btn-link text-decoration-none p-0 fw-bold text-success d-flex align-items-center gap-2" id="toggleEstablishmentInfoBtn">
                             <i class="ti ti-chevron-right" id="establishmentInfoChevron" style="transition: transform .15s ease;"></i>
                             <i class="ti ti-building"></i>
-                            Información del establecimiento
+                            Información
                         </button>
 
                         <div id="establishmentInfoSection" class="mt-3" style="display: none;">
@@ -387,6 +387,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <%# Opciones cargadas dinámicamente desde la BD (ExperienceCategories.populateSelect). %>
                     <option value="">Seleccionar</option>
                 </select>
+            </div>
+
+            <!-- Entradas (Opcional) -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Entradas <span class="text-muted">(opcional)</span></label>
+                <select class="experiencia-entradas-input" multiple placeholder="Buscar y agregar entradas..."></select>
+                <div class="form-text">Boletos de acceso asociados. Puedes elegir entradas de cualquier destino.</div>
             </div>
 
             <!-- Descripción -->
@@ -765,7 +772,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             processing: true,
             serverSide: true,
             ajax: {
-                url: apiEndpoint + '?type=Establishment&includeInactive=true', // Show all establishments in admin
+                url: apiEndpoint + '?type=Establishment&includeInactive=true&searchChildren=true', // Show all establishments in admin; búsqueda también por experiencia hija
                 type: 'GET',
                 dataSrc: function(json) {
                     return json.data || [];
@@ -830,6 +837,23 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         order: [],
         ordering: false,
         pageLength: 10,
+        searchDelay: 300,
+        initComplete: function () {
+            // Buscador grande + placeholder (también busca por experiencia hija)
+            const container = $(this.api().table().container());
+            const filter = container.find('div.dataTables_filter');
+            // Quitar el texto "Buscar:" dejando solo el input
+            filter.find('label').contents().filter(function () { return this.nodeType === 3; }).remove();
+            filter.find('label').css({ 'width': '100%', 'margin': '0' });
+            filter.find('input')
+                .attr('placeholder', 'Busca establecimiento o experiencia…')
+                .css({
+                    'display': 'block', 'width': '100%', 'height': '46px',
+                    'font-size': '0.98rem', 'padding': '0 14px',
+                    'border-radius': '10px', 'margin': '0'
+                });
+            filter.css({ 'width': '100%', 'float': 'none', 'text-align': 'left' });
+        },
         language: {
             url: '/assets/vendor/datatables/es-ES.json'
         },
@@ -1851,7 +1875,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                     if (finalEstablishmentId) {
                         $('#establishmentId').val(finalEstablishmentId);
-                        $('#establishmentModalTitle').text('Editar Establecimiento');
+                        $('#establishmentModalTitle').text($('#establishmentName').val() || 'Establecimiento');
                         currentModalState = { mode: 'edit', establishmentId: finalEstablishmentId, isOpen: true, sessionId: currentModalState.sessionId };
                         loadEstablishmentExperiencias(finalEstablishmentId, function() {
                             const cards = document.querySelectorAll('#establishmentExperienciasList .experiencia-editable');
@@ -2001,6 +2025,90 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             else collapseEstablishmentInfo();
         });
 
+        // ===== Entradas por tarjeta (boletos de acceso; NO ligadas al destino) =====
+        let _entradasCache = null;
+
+        function entradasEnsureStyles() {
+            if (document.getElementById('entradas-ts-styles')) return;
+            const st = document.createElement('style');
+            st.id = 'entradas-ts-styles';
+            st.textContent = '.ts-dropdown .optgroup-header{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:#8a8f78;background:#f3f2ec;padding:7px 12px;cursor:default;position:sticky;top:0;z-index:1;border-top:1px solid #e4dfcf;}'
+                + '.ts-dropdown .optgroup-header .ti{margin-right:5px;opacity:.7;}'
+                + '.ts-dropdown .optgroup:first-child .optgroup-header{border-top:0;}'
+                + '.ts-dropdown .option{padding:8px 12px 8px 22px;}'
+                + '.ts-dropdown .ent-opt{display:flex;justify-content:space-between;align-items:center;gap:12px;}'
+                + '.ts-dropdown .ent-opt-name{color:#2b2b2b;}'
+                + '.ts-dropdown .ent-opt-price{color:#6E7A50;font-weight:600;white-space:nowrap;}';
+            document.head.appendChild(st);
+        }
+
+        async function entradasFetchAll() {
+            if (_entradasCache) return _entradasCache;
+            try {
+                const token = (typeof getAccessToken === 'function') ? getAccessToken() : (localStorage.getItem('accessToken') || localStorage.getItem('token'));
+                const res = await fetch('/api/destinos/all-entradas', { credentials: 'same-origin', headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
+                const json = res.ok ? await res.json() : {};
+                _entradasCache = (json && json.data) || [];
+            } catch (e) { _entradasCache = []; }
+            return _entradasCache;
+        }
+
+        function entradaChipLabel(name, price) {
+            return `${name} · $${Number(price || 0).toLocaleString('es-MX')}`;
+        }
+
+        function _cardEntradasSelect(cardEl) {
+            if (!cardEl) return null;
+            return cardEl.querySelector ? cardEl.querySelector('.experiencia-entradas-input') : (($(cardEl).find('.experiencia-entradas-input')[0]) || null);
+        }
+
+        async function initCardEntradas(cardEl, selected) {
+            if (typeof TomSelect === 'undefined') return;
+            const el = _cardEntradasSelect(cardEl);
+            if (!el) return;
+            entradasEnsureStyles();
+            if (el.tomselect) { el.tomselect.destroy(); }
+
+            const all = await entradasFetchAll();
+            const optgroups = []; const seen = {};
+            const options = all.map((e) => {
+                const group = e.destinoName || 'Sin destino';
+                if (!seen[group]) { seen[group] = true; optgroups.push({ value: group, label: group }); }
+                return { id: e.id, label: entradaChipLabel(e.name, e.price), name: e.name || '', price: Number(e.price || 0), group, destinoName: e.destinoName || '' };
+            });
+
+            const ts = new TomSelect(el, {
+                plugins: ['remove_button'], maxItems: null, valueField: 'id', labelField: 'label',
+                searchField: ['label', 'destinoName'], optgroupField: 'group', lockOptgroupOrder: true,
+                optgroups, options,
+                render: {
+                    option: (d, escape) => `<div class="ent-opt"><span class="ent-opt-name">${escape(d.name || d.label)}</span><span class="ent-opt-price">$${Number(d.price || 0).toLocaleString('es-MX')}</span></div>`,
+                    item: (d, escape) => `<div>${escape(d.label)}</div>`,
+                    optgroup_header: (d, escape) => `<div class="optgroup-header"><i class="ti ti-map-pin"></i>${escape(d.label)}</div>`,
+                },
+            });
+
+            if (Array.isArray(selected) && selected.length) {
+                const ids = [];
+                selected.forEach((e) => {
+                    if (!e || !e.id) return;
+                    if (!ts.options[e.id]) {
+                        ts.addOption({ id: e.id, label: entradaChipLabel(e.name || e.id, e.price), name: e.name || String(e.id), price: Number(e.price || 0), group: e.destinoName || 'Sin destino', destinoName: e.destinoName || '' });
+                    }
+                    ids.push(e.id);
+                });
+                ts.setValue(ids, true);
+            }
+        }
+
+        function getCardEntradaIds(cardEl) {
+            const el = _cardEntradasSelect(cardEl);
+            const ts = el && el.tomselect;
+            if (!ts) return [];
+            const v = ts.getValue();
+            return Array.isArray(v) ? v : (v ? [v] : []);
+        }
+
         function addEstablishmentExperiencia() {
             const template = document.getElementById('establishmentExperienciaEditableTemplate');
             const clone = template.content.cloneNode(true);
@@ -2019,6 +2127,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 applyCat();
                 window.ExperienceCategories.fetch().then(applyCat);
             }
+
+            // Inicializa el multiselect de Entradas de la tarjeta nueva
+            initCardEntradas(experienciaCard, []);
 
             updateEstablishmentNoExperienciasMessage();
 
@@ -2310,6 +2421,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     description: getName('.experiencia-description-input'),
                     tipo: getName('.experiencia-tipo-input'),
                     experience_category: getName('.experiencia-category-input'),
+                    entradas: getCardEntradaIds(card),
                     price: getNumber('.experiencia-price-input') || 0,
                     price_no_alcohol: getNumber('.experiencia-price-no-alcohol-input'),
                     price_child: getNumber('.experiencia-price-child-input'),
@@ -2687,7 +2799,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             // Update modal title and button text
             const modalTitle = document.getElementById('establishmentModalTitle');
-            if (modalTitle) modalTitle.textContent = isEdit ? 'Editar Establecimiento' : 'Crear Nuevo Establecimiento';
+            // En edición el título muestra el nombre del establecimiento (lo llena loadEstablishmentData).
+            if (modalTitle) modalTitle.textContent = isEdit ? '' : 'Crear Nuevo Establecimiento';
             // Crear: info del establecimiento abierta (hay que llenarla). Editar: colapsada.
             setEstablishmentInfo(!isEdit);
             
@@ -2754,6 +2867,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         // Populate form fields
                         $('#establishmentId').val(establishment.id);
                         $('#establishmentName').val(establishment.name);
+                        $('#establishmentModalTitle').text(establishment.name || 'Establecimiento');
                         $('#establishmentDescription').val(establishment.description || '');
                         
                         // Populate destinationPOI field — guarda el destino como "pendiente"
@@ -3043,6 +3157,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Add to container
             document.getElementById('establishmentExperienciasList').appendChild(card);
             updateEstablishmentNoExperienciasMessage();
+
+            // Inicializa el multiselect de Entradas de esta tarjeta (todas, agrupadas por destino)
+            initCardEntradas(card, experiencia.entradas || []);
         }
 
         // Populate availability interface from data

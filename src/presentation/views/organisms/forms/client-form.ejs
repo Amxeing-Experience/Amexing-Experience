@@ -19,6 +19,9 @@ include('../../organisms/forms/client-form', {
 const formId = locals.formId || 'editClientForm';
 const idPrefix = locals.idPrefix || 'edit';
 const isEdit = locals.isEdit || true;
+// showPassword: incluye el campo de contraseña (con generar/copiar/ver) para dar acceso al cliente.
+const showPassword = locals.showPassword || false;
+const passwordHelp = locals.passwordHelp || '';
 %>
 
 <form id="<%= formId %>">
@@ -79,6 +82,20 @@ const isEdit = locals.isEdit || true;
                 }) %>
             </div>
         </div>
+
+        <% if (showPassword) { %>
+        <div class="row">
+            <div class="col-md-6">
+                <%- include('../../molecules/common/password-field', {
+                    id: idPrefix + 'Password',
+                    name: 'password',
+                    label: 'Contraseña',
+                    required: false,
+                    helpText: passwordHelp || 'Opcional: si la asignas (requiere email), el cliente podrá iniciar sesión para ver sus reservaciones.'
+                }) %>
+            </div>
+        </div>
+        <% } %>
 
         <div class="row">
             <div class="col-md-6">
@@ -371,5 +388,16 @@ const isEdit = locals.isEdit || true;
                 }) %>
             </div>
         </div>
+
+        <% if (typeof showActive !== 'undefined' && showActive) { %>
+        <div class="row">
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="<%= idPrefix %>Active" name="active" checked>
+                    <label class="form-check-label" for="<%= idPrefix %>Active">Cliente activo</label>
+                </div>
+            </div>
+        </div>
+        <% } %>
     </div>
 </form>

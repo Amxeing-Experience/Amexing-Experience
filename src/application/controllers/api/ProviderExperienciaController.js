@@ -508,6 +508,7 @@ class ProviderExperienciaController {
         private_min_value: privateMinValue,
         fixed_schedule: fixedSchedule,
         displayOrder,
+        entradas,
         tipo,
         experience_category: experienceCategory,
         availability,
@@ -657,6 +658,13 @@ class ProviderExperienciaController {
         experiencia.set('team_notes', teamNotes);
       }
 
+      // Entradas asociadas (boletos de acceso; NO ligadas al destino de la experiencia)
+      if (Array.isArray(entradas)) {
+        experiencia.set('entradas', entradas
+          .filter((eid) => eid && String(eid).trim() !== '')
+          .map((eid) => { const p = new Parse.Object('Entrada'); p.id = String(eid).trim(); return p; }));
+      }
+
       // Set required lifecycle fields before validation
       experiencia.set('active', true);
       experiencia.set('exists', true);
@@ -731,6 +739,7 @@ class ProviderExperienciaController {
         private_min_value: privateMinValue,
         fixed_schedule: fixedSchedule,
         displayOrder,
+        entradas,
         active,
         tipo,
         experience_category: experienceCategory,
@@ -811,6 +820,12 @@ class ProviderExperienciaController {
       if (displayOrder !== undefined) experiencia.setDisplayOrder(displayOrder);
       if (active !== undefined) experiencia.set('active', active); // setActive() no existe en el modelo
       if (availability !== undefined) experiencia.setAvailability(availability);
+      // Entradas asociadas (boletos de acceso; NO ligadas al destino de la experiencia)
+      if (entradas !== undefined) {
+        experiencia.set('entradas', (Array.isArray(entradas) ? entradas : [])
+          .filter((eid) => eid && String(eid).trim() !== '')
+          .map((eid) => { const p = new Parse.Object('Entrada'); p.id = String(eid).trim(); return p; }));
+      }
 
       // Update includes, languages, notincludes, advance booking time, and photos fields
       if (includes !== undefined) {
@@ -1403,6 +1418,20 @@ class ProviderExperienciaController {
       active: experiencia.isActive(),
       availability: experiencia.getAvailability(),
       popular: experiencia.get('popular') === true,
+      // Entradas asociadas (boletos de acceso; NO ligadas al destino).
+      entradas: (experiencia.get('entradas') || [])
+        .filter((e) => e && e.id)
+        .map((e) => {
+          const destino = e.get('destino');
+          const priceVal = e.get('price');
+          return {
+            id: e.id,
+            name: e.get('name') || '',
+            price: typeof priceVal === 'number' ? priceVal : Number(priceVal) || 0,
+            destinoId: destino ? destino.id : null,
+            destinoName: destino ? destino.get('name') || '' : '',
+          };
+        }),
       createdAt: experiencia.createdAt,
       updatedAt: experiencia.updatedAt,
     };

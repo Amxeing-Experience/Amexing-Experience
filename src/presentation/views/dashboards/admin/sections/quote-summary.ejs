@@ -77,7 +77,7 @@ const e = __isRes ? 'reservación' : 'cotización';
         margin: 0;
         display: block;
         border-radius: 0;
-        font-family: var(--font-myriad, 'Myriad Pro'), 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-family: 'ArponaPDF', var(--font-myriad, 'Myriad Pro'), 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         width: 100%;
         text-align: center;
     }
@@ -790,6 +790,10 @@ const e = __isRes ? 'reservación' : 'cotización';
                 <div class="sm-totals-row sm-totals-iva" id="summaryIVARow">
                     <span>IVA (16%)</span>
                     <span id="summaryIVA">$0.00</span>
+                </div>
+                <div class="sm-totals-row sm-totals-tip d-none" id="summaryGlobalTipRow">
+                    <span><i class="ti ti-coin me-1"></i>Propina general</span>
+                    <span id="summaryGlobalTip">$0.00</span>
                 </div>
                 <div class="sm-totals-row sm-totals-grand">
                     <span>Total</span>
@@ -1532,19 +1536,35 @@ const e = __isRes ? 'reservación' : 'cotización';
             // Render with normalized data
             renderer.renderNormalized(normalizedData);
 
-            // Calculate and update totals
+            // Calculate and update totals — usar los métodos del renderer (mismos que los totales
+            // por día) para reflejar descuento + propina por servicio. netSubtotal (sin propinas por
+            // servicio) es la base de la propina global.
             let serviceTotal = 0;
-            serviceItems.days.forEach(day => {
-                if (day.subconcepts && day.subconcepts.length > 0) {
-                    day.subconcepts.forEach(sc => {
-                        let servicePrice = sc.total;
-                        if (sc.pricesByType && typeof sc.pricesByType === 'object' && savedPayment) {
-                            servicePrice = sc.pricesByType[savedPayment] || sc.total;
-                        }
-                        if (servicePrice != null && sc.includeInTotal !== false) serviceTotal += servicePrice;
-                    });
-                }
+            let netSubtotal = 0;
+            normalizedData.days.forEach(day => {
+                (day.services || []).forEach(svc => {
+                    if (svc.includeInTotal === false) return;
+                    const net = renderer.getServicePrice(svc);
+                    netSubtotal += net;
+                    serviceTotal += net + renderer.getServiceTip(svc);
+                });
             });
+
+            // Fase 2b: propina global de la cotización. Se usa el monto guardado (calculado en la
+            // forma de pago guardada) y se muestra en su línea + se suma al total.
+            const gtMeta = serviceItems.globalTip;
+            const globalTipAmount = (gtMeta && gtMeta.type && Number(gtMeta.value) > 0) ? (Number(gtMeta.amount) || 0) : 0;
+            const gtRow = document.getElementById('summaryGlobalTipRow');
+            const gtEl = document.getElementById('summaryGlobalTip');
+            if (gtRow && gtEl) {
+                if (globalTipAmount > 0) {
+                    gtEl.textContent = `+${currencyFormatter.format(globalTipAmount)}`;
+                    gtRow.classList.remove('d-none');
+                } else {
+                    gtRow.classList.add('d-none');
+                }
+            }
+            serviceTotal += globalTipAmount;
 
             // Calculate IVA breakdown based on payment type (matching main services logic)
             let subtotal;

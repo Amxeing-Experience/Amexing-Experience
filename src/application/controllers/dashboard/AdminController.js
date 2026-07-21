@@ -227,8 +227,8 @@ class AdminController extends RoleBasedController {
         breadcrumb: null, // Disable automatic breadcrumb generation
       };
 
-      // Add DataTables assets if employees, tarifario or trips (quotes) section is active
-      if (section === 'employees' || section === 'tarifario' || section === 'quotes') {
+      // Add DataTables assets if employees, tarifario, trips (quotes) or clientes section is active
+      if (section === 'employees' || section === 'tarifario' || section === 'quotes' || section === 'clientes') {
         viewData.pageStyles = [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
           'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
@@ -473,6 +473,26 @@ class AdminController extends RoleBasedController {
           <!-- Tom Select for Enhanced Multi-Select -->
           <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
         `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Entradas (boletos de acceso) por destino — bandeja master-detail.
+   * Izquierda: lista de destinos (POI). Derecha: tabla de entradas del destino.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   */
+  async entradas(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'entradas', {
+        title: 'Entradas',
+        breadcrumb: null,
+        pageStyles: [],
+        footerScripts: '',
       });
     } catch (error) {
       this.handleError(res, error);

@@ -58,10 +58,11 @@ const ecCat = (typeof clientCategory !== 'undefined' && clientCategory)
 const ecCaps = (typeof endClientCaps !== 'undefined' && endClientCaps)
   ? endClientCaps
   : {
-      viewQuotes: ecCat !== 'home_owner',
+      // agency_client: SOLO reservaciones (sin cotizaciones ni tarifario).
+      viewQuotes: ecCat !== 'home_owner' && ecCat !== 'agency_client',
       createQuotes: (ecCat === 'direct_client' || ecCat === 'wedding_planner' || ecCat === 'concierge'),
-      viewTarifario: !!ecCat && ecCat !== 'direct_client',
-      dashboardQuotes: ecCat !== 'home_owner',
+      viewTarifario: !!ecCat && ecCat !== 'direct_client' && ecCat !== 'agency_client',
+      dashboardQuotes: ecCat !== 'home_owner' && ecCat !== 'agency_client',
     };
 const endClientActivityItems = [];
 if (ecCaps.viewQuotes) {
@@ -102,6 +103,7 @@ const navigationItems = {
             { name: 'Gestión de Experiencias', icon: 'star', path: '/dashboard/superadmin/experiences', id: 'experiences' },
             { name: 'Gestión de Tours', icon: 'map', path: '/dashboard/superadmin/tours', id: 'tours' },
             { name: 'Greeter', icon: 'user-plus', path: '/dashboard/superadmin/greeter', id: 'greeter' },
+            { name: 'Entradas', icon: 'ticket', path: '/dashboard/superadmin/entradas', id: 'entradas' },
             { name: 'Exportar Tarifario', icon: 'download', path: '/dashboard/superadmin/tarifario-export', id: 'tarifario-export' }
         ]},
         // Equipo y Recursos Section
@@ -131,6 +133,7 @@ const navigationItems = {
             { name: 'A Disposición', icon: 'calculator', path: '/dashboard/admin/a-disposicion', id: 'a-disposicion' },
             { name: 'Experiencias', icon: 'star', path: '/dashboard/admin/experiences', id: 'experiences' },
             { name: 'Tours', icon: 'map', path: '/dashboard/admin/tours', id: 'tours' },
+            { name: 'Entradas', icon: 'ticket', path: '/dashboard/admin/entradas', id: 'entradas' },
             { name: 'Exportar Tarifario', icon: 'download', path: '/dashboard/admin/tarifario-export', id: 'tarifario-export' }
             // Hidden for practical purposes
             // { name: 'Greeter', icon: 'user-plus', path: '/dashboard/admin/greeter', id: 'greeter' }

@@ -2197,6 +2197,8 @@ class QuoteController {
       const {
         days = [], subtotal = 0, iva = 0, total = 0,
         currency = 'MXN', paymentType = 'efectivo',
+        globalTip = null, // Fase 2b: propina global de la cotización (persistir tal cual).
+        suggestedTipPct = null, // Fase 2c: % de propina sugerida (default 10 en el front).
       } = req.body;
 
       // Validate serviceItems structure
@@ -2430,6 +2432,8 @@ class QuoteController {
         total,
         currency,
         paymentType,
+        globalTip, // Fase 2b: propina global de la cotización.
+        suggestedTipPct, // Fase 2c: % de propina sugerida.
       };
 
       // Asegura un id estable por subconcepto ANTES de guardar. Los servicios agregados desde
@@ -4177,6 +4181,8 @@ class QuoteController {
         paymentInfoId,
         billingProfileId,
         force,
+        showTips,
+        showDiscounts,
       } = req.body;
 
       const result = await this.quoteService.generateReceipt(
@@ -4186,7 +4192,9 @@ class QuoteController {
         includePaymentInfo, // Pass the flag from request
         paymentInfoId, // Pass the specific payment info ID
         billingProfileId, // Perfil de facturación elegido (o undefined)
-        force === true // Override admin del bloqueo de reservación no saldada
+        force === true, // Override admin del bloqueo de reservación no saldada
+        // Desglose por servicio en el recibo (default: mostrar). No afecta los totales.
+        { showTips: showTips !== false, showDiscounts: showDiscounts !== false }
       );
 
       // If PDF buffer is returned, send it as a downloadable file
