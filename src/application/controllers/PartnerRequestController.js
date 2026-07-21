@@ -33,12 +33,16 @@ class PartnerRequestController {
         type,
         request.get('collaboratorTypeOther')
       ),
+      collaboratorTypeRaw: type || null,
+      collaboratorTypeOther: request.get('collaboratorTypeOther') || null,
       website: request.get('website'),
       professionalAffiliation: request.get('professionalAffiliation'),
       howDidYouHear: request.get('howDidYouHear'),
       comments: request.get('comments'),
       status: request.get('status'),
       submittedAt: request.get('submittedAt'),
+      convertedClientId: request.get('convertedClientId') || null,
+      convertedAt: request.get('convertedAt') || null,
     };
   }
 
@@ -154,6 +158,123 @@ class PartnerRequestController {
         request: null,
       });
     }
+  }
+
+  /**
+   * Admin API: list partner requests (JSON) with status filter, search and pagination.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async apiList(req, res) {
+    try {
+      const status = (req.query.status || '').trim();
+      const search = (req.query.search || '').trim();
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
+      const { items, total, pendingCount } = await this.service.listRequests({
+        status, search, page, limit,
+      });
+
+      // Marca qué correos ya existen como usuario (para avisar antes de convertir).
+      // Una sola query batch en vez de N.
+      const emails = items
+        .map((r) => (r.get('email') || '').trim().toLowerCase())
+        .filter(Boolean);
+      const existing = new Set();
+      if (emails.length) {
+        const Parse = require('parse/node');
+        const emailQuery = new Parse.Query(Parse.Object.extend('AmexingUser'));
+        emailQuery.containedIn('email', emails);
+        emailQuery.select('email');
+        emailQuery.limit(1000);
+        const users = await emailQuery.find({ useMasterKey: true }).catch(() => []);
+        users.forEach((u) => existing.add((u.get('email') || '').trim().toLowerCase()));
+      }
+
+      return res.json({
+        success: true,
+        data: items.map((r) => ({
+          ...PartnerRequestController.toView(r),
+          reviewedAt: r.get('reviewedAt') || null,
+          emailExists: existing.has((r.get('email') || '').trim().toLowerCase()),
+        })),
+        pagination: { page, limit, total },
+        pendingCount,
+      });
+    } catch (error) {
+      logger.error('Error listing partner requests (admin)', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Error al listar solicitudes' });
+    }
+  }
+
+  /**
+   * Admin API: resolve a partner request (approve/reject). Only pending ones.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @param {string} action - 'approve' or 'reject'.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async apiResolve(req, res, action) {
+    try {
+      const { id } = req.params;
+      const request = await this.service.getRequestById(id);
+      if (!request || request.get('exists') === false) {
+        return res.status(404).json({ success: false, error: 'Solicitud no encontrada' });
+      }
+      if (request.get('status') && request.get('status') !== 'pending') {
+        return res.status(409).json({ success: false, error: 'La solicitud ya fue resuelta' });
+      }
+      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      const updated = await this.service.updateStatus(id, newStatus);
+      logger.info('Partner request resolved from admin panel', { id, status: newStatus });
+      return res.json({ success: true, data: PartnerRequestController.toView(updated) });
+    } catch (error) {
+      logger.error('Error resolving partner request (admin)', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Error al actualizar la solicitud' });
+    }
+  }
+
+  /**
+   * Admin API: mark a request as converted (status 'approved' + link al cliente creado).
+   * Se invoca DESPUÉS de crear el cliente desde el alta (Opción A). No falla si ya
+   * estaba convertida; solo rechaza si la solicitud fue previamente 'rejected'.
+   * @param {object} req - Express request (body: { clientId }).
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async apiConvert(req, res) {
+    try {
+      const { id } = req.params;
+      const clientId = (req.body && req.body.clientId) || null;
+      const request = await this.service.getRequestById(id);
+      if (!request || request.get('exists') === false) {
+        return res.status(404).json({ success: false, error: 'Solicitud no encontrada' });
+      }
+      if (request.get('status') === 'rejected') {
+        return res.status(409).json({ success: false, error: 'La solicitud fue rechazada' });
+      }
+      const updated = await this.service.markConverted(id, clientId);
+      logger.info('Partner request converted from admin panel', { id, clientId });
+      return res.json({ success: true, data: PartnerRequestController.toView(updated) });
+    } catch (error) {
+      logger.error('Error converting partner request (admin)', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Error al convertir la solicitud' });
+    }
+  }
+
+  /**
+   * Admin API: reject a partner request.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async apiReject(req, res) {
+    return this.apiResolve(req, res, 'reject');
   }
 }
 

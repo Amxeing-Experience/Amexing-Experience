@@ -89,6 +89,7 @@ const menuItems = [
     // Agencies are entities (no personal profile); people-type clients get Perfil, agencies get Agentes.
     ...(!isAgency ? [{ label: 'Perfil', icon: 'address-book', section: 'profile', href: `/dashboard/admin/clients/${clientId}?section=profile` }] : []),
     ...(isAgency ? [{ label: 'Agentes', icon: 'users', section: 'employees', href: `/dashboard/admin/clients/${clientId}?section=employees` }] : []),
+    ...(isAgency ? [{ label: 'Clientes', icon: 'user-heart', section: 'clientes', href: `/dashboard/admin/clients/${clientId}?section=clientes` }] : []),
     { label: 'Trips', icon: 'plane', section: 'quotes', href: `/dashboard/admin/clients/${clientId}?section=quotes` },
     { label: 'Tarifario', icon: 'receipt-2', section: 'tarifario', href: `/dashboard/admin/clients/${clientId}?section=tarifario` }
 ];
@@ -310,6 +311,80 @@ window.cffForms = (function () {
                 </form>
             </div>
 
+            <!-- Prellenado al "Aprobar y convertir" una solicitud de colaborador (agencia por defecto). -->
+            <script>
+            (function () {
+                function run() {
+                    var raw;
+                    try { raw = sessionStorage.getItem('prefillNewClient'); } catch (e) { return; }
+                    if (!raw) return;
+                    var d;
+                    try { d = JSON.parse(raw); } catch (e) { return; }
+                    try { sessionStorage.removeItem('prefillNewClient'); } catch (e) { /* ignore */ }
+
+                    function setById(id, val) { var el = document.getElementById(id); if (el && val != null && String(val) !== '') el.value = val; }
+                    function setByName(form, name, val) { if (!form) return; var el = form.querySelector('[name="' + name + '"]'); if (el && val != null && String(val) !== '') el.value = val; }
+                    function fire(el) { if (el) el.dispatchEvent(new Event('change', { bubbles: true })); }
+
+                    // Sugerir tipo de cliente según el tipo de colaborador.
+                    var t = d.collaboratorTypeRaw || '';
+                    var toCategory = { wedding_planner: 'wedding_planner', concierge: 'concierge', airbnb_villa_owner: 'home_owner' };
+                    var isClient = Object.prototype.hasOwnProperty.call(toCategory, t);
+
+                    var agRadio = document.getElementById('pageTypeAgency');
+                    var clRadio = document.getElementById('pageTypeClient');
+                    if (isClient && clRadio) { clRadio.checked = true; fire(clRadio); }
+                    else if (agRadio) { agRadio.checked = true; fire(agRadio); }
+
+                    if (isClient) {
+                        var catIdByCat = { direct_client: 'directClientCatDirect', wedding_planner: 'directClientCatWedding', concierge: 'directClientCatConcierge', home_owner: 'directClientCatHome' };
+                        var catRadio = document.getElementById(catIdByCat[toCategory[t]]);
+                        if (catRadio) { catRadio.checked = true; fire(catRadio); }
+                    }
+
+                    // Notas comunes con la info de la solicitud.
+                    var notes = [];
+                    if (d.collaboratorType) notes.push('Tipo de colaborador: ' + d.collaboratorType);
+                    if (d.professionalAffiliation) notes.push('Afiliación: ' + d.professionalAffiliation);
+                    if (d.howDidYouHear) notes.push('¿Cómo nos conoció?: ' + d.howDidYouHear);
+                    if (d.comments) notes.push('Comentarios: ' + d.comments);
+                    notes.push('(Convertido desde solicitud de colaborador' + (d.fromRequestId ? ' #' + d.fromRequestId : '') + ')');
+                    var notesStr = notes.join('\n');
+
+                    // Prellenar AMBOS forms (así no se pierde el dato si el admin cambia de tipo).
+                    setById('agencyFirstName', d.firstName);
+                    setById('agencyLastName', d.lastName);
+                    setById('agencyEmail', d.email);
+                    setById('agencyPhone', d.phone);
+                    setById('agencyWebsite', d.website);
+                    setById('agencyNotes', notesStr);
+
+                    var clientForm = document.getElementById('createClientPageForm');
+                    setById('directClientFirstName', d.firstName);
+                    setById('directClientLastName', d.lastName);
+                    setById('directClientEmail', d.email);
+                    setById('directClientPhone', d.phone);
+                    setByName(clientForm, 'notes', notesStr);
+
+                    // Aviso: el correo ya existe → cámbialo antes de crear.
+                    if (d.emailExists) {
+                        ['agencyEmail', 'directClientEmail'].forEach(function (id) {
+                            var el = document.getElementById(id);
+                            if (el && el.parentNode && !el.parentNode.querySelector('.prt-email-warn')) {
+                                var w = document.createElement('div');
+                                w.className = 'form-text text-warning prt-email-warn';
+                                w.innerHTML = '<i class="ti ti-alert-triangle me-1"></i>Este correo ya existe. Cámbialo antes de crear el cliente.';
+                                el.parentNode.appendChild(w);
+                            }
+                        });
+                    }
+                }
+                // Espera un poco a que los átomos (teléfono, etc.) terminen su init.
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(run, 150); });
+                else setTimeout(run, 150);
+            })();
+            </script>
+
             <!-- Barra de acción fija al viewport -->
             <div class="cff-sticky">
                 <div class="cff-sticky-inner">
@@ -405,6 +480,18 @@ document.addEventListener('DOMContentLoaded', function () {
             if (resp.ok && data && data.success) {
                 var d = data.data || {};
                 var id = d.id || (d.client && (d.client.id || d.client.objectId)) || null;
+                // Si venimos de una solicitud de colaborador, márcala aprobada + enlázala al cliente.
+                var fromReq = (location.search.match(/[?&]fromRequest=([^&]+)/) || [])[1];
+                if (fromReq) {
+                    try {
+                        await fetch('/api/partner-requests/' + encodeURIComponent(fromReq) + '/convert', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ clientId: id })
+                        });
+                    } catch (e) { /* best-effort: no bloquea la navegación */ }
+                }
                 window.location.href = id ? ('/dashboard/admin/clients/' + id) : '/dashboard/admin/clients';
                 return;
             }
@@ -816,6 +903,27 @@ document.addEventListener('DOMContentLoaded', function () {
             }) %>
             <% } else { %>
             <div class="alert alert-info mb-0"><i class="ti ti-info-circle me-2"></i>Solo las agencias tienen agentes.</div>
+            <% } %>
+        <% } else if (activeSection === 'clientes') { %>
+            <!-- Clientes de la agencia — solo agencias. Lista + abrir detalle (solo lectura aquí). -->
+            <% if (isAgency) { %>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="ti ti-user-heart me-2 text-primary"></i>Clientes de la agencia</h5>
+                    <p class="text-muted small mb-0 mt-1">Clientes dados de alta por esta agencia. Haz clic en uno para ver su detalle.</p>
+                </div>
+                <div class="card-body">
+                    <%- include('../../organisms/datatable/owned-clients-table', {
+                        tableId: 'agency-clients-table',
+                        apiEndpoint: `/api/owned-clients?agencyId=${clientId}`,
+                        userRole: 'admin',
+                        showActions: true,
+                        readOnly: true
+                    }) %>
+                </div>
+            </div>
+            <% } else { %>
+            <div class="alert alert-info mb-0"><i class="ti ti-info-circle me-2"></i>Solo las agencias tienen clientes.</div>
             <% } %>
         <% } else if (activeSection === 'quotes') { %>
             <!-- Trips: read-only quotes/reservations linked to this client. Loaded via AJAX. -->

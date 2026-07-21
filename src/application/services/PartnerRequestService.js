@@ -713,6 +713,59 @@ Enviado automáticamente desde el formulario de solicitud de acceso de Amexing C
    * @returns {Promise<Parse.Object>} The updated request.
    * @example
    */
+  /**
+   * Lists partner requests for the admin panel, with optional status filter,
+   * search (by name/email) and pagination. Also returns the count of pending
+   * requests (for the menu/pill badge).
+   * @param {object} opts - Options.
+   * @param {string} [opts.status] - Filter by status (pending|approved|rejected); '' or 'all' = todos.
+   * @param {string} [opts.search] - Search term matched against firstName/lastName/email.
+   * @param {number} [opts.page] - 1-based page.
+   * @param {number} [opts.limit] - Page size.
+   * @returns {Promise<{items: Array<object>, total: number, pendingCount: number}>} Result set.
+   * @example
+   */
+  async listRequests({
+    status = '', search = '', page = 1, limit = 25,
+  } = {}) {
+    const scoped = status && status !== 'all' ? status : null;
+
+    let query;
+    if (search) {
+      const byFirst = new Parse.Query('PartnerRequest');
+      byFirst.matches('firstName', search, 'i');
+      byFirst.notEqualTo('exists', false);
+      if (scoped) byFirst.equalTo('status', scoped);
+      const byLast = new Parse.Query('PartnerRequest');
+      byLast.matches('lastName', search, 'i');
+      byLast.notEqualTo('exists', false);
+      if (scoped) byLast.equalTo('status', scoped);
+      const byEmail = new Parse.Query('PartnerRequest');
+      byEmail.matches('email', search, 'i');
+      byEmail.notEqualTo('exists', false);
+      if (scoped) byEmail.equalTo('status', scoped);
+      query = Parse.Query.or(byFirst, byLast, byEmail);
+    } else {
+      query = new Parse.Query('PartnerRequest');
+      query.notEqualTo('exists', false);
+      if (scoped) query.equalTo('status', scoped);
+    }
+
+    // count() ignora skip/limit, así que lo calculamos antes de paginar.
+    const total = await query.count({ useMasterKey: true });
+    query.descending('submittedAt');
+    query.skip((Math.max(1, page) - 1) * limit);
+    query.limit(limit);
+    const items = await query.find({ useMasterKey: true });
+
+    const pendingQuery = new Parse.Query('PartnerRequest');
+    pendingQuery.notEqualTo('exists', false);
+    pendingQuery.equalTo('status', 'pending');
+    const pendingCount = await pendingQuery.count({ useMasterKey: true });
+
+    return { items, total, pendingCount };
+  }
+
   async updateStatus(submissionId, status) {
     // Fetch the full record first so the returned object keeps all fields
     // (name, email, etc.) populated for the confirmation view.
@@ -722,6 +775,27 @@ Enviado automáticamente desde el formulario de solicitud de acceso de Amexing C
     request.set('reviewedAt', new Date());
     const saved = await request.save(null, { useMasterKey: true });
     logger.info('Partner request status updated', { submissionId, status });
+    return saved;
+  }
+
+  /**
+   * Marks a request as converted: sets status='approved' and links the created client.
+   * La solicitud solo pasa a 'approved' cuando REALMENTE se creó el cliente (Opción A:
+   * aprobar sin convertir no cambia el estado, así abortar el alta la deja pendiente).
+   * @param {string} submissionId - PartnerRequest object id.
+   * @param {string|null} clientId - Id del cliente creado (o null).
+   * @returns {Promise<Parse.Object>} The updated request.
+   * @example
+   */
+  async markConverted(submissionId, clientId) {
+    const query = new Parse.Query('PartnerRequest');
+    const request = await query.get(submissionId, { useMasterKey: true });
+    request.set('status', 'approved');
+    request.set('convertedClientId', clientId || null);
+    request.set('convertedAt', new Date());
+    request.set('reviewedAt', new Date());
+    const saved = await request.save(null, { useMasterKey: true });
+    logger.info('Partner request converted', { submissionId, clientId });
     return saved;
   }
 }

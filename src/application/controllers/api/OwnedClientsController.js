@@ -238,8 +238,11 @@ class OwnedClientsController {
       if (userRole === 'department_manager' || userRole === 'client') {
         const agencyId = this.getAgencyId(currentUser, userRole);
         query.equalTo('organizationId', agencyId);
+      } else if (['admin', 'superadmin'].includes(userRole) && req.query.agencyId) {
+        // El admin puede acotar a los clientes de UNA agencia (tab "Clientes" en el detalle de agencia).
+        query.equalTo('organizationId', req.query.agencyId);
       }
-      // admin/superadmin: ven todos los clientes de agencia (sin filtro de organizationId).
+      // admin/superadmin sin agencyId: ven todos los clientes de agencia (sin filtro de organizationId).
 
       // Active filter
       if (active !== null) {

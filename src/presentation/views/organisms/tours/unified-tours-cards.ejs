@@ -3588,7 +3588,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (tour.price) pp += priceCard('Adulto', 'Con alcohol', convertTourPrice(tour.price, currency, paymentType, true), perUnit);
                 if (tour.price_child) pp += priceCard('Niño', 'Menor de edad', convertTourPrice(tour.price_child, currency, paymentType, true), perUnit);
                 if (tour.price_no_alcohol) pp += priceCard('Sin alcohol', 'Sin bebidas alcohólicas', convertTourPrice(tour.price_no_alcohol, currency, paymentType, true), perUnit);
-                if (pp) html += `<div class="tour-rate-group"><span class="tour-rate-label" style="border-color:var(--exp-olive);">Por persona</span>${pp}</div>`;
+                if (pp) html += `<div class="tour-rate-group"><span class="tour-rate-label" style="border-color:var(--exp-olive);">Por persona · ADICIONAL</span>${pp}</div>`;
             }
         }
         // --- Tours a pie: tramos por tamaño de grupo ---
