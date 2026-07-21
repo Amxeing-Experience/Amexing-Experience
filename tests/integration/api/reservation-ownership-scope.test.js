@@ -304,7 +304,9 @@ describe('Reservation ownership scope — GET /:id + payment endpoints (integrat
 
     it('agencia AJENA (otro departamento) => 404 en los 5 endpoints', async () => {
       // Un pago real creado por la dueña, para que el 404 ajeno no sea por "pago inexistente".
-      const create = await postPayment(resOwned.id, tokenA, { amount: 100, method: 'efectivo' });
+      const create = await postPayment(resOwned.id, tokenA, {
+        amount: 100, method: 'efectivo', paidAt: new Date().toISOString(), receivedBy: 'QA Cajero',
+      });
       expect(create.status).toBe(200);
       const pid = create.body.data.payment.id;
       const payPtr = new Parse.Object('Payment');
@@ -319,7 +321,9 @@ describe('Reservation ownership scope — GET /:id + payment endpoints (integrat
     });
 
     it('agencia DUEÑA => pasa el scope en los 5 (create/get/update/delete 200; receipt no-404)', async () => {
-      const create = await postPayment(resOwned.id, tokenA, { amount: 300, method: 'efectivo' });
+      const create = await postPayment(resOwned.id, tokenA, {
+        amount: 300, method: 'efectivo', paidAt: new Date().toISOString(), receivedBy: 'QA Cajero',
+      });
       expect(create.status).toBe(200);
       const pid = create.body.data.payment.id;
 
