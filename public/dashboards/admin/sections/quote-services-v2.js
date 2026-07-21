@@ -1215,6 +1215,11 @@ class ItineraryBuilder {
       document.getElementById(id)?.addEventListener('change', syncGlobalTip);
       document.getElementById(id)?.addEventListener('input', syncGlobalTip);
     });
+    // El template de totales no recibe canEditPrices; mostramos el control de propina general
+    // solo si el rol puede editar precios (los demás roles ven el efecto en el total, no el control).
+    if (this.canEditPrices) {
+      document.getElementById('globalTipSection')?.classList.remove('d-none');
+    }
 
     // Tour start time listener - auto-calculate end time
     document.getElementById('tourStartTime')?.addEventListener('change', () => {
