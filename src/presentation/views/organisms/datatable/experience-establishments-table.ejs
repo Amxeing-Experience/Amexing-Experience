@@ -765,7 +765,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             processing: true,
             serverSide: true,
             ajax: {
-                url: apiEndpoint + '?type=Establishment&includeInactive=true', // Show all establishments in admin
+                url: apiEndpoint + '?type=Establishment&includeInactive=true&searchChildren=true', // Show all establishments in admin; búsqueda también por experiencia hija
                 type: 'GET',
                 dataSrc: function(json) {
                     return json.data || [];
@@ -830,6 +830,23 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         order: [],
         ordering: false,
         pageLength: 10,
+        searchDelay: 300,
+        initComplete: function () {
+            // Buscador grande + placeholder (también busca por experiencia hija)
+            const container = $(this.api().table().container());
+            const filter = container.find('div.dataTables_filter');
+            // Quitar el texto "Buscar:" dejando solo el input
+            filter.find('label').contents().filter(function () { return this.nodeType === 3; }).remove();
+            filter.find('label').css({ 'width': '100%', 'margin': '0' });
+            filter.find('input')
+                .attr('placeholder', 'Busca establecimiento o experiencia…')
+                .css({
+                    'display': 'block', 'width': '100%', 'height': '46px',
+                    'font-size': '0.98rem', 'padding': '0 14px',
+                    'border-radius': '10px', 'margin': '0'
+                });
+            filter.css({ 'width': '100%', 'float': 'none', 'text-align': 'left' });
+        },
         language: {
             url: '/assets/vendor/datatables/es-ES.json'
         },

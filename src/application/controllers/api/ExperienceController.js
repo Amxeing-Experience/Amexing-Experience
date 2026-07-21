@@ -65,6 +65,9 @@ class ExperienceController {
 
       // Parse the includeInactive parameter (for admin views)
       const includeInactive = req.query.includeInactive === 'true';
+      // Solo el admin (tablas de Proveedores/Establecimientos) manda searchChildren=true
+      // para que la búsqueda también encuentre por nombre de experiencia hija.
+      const searchChildren = req.query.searchChildren === 'true';
 
       // Get total records count
       const totalQuery = this.buildBaseQuery(params.typeFilter, null, null, includeInactive);
@@ -72,12 +75,13 @@ class ExperienceController {
 
       // Build filtered query (with day-of-week filtering if dayDate provided)
       const filteredQuery = params.searchValue
-        ? this.buildSearchQuery(
+        ? await this.buildSearchQuery(
           params.searchValue,
           params.typeFilter,
           params.excludeId,
           params.dayDate,
-          includeInactive
+          includeInactive,
+          searchChildren
         )
         : this.buildBaseQuery(params.typeFilter, params.excludeId, params.dayDate, includeInactive);
 
@@ -357,6 +361,7 @@ class ExperienceController {
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
+   * @example
    */
   async togglePopular(req, res) {
     try {
@@ -1882,11 +1887,19 @@ class ExperienceController {
    * @param {string} excludeId - ID to exclude.
    * @param {string} dayDate - Date in YYYY-MM-DD format for day-of-week filtering.
    * @param {boolean} includeInactive - Whether to include inactive experiences (default: false).
+   * @param includeChildren
    * @returns {Parse.Query} Filtered query.
    * @private
    * @example
    */
-  buildSearchQuery(searchValue, typeFilter, excludeId, dayDate, includeInactive = false) {
+  async buildSearchQuery(
+    searchValue,
+    typeFilter,
+    excludeId,
+    dayDate,
+    includeInactive = false,
+    includeChildren = false
+  ) {
     const nameQuery = new Parse.Query('Experience');
     nameQuery.equalTo('exists', true);
 
@@ -1925,7 +1938,38 @@ class ExperienceController {
       }
     }
 
-    return Parse.Query.or(nameQuery, descQuery);
+    const queries = [nameQuery, descQuery];
+
+    // Rama opcional (solo admin): incluir padres cuyas experiencias hijas
+    // (ProviderExperiencia) coinciden por nombre. Cubre Proveedores y Establecimientos.
+    if (includeChildren) {
+      const childQuery = new Parse.Query('ProviderExperiencia');
+      childQuery.equalTo('exists', true);
+      childQuery.matches('name', searchValue, 'i');
+      childQuery.select('provider');
+      childQuery.limit(1000);
+      const children = await childQuery.find({ useMasterKey: true });
+      const parentIds = [
+        ...new Set(children.map((c) => (c.get('provider') ? c.get('provider').id : null)).filter(Boolean)),
+      ];
+
+      const byExperiencia = new Parse.Query('Experience');
+      byExperiencia.equalTo('exists', true);
+      if (!includeInactive) byExperiencia.equalTo('active', true);
+      byExperiencia.doesNotExist('valid_until');
+      if (typeFilter) byExperiencia.equalTo('type', typeFilter);
+      if (excludeId) byExperiencia.notEqualTo('objectId', excludeId);
+      if (dayDate) {
+        const QuoteServiceHelper = require('../../services/QuoteServiceHelper');
+        const dayCode = QuoteServiceHelper.getDayOfWeekCode(dayDate);
+        if (dayCode !== null) byExperiencia.equalTo('availability.day', dayCode);
+      }
+      // Si no hubo coincidencias, un id imposible evita traer todo por error.
+      byExperiencia.containedIn('objectId', parentIds.length ? parentIds : ['__none_match__']);
+      queries.push(byExperiencia);
+    }
+
+    return Parse.Query.or(...queries);
   }
 
   /**

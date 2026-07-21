@@ -480,6 +480,26 @@ class AdminController extends RoleBasedController {
   }
 
   /**
+   * Entradas (boletos de acceso) por destino — bandeja master-detail.
+   * Izquierda: lista de destinos (POI). Derecha: tabla de entradas del destino.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   */
+  async entradas(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'entradas', {
+        title: 'Entradas',
+        breadcrumb: null,
+        pageStyles: [],
+        footerScripts: '',
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Experience detail page with sections (information, services).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
