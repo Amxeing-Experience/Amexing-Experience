@@ -690,7 +690,7 @@ class ClientProfileController {
   }
 
   async getDocuments(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const documents = await ClientDocument.getByOwner(owner.ownerType, owner.ownerId);
@@ -768,7 +768,7 @@ class ClientProfileController {
    * @example
    */
   async uploadDocument(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
 
@@ -811,7 +811,7 @@ class ClientProfileController {
   // the PUT updates fields, and if a new file is sent it's stored via the same pipeline and the old
   // S3 object is cleaned up. Body: { label, [fileBase64, fileName, mimeType] }.
   async updateDocument(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const doc = await this.findOwnedRecord('ClientDocument', req.params.docId, owner);
@@ -858,7 +858,7 @@ class ClientProfileController {
    * @example
    */
   async deleteDocument(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const doc = await this.findOwnedRecord('ClientDocument', req.params.docId, owner);
