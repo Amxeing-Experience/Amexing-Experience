@@ -5436,9 +5436,13 @@ class ItineraryBuilder {
           // Flag the restore so handleExperienceSelection doesn't reset the price
           // override here (that reset is only meant for genuine user changes).
           if (this.handleExperienceSelection) {
+            // El flag debe cubrir TODA la restauración async (no solo esta llamada síncrona): el
+            // listener 'change' del dropdown limpia los precios por persona y el autollenado del
+            // catálogo solo repone adulto (cost). Niño/sin-alcohol sin precio de catálogo quedaban
+            // en 0, pisando los personalizados guardados. Se apaga al final de populateQuantityFields,
+            // ya restaurados los precios.
             this._restoringExperienceData = true;
             this.handleExperienceSelection(service.experienceId);
-            this._restoringExperienceData = false;
 
             // Force show pricing section after selection
             setTimeout(() => {
@@ -5528,12 +5532,17 @@ class ItineraryBuilder {
             if (expPickupField) expPickupField.value = service.pickupAddress || '';
             // Con horario restaurado, reflejar la duración real y su aviso (si difiere del catálogo).
             this.updateExperienceDurationFromSchedule();
+            // Restauración completa: reactivar el autollenado/limpieza del catálogo para cambios
+            // genuinos del usuario. (Antes se apagaba síncrono y dejaba la ventana async sin proteger.)
+            this._restoringExperienceData = false;
           } else if (attempt < 5) {
             // Retry with longer delay
 
             setTimeout(() => populateQuantityFields(attempt + 1), 100 * attempt);
           } else {
             console.error('❌ Failed to populate quantity fields after 5 attempts');
+            // No dejar el flag colgado si la restauración falla tras 5 intentos.
+            this._restoringExperienceData = false;
           }
         };
 
