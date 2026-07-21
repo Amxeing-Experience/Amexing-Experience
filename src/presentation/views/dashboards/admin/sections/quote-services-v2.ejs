@@ -130,6 +130,21 @@
                             <span class="text-muted"><i class="ti ti-coin me-1"></i>Propina general:</span>
                             <span class="fw-semibold text-info" id="globalTipAmount">$0.00</span>
                         </div>
+                        <!-- Fase 2c: nota de propina SUGERIDA. Solo aparece si NO hay propina (ni
+                             por servicio ni global). Solo advierte (no bloquea ni suma al total).
+                             El % es editable por admin (se oculta el editor/botón para no-admins vía JS). -->
+                        <div class="alert alert-info py-2 px-2 mb-2 small d-none" id="suggestedTipNotice" role="note">
+                            <div class="d-flex align-items-center flex-wrap" style="gap: 4px;">
+                                <i class="ti ti-bulb me-1"></i><span>Propina sugerida</span>
+                                <span class="input-group input-group-sm d-none" id="suggestedTipPctEdit" style="width: 74px;">
+                                    <input type="number" class="form-control" id="suggestedTipPct" value="10" min="0" step="1" style="padding: 0 4px;">
+                                    <span class="input-group-text px-1">%</span>
+                                </span>
+                                <span id="suggestedTipPctLabel">(10%)</span>
+                                <span>≈ <strong id="suggestedTipAmount">$0.00</strong></span>
+                                <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 ms-auto d-none" id="applySuggestedTipBtn">Aplicar</button>
+                            </div>
+                        </div>
                         <hr>
                         <div class="d-flex justify-content-between mb-3">
                             <span class="fw-bold">Total:</span>

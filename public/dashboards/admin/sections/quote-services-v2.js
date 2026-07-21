@@ -1223,7 +1223,32 @@ class ItineraryBuilder {
     // solo si el rol puede editar precios (los demás roles ven el efecto en el total, no el control).
     if (this.canEditPrices) {
       document.getElementById('globalTipSection')?.classList.remove('d-none');
+      // Fase 2c: el admin puede editar el % sugerido y aplicarlo como propina general.
+      document.getElementById('suggestedTipPctEdit')?.classList.remove('d-none');
+      document.getElementById('suggestedTipPctLabel')?.classList.add('d-none');
+      document.getElementById('applySuggestedTipBtn')?.classList.remove('d-none');
     }
+    // Fase 2c: cambiar el % sugerido (admin) → persistir y recalcular la nota.
+    const onSuggestedPct = () => {
+      const v = parseFloat(document.getElementById('suggestedTipPct')?.value || 0);
+      this.suggestedTipPct = (Number.isFinite(v) && v >= 0) ? v : 10;
+      this.hasUnsavedChanges = true;
+      if (this.scheduleAutoSave) this.scheduleAutoSave();
+      this.updateTotals();
+    };
+    document.getElementById('suggestedTipPct')?.addEventListener('input', onSuggestedPct);
+    document.getElementById('suggestedTipPct')?.addEventListener('change', onSuggestedPct);
+    // Botón "Aplicar": convierte la sugerencia en propina general (%), reusando el flujo global.
+    document.getElementById('applySuggestedTipBtn')?.addEventListener('click', () => {
+      const pct = Number(this.suggestedTipPct) || 10;
+      const applyEl = document.getElementById('applyGlobalTip');
+      const typeEl = document.getElementById('globalTipType');
+      const valEl = document.getElementById('globalTipValue');
+      if (applyEl) applyEl.checked = true;
+      if (typeEl) typeEl.value = 'percent';
+      if (valEl) valEl.value = pct;
+      syncGlobalTip();
+    });
 
     // Tour start time listener - auto-calculate end time
     document.getElementById('tourStartTime')?.addEventListener('change', () => {
@@ -12015,6 +12040,8 @@ class ItineraryBuilder {
     // Fase 2b: subtotal NETO (precios con descuento, SIN propinas por servicio) — base de la
     // propina global (para no cobrar propina sobre propina).
     let netSubtotalMXN = 0;
+    // Fase 2c: suma de propinas por servicio (para saber si ya hay alguna propina → nota sugerida).
+    let serviceTipsTotalMXN = 0;
     // Parte D: contar servicios con "precio pendiente" (ruta de transporte sin precio de catálogo).
     // Cuentan como $0 en el total (su precio ya es 0) hasta que el admin defina la tarifa.
     let pendingPriceCount = 0;
@@ -12028,6 +12055,7 @@ class ItineraryBuilder {
           // Fase 2: la propina por servicio es aditiva → se suma al total (línea aparte en la tarjeta).
           const serviceTipAmount = this.getServiceTipInPaymentType ? this.getServiceTipInPaymentType(service) : 0;
           netSubtotalMXN += serviceDisplayPrice;
+          serviceTipsTotalMXN += serviceTipAmount;
           totalMXN += serviceDisplayPrice + serviceTipAmount;
           if (service.priceePending) pendingPriceCount += 1;
         }
@@ -12046,6 +12074,26 @@ class ItineraryBuilder {
         globalTipRow.classList.remove('d-none');
       } else {
         globalTipRow.classList.add('d-none');
+      }
+    }
+
+    // Fase 2c: nota de propina sugerida. Solo si NO hay ninguna propina (ni por servicio ni
+    // global) y hay subtotal. Solo informa: NO se suma al total.
+    const suggestedNotice = document.getElementById('suggestedTipNotice');
+    if (suggestedNotice) {
+      const hasAnyTip = globalTipAmount > 0 || serviceTipsTotalMXN > 0;
+      if (!hasAnyTip && netSubtotalMXN > 0) {
+        const suggestedPct = Number(this.suggestedTipPct) || 10;
+        const suggestedAmount = Math.round(netSubtotalMXN * (suggestedPct / 100) * 100) / 100;
+        const amtEl = document.getElementById('suggestedTipAmount');
+        if (amtEl) amtEl.textContent = this.formatCurrency(suggestedAmount);
+        const lblEl = document.getElementById('suggestedTipPctLabel');
+        if (lblEl) lblEl.textContent = `(${suggestedPct}%)`;
+        const pctInput = document.getElementById('suggestedTipPct');
+        if (pctInput && document.activeElement !== pctInput) pctInput.value = suggestedPct;
+        suggestedNotice.classList.remove('d-none');
+      } else {
+        suggestedNotice.classList.add('d-none');
       }
     }
 
@@ -12419,6 +12467,11 @@ class ItineraryBuilder {
       const gtMand = document.getElementById('globalTipMandatory');
       if (gtMand) gtMand.checked = !!(this.globalTip && this.globalTip.mandatory);
     }
+
+    // Fase 2c: restaurar el % de propina sugerida (default 10).
+    this.suggestedTipPct = Number(serviceItemsData.suggestedTipPct) > 0 ? Number(serviceItemsData.suggestedTipPct) : 10;
+    const stPct = document.getElementById('suggestedTipPct');
+    if (stPct) stPct.value = this.suggestedTipPct;
 
     // Process days and services
     serviceItemsData.days.forEach((day, index) => {
@@ -20821,6 +20874,8 @@ class ItineraryBuilder {
     serviceItemsData.globalTip = this.globalTip
       ? { type: this.globalTip.type, value: this.globalTip.value, mandatory: !!this.globalTip.mandatory, amount: Math.round(globalTipSave * 100) / 100 }
       : null;
+    // Fase 2c: % de propina sugerida (default 10; ajustable por admin). Solo informativo.
+    serviceItemsData.suggestedTipPct = Number(this.suggestedTipPct) > 0 ? Number(this.suggestedTipPct) : 10;
     serviceItemsData.total = Math.round((serviceItemsData.subtotal + globalTipSave) * 100) / 100;
 
     // Get access token from cookie
