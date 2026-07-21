@@ -595,9 +595,9 @@
                 if (isExcluded) {
                     // "Pago externo" ya se muestra junto al nombre (izquierda); no se duplica aquí
                     // (junto al precio, derecha).
-                    html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
+                    html += `<div class="service-price excluded">${this.formatCurrency(price + this.getServiceTip(service))}</div>`;
                 } else {
-                    html += `<div class="service-price">${this.formatCurrency(price)}</div>`;
+                    html += `<div class="service-price">${this.formatCurrency(price + this.getServiceTip(service))}</div>`;
                 }
                 // Fase 1: descuento por servicio. El precio de arriba ya viene con descuento (pricesByType);
                 // esta línea lo hace visible en el resumen. El monto se muestra en efectivo (como la tarjeta).
@@ -1204,9 +1204,9 @@
                 if (isExcluded) {
                     // "Pago externo" ya se muestra junto al nombre (izquierda); no se duplica aquí
                     // (junto al precio, derecha).
-                    html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
+                    html += `<div class="service-price excluded">${this.formatCurrency(price + this.getServiceTip(service))}</div>`;
                 } else {
-                    html += `<div class="service-price">${this.formatCurrency(price)}</div>`;
+                    html += `<div class="service-price">${this.formatCurrency(price + this.getServiceTip(service))}</div>`;
                 }
                 // Fase 1: descuento por servicio (transporte). El precio ya viene con descuento (pricesByType).
                 if (Number(service.discountAmount) > 0) {

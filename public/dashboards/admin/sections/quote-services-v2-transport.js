@@ -646,7 +646,7 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                             <span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span>
                             ` : ''}
                             <div class="fw-semibold ${service.includeInTotal === false ? 'text-muted text-decoration-line-through' : 'text-primary'}">
-                                ${this.formatCurrency(this.getServiceDisplayPrice(service))}
+                                ${this.formatCurrency(this.getServiceDisplayPrice(service) + this.getServiceTipInPaymentType(service))}
                                 ${this.getPriceTypeLabel()}
                             </div>
                             ${Number(service.discountAmount) > 0 ? `<div class="small text-success mt-1" title="Descuento aplicado"><i class="ti ti-discount-2 me-1"></i>Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>` : ''}
