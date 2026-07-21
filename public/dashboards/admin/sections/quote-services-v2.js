@@ -797,17 +797,20 @@ class ItineraryBuilder {
 
     // Experience selection handler
     document.getElementById('experienceSelect')?.addEventListener('change', (e) => {
-      // Nueva experiencia → limpiar los precios por persona para que se autollenen con los del
-      // catálogo de la experiencia seleccionada (el autollenado en handleExperienceSelection es
-      // solo-si-vacío; sin esto quedaban los precios de la experiencia anterior mientras el
-      // "Lista AAAA" sí mostraba los nuevos). No se toca en la restauración de edición.
-      if (!this._restoringExperienceData) {
+      const newExpId = e.target.value;
+      // Limpiar los precios por persona SOLO al cambiar a una experiencia DISTINTA, para que se
+      // autollenen con los del catálogo nuevo (el autollenado es solo-si-vacío). Al re-seleccionar
+      // la MISMA experiencia —incluida la restauración de edición, que setea el value de forma
+      // programática y TomSelect dispara 'change'— NO se limpia: si el catálogo no trae precio de
+      // niño/sin-alcohol, limpiarlos aquí pisaba los personalizados guardados y quedaban en 0.
+      if (!this._restoringExperienceData && newExpId !== this._loadedExperienceId) {
         ['adultPrice', 'childPrice', 'noAlcoholPrice'].forEach((id) => {
           const f = document.getElementById(id);
           if (f) f.value = '';
         });
       }
-      this.handleExperienceSelection(e.target.value);
+      this._loadedExperienceId = newExpId;
+      this.handleExperienceSelection(newExpId);
     });
 
     // Tour selection handler
@@ -1156,6 +1159,23 @@ class ItineraryBuilder {
       document.getElementById(id)?.addEventListener('change', () => {
         this.serviceModified = true;
         this.updateConceptoServicePrice();
+        this.updateServicePriceBreakdown();
+      });
+    });
+
+    // Fase 1: descuento por servicio — mostrar/ocultar campos y recalcular el desglose en vivo.
+    document.getElementById('applyServiceDiscount')?.addEventListener('change', (e) => {
+      this.serviceModified = true;
+      document.getElementById('serviceDiscountFields')?.classList.toggle('d-none', !e.target.checked);
+      this.updateServicePriceBreakdown();
+    });
+    ['serviceDiscountType', 'serviceDiscountValue'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => {
+        this.serviceModified = true;
+        this.updateServicePriceBreakdown();
+      });
+      document.getElementById(id)?.addEventListener('change', () => {
+        this.serviceModified = true;
         this.updateServicePriceBreakdown();
       });
     });
@@ -3152,6 +3172,11 @@ class ItineraryBuilder {
         };
       }
 
+      // Descuento por servicio (Fase 1): el monto (efectivo) se reparte por pierna igual que el
+      // precio; el TIPO y el VALOR (%/$) se quedan iguales (el % es el mismo por pierna). Sin
+      // esto cada pierna heredaba el descuento completo vía {...serviceData} y descontaba de más.
+      const splitDiscountAmount = Math.round((Math.abs(parseFloat(serviceData.discountAmount) || 0) / 2) * 100) / 100;
+
       // Validation: Check if split prices add up to original (with small tolerance for rounding)
       const priceValidation = {
         originalTotal: originalPrice,
@@ -3191,6 +3216,8 @@ class ItineraryBuilder {
         price: splitPrice,
         basePrice: splitBasePrice,
         pricesByType: { ...splitPricesByType },
+        // Descuento repartido por pierna (el % se mantiene vía {...serviceData}).
+        discountAmount: splitDiscountAmount,
         // Ensure quantity is appropriate for single leg (usually 1)
         quantity: 1,
       };
@@ -3223,6 +3250,8 @@ class ItineraryBuilder {
         price: splitPrice,
         basePrice: splitBasePrice,
         pricesByType: { ...splitPricesByType },
+        // Descuento repartido por pierna (el % se mantiene vía {...serviceData}).
+        discountAmount: splitDiscountAmount,
         // Ensure quantity is appropriate for single leg (usually 1)
         quantity: 1,
       };
@@ -3967,11 +3996,36 @@ class ItineraryBuilder {
     qsDevLog(document.getElementById('additionalSegmentSelect')?.value || null)
     qsDevLog(document.getElementById('additionalVehicleSelect')?.value || null)
 
+    // Fase 1: descuento por servicio. SOLO se computa el monto (en efectivo); NO se toca
+    // pricesByType, que queda como base pura. El descuento se resta al mostrar/guardar vía
+    // getServiceDisplayPrice, de modo que la base intacta permite reeditar sin compoundear y el
+    // total guardado/reserva/PDF reflejan el descuento igual que la pantalla.
+    let serviceDiscountType = null;
+    let serviceDiscountValue = 0;
+    let serviceDiscountAmount = 0;
+    if (this.canEditPrices && document.getElementById('applyServiceDiscount')?.checked) {
+      const dt = document.getElementById('serviceDiscountType')?.value === 'amount' ? 'amount' : 'percent';
+      const dv = parseFloat(document.getElementById('serviceDiscountValue')?.value || 0) || 0;
+      const efBase = Number(pricesByType && pricesByType.efectivo) || Number(basePriceEfectivo) || 0;
+      if (dv > 0 && efBase > 0) {
+        const amt = Math.min(dt === 'percent' ? efBase * (dv / 100) : dv, efBase);
+        serviceDiscountAmount = Math.max(0, Math.round(amt * 100) / 100);
+        if (serviceDiscountAmount > 0) {
+          serviceDiscountType = dt;
+          serviceDiscountValue = dv;
+        }
+      }
+    }
+
     const data = {
       type,
       price: finalServicePrice,
       basePrice: basePriceEfectivo, // Base efectivo price for recalculation (backward compatibility)
-      pricesByType, // All 3 payment type prices for easy switching
+      pricesByType, // All 3 payment type prices for easy switching (base pura, SIN descuento)
+      // Descuento por servicio (Fase 1): se resta al mostrar/guardar (getServiceDisplayPrice).
+      discountType: serviceDiscountType, // 'percent' | 'amount' | null
+      discountValue: serviceDiscountValue, // valor capturado (10 = 10% o $10)
+      discountAmount: serviceDiscountAmount, // monto efectivo descontado (para mostrar)
       devBreakdowns, // Development breakdown text for each payment type
       // Tour formula components
       vehicleRatePerHour, // Base vehicle rate per hour (efectivo)
@@ -5287,6 +5341,18 @@ class ItineraryBuilder {
     // Update capacity note after all checkboxes are set
     this.updateVehicleCapacityNote();
 
+    // Fase 1: restaurar el descuento por servicio guardado.
+    if (this.canEditPrices) {
+      const hasDiscount = !!(service.discountType && Number(service.discountValue) > 0);
+      const dApplyR = document.getElementById('applyServiceDiscount');
+      if (dApplyR) dApplyR.checked = hasDiscount;
+      document.getElementById('serviceDiscountFields')?.classList.toggle('d-none', !hasDiscount);
+      const dTypeR = document.getElementById('serviceDiscountType');
+      if (dTypeR) dTypeR.value = service.discountType === 'amount' ? 'amount' : 'percent';
+      const dValR = document.getElementById('serviceDiscountValue');
+      if (dValR) dValR.value = hasDiscount ? service.discountValue : '';
+    }
+
     // Apply price override toggle effects (toggle is already checked earlier)
     if (service.priceOverride) {
       switch (service.type) {
@@ -5366,6 +5432,9 @@ class ItineraryBuilder {
 
         const experienceSelect = document.getElementById('experienceSelect');
         if (experienceSelect && service.experienceId) {
+          // Marca la experiencia como "ya cargada" ANTES de setear el value: si TomSelect dispara
+          // 'change', el handler la ve igual y no limpia los precios personalizados guardados.
+          this._loadedExperienceId = service.experienceId;
           experienceSelect.value = service.experienceId;
           qsDevLog('📝 EDIT EXPERIENCE DEBUG - Experience selected in dropdown:', service.experienceId);
 
@@ -5373,9 +5442,13 @@ class ItineraryBuilder {
           // Flag the restore so handleExperienceSelection doesn't reset the price
           // override here (that reset is only meant for genuine user changes).
           if (this.handleExperienceSelection) {
+            // El flag debe cubrir TODA la restauración async (no solo esta llamada síncrona): el
+            // listener 'change' del dropdown limpia los precios por persona y el autollenado del
+            // catálogo solo repone adulto (cost). Niño/sin-alcohol sin precio de catálogo quedaban
+            // en 0, pisando los personalizados guardados. Se apaga al final de populateQuantityFields,
+            // ya restaurados los precios.
             this._restoringExperienceData = true;
             this.handleExperienceSelection(service.experienceId);
-            this._restoringExperienceData = false;
 
             // Force show pricing section after selection
             setTimeout(() => {
@@ -5465,12 +5538,17 @@ class ItineraryBuilder {
             if (expPickupField) expPickupField.value = service.pickupAddress || '';
             // Con horario restaurado, reflejar la duración real y su aviso (si difiere del catálogo).
             this.updateExperienceDurationFromSchedule();
+            // Restauración completa: reactivar el autollenado/limpieza del catálogo para cambios
+            // genuinos del usuario. (Antes se apagaba síncrono y dejaba la ventana async sin proteger.)
+            this._restoringExperienceData = false;
           } else if (attempt < 5) {
             // Retry with longer delay
 
             setTimeout(() => populateQuantityFields(attempt + 1), 100 * attempt);
           } else {
             console.error('❌ Failed to populate quantity fields after 5 attempts');
+            // No dejar el flag colgado si la restauración falla tras 5 intentos.
+            this._restoringExperienceData = false;
           }
         };
 
@@ -7958,6 +8036,7 @@ class ItineraryBuilder {
                                 ${this.formatCurrency(this.getServiceDisplayPrice(service))}
                                 ${this.getPriceTypeLabel()}
                             </div>
+                            ${Number(service.discountAmount) > 0 ? `<div class="small text-success mt-1" title="Descuento aplicado"><i class="ti ti-discount-2 me-1"></i>Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>` : ''}
                             ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
                                     data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
@@ -12028,6 +12107,9 @@ class ItineraryBuilder {
     this._editModalOpen = false;
     this._restoringWalkingTourData = false;
     this._populatingForm = false;
+    // Modal nuevo: olvidar la experiencia "ya cargada" para que la primera selección genuina
+    // limpie/autollene los precios por persona con el catálogo correcto.
+    this._loadedExperienceId = null;
     this.currentServiceCopy = null;
     this.additionalTourIds = []; // limpiar destinos adicionales combinados del tour
     this.serviceTypeFields = {
@@ -12044,6 +12126,14 @@ class ItineraryBuilder {
     // no toca classList, así que el container podría quedar visible de un servicio anterior.
     const aDispGiv = document.getElementById('aDisposicionGreeterInVehicle');
     if (aDispGiv) aDispGiv.checked = false;
+    // Fase 1: limpiar el descuento por servicio al abrir un modal nuevo.
+    const dApplyReset = document.getElementById('applyServiceDiscount');
+    if (dApplyReset) dApplyReset.checked = false;
+    document.getElementById('serviceDiscountFields')?.classList.add('d-none');
+    const dTypeReset = document.getElementById('serviceDiscountType');
+    if (dTypeReset) dTypeReset.value = 'percent';
+    const dValReset = document.getElementById('serviceDiscountValue');
+    if (dValReset) dValReset.value = '';
     const aDispGivCont = document.getElementById('aDisposicionGreeterInVehicleContainer');
     if (aDispGivCont) aDispGivCont.classList.add('d-none');
   }
@@ -12204,6 +12294,10 @@ class ItineraryBuilder {
             dayId: dayData.id,
             // Bloqueo por-servicio (Fase 1): restaura el candado guardado para el render.
             adminLocked: subconcept.adminLocked || false,
+            // Descuento por servicio (Fase 1).
+            discountType: subconcept.discountType || null,
+            discountValue: subconcept.discountValue || 0,
+            discountAmount: subconcept.discountAmount || 0,
             // Fase 2: restaura la solicitud de cambio pendiente (si hay) para el render.
             changeRequest: subconcept.changeRequest || null,
             type: subconcept.type || 'other',
@@ -15178,6 +15272,41 @@ class ItineraryBuilder {
   }
 
   /**
+   * Fase 1: línea de descuento para el desglose live del modal (común a TODOS los tipos,
+   * incluidos walking/vehicle tour que tienen su propio render). Lee los campos del descuento
+   * y, si aplica, devuelve la línea HTML y el total ajustado en la forma de pago actual,
+   * espejando la matemática de collectServiceData (descuento sobre la base efectivo, escalado a
+   * la forma de pago). Solo presentación: no toca los datos que se guardan.
+   * @param {number} displayTotal - Total mostrado (con recargo por forma de pago, sin descuento).
+   * @returns {{discountLineHTML: string, adjustedTotal: number}} Línea y total ajustado.
+   * @example
+   * const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(totalMXN);
+   */
+  buildModalDiscountLine(displayTotal) {
+    let discountLineHTML = '';
+    let adjustedTotal = displayTotal;
+    if (this.canEditPrices && document.getElementById('applyServiceDiscount')?.checked) {
+      const dt = document.getElementById('serviceDiscountType')?.value === 'amount' ? 'amount' : 'percent';
+      const dv = parseFloat(document.getElementById('serviceDiscountValue')?.value || 0) || 0;
+      const efBaseTotal = this.getBasePriceFromCurrent ? this.getBasePriceFromCurrent(displayTotal) : displayTotal;
+      if (dv > 0 && efBaseTotal > 0) {
+        const discEf = Math.min(dt === 'percent' ? efBaseTotal * (dv / 100) : dv, efBaseTotal);
+        const factor = efBaseTotal > 0 ? (displayTotal / efBaseTotal) : 1;
+        const discInPt = Math.round(discEf * factor * 100) / 100;
+        if (discInPt > 0) {
+          adjustedTotal = Math.max(0, displayTotal - discInPt);
+          const dLabel = dt === 'percent' ? `Descuento (${dv}%)` : 'Descuento';
+          discountLineHTML = `<div class="d-flex justify-content-between text-success">
+        <span><i class="ti ti-discount-2 me-1"></i>${dLabel}</span>
+        <span>−${this.formatCurrency(discInPt)}</span>
+      </div>`;
+        }
+      }
+    }
+    return { discountLineHTML, adjustedTotal };
+  }
+
+  /**
    * Show an itemized price breakdown for walking tours by reading from dev breakdown.
    * @example
    */
@@ -15306,8 +15435,10 @@ class ItineraryBuilder {
       </div>`).join('');
 
     // Render the complete breakdown
-    itemsDiv.innerHTML = itemsHTML;
-    totalSpan.textContent = this.formatCurrency(totalMXN);
+    // Fase 1: descuento por servicio en el desglose live (aplica también a tours).
+    const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(totalMXN);
+    itemsDiv.innerHTML = itemsHTML + discountLineHTML;
+    totalSpan.textContent = this.formatCurrency(adjustedTotal);
     container.classList.remove('d-none');
   }
 
@@ -15446,8 +15577,10 @@ class ItineraryBuilder {
       </div>`).join('');
 
     // Render the complete breakdown
-    itemsDiv.innerHTML = itemsHTML;
-    totalSpan.textContent = this.formatCurrency(totalMXN);
+    // Fase 1: descuento por servicio en el desglose live (aplica también a tours).
+    const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(totalMXN);
+    itemsDiv.innerHTML = itemsHTML + discountLineHTML;
+    totalSpan.textContent = this.formatCurrency(adjustedTotal);
     container.classList.remove('d-none');
 
     qsDevLog('📊 VEHICLE TOUR DEVBREAKDOWN: Complete breakdown rendered', {
@@ -16526,14 +16659,19 @@ class ItineraryBuilder {
     // totalMXN is already the properly calculated total (no additional surcharging needed)
     const displayTotal = totalMXN;
 
-    // Store the display total for use when saving
+    // Store the display total for use when saving. OJO: sin descuento — collectServiceData
+    // aplica el descuento por su cuenta (sobre pricesByType); si aquí lo descontáramos también
+    // se compoundearía al guardar. El descuento de abajo es SOLO presentación del desglose.
     this.currentServiceTotal = displayTotal;
 
-    // Render the complete breakdown (removed Subtotal and IVA lines)
-    itemsDiv.innerHTML = itemsHTML;
+    // Fase 1: descuento por servicio en el desglose live (helper común a todos los tipos).
+    const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(displayTotal);
 
-    // Show final total
-    totalSpan.textContent = this.formatCurrency(displayTotal);
+    // Render the complete breakdown (removed Subtotal and IVA lines)
+    itemsDiv.innerHTML = itemsHTML + discountLineHTML;
+
+    // Show final total (con descuento si aplica)
+    totalSpan.textContent = this.formatCurrency(adjustedTotal);
     container.classList.remove('d-none');
 
     // Update debug payment section with breakdown data
@@ -20230,8 +20368,11 @@ class ItineraryBuilder {
           const service = this.services.get(serviceId);
           if (!service) return null;
 
-          // Use the price directly from the service - it's already the final calculated price from the modal
-          const servicePrice = service.price || 0;
+          // Precio a guardar = precio de display (pricesByType[forma] menos el descuento por
+          // servicio). Antes se usaba service.price (base SIN descuento), lo que dejaba el total
+          // guardado, el PDF y la reserva sin reflejar el descuento. getServiceDisplayPrice es la
+          // misma fuente que usa el total en pantalla → lo guardado == lo mostrado.
+          const servicePrice = this.getServiceDisplayPrice(service);
           const serviceTotal = servicePrice;
           dayTotal += serviceTotal;
 
@@ -20252,6 +20393,10 @@ class ItineraryBuilder {
             // Bloqueo por-servicio (Fase 1): true si un admin lo agregó/editó → solo lectura
             // para no-admins. Se persiste en el subconcepto para restaurarlo al recargar.
             adminLocked: service.adminLocked || false,
+            // Descuento por servicio (Fase 1).
+            discountType: service.discountType || null,
+            discountValue: service.discountValue || 0,
+            discountAmount: service.discountAmount || 0,
             // Fase 2: solicitud de cambio (borrar/modificar) pendiente de aprobación del admin.
             changeRequest: service.changeRequest || null,
             concept: this.getServiceTitle(service),
