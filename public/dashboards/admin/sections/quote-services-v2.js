@@ -797,17 +797,20 @@ class ItineraryBuilder {
 
     // Experience selection handler
     document.getElementById('experienceSelect')?.addEventListener('change', (e) => {
-      // Nueva experiencia → limpiar los precios por persona para que se autollenen con los del
-      // catálogo de la experiencia seleccionada (el autollenado en handleExperienceSelection es
-      // solo-si-vacío; sin esto quedaban los precios de la experiencia anterior mientras el
-      // "Lista AAAA" sí mostraba los nuevos). No se toca en la restauración de edición.
-      if (!this._restoringExperienceData) {
+      const newExpId = e.target.value;
+      // Limpiar los precios por persona SOLO al cambiar a una experiencia DISTINTA, para que se
+      // autollenen con los del catálogo nuevo (el autollenado es solo-si-vacío). Al re-seleccionar
+      // la MISMA experiencia —incluida la restauración de edición, que setea el value de forma
+      // programática y TomSelect dispara 'change'— NO se limpia: si el catálogo no trae precio de
+      // niño/sin-alcohol, limpiarlos aquí pisaba los personalizados guardados y quedaban en 0.
+      if (!this._restoringExperienceData && newExpId !== this._loadedExperienceId) {
         ['adultPrice', 'childPrice', 'noAlcoholPrice'].forEach((id) => {
           const f = document.getElementById(id);
           if (f) f.value = '';
         });
       }
-      this.handleExperienceSelection(e.target.value);
+      this._loadedExperienceId = newExpId;
+      this.handleExperienceSelection(newExpId);
     });
 
     // Tour selection handler
@@ -5429,6 +5432,9 @@ class ItineraryBuilder {
 
         const experienceSelect = document.getElementById('experienceSelect');
         if (experienceSelect && service.experienceId) {
+          // Marca la experiencia como "ya cargada" ANTES de setear el value: si TomSelect dispara
+          // 'change', el handler la ve igual y no limpia los precios personalizados guardados.
+          this._loadedExperienceId = service.experienceId;
           experienceSelect.value = service.experienceId;
           qsDevLog('📝 EDIT EXPERIENCE DEBUG - Experience selected in dropdown:', service.experienceId);
 
@@ -12101,6 +12107,9 @@ class ItineraryBuilder {
     this._editModalOpen = false;
     this._restoringWalkingTourData = false;
     this._populatingForm = false;
+    // Modal nuevo: olvidar la experiencia "ya cargada" para que la primera selección genuina
+    // limpie/autollene los precios por persona con el catálogo correcto.
+    this._loadedExperienceId = null;
     this.currentServiceCopy = null;
     this.additionalTourIds = []; // limpiar destinos adicionales combinados del tour
     this.serviceTypeFields = {
