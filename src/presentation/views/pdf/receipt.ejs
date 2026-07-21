@@ -2,15 +2,22 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<!-- Fuentes embebidas (TTF base64) para el PDF: cuerpo/subtítulos Myriad Pro, títulos Arpona. -->
+<style><%- typeof arponaEmbedCss !== 'undefined' ? arponaEmbedCss : '' %></style>
+<style><%- typeof myriadEmbedCss !== 'undefined' ? myriadEmbedCss : '' %></style>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    font-family: 'Helvetica Neue', 'Segoe UI', Arial, sans-serif;
+    font-family: 'MyriadPDF', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     color: #333;
     font-size: 11px;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  /* Solo TÍTULOS en Arpona; todo lo demás hereda Myriad Pro. */
+  .brand-fallback,
+  .invoice-band,
+  .thankyou .ty { font-family: 'ArponaPDF', 'MyriadPDF', 'Segoe UI', Arial, sans-serif; }
   .wrap { padding: 4px 2px; }
 
   /* Cabecera de marca (solo página 1) */
@@ -25,8 +32,8 @@
     text-align: center;
     font-size: 15px;
     font-weight: 700;
-    letter-spacing: 12px;
-    padding: 7px 0 7px 12px;
+    letter-spacing: 6px;
+    padding: 7px 0 7px 6px;
     margin-bottom: 22px;
   }
 
@@ -60,6 +67,9 @@
   table.items tbody tr.last-row td { border-bottom: 2px solid #969b81; }
   td.desc .date { font-weight: 700; margin-bottom: 3px; }
   td.desc .sub { color: #555; line-height: 1.45; }
+  /* Tipo de servicio (etiqueta) + desglose por servicio. */
+  td.desc .sub .li-type { display: block; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; font-size: 10px; color: #969b81; margin-bottom: 2px; }
+  td.desc .sub .li-adj { display: block; color: #777; font-size: 10px; line-height: 1.55; margin-top: 1px; }
   td.amount { text-align: right; white-space: nowrap; vertical-align: bottom; color: #333; }
 
   /* Totales — a todo lo ancho, sin línea arriba del subtotal. */
@@ -89,7 +99,7 @@
     <% } %>
   </div>
 
-  <div class="invoice-band">INVOICE</div>
+  <div class="invoice-band"><%= invoiceNo %></div>
 
   <div class="meta">
     <div class="issued">
@@ -135,7 +145,12 @@
   <div class="totals">
     <table>
       <tr><td class="k">SUBTOTAL</td><td class="v"><%= subtotal %></td></tr>
+      <% if (typeof hasTaxes === 'undefined' || hasTaxes) { %>
       <tr><td class="k">TAXES</td><td class="v"><%= taxes %></td></tr>
+      <% } %>
+      <% if (typeof hasGlobalTip !== 'undefined' && hasGlobalTip) { %>
+      <tr><td class="k">PROPINA GENERAL</td><td class="v"><%= globalTip %></td></tr>
+      <% } %>
       <tr class="grand"><td class="k">TOTAL</td><td class="v"><%= total %></td></tr>
     </table>
   </div>

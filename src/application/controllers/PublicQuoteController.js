@@ -18,6 +18,7 @@ const QuoteOwnershipService = require('../services/QuoteOwnershipService');
 const logger = require('../../infrastructure/logger');
 const FileStorageService = require('../services/FileStorageService');
 const { renderUrlToPdf } = require('../services/PdfRenderService');
+const { getArponaEmbedCss, getMyriadEmbedCss } = require('../../infrastructure/utils/fontEmbed');
 
 const fileStorageService = new FileStorageService({
   baseFolder: 'general',
@@ -79,6 +80,9 @@ class PublicQuoteController {
         isPublicView: true,
         // Pestaña sin folio/id, consistente con el detalle admin.
         pageTitle: 'Cotización - Amexing',
+        // Fuentes embebidas (TTF) para el PDF: títulos Arpona, cuerpo Myriad Pro.
+        arponaEmbedCss: getArponaEmbedCss(),
+        myriadEmbedCss: getMyriadEmbedCss(),
       });
     } catch (error) {
       return this.handlePublicQuoteError(error, folio, req, res);

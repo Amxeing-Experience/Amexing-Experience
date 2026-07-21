@@ -942,6 +942,75 @@ class QuoteService {
    * @example
    * const result = await service.generateReceipt(currentUser, 'abc123', 'department_manager');
    */
+  /**
+   * Next global sequential receipt folio: INVOICE-000001 (patrón "máx + 1", como generateFolio).
+   * @returns {Promise<string>} The next folio.
+   * @example
+   * const folio = await service.generateReceiptFolio(); // 'INVOICE-000123'
+   */
+  async generateReceiptFolio() {
+    try {
+      const prefix = 'INVOICE-';
+      const query = new Parse.Query('Receipt');
+      query.startsWith('folio', prefix);
+      query.descending('folio');
+      query.limit(1);
+      query.select('folio');
+      const last = await query.first({ useMasterKey: true });
+      let next = 1;
+      if (last) {
+        const n = parseInt(String(last.get('folio')).replace(prefix, ''), 10);
+        if (!Number.isNaN(n)) next = n + 1;
+      }
+      return `${prefix}${String(next).padStart(6, '0')}`;
+    } catch (error) {
+      logger.error('Error generating receipt folio', { error: error.message });
+      return `INVOICE-${Date.now()}`;
+    }
+  }
+
+  /**
+   * Devuelve el folio de recibo de una reservación: reusa el existente (un invoice = un número
+   * estable) o crea el registro Receipt con el siguiente folio secuencial.
+   * @param {object} data - Datos del recibo.
+   * @param {string} data.reservationId - Id de la reservación (clave de idempotencia).
+   * @param {string} [data.reservationFolio] - Folio de la reservación.
+   * @param {string} [data.quoteId] - Id de la cotización.
+   * @param {string} [data.clientName] - Nombre del cliente.
+   * @param {number} [data.total] - Total del recibo.
+   * @param {string} [data.currency] - Moneda.
+   * @param {string} [data.paymentType] - Tipo de pago.
+   * @param {string} [data.createdBy] - Id del usuario que lo genera.
+   * @returns {Promise<string>} El folio (INVOICE-000001).
+   * @example
+   * const folio = await service.resolveReceiptFolio({ reservationId, total });
+   */
+  async resolveReceiptFolio(data) {
+    const existingQuery = new Parse.Query('Receipt');
+    existingQuery.equalTo('reservationId', data.reservationId);
+    existingQuery.notEqualTo('exists', false);
+    existingQuery.descending('createdAt');
+    const existing = await existingQuery.first({ useMasterKey: true });
+    if (existing) return existing.get('folio');
+
+    const folio = await this.generateReceiptFolio();
+    const Receipt = Parse.Object.extend('Receipt');
+    const rec = new Receipt();
+    rec.set('folio', folio);
+    rec.set('reservationId', data.reservationId);
+    rec.set('reservationFolio', data.reservationFolio || null);
+    rec.set('quoteId', data.quoteId || null);
+    rec.set('clientName', data.clientName || null);
+    rec.set('total', Number(data.total) || 0);
+    rec.set('currency', data.currency || 'MXN');
+    rec.set('paymentType', data.paymentType || null);
+    rec.set('createdBy', data.createdBy || null);
+    rec.set('exists', true);
+    await rec.save(null, { useMasterKey: true });
+    logger.info('Receipt folio created', { folio, reservationId: data.reservationId });
+    return folio;
+  }
+
   async generateReceipt(
     currentUser,
     quoteId,
@@ -949,7 +1018,8 @@ class QuoteService {
     includePaymentInfoOverride = null,
     paymentInfoId = null,
     billingProfileId = null,
-    force = false
+    force = false,
+    receiptOptions = {}
   ) {
     try {
       // Validate user authentication
@@ -1092,10 +1162,20 @@ class QuoteService {
         hasServiceItems: serviceItems.length > 0,
       });
 
-      // Use the quote's stored totals directly (these are the official quote totals)
-      const subtotal = serviceItemsRaw.subtotal || 0;
-      const iva = serviceItemsRaw.iva || 0;
+      // El IVA se DERIVA del tipo de pago (igual que el resumen de la cotización), no del
+      // campo serviceItems.iva (que suele venir 0). Efectivo: sin IVA. Transferencia/Tarjeta:
+      // el total ya incluye IVA (16%) y se desglosa hacia atrás.
       const total = serviceItemsRaw.total || 0;
+      const paymentType = serviceItemsRaw.paymentType || reservation.get('paymentType') || 'efectivo';
+      let subtotal;
+      let iva;
+      if (paymentType === 'efectivo') {
+        subtotal = total;
+        iva = 0;
+      } else {
+        subtotal = Math.round((total / 1.16) * 100) / 100;
+        iva = Math.round((total - subtotal) * 100) / 100;
+      }
 
       // Determine whether to include payment info and get specific payment data
       // For admin role: use the override if provided, otherwise default to true
@@ -1217,93 +1297,70 @@ class QuoteService {
       // Los subconceptos "nuevos" guardan el segmento como ID de Rate (category /
       // additionalVehicleSegment); se resuelve el nombre con un rateMap (una sola query).
       // Los "viejos" ya traen rateName.
-      const rateIdSet = new Set();
-      (serviceItems || []).forEach((day) => (day.subconcepts || []).forEach((sc) => {
-        [sc.category, sc.rateId, sc.additionalVehicleSegment].forEach((id) => { if (id) rateIdSet.add(id); });
-        (sc.extraAdditionalVehicles || []).forEach((v) => { if (v && v.segment) rateIdSet.add(v.segment); });
-      }));
-      const rateMap = new Map();
-      if (rateIdSet.size) {
-        try {
-          const rq = new Parse.Query('Rate');
-          rq.containedIn('objectId', [...rateIdSet]);
-          rq.limit(1000);
-          const rates = await rq.find({ useMasterKey: true });
-          rates.forEach((r) => rateMap.set(r.id, r.get('name') || ''));
-        } catch (rmErr) {
-          logger.warn('No se pudo cargar rateMap para el recibo', { quoteId, error: rmErr.message });
-        }
-      }
-
-      /**
-       * Quita un sufijo " - N pax" ya embebido y los paréntesis de un nombre.
-       * @param {string} s - Texto a limpiar.
-       * @returns {string} Texto limpio.
-       * @example stripPax('SEDAN - 4 pax'); // 'SEDAN'
-       */
-      const stripPax = (s) => String(s || '').replace(/\s*[-–]\s*\d+\s*pax\s*$/i, '').replace(/\s*\([^)]*\)/g, '').trim();
-      /**
-       * Nombre del segmento/tarifa: rateName (estructura vieja) o el resuelto por ID (nueva).
-       * @param {object} sc - Subconcepto del día.
-       * @returns {string} Nombre del segmento (o '').
-       * @example segmentName({ rateName: 'Premium' }); // 'Premium'
-       */
-      const segmentName = (sc) => sc.rateName || rateMap.get(sc.category) || rateMap.get(sc.rateId)
-        || sc.categoryName || sc.segmentName || '';
-      /**
-       * Nombre del vehículo: prefiere vehicleTypeName (nueva); vehicleType es el nombre en la vieja.
-       * @param {object} sc - Subconcepto del día.
-       * @returns {string} Nombre del vehículo (o '').
-       * @example vehicleName({ vehicleTypeName: 'MODEL Y' }); // 'MODEL Y'
-       */
-      const vehicleName = (sc) => {
-        const v = (sc.vehicleTypeName || sc.vehicleType || '');
-        return v === 'N/A' ? '' : stripPax(v);
+      const TYPE_LABELS = {
+        traslado: 'Traslado',
+        tour: 'Tour',
+        experiencia: 'Experiencia',
+        'a-disposicion': 'A Disposición',
+        entrada: 'Entrada',
       };
       /**
-       * Desglose de personas (adultos/niños/infantes/sin-alcohol) o un conteo "N pax".
-       * @param {object} sc - Subconcepto del día.
-       * @returns {string} Texto del desglose (o '').
-       * @example paxText({ adultsQuantity: 2, childrenQuantity: 1 }); // '2 adultos, 1 niño'
+       * Normaliza el tipo de servicio del subconcepto.
+       * @param {object} sc - Subconcepto.
+       * @returns {string} Tipo normalizado.
+       * @example normType({ type: 'transport' }); // 'traslado'
        */
-      const paxText = (sc) => {
-        const parts = [];
-        const groups = [
-          [sc.adultsQuantity, 'adulto', 'adultos'],
-          [sc.adultsNoAlcoholQuantity, 'adulto sin alcohol', 'adultos sin alcohol'],
-          [sc.childrenQuantity, 'niño', 'niños'],
-          [sc.infantsQuantity, 'infante', 'infantes'],
-        ];
-        groups.forEach(([n, one, many]) => {
-          const q = Number(n);
-          if (q > 0) parts.push(`${q} ${q === 1 ? one : many}`);
-        });
-        if (parts.length) return parts.join(', ');
-        const count = sc.numberOfPeople || sc.walkingTourPeopleCount || sc.persons || 0;
-        return count > 0 ? `${count} pax` : '';
+      const normType = (sc) => {
+        const t = String(sc.type || '').toLowerCase();
+        if (/disposici/.test(t)) return 'a-disposicion';
+        if (['traslado', 'transport', 'transfer'].includes(t)) return 'traslado';
+        if (t === 'tour') return 'tour';
+        if (['experiencia', 'experience'].includes(t)) return 'experiencia';
+        if (t === 'entrada') return 'entrada';
+        if (sc.transportType || sc.directionType) return 'traslado';
+        if (sc.hourlyPrice != null) return 'a-disposicion';
+        if (sc.tourId || sc.isWalkingTour) return 'tour';
+        if (sc.experienceId) return 'experiencia';
+        return t || 'servicio';
       };
       /**
-       * Lista de vehículos adicionales (principal + extras) con su segmento resuelto.
-       * @param {object} sc - Subconcepto del día.
-       * @returns {Array<{segment: string, vehicle: string}>} Vehículos adicionales.
-       * @example additionalVehicles({ hasAdditionalVehicle: true, additionalVehicleTypeName: 'SEDAN' });
+       * Conteo total de pasajeros del subconcepto (evita doble conteo transporte vs. General).
+       * @param {object} sc - Subconcepto.
+       * @returns {number} Número de pax.
+       * @example paxCount({ adultsQuantity: 2 }); // 2
        */
-      const additionalVehicles = (sc) => {
-        const out = [];
-        if (sc.hasAdditionalVehicle && (sc.additionalVehicleTypeName || sc.additionalVehicleSegment)) {
-          out.push({
-            segment: rateMap.get(sc.additionalVehicleSegment) || sc.additionalVehicleSegmentName || '',
-            vehicle: stripPax(sc.additionalVehicleTypeName),
-          });
-        } else if (sc.additionalVehicleForLuggage && sc.additionalVehicleTypeName) {
-          out.push({ segment: '', vehicle: stripPax(sc.additionalVehicleTypeName) });
+      const paxCount = (sc) => {
+        const nonT = (Number(sc.adultsQuantity) || 0) + (Number(sc.adultsNoAlcoholQuantity) || 0)
+          + (Number(sc.childrenQuantity) || 0) + (Number(sc.infantsQuantity) || 0);
+        const t = (Number(sc.transportAdults) || 0) + (Number(sc.transportChildren) || 0)
+          + (Number(sc.transportInfants) || 0);
+        const sum = Math.max(nonT, t);
+        if (sum > 0) return sum;
+        return Number(sc.numberOfPeople || sc.walkingTourPeopleCount || sc.persons || sc.attendees || 0) || 0;
+      };
+      /**
+       * Descripción breve del servicio según su tipo: ruta (traslado), horas (a-disposición) o pax.
+       * @param {object} sc - Subconcepto.
+       * @param {string} type - Tipo normalizado.
+       * @returns {string} Descripción breve.
+       * @example shortDesc({ concept: 'Cooking Class', adultsQuantity: 4 }, 'experiencia'); // 'Cooking Class - 4 pax'
+       */
+      const shortDesc = (sc, type) => {
+        if (type === 'traslado') {
+          const o = sc.originName || sc.origin || '';
+          const d = sc.destinationName || sc.destination || '';
+          const round = /round|redond/i.test(String(sc.tripType || sc.directionType || ''))
+            || !!sc.roundTripDepartureTimeSuggestedIda || !!sc.returnOrigin || !!sc.returnDestination;
+          const route = round ? [o, d, o].filter(Boolean).join(' - ') : [o, d].filter(Boolean).join(' - ');
+          return `${round ? 'Round-trip' : 'One-way'}${route ? ` ${route}` : ''}`.trim();
         }
-        (sc.extraAdditionalVehicles || []).forEach((v) => {
-          const vehicle = stripPax(v.vehicleTypeName || v.vehicleName);
-          const segment = v.segmentName || rateMap.get(v.segment) || '';
-          if (vehicle || segment) out.push({ segment, vehicle });
-        });
-        return out;
+        const name = sc.concept || TYPE_LABELS[type] || 'Servicio';
+        if (type === 'a-disposicion') {
+          const h = Number(sc.hours || sc.duration) || 0;
+          return `${name}${h ? ` - ${h} horas` : ''}`;
+        }
+        const p = paxCount(sc);
+        return `${name}${p ? ` - ${p} pax` : ''}`;
       };
 
       const receiptItems = (serviceItems || []).flatMap((day) => {
@@ -1318,24 +1375,47 @@ class QuoteService {
           d.setUTCDate(d.getUTCDate() + (day.dayNumber - 1));
           dayIso = d.toISOString().slice(0, 10);
         }
-        return subs.map((sc, idx) => ({
-          dayDate: idx === 0 ? dayIso : '',
-          concept: sc.concept,
-          segment: segmentName(sc),
-          vehicle: vehicleName(sc),
-          paxText: paxText(sc),
-          additionalVehicles: additionalVehicles(sc),
-          total: sc.total || 0,
-        }));
+        return subs.map((sc, idx) => {
+          const type = normType(sc);
+          return {
+            dayDate: idx === 0 ? dayIso : '',
+            // Formato estandarizado: Tipo de servicio + descripción breve (ruta / horas / pax).
+            serviceTypeLabel: TYPE_LABELS[type] || '',
+            shortDescription: shortDesc(sc, type),
+            total: sc.total || 0,
+            // Descuento / propina POR SERVICIO (para desglosarlos en el recibo).
+            discountAmount: Number(sc.discountAmount) || 0,
+            discountType: sc.discountType || null,
+            discountValue: Number(sc.discountValue) || 0,
+            tipAmount: Number(sc.tipAmount) || 0,
+            tipType: sc.tipType || null,
+            tipValue: Number(sc.tipValue) || 0,
+            tipMandatory: !!sc.tipMandatory,
+          };
+        });
       });
 
       // Prepare quote data for PDF generation
+      // Folio de recibo (INVOICE-000001): uno por reservación, reusable al regenerar.
+      const receiptFolio = await this.resolveReceiptFolio({
+        reservationId: reservation.id,
+        reservationFolio: reservation.get('folio') || '',
+        quoteId: quote.id,
+        clientName: quote.get('client')?.get('fullName') || quote.get('contactPerson') || null,
+        total,
+        currency: 'MXN',
+        paymentType,
+        createdBy: currentUser?.id || null,
+      });
+
       const quoteData = {
         quote: {
           id: quote.id,
           folio: quote.get('folio'),
           validUntil: quote.get('validUntil'),
         },
+        // Folio propio del recibo (INVOICE-…), usado como número de invoice.
+        invoiceFolio: receiptFolio,
         client: {
           firstName: quote.get('client')?.get('firstName') || '',
           lastName: quote.get('client')?.get('lastName') || '',
@@ -1349,13 +1429,21 @@ class QuoteService {
           subtotal,
           iva,
           total,
+          // Propina general (informativa; ya está incluida en el total, como en el resumen del quote).
+          globalTip: (serviceItemsRaw.globalTip && Number(serviceItemsRaw.globalTip.amount)) || 0,
+        },
+        // Desglose por servicio en el recibo (default: mostrar). NO cambia los montos/totales.
+        receiptOptions: {
+          showTips: receiptOptions.showTips !== false,
+          showDiscounts: receiptOptions.showDiscounts !== false,
         },
         // Invoice No. del recibo = folio de la RESERVACIÓN (no de la cotización).
         reservationFolio: reservation.get('folio') || '',
-        // Nombres de huéspedes bajo DESCRIPTION (Lead Guest + persona de contacto), sin vacíos ni duplicados.
+        // Bajo DESCRIPTION: motivo de viaje (eventType) + lead guest / cliente final.
+        // Sin persona de contacto. Se omiten vacíos y duplicados.
         guestNames: [
+          reservation.get('eventType') || quote.get('eventType') || '',
           `${quote.get('leadGuestFirstName') || ''} ${quote.get('leadGuestLastName') || ''}`.trim(),
-          quote.get('contactPerson'),
         ].filter((n, i, arr) => n && arr.indexOf(n) === i),
         includePaymentInfo, // Pass the flag to PDF service
         selectedPaymentInfo, // Pass the specific payment info data

@@ -19,6 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../../infrastructure/logger');
 const { renderHtmlToPdf } = require('./PdfRenderService');
+const { getArponaEmbedCss, getMyriadEmbedCss } = require('../../infrastructure/utils/fontEmbed');
 
 const TEMPLATE_PATH = path.join(__dirname, '../../presentation/views/pdf/receipt.ejs');
 // Mismo logo que usa la cotización (wordmark sin el corazón).
@@ -75,19 +76,34 @@ class PDFReceiptService {
   async generateReceipt(quoteData) {
     try {
       const {
-        quote, client, serviceItems, totals, billingProfile, guestNames, reservationFolio,
+        quote, client, serviceItems, totals, billingProfile, guestNames, reservationFolio, invoiceFolio,
+        receiptOptions,
       } = quoteData;
+      // Desglose por servicio (default: mostrar). Ocultar NO cambia montos/totales.
+      const opts = {
+        showTips: !receiptOptions || receiptOptions.showTips !== false,
+        showDiscounts: !receiptOptions || receiptOptions.showDiscounts !== false,
+      };
 
       const viewData = {
         brand: BRAND_GREEN,
+        // Fuentes embebidas (TTF base64) para el PDF: títulos Arpona, cuerpo Myriad Pro.
+        arponaEmbedCss: getArponaEmbedCss(),
+        myriadEmbedCss: getMyriadEmbedCss(),
         logoDataUri: this.getLogoDataUri(),
         issuedTo: this.buildIssuedTo(client, billingProfile),
-        invoiceNo: reservationFolio || String(quote.folio || '').replace('QTE-', '') || 'N/A',
+        // Número de invoice = folio propio del recibo (INVOICE-…); cae a reservación/cotización si falta.
+        invoiceNo: invoiceFolio || reservationFolio || String(quote.folio || '').replace('QTE-', '') || 'N/A',
         date: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }),
         guestNames: Array.isArray(guestNames) ? guestNames.filter(Boolean) : [],
-        items: (serviceItems || []).map((item) => this.buildItem(item)),
+        items: (serviceItems || []).map((item) => this.buildItem(item, opts)),
         subtotal: `$${this.formatCurrency(totals.subtotal || 0)} MXN`,
         taxes: `$${this.formatCurrency(totals.iva || 0)} MXN`,
+        // Solo se muestra la fila de impuestos cuando hay IVA (transferencia/tarjeta).
+        hasTaxes: (Number(totals.iva) || 0) > 0,
+        // Propina general (informativa; ya incluida en el total). Se oculta si el usuario apaga propinas.
+        globalTip: `$${this.formatCurrency(totals.globalTip || 0)} MXN`,
+        hasGlobalTip: (Number(totals.globalTip) || 0) > 0 && opts.showTips,
         total: `$${this.formatCurrency(totals.total || 0)} MXN`,
       };
 
@@ -148,25 +164,28 @@ class PDFReceiptService {
    * @returns {{date: string, desc: string, amount: string}} Renglón listo para la plantilla.
    * @example
    */
-  buildItem(item) {
+  buildItem(item, opts = {}) {
     // Fecha real del día (dayDate 'YYYY-MM-DD'); solo viene en el primer servicio del día.
     const date = item.dayDate ? `${this.formatDayDate(item.dayDate)}:` : '';
 
     const parts = [];
-    if (item.concept) parts.push(this.escapeHtml(item.concept));
-    // Segmento + vehículo + desglose de personas (p.ej. "Premium Suburban - 2 adultos").
-    const vehicle = [item.segment, item.vehicle].filter(Boolean).join(' ');
-    if (vehicle) {
-      parts.push(this.escapeHtml(`${vehicle}${item.paxText ? ` - ${item.paxText}` : ''}`));
-    } else if (item.paxText) {
-      // Sin vehículo (experiencias / walking tours): solo el desglose de personas.
-      parts.push(this.escapeHtml(item.paxText));
+    // Tipo de servicio (Traslado / Tour / Experiencia / A Disposición / Entrada) + descripción breve
+    // (ruta one-way/round-trip, "N horas" o "N pax").
+    if (item.serviceTypeLabel) parts.push(`<span class="li-type">${this.escapeHtml(item.serviceTypeLabel)}</span>`);
+    if (item.shortDescription) parts.push(this.escapeHtml(item.shortDescription));
+
+    // Desglose POR SERVICIO: descuento y propina (informativos; ya incluidos en el total del
+    // renglón). Se muestran según los flags del modal; ocultarlos NO cambia el monto.
+    const disc = Number(item.discountAmount) || 0;
+    const tip = Number(item.tipAmount) || 0;
+    if (disc > 0 && opts.showDiscounts !== false) {
+      const dl = item.discountType === 'percent' ? `${item.discountValue}%` : 'monto';
+      parts.push(`<span class="li-adj">Descuento (${this.escapeHtml(dl)}): −$${this.formatCurrency(disc)}</span>`);
     }
-    // Vehículos adicionales (si existen), uno por línea.
-    (item.additionalVehicles || []).forEach((av) => {
-      const v = [av.segment, av.vehicle].filter(Boolean).join(' ');
-      if (v) parts.push(this.escapeHtml(`+ ${v}`));
-    });
+    if (tip > 0 && opts.showTips !== false) {
+      const tl = item.tipType === 'percent' ? `${item.tipValue}%${item.tipMandatory ? ', oblig.' : ''}` : 'monto';
+      parts.push(`<span class="li-adj">Propina (${this.escapeHtml(tl)}): +$${this.formatCurrency(tip)}</span>`);
+    }
 
     return {
       date,
