@@ -4122,6 +4122,22 @@ class ItineraryBuilder {
       }
     }
 
+    // Fase 2d: los no-admins NO editan descuento/propina (los controles son admin-only). Al editar
+    // un servicio existente, preservar los valores guardados para que no se pierdan/quiten (una
+    // propina "obligatoria" no se puede eliminar por un no-admin).
+    if (!this.canEditPrices && this.currentServiceId) {
+      const existingSvc = this.services.get(this.currentServiceId);
+      if (existingSvc) {
+        serviceDiscountType = existingSvc.discountType || null;
+        serviceDiscountValue = existingSvc.discountValue || 0;
+        serviceDiscountAmount = existingSvc.discountAmount || 0;
+        serviceTipType = existingSvc.tipType || null;
+        serviceTipValue = existingSvc.tipValue || 0;
+        serviceTipMandatory = existingSvc.tipMandatory || false;
+        serviceTipAmount = existingSvc.tipAmount || 0;
+      }
+    }
+
     const data = {
       type,
       price: finalServicePrice,

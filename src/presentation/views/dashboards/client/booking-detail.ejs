@@ -389,7 +389,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     function renderFinancialSummary() {
         const d = reservationData;
         const adjustments = d.adjustments || [];
-        if (adjustments.length === 0) return;
+        // Fase 2d: propina global de la cotización (del snapshot).
+        const globalTip = d.globalTip;
+        const globalTipAmount = (globalTip && Number(globalTip.amount) > 0) ? Number(globalTip.amount) : 0;
+        if (adjustments.length === 0 && globalTipAmount <= 0) return;
 
         const card = document.getElementById('financialSummaryCard');
         const body = document.getElementById('financialSummaryBody');
@@ -418,6 +421,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
         });
 
+        // Fase 2d: propina general (informativa; ya está incluida en el Total Final).
+        if (globalTipAmount > 0) {
+            const gtPct = (globalTip.type === 'percent' && globalTip.value) ? ` (${globalTip.value}%)` : '';
+            const gtMand = globalTip.mandatory ? ' · obligatoria' : '';
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propina general${gtPct}${gtMand}</span></div>
+                <span class="text-info fw-semibold">+${formatCurrency(globalTipAmount, curr)}</span>
+            </div>`;
+        }
+
         html += `<div class="d-flex justify-content-between align-items-center py-2 mt-1">
             <span class="fw-bold"><i class="ti ti-receipt me-2"></i>Total Final</span>
             <span class="fw-bold fs-5 text-success">${formatCurrency(d.totalAmount || 0, curr)}</span>
@@ -430,6 +443,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!sub) return '';
         const tags = [];
         const tag = (icon, text, color) => `<span class="badge detail-tag bg-${color}-subtle text-${color}"><i class="ti ti-${icon} me-1"></i>${text}</span>`;
+
+        // Fase 2d: descuento y propina por servicio (ya reflejados en el total del servicio).
+        if (Number(sub.discountAmount) > 0) {
+            const dPct = (sub.discountType === 'percent' && sub.discountValue) ? ` ${sub.discountValue}%` : '';
+            tags.push(tag('discount-2', `Descuento${dPct} −${formatCurrency(sub.discountAmount, reservationData.currency)}`, 'success'));
+        }
+        if (Number(sub.tipAmount) > 0) {
+            const tPct = (sub.tipType === 'percent' && sub.tipValue) ? ` ${sub.tipValue}%` : '';
+            const tMand = sub.tipMandatory ? ' (oblig.)' : '';
+            tags.push(tag('coin', `Propina${tPct} +${formatCurrency(sub.tipAmount, reservationData.currency)}${tMand}`, 'info'));
+        }
 
         // Vehicle quantity (applies to transport, a-disposicion, etc.)
         if (sub.quantity && sub.quantity > 1) tags.push(tag('car', `${sub.quantity} vehículos`, 'primary'));
