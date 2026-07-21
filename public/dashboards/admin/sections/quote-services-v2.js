@@ -15245,6 +15245,41 @@ class ItineraryBuilder {
   }
 
   /**
+   * Fase 1: línea de descuento para el desglose live del modal (común a TODOS los tipos,
+   * incluidos walking/vehicle tour que tienen su propio render). Lee los campos del descuento
+   * y, si aplica, devuelve la línea HTML y el total ajustado en la forma de pago actual,
+   * espejando la matemática de collectServiceData (descuento sobre la base efectivo, escalado a
+   * la forma de pago). Solo presentación: no toca los datos que se guardan.
+   * @param {number} displayTotal - Total mostrado (con recargo por forma de pago, sin descuento).
+   * @returns {{discountLineHTML: string, adjustedTotal: number}} Línea y total ajustado.
+   * @example
+   * const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(totalMXN);
+   */
+  buildModalDiscountLine(displayTotal) {
+    let discountLineHTML = '';
+    let adjustedTotal = displayTotal;
+    if (this.canEditPrices && document.getElementById('applyServiceDiscount')?.checked) {
+      const dt = document.getElementById('serviceDiscountType')?.value === 'amount' ? 'amount' : 'percent';
+      const dv = parseFloat(document.getElementById('serviceDiscountValue')?.value || 0) || 0;
+      const efBaseTotal = this.getBasePriceFromCurrent ? this.getBasePriceFromCurrent(displayTotal) : displayTotal;
+      if (dv > 0 && efBaseTotal > 0) {
+        const discEf = Math.min(dt === 'percent' ? efBaseTotal * (dv / 100) : dv, efBaseTotal);
+        const factor = efBaseTotal > 0 ? (displayTotal / efBaseTotal) : 1;
+        const discInPt = Math.round(discEf * factor * 100) / 100;
+        if (discInPt > 0) {
+          adjustedTotal = Math.max(0, displayTotal - discInPt);
+          const dLabel = dt === 'percent' ? `Descuento (${dv}%)` : 'Descuento';
+          discountLineHTML = `<div class="d-flex justify-content-between text-success">
+        <span><i class="ti ti-discount-2 me-1"></i>${dLabel}</span>
+        <span>−${this.formatCurrency(discInPt)}</span>
+      </div>`;
+        }
+      }
+    }
+    return { discountLineHTML, adjustedTotal };
+  }
+
+  /**
    * Show an itemized price breakdown for walking tours by reading from dev breakdown.
    * @example
    */
@@ -15373,8 +15408,10 @@ class ItineraryBuilder {
       </div>`).join('');
 
     // Render the complete breakdown
-    itemsDiv.innerHTML = itemsHTML;
-    totalSpan.textContent = this.formatCurrency(totalMXN);
+    // Fase 1: descuento por servicio en el desglose live (aplica también a tours).
+    const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(totalMXN);
+    itemsDiv.innerHTML = itemsHTML + discountLineHTML;
+    totalSpan.textContent = this.formatCurrency(adjustedTotal);
     container.classList.remove('d-none');
   }
 
@@ -15513,8 +15550,10 @@ class ItineraryBuilder {
       </div>`).join('');
 
     // Render the complete breakdown
-    itemsDiv.innerHTML = itemsHTML;
-    totalSpan.textContent = this.formatCurrency(totalMXN);
+    // Fase 1: descuento por servicio en el desglose live (aplica también a tours).
+    const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(totalMXN);
+    itemsDiv.innerHTML = itemsHTML + discountLineHTML;
+    totalSpan.textContent = this.formatCurrency(adjustedTotal);
     container.classList.remove('d-none');
 
     qsDevLog('📊 VEHICLE TOUR DEVBREAKDOWN: Complete breakdown rendered', {
@@ -16598,36 +16637,14 @@ class ItineraryBuilder {
     // se compoundearía al guardar. El descuento de abajo es SOLO presentación del desglose.
     this.currentServiceTotal = displayTotal;
 
-    // Fase 1: descuento por servicio en el desglose live (solo admin). Espeja la misma
-    // matemática de collectServiceData: descuenta sobre la base efectivo y lo lleva a la forma
-    // de pago actual de forma proporcional (el recargo es multiplicativo). No toca los items ni
-    // currentServiceTotal, solo agrega una línea "Descuento" y ajusta el total mostrado.
-    let discountLineHTML = '';
-    let displayTotalAfterDiscount = displayTotal;
-    if (this.canEditPrices && document.getElementById('applyServiceDiscount')?.checked) {
-      const dt = document.getElementById('serviceDiscountType')?.value === 'amount' ? 'amount' : 'percent';
-      const dv = parseFloat(document.getElementById('serviceDiscountValue')?.value || 0) || 0;
-      const efBaseTotal = this.getBasePriceFromCurrent ? this.getBasePriceFromCurrent(displayTotal) : displayTotal;
-      if (dv > 0 && efBaseTotal > 0) {
-        const discEf = Math.min(dt === 'percent' ? efBaseTotal * (dv / 100) : dv, efBaseTotal);
-        const factor = efBaseTotal > 0 ? (displayTotal / efBaseTotal) : 1;
-        const discInPt = Math.round(discEf * factor * 100) / 100;
-        if (discInPt > 0) {
-          displayTotalAfterDiscount = Math.max(0, displayTotal - discInPt);
-          const dLabel = dt === 'percent' ? `Descuento (${dv}%)` : 'Descuento';
-          discountLineHTML = `<div class="d-flex justify-content-between text-success">
-        <span><i class="ti ti-discount-2 me-1"></i>${dLabel}</span>
-        <span>−${this.formatCurrency(discInPt)}</span>
-      </div>`;
-        }
-      }
-    }
+    // Fase 1: descuento por servicio en el desglose live (helper común a todos los tipos).
+    const { discountLineHTML, adjustedTotal } = this.buildModalDiscountLine(displayTotal);
 
     // Render the complete breakdown (removed Subtotal and IVA lines)
     itemsDiv.innerHTML = itemsHTML + discountLineHTML;
 
     // Show final total (con descuento si aplica)
-    totalSpan.textContent = this.formatCurrency(displayTotalAfterDiscount);
+    totalSpan.textContent = this.formatCurrency(adjustedTotal);
     container.classList.remove('d-none');
 
     // Update debug payment section with breakdown data
