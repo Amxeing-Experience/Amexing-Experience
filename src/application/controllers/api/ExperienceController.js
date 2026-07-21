@@ -301,6 +301,8 @@ class ExperienceController {
       query.include('tours');
       query.include('vehicleType');
       query.include('destinationPOI');
+      query.include('entradas');
+      query.include('entradas.destino');
 
       const experience = await query.get(experienceId, { useMasterKey: true });
 
@@ -322,6 +324,22 @@ class ExperienceController {
         vehicleType,
         destinationPOI
       );
+
+      // Entradas asociadas (boletos de acceso). NO ligadas al destino de la experiencia.
+      const entradas = experience.get('entradas') || [];
+      data.entradas = entradas
+        .filter((e) => e && e.id)
+        .map((e) => {
+          const destino = e.get('destino');
+          const priceVal = e.get('price');
+          return {
+            id: e.id,
+            name: e.get('name') || '',
+            price: typeof priceVal === 'number' ? priceVal : Number(priceVal) || 0,
+            destinoId: destino ? destino.id : null,
+            destinoName: destino ? destino.get('name') || '' : '',
+          };
+        });
 
       // Debug logging
       logger.info('Experience getById - Returning data', {
@@ -828,6 +846,18 @@ class ExperienceController {
       experienceObj.set('destinationPOI', poiPointer);
     }
 
+    // Entradas asociadas (boletos de acceso; NO ligadas al destino de la experiencia)
+    if (Array.isArray(data.entradas)) {
+      const entradaPointers = data.entradas
+        .filter((id) => id && String(id).trim() !== '')
+        .map((id) => {
+          const p = new Parse.Object('Entrada');
+          p.id = String(id).trim();
+          return p;
+        });
+      experienceObj.set('entradas', entradaPointers);
+    }
+
     return experienceObj;
   }
 
@@ -1331,7 +1361,29 @@ class ExperienceController {
    * @example
    */
   async updateExperienceRelationships(experienceObj, experienceId, data) {
-    const { experiences, providerExperiences, tours } = data;
+    const {
+      experiences, providerExperiences, tours, entradas,
+    } = data;
+
+    // Update entradas array (boletos de acceso asociados; NO ligados al destino)
+    if (entradas !== undefined) {
+      if (Array.isArray(entradas) && entradas.length > 0) {
+        const entradaPointers = [];
+        for (const entId of entradas) {
+          try {
+            const entQuery = new Parse.Query('Entrada');
+            entQuery.notEqualTo('exists', false);
+            const ent = await entQuery.get(entId, { useMasterKey: true });
+            if (ent) entradaPointers.push(ent);
+          } catch (err) {
+            // Ignora entradas inexistentes en lugar de fallar todo el guardado.
+          }
+        }
+        experienceObj.set('entradas', entradaPointers);
+      } else {
+        experienceObj.set('entradas', []);
+      }
+    }
 
     // Update experiences array
     if (experiences !== undefined) {
