@@ -16,11 +16,12 @@ const ecCat = (typeof clientCategory !== 'undefined' && clientCategory)
   ? clientCategory
   : ((typeof user !== 'undefined' && user && user.clientCategory) ? user.clientCategory : null);
 // showQuotes: el dashboard incluye lo de Cotizaciones (segmento Cotizado + aviso de tarifas).
-const showQuotes = ecCaps ? !!ecCaps.dashboardQuotes : (ecCat !== 'home_owner');
+// (agency_client: solo reservaciones → sin cotizaciones ni tarifario.)
+const showQuotes = ecCaps ? !!ecCaps.dashboardQuotes : (ecCat !== 'home_owner' && ecCat !== 'agency_client');
 // canCreateQuote: botón Reservar (crear cotización) — todos los que ven cotizaciones menos home owner.
 const canCreateQuote = ecCaps ? !!ecCaps.createQuotes : (ecCat === 'direct_client' || ecCat === 'wedding_planner' || ecCat === 'concierge');
 // showTarifario: accesos rápidos al catálogo (Vehículos, Traslados, …) — todos menos cliente directo.
-const showTarifario = ecCaps ? !!ecCaps.viewTarifario : (!!ecCat && ecCat !== 'direct_client');
+const showTarifario = ecCaps ? !!ecCaps.viewTarifario : (!!ecCat && ecCat !== 'direct_client' && ecCat !== 'agency_client');
 %>
 
 <style>

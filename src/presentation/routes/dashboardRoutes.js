@@ -21,8 +21,35 @@ router.use(dashboardAuth.requireAuth);
 
 // Cliente directo (end_client): expone las capacidades según su tipo (clientCategory, que ya viene
 // del JWT en res.locals) para que menú, vistas y controllers decidan qué mostrar/permitir.
-router.use('/end_client', (req, res, next) => {
+router.use('/end_client', async (req, res, next) => {
   res.locals.endClientCaps = getEndClientCapabilities(req.user && req.user.clientCategory);
+  // White-label: los clientes de agencia (agency_client) ven el logo de SU agencia (dueña por
+  // organizationId = id del AmexingUser del department manager) + leyenda "Powered by Amexing".
+  try {
+    const getField = (f) => (req.user && (req.user.get ? req.user.get(f) : req.user[f]));
+    const clientCategory = getField('clientCategory');
+    const orgId = getField('organizationId');
+    if (clientCategory === 'agency_client' && orgId && orgId !== 'amexing') {
+      const Parse = require('parse/node');
+      const agency = await new Parse.Query('AmexingUser').get(orgId, { useMasterKey: true }).catch(() => null);
+      if (agency) {
+        let logo = agency.get('companyLogo') || '';
+        const s3Key = agency.get('companyLogoS3Key');
+        if (s3Key) {
+          try {
+            const FileStorageService = require('../../application/services/FileStorageService');
+            logo = await new FileStorageService().getPresignedUrl(s3Key);
+          } catch (imgErr) { /* conserva la URL guardada */ }
+        }
+        if (logo) {
+          res.locals.agencyBranding = {
+            logo,
+            name: agency.get('contextualData')?.companyName || agency.get('companyName') || '',
+          };
+        }
+      }
+    }
+  } catch (brandingErr) { /* sin branding → cae al logo de Amexing */ }
   next();
 });
 

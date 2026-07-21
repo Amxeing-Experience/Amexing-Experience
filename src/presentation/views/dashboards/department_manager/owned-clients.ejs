@@ -137,6 +137,17 @@ const currentPath = '/dashboard/clients';
                                 }) %>
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/password-field', {
+                                    id: 'clientPassword',
+                                    name: 'password',
+                                    label: 'Contraseña',
+                                    required: false,
+                                    helpText: 'Opcional: si la asignas (requiere email), el cliente podrá iniciar sesión para ver sus reservaciones.'
+                                }) %>
+                            </div>
+                        </div>
 
                     </div>
 
@@ -507,6 +518,17 @@ const currentPath = '/dashboard/clients';
                                     countryCode: 'MX',
                                     placeholder: '999 123 4567',
                                     helpText: 'Número de contacto principal'
+                                }) %>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/password-field', {
+                                    id: 'editClientPassword',
+                                    name: 'password',
+                                    label: 'Contraseña',
+                                    required: false,
+                                    helpText: 'Déjala vacía para conservar la actual. Si la cambias (requiere email), el cliente entra con la nueva.'
                                 }) %>
                             </div>
                         </div>
@@ -900,9 +922,11 @@ async function createClient() {
         accessibilityRequirements: formData.get('accessibilityRequirements'),
         allergies: allergiesText,
         dietaryRestrictions: dietaryText,
-        notes: formData.get('notes')
+        notes: formData.get('notes'),
+        // Contraseña opcional: si viene, el cliente podrá iniciar sesión (requiere email).
+        password: formData.get('password')
     };
-    
+
     // Remove empty fields to avoid sending nulls
     Object.keys(clientData).forEach(key => {
         if (!clientData[key] || clientData[key].trim() === '') {
@@ -1221,9 +1245,11 @@ async function updateClient() {
         allergies: allergiesText,
         dietaryRestrictions: dietaryText,
         notes: formData.get('notes'),
-        active: document.getElementById('editClientActive').checked
+        active: document.getElementById('editClientActive').checked,
+        // Contraseña: vacía = conservar la actual (se elimina abajo); si viene, se actualiza.
+        password: formData.get('password')
     };
-    
+
     // Remove empty fields to avoid sending nulls
     Object.keys(clientData).forEach(key => {
         if (key !== 'active' && (!clientData[key] || clientData[key].trim() === '')) {

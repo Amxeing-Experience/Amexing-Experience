@@ -23,12 +23,19 @@ const profileData = {
   role: user.role || 'employee',
   organizationId: user.organizationId || '',
   phone: user.phone || '',
+  phoneCountry: user.phoneCountry || '',
   companyName: user.companyName || '',
+  companyLogo: user.companyLogo || '',
   taxId: user.taxId || '',
   website: user.website || '',
   notes: user.notes || '',
   address: user.address || {}
 };
+
+// Teléfono con código de marcación por país (solo si hay phoneCountry), igual que la tabla de clientes.
+const DIAL = { MX:'+52',US:'+1',CA:'+1',CO:'+57',AR:'+54',CL:'+56',PE:'+51',BR:'+55',EC:'+593',ES:'+34',GB:'+44',FR:'+33',DE:'+49',IT:'+39',PT:'+351',NL:'+31',BE:'+32',CH:'+41',SE:'+46',NO:'+47',DK:'+45',FI:'+358',PL:'+48',IE:'+353',AT:'+43',CN:'+86',JP:'+81',KR:'+82',IN:'+91',SG:'+65',TH:'+66',MY:'+60',PH:'+63',ID:'+62',VN:'+84',TW:'+886',HK:'+852',AE:'+971',SA:'+966',IL:'+972' };
+const phoneDial = (profileData.phone && DIAL[profileData.phoneCountry]) ? (DIAL[profileData.phoneCountry] + ' ') : '';
+const phoneDisplay = profileData.phone ? (phoneDial + profileData.phone) : 'Sin registro';
 
 // Generate initials for avatar placeholder
 const initials = profileData.fullName.split(' ')
@@ -62,8 +69,9 @@ const formatRoleName = (role) => {
   .profile-wrap .profile-name { font-size: 1.05rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 14px 0 8px; }
   .profile-wrap .profile-role { display: inline-flex; align-items: center; gap: 5px; background: #eef0e6; color: var(--olive-d); border: 1px solid var(--line); border-radius: 999px; padding: .22rem .8rem; font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
   .profile-wrap .aside-contact { text-align: left; margin-top: 18px; }
-  .profile-wrap .aside-contact .item { display: flex; align-items: center; gap: 10px; color: var(--ink); font-size: .84rem; font-style: italic; padding: 5px 0; }
-  .profile-wrap .aside-contact .item i { color: var(--olive); font-size: 1rem; width: 18px; text-align: center; flex-shrink: 0; font-style: normal; }
+  .profile-wrap .aside-contact .item { display: flex; align-items: flex-start; gap: 10px; color: var(--ink); font-size: .84rem; font-style: italic; padding: 5px 0; }
+  .profile-wrap .aside-contact .item i { color: var(--olive); font-size: 1rem; width: 18px; text-align: center; flex-shrink: 0; font-style: normal; line-height: 1.5; }
+  .profile-wrap .aside-contact .item span { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
   .profile-wrap .aside-divider { border-top: 1px solid var(--line); margin: 16px 0; }
   .profile-wrap .aside-stat { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; }
   .profile-wrap .aside-stat .k { text-transform: uppercase; letter-spacing: .08em; font-size: .64rem; color: var(--muted); font-weight: 600; }
@@ -127,7 +135,7 @@ const formatRoleName = (role) => {
         <!-- Contacto -->
         <div class="aside-contact">
           <div class="item"><i class="ti ti-mail"></i><span><%= profileData.email || 'Sin registro' %></span></div>
-          <div class="item"><i class="ti ti-phone"></i><span><%= profileData.phone || 'Sin registro' %></span></div>
+          <div class="item"><i class="ti ti-phone"></i><span><%= phoneDisplay %></span></div>
           <div class="item"><i class="ti ti-clock"></i><span>Miembro desde <%= profileData.joinedDate %></span></div>
         </div>
 
@@ -189,9 +197,14 @@ const formatRoleName = (role) => {
         </div>
         <div class="row">
           <div class="col-md-6 field"><label>Nombre de Empresa</label><div class="val"><%= profileData.companyName || 'Sin registro' %></div></div>
-          <div class="col-md-6 field"><label>RFC / Tax ID</label><div class="val"><%= profileData.taxId || 'Sin registro' %></div></div>
           <div class="col-md-6 field"><label>Sitio Web</label><div class="val"><% if (profileData.website) { %><a href="<%= profileData.website %>" target="_blank"><%= profileData.website %></a><% } else { %>Sin registro<% } %></div></div>
-          <div class="col-md-6 field"><label>País</label><div class="val"><%= (profileData.address && profileData.address.country) || 'Sin registro' %></div></div>
+        </div>
+        <div class="mt-4">
+          <label class="d-block mb-2" style="font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted,#9a9a8e); font-weight:600;">Logo de la empresa</label>
+          <%- include('../../organisms/profile/company-logo-upload', {
+            logoUrl: profileData.companyLogo,
+            companyName: profileData.companyName
+          }) %>
         </div>
       </div>
 

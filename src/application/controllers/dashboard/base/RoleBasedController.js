@@ -181,6 +181,7 @@ class RoleBasedController extends DashboardController {
             lastName: parseUser.get('lastName'),
             fullName: parseUser.get('fullName'),
             phone: parseUser.get('phone'),
+            phoneCountry: parseUser.get('phoneCountry') || '',
             department: parseUser.get('department'),
             employeeId: parseUser.get('employeeId'),
             createdAt: parseUser.get('createdAt') || parseUser.createdAt,
@@ -194,6 +195,7 @@ class RoleBasedController extends DashboardController {
             organizationId: parseUser.get('organizationId'),
             // Datos de empresa/fiscales (agencias): para que el perfil muestre lo mismo que el admin.
             companyName: parseUser.get('contextualData')?.companyName || '',
+            companyLogo: parseUser.get('companyLogo') || '',
             taxId: parseUser.get('taxId') || '',
             website: parseUser.get('website') || '',
             notes: parseUser.get('notes') || '',
@@ -210,6 +212,18 @@ class RoleBasedController extends DashboardController {
               fullUserData.profilePicture = await fileStorageService.getPresignedUrl(profilePictureS3Key);
             } catch (imgError) {
               // Si falla, se conserva la URL guardada (el front cae a iniciales si da 403).
+            }
+          }
+
+          // El logo de empresa también se guarda como URL presignada (expira) → regenerar fresca.
+          const companyLogoS3Key = parseUser.get('companyLogoS3Key');
+          if (companyLogoS3Key) {
+            try {
+              const FileStorageService = require('../../../services/FileStorageService');
+              const fileStorageService = new FileStorageService();
+              fullUserData.companyLogo = await fileStorageService.getPresignedUrl(companyLogoS3Key);
+            } catch (logoError) {
+              // Si falla, se conserva la URL guardada (el front cae al placeholder si da 403).
             }
           }
         } else {
@@ -231,6 +245,7 @@ class RoleBasedController extends DashboardController {
         lastName: fullUserData.lastName || fullUserData.last_name || '',
         fullName: fullUserData.fullName || `${fullUserData.firstName || ''} ${fullUserData.lastName || ''}`.trim(),
         phone: fullUserData.phone || fullUserData.phoneNumber || '',
+        phoneCountry: fullUserData.phoneCountry || '',
         department: fullUserData.department || '',
         employeeId: fullUserData.employeeId || fullUserData.employee_id || '',
         createdAt: fullUserData.createdAt,
@@ -242,6 +257,7 @@ class RoleBasedController extends DashboardController {
         role: fullUserData.role || this.role,
         organizationId: fullUserData.organizationId || fullUserData.organization_id || '',
         companyName: fullUserData.companyName || '',
+        companyLogo: fullUserData.companyLogo || '',
         taxId: fullUserData.taxId || '',
         website: fullUserData.website || '',
         notes: fullUserData.notes || '',
