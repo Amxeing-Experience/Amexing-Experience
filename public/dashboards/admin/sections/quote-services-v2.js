@@ -1197,6 +1197,25 @@ class ItineraryBuilder {
       });
     });
 
+    // Propina GLOBAL de la cotización (Fase 2b): sincroniza this.globalTip y recalcula el total.
+    const syncGlobalTip = () => {
+      const apply = document.getElementById('applyGlobalTip')?.checked;
+      document.getElementById('globalTipFields')?.classList.toggle('d-none', !apply);
+      if (apply) {
+        const type = document.getElementById('globalTipType')?.value === 'amount' ? 'amount' : 'percent';
+        const value = parseFloat(document.getElementById('globalTipValue')?.value || 0) || 0;
+        const mandatory = document.getElementById('globalTipMandatory')?.checked || false;
+        this.globalTip = value > 0 ? { type, value, mandatory } : null;
+      } else {
+        this.globalTip = null;
+      }
+      this.updateTotals();
+    };
+    ['applyGlobalTip', 'globalTipType', 'globalTipValue', 'globalTipMandatory'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('change', syncGlobalTip);
+      document.getElementById(id)?.addEventListener('input', syncGlobalTip);
+    });
+
     // Tour start time listener - auto-calculate end time
     document.getElementById('tourStartTime')?.addEventListener('change', () => {
       this.calculateTourEndTime();
@@ -11984,6 +12003,9 @@ class ItineraryBuilder {
   updateTotals() {
     // CRITICAL FIX: Use getServiceDisplayPrice to respect pricesByType (like day totals and preview do)
     let totalMXN = 0;
+    // Fase 2b: subtotal NETO (precios con descuento, SIN propinas por servicio) — base de la
+    // propina global (para no cobrar propina sobre propina).
+    let netSubtotalMXN = 0;
     // Parte D: contar servicios con "precio pendiente" (ruta de transporte sin precio de catálogo).
     // Cuentan como $0 en el total (su precio ya es 0) hasta que el admin defina la tarifa.
     let pendingPriceCount = 0;
@@ -11996,17 +12018,32 @@ class ItineraryBuilder {
           const serviceDisplayPrice = this.getServiceDisplayPrice(service);
           // Fase 2: la propina por servicio es aditiva → se suma al total (línea aparte en la tarjeta).
           const serviceTipAmount = this.getServiceTipInPaymentType ? this.getServiceTipInPaymentType(service) : 0;
+          netSubtotalMXN += serviceDisplayPrice;
           totalMXN += serviceDisplayPrice + serviceTipAmount;
           if (service.priceePending) pendingPriceCount += 1;
         }
       });
     });
 
+    // Fase 2b: propina global de la cotización (sobre el subtotal neto). Se suma al total y se
+    // muestra en su propia línea. Aplica también a no-admins (se lee de this.globalTip).
+    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    const globalTipAmount = this.getGlobalTipAmount ? this.getGlobalTipAmount(netSubtotalMXN, paymentType) : 0;
+    const globalTipRow = document.getElementById('globalTipRow');
+    const globalTipAmountEl = document.getElementById('globalTipAmount');
+    if (globalTipRow && globalTipAmountEl) {
+      if (globalTipAmount > 0) {
+        globalTipAmountEl.textContent = `+${this.formatCurrency(globalTipAmount)}${(this.globalTip && this.globalTip.mandatory) ? ' · obligatoria' : ''}`;
+        globalTipRow.classList.remove('d-none');
+      } else {
+        globalTipRow.classList.add('d-none');
+      }
+    }
+
     // Total now correctly uses pricesByType when available (consistent with preview)
-    const finalTotal = totalMXN;
+    const finalTotal = totalMXN + globalTipAmount;
 
     // Calculate IVA breakdown based on payment type
-    const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
     const ivaRow = document.getElementById('ivaRow');
 
     let displaySubtotal; let
@@ -12356,6 +12393,23 @@ class ItineraryBuilder {
     // Clear existing data
     this.days = [];
     this.services.clear();
+
+    // Fase 2b: restaurar la propina global de la cotización + sincronizar los controles (admin).
+    const gt = serviceItemsData.globalTip;
+    this.globalTip = (gt && gt.type && Number(gt.value) > 0)
+      ? { type: gt.type === 'amount' ? 'amount' : 'percent', value: Number(gt.value) || 0, mandatory: !!gt.mandatory }
+      : null;
+    const gtApply = document.getElementById('applyGlobalTip');
+    if (gtApply) {
+      gtApply.checked = !!this.globalTip;
+      document.getElementById('globalTipFields')?.classList.toggle('d-none', !this.globalTip);
+      const gtType = document.getElementById('globalTipType');
+      if (gtType) gtType.value = this.globalTip ? this.globalTip.type : 'percent';
+      const gtValue = document.getElementById('globalTipValue');
+      if (gtValue) gtValue.value = this.globalTip ? this.globalTip.value : '';
+      const gtMand = document.getElementById('globalTipMandatory');
+      if (gtMand) gtMand.checked = !!(this.globalTip && this.globalTip.mandatory);
+    }
 
     // Process days and services
     serviceItemsData.days.forEach((day, index) => {
@@ -20744,7 +20798,21 @@ class ItineraryBuilder {
     // For ALL payment types, the modal value IS the final value
     serviceItemsData.subtotal = Math.round(grandSubtotal * 100) / 100;
     serviceItemsData.iva = 0; // IVA is already included in the modal total
-    serviceItemsData.total = serviceItemsData.subtotal;
+    // Fase 2b: propina global sobre el subtotal NETO (sin propinas por servicio). Se hornea en el
+    // total guardado (→ reserva/PDF) y se persiste su metadata para restaurar los controles.
+    let netSubtotalForTip = 0;
+    this.days.forEach((day) => {
+      day.services.forEach((sid) => {
+        const svc = this.services.get(sid);
+        if (svc && svc.includeInTotal !== false) netSubtotalForTip += this.getServiceDisplayPrice(svc);
+      });
+    });
+    const paymentTypeSave = document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    const globalTipSave = this.getGlobalTipAmount ? this.getGlobalTipAmount(netSubtotalForTip, paymentTypeSave) : 0;
+    serviceItemsData.globalTip = this.globalTip
+      ? { type: this.globalTip.type, value: this.globalTip.value, mandatory: !!this.globalTip.mandatory, amount: Math.round(globalTipSave * 100) / 100 }
+      : null;
+    serviceItemsData.total = Math.round((serviceItemsData.subtotal + globalTipSave) * 100) / 100;
 
     // Get access token from cookie
     const accessToken = this.getAccessToken();
