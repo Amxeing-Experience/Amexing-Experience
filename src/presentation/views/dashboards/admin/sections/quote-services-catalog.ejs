@@ -15,24 +15,24 @@
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
     </div>
     <div class="offcanvas-body p-0" id="catalogDragSourcePanel">
-        <!-- Tabs -->
-        <ul class="nav nav-tabs px-3 pt-2" id="catalogTabs" role="tablist">
+        <!-- Tabs (control segmentado) -->
+        <ul class="nav catalog-seg" id="catalogTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="catalogTabExperiences" data-bs-toggle="tab" data-bs-target="#catalogPaneExperiences" type="button" role="tab">
-                    <i class="ti ti-beach me-1"></i>Exp
-                    <span class="badge bg-secondary ms-1" id="catalogExpCount">0</span>
+                    <i class="ti ti-beach"></i><span>Experiencias</span>
+                    <span class="badge" id="catalogExpCount">0</span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="catalogTabTours" data-bs-toggle="tab" data-bs-target="#catalogPaneTours" type="button" role="tab">
-                    <i class="ti ti-map-2 me-1"></i>Tours
-                    <span class="badge bg-secondary ms-1" id="catalogToursCount">0</span>
+                    <i class="ti ti-map-2"></i><span>Tours</span>
+                    <span class="badge" id="catalogToursCount">0</span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="catalogTabTransport" data-bs-toggle="tab" data-bs-target="#catalogPaneTransport" type="button" role="tab">
-                    <i class="ti ti-car me-1"></i>Trans
-                    <span class="badge bg-secondary ms-1" id="catalogTransportCount">0</span>
+                    <i class="ti ti-car"></i><span>Transporte</span>
+                    <span class="badge" id="catalogTransportCount">0</span>
                 </button>
             </li>
         </ul>
@@ -41,9 +41,12 @@
             <!-- Experiences Tab -->
             <div class="tab-pane fade show active" id="catalogPaneExperiences" role="tabpanel">
                 <div class="p-3 pb-2">
-                    <input type="text" class="form-control form-control-sm" id="catalogSearchExperiences" placeholder="Buscar experiencia...">
+                    <input type="text" class="form-control catalog-search-input mb-2" id="catalogSearchExperiences" placeholder="Buscar experiencia...">
+                    <select class="form-select catalog-filter-select" id="catalogFilterDestination" title="Filtrar por destino">
+                        <option value="all">Todos los destinos</option>
+                    </select>
                 </div>
-                <div class="catalog-drag-items-list px-3 pb-3" id="catalogExperiencesList" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+                <div class="catalog-drag-items-list px-3 pb-3" id="catalogExperiencesList" style="max-height: calc(100vh - 270px); overflow-y: auto;">
                     <div class="text-center text-muted py-3">
                         <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
                     </div>
@@ -53,7 +56,7 @@
             <!-- Tours Tab -->
             <div class="tab-pane fade" id="catalogPaneTours" role="tabpanel">
                 <div class="p-3 pb-2">
-                    <input type="text" class="form-control form-control-sm" id="catalogSearchTours" placeholder="Buscar tour...">
+                    <input type="text" class="form-control catalog-search-input" id="catalogSearchTours" placeholder="Buscar tour...">
                     <!-- Tour Type Filter -->
                     <div class="btn-group btn-group-sm w-100 mt-2" role="group" aria-label="Filtro de tours">
                         <input type="radio" class="btn-check" name="tourTypeFilter" id="tourFilterAll" value="all" checked>
@@ -82,9 +85,23 @@
             <!-- Transport Tab -->
             <div class="tab-pane fade" id="catalogPaneTransport" role="tabpanel">
                 <div class="p-3 pb-2">
-                    <input type="text" class="form-control form-control-sm" id="catalogSearchTransport" placeholder="Buscar transporte...">
+                    <input type="text" class="form-control catalog-search-input" id="catalogSearchTransport" placeholder="Buscar transporte...">
+                    <!-- Transport Type Filter -->
+                    <div class="btn-group btn-group-sm w-100 mt-2" role="group" aria-label="Filtro de transporte">
+                        <input type="radio" class="btn-check" name="transportTypeFilter" id="transportFilterAll" value="all" checked>
+                        <label class="btn btn-outline-secondary" for="transportFilterAll"><i class="ti ti-list me-1"></i>Todos</label>
+
+                        <input type="radio" class="btn-check" name="transportTypeFilter" id="transportFilterAeropuerto" value="aeropuerto">
+                        <label class="btn btn-outline-secondary" for="transportFilterAeropuerto"><i class="ti ti-plane me-1"></i>Aeropuerto</label>
+
+                        <input type="radio" class="btn-check" name="transportTypeFilter" id="transportFilterPunto" value="punto-a-punto">
+                        <label class="btn btn-outline-secondary" for="transportFilterPunto"><i class="ti ti-arrows-exchange me-1"></i>Punto a Punto</label>
+
+                        <input type="radio" class="btn-check" name="transportTypeFilter" id="transportFilterLocal" value="local">
+                        <label class="btn btn-outline-secondary" for="transportFilterLocal"><i class="ti ti-map-pin me-1"></i>Local</label>
+                    </div>
                 </div>
-                <div class="catalog-drag-items-list px-3 pb-3" id="catalogTransportList" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+                <div class="catalog-drag-items-list px-3 pb-3" id="catalogTransportList" style="max-height: calc(100vh - 240px); overflow-y: auto;">
                     <div class="text-center text-muted py-3">
                         <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
                     </div>

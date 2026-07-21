@@ -1,6 +1,7 @@
 const BaseController = require('./BaseController');
 const logger = require('../../../../infrastructure/logger');
 const AmexingUser = require('../../../../domain/models/AmexingUser');
+const { getEndClientCapabilities } = require('../../../config/endClientCapabilities');
 
 /**
  * DashboardController - Open/Closed Principle (OCP)
@@ -190,6 +191,13 @@ class DashboardController extends BaseController {
         userName,
         userId: enhancedUser?.id || req.user?.id,
         accessToken,
+        // Tipo de cliente directo + sus capacidades (menú/vistas los usan). res.locals no se
+        // fusiona en la vista, así que se pasan explícitamente aquí. null/default para otros roles.
+        clientCategory: req.user?.clientCategory || null,
+        endClientCaps: getEndClientCapabilities(req.user?.clientCategory || null),
+        // White-label de agencia (logo + "Powered by Amexing"): lo resuelve el middleware /end_client
+        // en res.locals; se pasa explícito porque res.locals no se fusiona en la vista.
+        agencyBranding: res.locals.agencyBranding || null,
         breadcrumb: this.buildBreadcrumb(req.path, req.user?.role),
         ...additionalData, // Spread additionalData last so it can override defaults
       };

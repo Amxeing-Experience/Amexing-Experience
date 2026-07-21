@@ -1,0 +1,22 @@
+{{TITULO_PRINCIPAL}}
+
+Estimado/a {{NOMBRE_CLIENTE}},
+
+{{CONTENIDO_MENSAJE}}
+
+DETALLES DE LA CANCELACIÓN
+--------------------------
+Folio de reservación: {{FOLIO_RESERVACION}}
+Folio de cotización: {{FOLIO_COTIZACION}}
+Fecha de cancelación: {{FECHA_CANCELACION}}
+Motivo: {{MOTIVO}}
+
+{{MENSAJE_ADICIONAL}}
+
+¿Necesita asistencia?
+Teléfono: {{TELEFONO}}
+Email: {{EMAIL_CONTACTO}}
+Emergencias 24/7: {{TELEFONO_EMERGENCIAS}}
+
+"{{TAGLINE}}"
+© {{AÑO}} Amexing Experience. Todos los derechos reservados.

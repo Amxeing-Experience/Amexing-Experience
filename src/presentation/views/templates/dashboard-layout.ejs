@@ -277,7 +277,8 @@
         <%- include('../organisms/dashboard/navigation/sidebar-nav', {
             userRole: typeof userRole !== 'undefined' ? userRole : 'guest',
             currentPath: typeof currentPath !== 'undefined' ? currentPath : '',
-            user: typeof user !== 'undefined' ? user : {}
+            user: typeof user !== 'undefined' ? user : {},
+            endClientCaps: typeof endClientCaps !== 'undefined' ? endClientCaps : null
         }) %>
 
         <!-- Main Content Area -->
@@ -287,7 +288,8 @@
                 <%- include('../organisms/dashboard/header/dashboard-header', {
                     userRole: typeof userRole !== 'undefined' ? userRole : 'guest',
                     user: typeof user !== 'undefined' ? user : {},
-                    title: typeof title !== 'undefined' ? title : 'Dashboard'
+                    title: typeof title !== 'undefined' ? title : 'Dashboard',
+                    clientCategory: typeof clientCategory !== 'undefined' ? clientCategory : null
                 }) %>
             </header>
 

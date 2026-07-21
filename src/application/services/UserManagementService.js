@@ -114,6 +114,7 @@ class UserManagementService {
         'departmentId',
         'contextualData',
         'phone',
+        'phoneCountry',
         'notes',
         'address',
         'createdAt',
@@ -506,6 +507,7 @@ class UserManagementService {
         'oauthAccounts',
         'primaryOAuthProvider',
         'phone',
+        'phoneCountry',
         'address',
         'contextualData',
         'notes',
@@ -1601,6 +1603,7 @@ class UserManagementService {
       contextualData, // Include full contextual data object
       address: user.get('address'), // Include address data for client details
       phone: user.get('phone'), // Include phone number
+      phoneCountry: user.get('phoneCountry') || null, // ISO del país del teléfono (p. ej. 'MX')
       notes: user.get('notes'), // Include notes field
       // People-type client profile (direct_client/wedding_planner/concierge/home_owner)
       clientCategory: user.get('clientCategory') || null,

@@ -433,7 +433,7 @@
             normalizedData.days.forEach(day => {
                 const dayTotal = day.services.reduce((sum, service) => {
                     if (service.includeInTotal === false) return sum;
-                    return sum + this.getServicePrice(service);
+                    return sum + this.getServicePrice(service) + this.getServiceTip(service);
                 }, 0);
                 grandTotal += dayTotal;
 
@@ -595,9 +595,19 @@
                 if (isExcluded) {
                     // "Pago externo" ya se muestra junto al nombre (izquierda); no se duplica aquí
                     // (junto al precio, derecha).
-                    html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
+                    html += `<div class="service-price excluded">${this.formatCurrency(price + this.getServiceTip(service))}</div>`;
                 } else {
-                    html += `<div class="service-price">${this.formatCurrency(price)}</div>`;
+                    html += `<div class="service-price">${this.formatCurrency(price + this.getServiceTip(service))}</div>`;
+                }
+                // Fase 1: descuento por servicio. El precio de arriba ya viene con descuento (pricesByType);
+                // esta línea lo hace visible en el resumen. El monto se muestra en efectivo (como la tarjeta).
+                if (Number(service.discountAmount) > 0) {
+                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>`;
+                }
+                // Fase 2: propina por servicio (línea aparte, aditiva; se suma al total).
+                const svcTip = this.getServiceTip(service);
+                if (svcTip > 0) {
+                    html += `<div class="service-tip small text-info">Propina ${service.tipType === 'percent' ? service.tipValue + '%' : ''} +${this.formatCurrency(svcTip)}${service.tipMandatory ? ' (obligatoria)' : ''}</div>`;
                 }
                 html += '</div>';
             }
@@ -898,7 +908,12 @@
             html += `<span class="service-badge secondary me-2">${transportLabel}</span>`;
 
             if (service.directionType) {
-                const dirLabel = directionLabels[service.directionType];
+                // Local con tiempo de espera (lleva, espera y regresa) → se separa en dos piernas:
+                // "Llevar" es la IDA y "Recoger" el REGRESO. (Round-trip sin espera queda igual.)
+                const isLocalWaiting = service.transportType === 'local' && service.waitingTimeHours > 0;
+                const dirLabel = isLocalWaiting
+                    ? (service.directionType === 'arrival' ? 'Ida' : 'Regreso')
+                    : directionLabels[service.directionType];
                 const badgeClass = service.directionType === 'arrival' ? 'service-badge info' : 'service-badge warning';
                 html += `<span class="${badgeClass} me-2">${dirLabel}</span>`;
             }
@@ -1189,9 +1204,18 @@
                 if (isExcluded) {
                     // "Pago externo" ya se muestra junto al nombre (izquierda); no se duplica aquí
                     // (junto al precio, derecha).
-                    html += `<div class="service-price excluded">${this.formatCurrency(price)}</div>`;
+                    html += `<div class="service-price excluded">${this.formatCurrency(price + this.getServiceTip(service))}</div>`;
                 } else {
-                    html += `<div class="service-price">${this.formatCurrency(price)}</div>`;
+                    html += `<div class="service-price">${this.formatCurrency(price + this.getServiceTip(service))}</div>`;
+                }
+                // Fase 1: descuento por servicio (transporte). El precio ya viene con descuento (pricesByType).
+                if (Number(service.discountAmount) > 0) {
+                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>`;
+                }
+                // Fase 2: propina por servicio (línea aparte, aditiva; se suma al total).
+                const svcTip = this.getServiceTip(service);
+                if (svcTip > 0) {
+                    html += `<div class="service-tip small text-info">Propina ${service.tipType === 'percent' ? service.tipValue + '%' : ''} +${this.formatCurrency(svcTip)}${service.tipMandatory ? ' (obligatoria)' : ''}</div>`;
                 }
                 html += '</div>';
             }
@@ -2113,21 +2137,50 @@
 
         // Helper: Get service price
         getServicePrice(service) {
-            // Use pricesByType if available
+            // pricesByType es la base PURA (sin descuento). El descuento por servicio (Fase 1) se
+            // guarda en efectivo (discountAmount) y se resta aquí, escalado a la forma de pago
+            // (recargo multiplicativo), para que el resumen/reserva muestren el precio descontado.
             if (service.pricesByType && typeof service.pricesByType === 'object' && this.paymentType) {
-                const price = service.pricesByType[this.paymentType];
-                if (price !== undefined) return price;
+                const base = service.pricesByType[this.paymentType];
+                if (base !== undefined) {
+                    const discEf = Number(service.discountAmount) || 0;
+                    const efBase = Number(service.pricesByType.efectivo) || 0;
+                    if (discEf > 0 && efBase > 0) {
+                        const factor = Number(base) / efBase;
+                        return Math.max(0, Number(base) - Math.round(discEf * factor * 100) / 100);
+                    }
+                    return base;
+                }
             }
 
-            // Fallback to base price
+            // Fallback: service.total ya viene con el descuento aplicado al guardar.
             return service.price || service.total || 0;
+        }
+
+        // Helper: propina por servicio (Fase 2) en la forma de pago actual. Aditiva, línea aparte.
+        // Porcentaje: sobre el precio neto (con descuento). Monto fijo (efectivo): escalado por el
+        // recargo de la forma de pago (mismo factor pricesByType[pt]/efectivo que el descuento).
+        getServiceTip(service) {
+            const type = service.tipType;
+            const val = Number(service.tipValue) || 0;
+            if (!type || val <= 0) return 0;
+            if (type === 'percent') {
+                return Math.round(this.getServicePrice(service) * (val / 100) * 100) / 100;
+            }
+            const pbt = service.pricesByType;
+            const pt = this.paymentType || 'efectivo';
+            if (pbt && Number(pbt.efectivo) > 0 && pbt[pt] != null) {
+                const factor = Number(pbt[pt]) / Number(pbt.efectivo);
+                return Math.round(val * factor * 100) / 100;
+            }
+            return val;
         }
 
         // Helper: Calculate day total
         calculateDayTotal(services) {
             return services.reduce((sum, service) => {
                 if (service.includeInTotal === false) return sum;
-                return sum + this.getServicePrice(service);
+                return sum + this.getServicePrice(service) + this.getServiceTip(service);
             }, 0);
         }
 

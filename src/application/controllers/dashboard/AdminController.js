@@ -102,6 +102,19 @@ class AdminController extends RoleBasedController {
         return this.handleError(res, new Error('Autenticación requerida'), 401);
       }
 
+      // Modo "nuevo": la misma página sirve para crear (como quoteDetail con id 'new'). No hay
+      // fetch; la vista muestra solo el form de Información (vacío) y oculta los demás tabs.
+      if (clientId === 'new') {
+        return await this.renderRoleView(req, res, 'client-detail', {
+          title: 'Nuevo Cliente',
+          client: {},
+          isNewClient: true,
+          section: 'information',
+          subsection: null,
+          breadcrumb: null,
+        });
+      }
+
       // Use UserManagementService directly instead of HTTP call
       const UserManagementService = require('../../services/UserManagementService');
       const userService = new UserManagementService();
@@ -142,6 +155,7 @@ class AdminController extends RoleBasedController {
         email: client.email || client.get?.('email'),
         username: client.username || client.get?.('username'),
         phone: client.phone || client.get?.('phone'),
+        phoneCountry: client.phoneCountry || client.get?.('phoneCountry') || null,
         active: typeof client.active !== 'undefined' ? client.active : client.get?.('active'),
         companyName:
           client.companyName
@@ -172,6 +186,17 @@ class AdminController extends RoleBasedController {
         anniversary: client.anniversary || client.get?.('anniversary') || null,
         createdAt: client.createdAt || client.get?.('createdAt'),
         updatedAt: client.updatedAt || client.get?.('updatedAt'),
+        // Campos de persona (Cliente Directo / end_client) para prefill del form de edición unificado.
+        companyType: client.companyType || client.get?.('companyType') || null,
+        contactFirstName: client.contactFirstName || client.get?.('contactFirstName') || '',
+        contactLastName: client.contactLastName || client.get?.('contactLastName') || '',
+        emergencyContactName: client.emergencyContactName || client.get?.('emergencyContactName') || '',
+        emergencyContactPhone: client.emergencyContactPhone || client.get?.('emergencyContactPhone') || '',
+        preferredLanguage: client.preferredLanguage || client.get?.('preferredLanguage') || 'es',
+        accessibilityRequirements:
+          client.accessibilityRequirements || client.get?.('accessibilityRequirements') || '',
+        allergies: client.allergies || client.get?.('allergies') || [],
+        dietaryRestrictions: client.dietaryRestrictions || client.get?.('dietaryRestrictions') || [],
       };
 
       // Determine active section (default: information)
@@ -196,13 +221,14 @@ class AdminController extends RoleBasedController {
       const viewData = {
         title: `Cliente: ${displayName}`,
         client: clientData,
+        isNewClient: false,
         section,
         subsection,
         breadcrumb: null, // Disable automatic breadcrumb generation
       };
 
-      // Add DataTables assets if employees, tarifario or trips (quotes) section is active
-      if (section === 'employees' || section === 'tarifario' || section === 'quotes') {
+      // Add DataTables assets if employees, tarifario, trips (quotes) or clientes section is active
+      if (section === 'employees' || section === 'tarifario' || section === 'quotes' || section === 'clientes') {
         viewData.pageStyles = [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
           'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
@@ -447,6 +473,26 @@ class AdminController extends RoleBasedController {
           <!-- Tom Select for Enhanced Multi-Select -->
           <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
         `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Entradas (boletos de acceso) por destino — bandeja master-detail.
+   * Izquierda: lista de destinos (POI). Derecha: tabla de entradas del destino.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   */
+  async entradas(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'entradas', {
+        title: 'Entradas',
+        breadcrumb: null,
+        pageStyles: [],
+        footerScripts: '',
       });
     } catch (error) {
       this.handleError(res, error);

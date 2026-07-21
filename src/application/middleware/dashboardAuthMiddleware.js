@@ -15,17 +15,21 @@ class DashboardAuthMiddleware {
       client: 5,
       department_manager: 4,
       employee: 3,
+      // Cliente directo (end_client): cliente final sin agencia. Nivel por debajo de client
+      // para que NO pueda alcanzar por URL las rutas de agencia (/dashboard/client/*).
+      end_client: 3,
       driver: 2,
       guest: 1,
     };
 
     // Define role-based dashboard access permissions
     this.dashboardPermissions = {
-      superadmin: ['superadmin', 'admin', 'client', 'department_manager', 'employee', 'driver', 'guest'],
-      admin: ['admin', 'client', 'department_manager', 'employee', 'driver'],
+      superadmin: ['superadmin', 'admin', 'client', 'department_manager', 'employee', 'end_client', 'driver', 'guest'],
+      admin: ['admin', 'client', 'department_manager', 'employee', 'end_client', 'driver'],
       client: ['client', 'department_manager', 'employee'],
       department_manager: ['department_manager', 'employee'],
       employee: ['employee'],
+      end_client: ['end_client'],
       driver: ['driver'],
       guest: ['guest'],
     };
@@ -92,6 +96,7 @@ class DashboardAuthMiddleware {
           role: decoded.role || 'guest',
           name: decoded.username || 'Unknown User',
           clientId: decoded.clientId,
+          clientCategory: decoded.clientCategory || null,
           organizationId: decoded.organizationId,
           isActive: true,
         };
@@ -119,6 +124,7 @@ class DashboardAuthMiddleware {
         name: req.session.user.name || req.session.user.username || 'Unknown User',
         email: req.session.user.email,
         clientId: req.session.user.clientId,
+        clientCategory: req.session.user.clientCategory || null,
         organizationId: req.session.user.organizationId,
         isActive: true,
       };
@@ -130,6 +136,7 @@ class DashboardAuthMiddleware {
     res.locals.userRole = user.role;
     res.locals.userName = user.name || user.username;
     res.locals.userId = user.id;
+    res.locals.clientCategory = user.clientCategory || null;
     res.locals.accessToken = accessToken; // Pass token to templates
 
     next();

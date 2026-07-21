@@ -6,12 +6,18 @@
  */
 
 const activeSection = typeof currentSection !== 'undefined' ? currentSection : 'information';
-const quoteTitle = isNewQuote ? 'Nueva Cotización' : `Cotización`;
+// Relabel a "Reservación" según el contexto con que se abrió (?context=reservation).
+const isReservationView = typeof isReservation !== 'undefined' && isReservation;
+const entityLabel = isReservationView ? 'Reservación' : 'Cotización';
+const quoteTitle = isNewQuote ? `Nueva ${entityLabel}` : entityLabel;
+// Preservar el contexto al navegar entre secciones del stepper.
+const ctxFirst = isReservationView ? '?context=reservation' : '';
+const ctxNext = isReservationView ? '&context=reservation' : '';
 
 const steps = [
-    { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/client/quotes/${quoteId}`, number: 1 },
-    { label: 'Servicios', icon: 'list', section: 'services', href: `/dashboard/client/quotes/${quoteId}?section=services`, number: 2 },
-    { label: 'Resumen', icon: 'calculator', section: 'summary', href: `/dashboard/client/quotes/${quoteId}?section=summary`, number: 3 }
+    { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/client/quotes/${quoteId}${ctxFirst}`, number: 1 },
+    { label: 'Servicios', icon: 'list', section: 'services', href: `/dashboard/client/quotes/${quoteId}?section=services${ctxNext}`, number: 2 },
+    { label: 'Resumen', icon: 'calculator', section: 'summary', href: `/dashboard/client/quotes/${quoteId}?section=summary${ctxNext}`, number: 3 }
 ];
 %>
 
@@ -21,6 +27,8 @@ window.currentUser = {
     role: '<%= typeof userRole !== "undefined" ? userRole : "client" %>',
     id: '<%= typeof userId !== "undefined" ? userId : "" %>'
 };
+// Contexto reservación: las secciones incluidas usan esta bandera para relabelar a "Reservación".
+window.__isReservation = <%= isReservationView ? 'true' : 'false' %>;
 </script>
 
 <!-- Page Header -->
@@ -39,7 +47,7 @@ window.currentUser = {
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item"><a href="/dashboard/client"><i class="ti ti-home me-1"></i>Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="/dashboard/client/quotes"><i class="ti ti-file-invoice me-1"></i>Cotizaciones</a></li>
+                    <li class="breadcrumb-item"><a href="/dashboard/client/<%= isReservationView ? 'bookings' : 'quotes' %>"><i class="ti <%= isReservationView ? 'ti-clipboard-list' : 'ti-file-invoice' %> me-1"></i><%= isReservationView ? 'Reservaciones' : 'Cotizaciones' %></a></li>
                     <li class="breadcrumb-item active" id="breadcrumbQuoteTitle"><%= quoteTitle %></li>
                 </ol>
             </nav>
@@ -1026,7 +1034,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (result.success && result.data) {
                 const folio = result.data.folio || quoteId;
-                const quoteTitleWithFolio = `Cotización ${folio}`;
+                const entityWord = window.__isReservation ? 'Reservación' : 'Cotización';
+                const quoteTitleWithFolio = `${entityWord} ${folio}`;
 
                 const quoteFolioSpan = document.getElementById('quoteFolioSpan');
                 if (quoteFolioSpan) {

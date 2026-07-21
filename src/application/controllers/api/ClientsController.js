@@ -656,6 +656,7 @@ class ClientsController {
             lastName: user.lastName,
             email: user.username,
             phone: user.phone,
+            phoneCountry: user.phoneCountry || null,
             companyType: 'travel_agency',
             active: user.active,
             createdAt: user.createdAt,
@@ -688,6 +689,7 @@ class ClientsController {
             lastName: user.get('lastName'),
             email: user.get('email') || '',
             phone: user.get('phone'),
+            phoneCountry: user.get('phoneCountry') || null,
             companyType: user.get('companyType'),
             active: user.get('active'),
             createdAt: user.get('createdAt'),
@@ -1606,8 +1608,22 @@ class ClientsController {
         return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can reset client passwords.', 403);
       }
 
-      // Generate new secure password
-      const newPassword = this.generateSecurePassword();
+      // Si el admin escribió una contraseña, úsala (validada); si no, genera una segura.
+      const providedPassword = (req.body && typeof req.body.password === 'string') ? req.body.password.trim() : '';
+      let newPassword;
+      if (providedPassword) {
+        const pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{12,}$/;
+        if (!pwdRegex.test(providedPassword)) {
+          return this.sendError(
+            res,
+            'La contraseña debe tener al menos 12 caracteres e incluir mayúscula, minúscula, número y carácter especial',
+            400
+          );
+        }
+        newPassword = providedPassword;
+      } else {
+        newPassword = this.generateSecurePassword();
+      }
 
       // Reset password using direct bcrypt hashing (like authController does)
       const bcrypt = require('bcrypt');

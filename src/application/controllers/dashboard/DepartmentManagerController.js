@@ -1,4 +1,5 @@
 const RoleBasedController = require('./base/RoleBasedController');
+const { getDashboardSummary } = require('./dashboardSummary');
 
 /**
  * DepartmentManagerController - Implements department manager dashboard functionality.
@@ -23,8 +24,25 @@ class DepartmentManagerController extends RoleBasedController {
    */
   async index(req, res) {
     try {
-      // Redirect department managers to vehicles page as default
-      res.redirect('/dashboard/department_manager/vehicles');
+      const { user } = req;
+      const agencyName = user?.fullName
+        || `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+        || 'Agente';
+
+      const summary = await getDashboardSummary(req);
+
+      const dashboardData = {
+        agencyName,
+        basePath: 'department_manager',
+        segments: summary.segments,
+        pendingPayments: summary.pendingPayments,
+      };
+
+      await this.renderRoleView(req, res, 'index', {
+        title: 'Inicio',
+        breadcrumb: null,
+        dashboardData,
+      });
     } catch (error) {
       this.handleError(res, error);
     }
@@ -283,6 +301,11 @@ class DepartmentManagerController extends RoleBasedController {
 
       const isNewQuote = quoteId === 'new';
 
+      // El relabel a "Reservación" lo decide el CONTEXTO con que se abrió (abierto desde
+      // Reservaciones llega ?context=reservation), no si existe una reservación. Igual que admin.
+      const isReservation = req.query.context === 'reservation';
+      const entityLabel = isReservation ? 'Reservación' : 'Cotización';
+
       // Traer estado + total de la cotización para pintar el panel (timeline + botón
       // "Solicitar Servicios") server-side y que no espere al fetch del cliente.
       let quoteStatus = '';
@@ -301,10 +324,11 @@ class DepartmentManagerController extends RoleBasedController {
       }
 
       await this.renderRoleView(req, res, 'quote-detail', {
-        title: isNewQuote ? 'Nueva Cotización' : `Cotización ${quoteId}`,
+        title: isNewQuote ? `Nueva ${entityLabel}` : `${entityLabel} ${quoteId}`,
         breadcrumb: null,
         quoteId,
         isNewQuote,
+        isReservation,
         quoteStatus,
         quoteTotal,
         currentSection: section,

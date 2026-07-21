@@ -77,9 +77,10 @@ class OwnedClientsController {
 
   /**
    * Create a people-type client as an AmexingUser (role 'end_client') so they can log in.
-   * Username derives from email, or a placeholder when none is given; a random password is
-   * set (these accounts don't log in until invited). Mirrors the migration script.
-   * @param {object} data - Profile fields (firstName, lastName, email, clientCategory, ...).
+   * Username derives from email, or a placeholder when none is given. Si data.password viene, se
+   * usa esa contraseña (mustChangePassword=false, ya puede entrar); si no, una aleatoria y la cuenta
+   * no puede entrar hasta que se le invite/resetee. Mirrors the migration script.
+   * @param {object} data - Profile fields (firstName, lastName, email, clientCategory, password, ...).
    * @returns {Promise<AmexingUser>} The saved user.
    * @example
    */
@@ -97,6 +98,7 @@ class OwnedClientsController {
       // 'amexing' para clientes directos de Amexing.
       organizationId: data.organizationId || 'amexing',
       phone: data.phone,
+      phoneCountry: data.phoneCountry, // ISO del país del teléfono (p. ej. 'MX')
       birthDate: data.birthDate,
       notes: data.notes,
       contextualData: {},
@@ -105,6 +107,7 @@ class OwnedClientsController {
       contactLastName: data.contactLastName,
       emergencyContactName: data.emergencyContactName,
       emergencyContactPhone: data.emergencyContactPhone,
+      companyName: data.companyName,
       companyType: data.companyType,
       taxId: data.taxId,
       website: data.website,
@@ -117,8 +120,15 @@ class OwnedClientsController {
     });
 
     const crypto = require('crypto');
-    await user.setPassword(crypto.randomBytes(24).toString('base64'), false);
-    user.set('mustChangePassword', true);
+    if (data.password) {
+      // El admin definió una contraseña: el cliente puede iniciar sesión de inmediato con su email.
+      await user.setPassword(data.password, false);
+      user.set('mustChangePassword', false);
+    } else {
+      // Sin contraseña: aleatoria; la cuenta no puede entrar hasta que se le invite/resetee.
+      await user.setPassword(crypto.randomBytes(24).toString('base64'), false);
+      user.set('mustChangePassword', true);
+    }
 
     await user.save(null, { useMasterKey: true });
     return user;
@@ -228,8 +238,11 @@ class OwnedClientsController {
       if (userRole === 'department_manager' || userRole === 'client') {
         const agencyId = this.getAgencyId(currentUser, userRole);
         query.equalTo('organizationId', agencyId);
+      } else if (['admin', 'superadmin'].includes(userRole) && req.query.agencyId) {
+        // El admin puede acotar a los clientes de UNA agencia (tab "Clientes" en el detalle de agencia).
+        query.equalTo('organizationId', req.query.agencyId);
       }
-      // admin/superadmin: ven todos los clientes de agencia (sin filtro de organizationId).
+      // admin/superadmin sin agencyId: ven todos los clientes de agencia (sin filtro de organizationId).
 
       // Active filter
       if (active !== null) {
@@ -281,6 +294,7 @@ class OwnedClientsController {
           // lanza "Requested unknown parameter 'phone'" cuando el campo está vacío).
           email: client.get('email') || '',
           phone: client.get('phone') || '',
+          phoneCountry: client.get('phoneCountry') || '',
           contactPerson: client.get('contactPerson') || '',
           companyType: client.get('companyType') || '',
           active: client.get('active') === true,
@@ -347,6 +361,7 @@ class OwnedClientsController {
         email: client.get('email') || '',
         contactPerson: client.get('contactPerson') || '',
         phone: client.get('phone') || '',
+        phoneCountry: client.get('phoneCountry') || '',
       }));
 
       return res.json({
@@ -405,6 +420,7 @@ class OwnedClientsController {
         lastName: client.get('lastName') || '',
         email: client.get('email') || '',
         phone: client.get('phone') || '',
+        phoneCountry: client.get('phoneCountry') || '',
         contactFirstName: client.get('contactFirstName') || '',
         contactLastName: client.get('contactLastName') || '',
         emergencyContactName: client.get('emergencyContactName') || '',
@@ -496,11 +512,11 @@ class OwnedClientsController {
         // Name fields (separated)
         firstName, lastName,
         // Contact fields
-        email, phone,
+        email, phone, phoneCountry,
         contactFirstName, contactLastName,
         emergencyContactName, emergencyContactPhone,
         // Company fields
-        companyType, taxId, website,
+        companyName, companyType, taxId, website,
         // Address fields (structured)
         streetType, streetName, exteriorNumber, interiorNumber,
         colonia, city, state, postalCode,
@@ -512,6 +528,8 @@ class OwnedClientsController {
         birthDate,
         // Direct-client category (direct_client | wedding_planner | concierge | home_owner)
         clientCategory,
+        // Contraseña opcional para que el cliente directo pueda iniciar sesión (requiere email).
+        password,
         // Legacy address field for backward compatibility
         address,
       } = req.body;
@@ -519,6 +537,11 @@ class OwnedClientsController {
       // Validate required fields
       if (!firstName || !lastName) {
         return this.sendError(res, 'First name and last name are required', 400);
+      }
+
+      // Si se define contraseña, se necesita email (el login es por email).
+      if (password && !(email || '').trim()) {
+        return this.sendError(res, 'Para asignar una contraseña, el cliente debe tener email.', 400);
       }
 
       // Birth date — shared standard: past-only (1900..hoy). Clients are people, so no future.
@@ -563,10 +586,12 @@ class OwnedClientsController {
           lastName,
           email,
           phone,
+          phoneCountry,
           contactFirstName,
           contactLastName,
           emergencyContactName,
           emergencyContactPhone,
+          companyName,
           companyType,
           taxId,
           website,
@@ -578,6 +603,7 @@ class OwnedClientsController {
           dietaryRestrictions: processedDietaryRestrictions,
           clientCategory: finalCategory,
           birthDate,
+          password, // opcional: si viene, el cliente puede iniciar sesión de una vez
           createdBy: currentUser.id,
         });
         logger.info('End-client user created', { userId: created.id, category: finalCategory });
@@ -615,6 +641,8 @@ class OwnedClientsController {
         dietaryRestrictions: processedDietaryRestrictions,
         // Agency clients are people too, so they carry a birthday.
         birthDate,
+        // Contraseña opcional: si el DM/agencia la asigna (con email), el cliente puede entrar.
+        password,
         clientCategory: 'agency_client',
         organizationId: agencyId,
         createdBy: currentUser.id,
@@ -871,11 +899,11 @@ class OwnedClientsController {
         // Name fields (separated)
         firstName, lastName,
         // Contact fields
-        email, phone,
+        email, phone, phoneCountry,
         contactFirstName, contactLastName,
         emergencyContactName, emergencyContactPhone,
         // Company fields
-        companyType, taxId, website,
+        companyName, companyType, taxId, website,
         // Address fields (structured)
         streetType, streetName, exteriorNumber, interiorNumber,
         colonia, city, state, postalCode,
@@ -883,6 +911,8 @@ class OwnedClientsController {
         preferredLanguage, accessibilityRequirements,
         allergies, dietaryRestrictions,
         notes, active,
+        // Contraseña opcional (solo para clientes que pueden iniciar sesión = AmexingUser end_client).
+        password,
         // Legacy address field for backward compatibility
         address,
       } = req.body;
@@ -949,7 +979,9 @@ class OwnedClientsController {
       if (name !== undefined) client.set('name', name);
       if (email !== undefined) client.set('email', email);
       if (phone !== undefined) client.set('phone', phone);
+      if (phoneCountry !== undefined) client.set('phoneCountry', phoneCountry);
       if (contactPerson !== undefined) client.set('contactPerson', contactPerson);
+      if (companyName !== undefined) client.set('companyName', companyName);
       if (companyType !== undefined) client.set('companyType', companyType);
       if (taxId !== undefined) client.set('taxId', taxId);
       if (website !== undefined) client.set('website', website);
@@ -974,6 +1006,29 @@ class OwnedClientsController {
       if (processedAllergies !== undefined) client.set('allergies', processedAllergies);
       if (processedDietaryRestrictions !== undefined) client.set('dietaryRestrictions', processedDietaryRestrictions);
       if (req.body.clientCategory !== undefined) client.set('clientCategory', req.body.clientCategory);
+
+      // Contraseña (opcional): solo para clientes que inician sesión (AmexingUser end_client).
+      // Vacía = conservar la actual. Con valor: requiere email y actualiza el acceso.
+      if (password && typeof password === 'string' && password.trim()) {
+        // La query devuelve un Parse.Object genérico (AmexingUser no está registrado como
+        // subclase), así que replicamos AmexingUser.setPassword (bcrypt + mismos campos).
+        if (client.className !== 'AmexingUser') {
+          return this.sendError(res, 'Este cliente no admite contraseña (registro heredado).', 400);
+        }
+        const effectiveEmail = ((email !== undefined ? email : client.get('email')) || '').trim();
+        if (!effectiveEmail) {
+          return this.sendError(res, 'Para asignar una contraseña, el cliente debe tener email.', 400);
+        }
+        const bcrypt = require('bcrypt');
+        const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+        const hashedPassword = await bcrypt.hash(password.trim(), saltRounds);
+        client.set('password', hashedPassword);
+        client.set('passwordHash', hashedPassword);
+        client.set('passwordChangedAt', new Date());
+        client.set('mustChangePassword', false);
+        client.set('loginAttempts', 0);
+        client.set('lockedUntil', null);
+      }
 
       client.set('modifiedBy', currentUser);
       await client.save(null, { useMasterKey: true });

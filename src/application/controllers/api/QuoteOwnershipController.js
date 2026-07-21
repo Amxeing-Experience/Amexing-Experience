@@ -13,7 +13,9 @@
  * @since 1.0.0
  */
 
+const Parse = require('parse/node');
 const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
+const QuoteActivityService = require('../../services/QuoteActivityService');
 const logger = require('../../../infrastructure/logger');
 
 /**
@@ -116,6 +118,22 @@ class QuoteOwnershipController {
         transferredById,
         reason
       );
+
+      // Timeline (Fase B1): registrar la transferencia de propiedad (con el nombre del nuevo owner).
+      let newOwnerName = 'otro usuario';
+      try {
+        const u = await new Parse.Query('AmexingUser').get(newOwnerId, { useMasterKey: true });
+        newOwnerName = `${u.get('firstName') || ''} ${u.get('lastName') || ''}`.trim()
+          || u.get('email') || u.get('username') || newOwnerName;
+      } catch (nameErr) { /* nombre no crítico */ }
+      await QuoteActivityService.log({
+        quoteId,
+        actor: req.user,
+        actorRole: req.userRole,
+        action: 'ownership_transferred',
+        summary: `transfirió la propiedad de la cotización a ${newOwnerName}`,
+        meta: { newOwnerId },
+      });
 
       res.status(200).json({
         success: true,

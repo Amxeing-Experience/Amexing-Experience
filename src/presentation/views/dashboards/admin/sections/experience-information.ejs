@@ -77,6 +77,32 @@
                         </select>
                         <div class="form-text">Punto de interés o destino principal asociado con esta experiencia</div>
                     </div>
+
+                    <!-- Entradas (Opcional) -->
+                    <style>
+                        /* Encabezado de destino: claramente una sección, NO una opción clicable */
+                        .ts-dropdown .optgroup-header {
+                            font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
+                            font-weight: 700; color: #8a8f78; background: #f3f2ec;
+                            padding: 7px 12px; cursor: default; position: sticky; top: 0; z-index: 1;
+                            border-top: 1px solid #e4dfcf;
+                        }
+                        .ts-dropdown .optgroup-header .ti { margin-right: 5px; opacity: .7; }
+                        .ts-dropdown .optgroup:first-child .optgroup-header { border-top: 0; }
+                        /* Opción (entrada): indentada bajo el encabezado, precio a la derecha */
+                        .ts-dropdown .option { padding: 8px 12px 8px 22px; }
+                        .ts-dropdown .ent-opt { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+                        .ts-dropdown .ent-opt-name { color: #2b2b2b; }
+                        .ts-dropdown .ent-opt-price { color: #6E7A50; font-weight: 600; white-space: nowrap; }
+                    </style>
+                    <div class="mb-3">
+                        <label for="experienceEntradas" class="form-label">
+                            Entradas <small class="text-muted">(Opcional)</small>
+                        </label>
+                        <select id="experienceEntradas" name="entradas" multiple placeholder="Buscar y agregar entradas...">
+                        </select>
+                        <div class="form-text">Boletos de acceso asociados. Puedes elegir entradas de cualquier destino.</div>
+                    </div>
                 </div>
 
                 <!-- Tiempos -->
@@ -525,6 +551,99 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`✅ Populated Destino with ${pois.length} POI options`);
     }
 
+    // ===== Entradas asociadas (boletos de acceso; NO ligadas al destino) =====
+    let experienceEntradasTom = null;
+
+    async function fetchAllEntradas() {
+        try {
+            const token = (typeof getAccessToken === 'function')
+                ? getAccessToken()
+                : (localStorage.getItem('accessToken') || localStorage.getItem('token'));
+            const res = await fetch('/api/destinos/all-entradas', {
+                credentials: 'same-origin',
+                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+            });
+            if (!res.ok) return [];
+            const json = await res.json();
+            return (json && json.data) || [];
+        } catch (e) {
+            console.warn('No se pudieron cargar las entradas:', e);
+            return [];
+        }
+    }
+
+    function entradaLabel(name, price) {
+        return `${name} · $${Number(price || 0).toLocaleString('es-MX')}`;
+    }
+
+    // Construye el multiselect (Tom Select) con TODAS las entradas, agrupadas por destino.
+    async function buildEntradasPicker() {
+        const el = document.getElementById('experienceEntradas');
+        if (!el || typeof TomSelect === 'undefined') return;
+
+        const all = await fetchAllEntradas();
+        const optgroups = [];
+        const seenGroups = {};
+        const options = all.map((e) => {
+            const group = e.destinoName || 'Sin destino';
+            if (!seenGroups[group]) { seenGroups[group] = true; optgroups.push({ value: group, label: group }); }
+            return {
+                id: e.id,
+                label: entradaLabel(e.name, e.price),
+                name: e.name || '',
+                price: Number(e.price || 0),
+                group,
+                destinoName: e.destinoName || '',
+            };
+        });
+
+        if (experienceEntradasTom) { experienceEntradasTom.destroy(); experienceEntradasTom = null; }
+
+        experienceEntradasTom = new TomSelect(el, {
+            plugins: ['remove_button'],
+            maxItems: null,
+            valueField: 'id',
+            labelField: 'label',
+            searchField: ['label', 'destinoName'],
+            optgroupField: 'group',
+            lockOptgroupOrder: true,
+            optgroups,
+            options,
+            render: {
+                option: (d, escape) => `<div class="ent-opt"><span class="ent-opt-name">${escape(d.name || d.label)}</span><span class="ent-opt-price">$${Number(d.price || 0).toLocaleString('es-MX')}</span></div>`,
+                item: (d, escape) => `<div>${escape(d.label)}</div>`,
+                optgroup_header: (d, escape) => `<div class="optgroup-header"><i class="ti ti-map-pin"></i>${escape(d.label)}</div>`,
+            },
+        });
+    }
+
+    // Preselecciona las entradas guardadas (agrega la opción si ya no está activa/listada).
+    function setEntradasSelection(entradas) {
+        if (!experienceEntradasTom || !Array.isArray(entradas)) return;
+        const ids = [];
+        entradas.forEach((e) => {
+            if (!e || !e.id) return;
+            if (!experienceEntradasTom.options[e.id]) {
+                experienceEntradasTom.addOption({
+                    id: e.id,
+                    label: entradaLabel(e.name || e.id, e.price),
+                    name: e.name || String(e.id),
+                    price: Number(e.price || 0),
+                    group: e.destinoName || 'Sin destino',
+                    destinoName: e.destinoName || '',
+                });
+            }
+            ids.push(e.id);
+        });
+        experienceEntradasTom.setValue(ids, true);
+    }
+
+    function getSelectedEntradaIds() {
+        if (!experienceEntradasTom) return [];
+        const v = experienceEntradasTom.getValue();
+        return Array.isArray(v) ? v : (v ? [v] : []);
+    }
+
     async function init() {
         // Add debug mode indicator if active
         if (isDebugMode()) {
@@ -553,6 +672,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (pois.length > 0) {
             populateDestinoSelect(pois);
         }
+
+        // Construye el multiselect de Entradas (todas, agrupadas por destino)
+        await buildEntradasPicker();
 
         // Carga dinámica de categorías de experiencia (desde la BD).
         // Se puebla antes de loadExperienceData para que el valor guardado se preserve.
@@ -1333,7 +1455,17 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('experiencePriceNoAlcohol').value = data.price_no_alcohol || '';
             document.getElementById('experiencePriceChild').value = data.price_child || '';
             document.getElementById('experiencePriceInfant').value = data.price_infant || '';
-            document.getElementById('experienceDuration').value = data.duration || '';
+            (function() {
+                // Duración ahora en MINUTOS (picker amigable), igual que trayecto/anticipación.
+                const durMin = parseInt(data.duration, 10) || 0;
+                const dHidden = document.getElementById('experienceDuration');
+                const dPicker = dHidden ? dHidden.closest('.advance-time-picker') : null;
+                if (dPicker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(dPicker, durMin);
+                } else if (dHidden) {
+                    dHidden.value = durMin || '';
+                }
+            })();
             (function() {
                 const travelMin = parseInt(data.travel_duration, 10) || 0;
                 const tHidden = document.getElementById('experienceTravelDuration');
@@ -1400,6 +1532,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('🔍 LOAD DEBUG - No destinationPOI found, clearing dropdown');
                 document.getElementById('experienceDestino').value = '';
             }
+
+            // Preselecciona las entradas asociadas
+            setEntradasSelection(data.entradas || []);
 
             // Includes / NotIncludes / Languages (arrays to textarea)
             console.log('🔍 Loading textarea fields - API Response data:', { 
@@ -1844,6 +1979,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 availability: availability.length > 0 ? availability : null,
                 fixed_schedule: document.getElementById('experienceFixedSchedule').checked,
                 destinationPOI: document.getElementById('experienceDestino').value || null,
+                entradas: getSelectedEntradaIds(),
             };
 
             // 🔍 SAVE DEBUG - Log destinationPOI save details

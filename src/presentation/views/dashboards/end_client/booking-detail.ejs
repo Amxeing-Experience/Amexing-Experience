@@ -1,0 +1,771 @@
+<%
+/**
+ * Booking Detail Page
+ * Client dashboard page for viewing and managing a single reservation
+ *
+ * @author Denisse Maldonado
+ * @version 1.0.0
+ */
+%>
+
+<!-- Page Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item"><a href="/dashboard/end_client/bookings" class="text-decoration-none">Reservaciones</a></li>
+                        <li class="breadcrumb-item active" id="breadcrumbFolio">Cargando...</li>
+                    </ol>
+                </nav>
+                <h2 class="mb-0 fw-bold" id="pageTitle">
+                    <i class="ti ti-clipboard-list me-2 text-primary"></i>
+                    Reservación
+                </h2>
+            </div>
+            <div id="headerActions"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading State -->
+<div id="loadingState" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Cargando...</span>
+    </div>
+    <p class="text-muted mt-2">Cargando reservación...</p>
+</div>
+
+<!-- Reservation Content -->
+<div id="reservationContent" style="display: none;">
+    <!-- Info Card -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Folio</small>
+                    <strong id="infoFolio">—</strong>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Cotización</small>
+                    <a href="#" id="infoQuoteLink" class="fw-semibold text-decoration-none">—</a>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Estado</small>
+                    <span id="infoStatus">—</span>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Fecha Creación</small>
+                    <span id="infoCreatedAt">—</span>
+                </div>
+            </div>
+            <hr>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Cliente</small>
+                    <strong id="infoClient">—</strong>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Contacto</small>
+                    <span id="infoContact">—</span>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Motivo de viaje</small>
+                    <span id="infoEventType">—</span>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Personas</small>
+                    <span id="infoPeople">—</span>
+                </div>
+            </div>
+            <hr>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Fecha Inicio</small>
+                    <span id="infoStartDate">—</span>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Fecha Fin</small>
+                    <span id="infoEndDate">—</span>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Tipo de Pago</small>
+                    <span id="infoPaymentType">—</span>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Total</small>
+                    <strong id="infoTotal" class="text-success fs-5">—</strong>
+                </div>
+            </div>
+            <hr>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <small class="text-muted d-block">Seguidor de Servicio (Amexing)</small>
+                    <span id="infoServiceCustomer" class="fw-semibold">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Summary Card (read-only) -->
+    <div class="card border-0 shadow-sm mb-4" id="financialSummaryCard" style="display:none;">
+        <div class="card-header" style="background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%); border: none;">
+            <h5 class="card-title mb-0 text-white">
+                <i class="ti ti-calculator me-2"></i>Resumen Financiero
+            </h5>
+        </div>
+        <div class="card-body" id="financialSummaryBody"></div>
+    </div>
+
+    <!-- Services by Day -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
+            <h5 class="card-title mb-0 text-white">
+                <i class="ti ti-list-details me-2"></i>Servicios
+            </h5>
+        </div>
+        <div class="card-body p-0" id="servicesContainer">
+            <!-- Services will be rendered here -->
+        </div>
+    </div>
+</div>
+
+<!-- Assign Employee Modal -->
+<div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold">Asignar Personal</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="assignServiceId">
+                <div class="mb-3">
+                    <label class="form-label">Conductor</label>
+                    <select id="assignDriver" class="form-select form-select-sm">
+                        <option value="">Sin asignar</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Guía</label>
+                    <select id="assignGuide" class="form-select form-select-sm">
+                        <option value="">Sin asignar</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Greeter</label>
+                    <select id="assignGreeter" class="form-select form-select-sm">
+                        <option value="">Sin asignar</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Vehículo</label>
+                    <select id="assignVehicle" class="form-select form-select-sm">
+                        <option value="">Sin asignar</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-sm btn-primary" id="saveAssignmentBtn">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.service-row {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.15s;
+}
+.service-row:hover {
+    background-color: #f8f9fa;
+}
+.service-row:last-child {
+    border-bottom: none;
+}
+.day-header {
+    background-color: #f8f9fa;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    border-bottom: 2px solid #e9ecef;
+}
+.assignment-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+}
+.detail-tag {
+    font-size: 0.9rem;
+    padding: 0.15rem 0.4rem;
+    font-weight: 500;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    const reservationId = '<%= reservationId %>';
+    let reservationData = null;
+    let employeesCache = null;
+    let vehiclesCache = null;
+
+    function getInitials(name) {
+        if (!name) return '?';
+        return name.split(' ').map(w => w[0]).filter(Boolean).join('').substring(0, 2).toUpperCase();
+    }
+
+    function buildPersonCard(person, roleLabel, roleIcon, colorClass) {
+        if (!person) return '';
+        const name = person.fullName || 'Sin nombre';
+        const phone = person.phone || '';
+        const photo = person.profilePhotoUrl || '';
+        const initials = getInitials(name);
+        const photoHtml = photo
+            ? `<img src="${photo}" class="rounded-circle photo-preview-trigger" width="36" height="36" style="object-fit:cover;cursor:pointer" data-photo="${photo}" data-name="${name.replace(/"/g, '&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+            : '';
+        const initialsDisplay = photo ? 'display:none' : 'display:flex';
+        return `
+            <div class="d-flex align-items-center gap-2 mb-2">
+                ${photoHtml}
+                <span class="rounded-circle bg-${colorClass}-subtle text-${colorClass} align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;${initialsDisplay};font-size:0.8rem;font-weight:600">${initials}</span>
+                <div>
+                    <div class="fw-semibold small">${name}</div>
+                    <small class="text-${colorClass}"><i class="ti ${roleIcon} me-1"></i>${roleLabel}</small>
+                    ${phone ? `<a href="tel:${phone}" class="text-muted small d-block"><i class="ti ti-phone me-1"></i>${phone}</a>` : ''}
+                </div>
+            </div>`;
+    }
+
+    function buildVehicleCard(vehicle) {
+        if (!vehicle) return '';
+        const name = vehicle.name || 'Vehiculo';
+        const photo = vehicle.imageUrl || '';
+        const initials = name.substring(0, 2).toUpperCase();
+        const photoHtml = photo
+            ? `<img src="${photo}" class="rounded-circle photo-preview-trigger" width="36" height="36" style="object-fit:cover;cursor:pointer" data-photo="${photo}" data-name="${name.replace(/"/g, '&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+            : '';
+        const initialsDisplay = photo ? 'display:none' : 'display:flex';
+        return `
+            <div class="d-flex align-items-center gap-2 mb-2">
+                ${photoHtml}
+                <span class="rounded-circle bg-secondary-subtle text-secondary align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;${initialsDisplay};font-size:0.8rem;font-weight:600">${initials}</span>
+                <div>
+                    <div class="fw-semibold small">${name}</div>
+                    <small class="text-secondary"><i class="ti ti-car me-1"></i>Vehiculo</small>
+                </div>
+            </div>`;
+    }
+
+    function getQuoteStatusBadge(status) {
+        if (!status) return '';
+        const map = {
+            scheduled: { label: 'Agendada', cls: 'bg-success text-white' },
+            hold: { label: 'Bloqueada', cls: 'bg-warning text-dark' },
+            requested: { label: 'Solicitada', cls: 'bg-info text-white' },
+            quoted: { label: 'Cotizada', cls: 'bg-primary text-white' },
+            rejected: { label: 'Rechazada', cls: 'bg-danger text-white' },
+        };
+        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado de cotización origen">${s.label}</span>`;
+    }
+    
+    function getReservationStatusBadge(status) {
+        const map = {
+            pending: { label: 'Asignaciones pendientes', cls: 'bg-warning text-dark' },
+            assigned: { label: 'Asignada', cls: 'bg-info text-white' },
+            in_progress: { label: 'En Progreso', cls: 'bg-primary text-white' },
+            completed: { label: 'Completada', cls: 'bg-success text-white' },
+            cancelled: { label: 'Cancelada', cls: 'bg-danger text-white' },
+            confirmed: { label: 'Confirmada', cls: 'bg-success text-white' },
+            hold: { label: 'En Espera', cls: 'bg-warning text-dark' },
+        };
+        const s = map[status] || { label: status, cls: 'bg-secondary text-white' };
+        return `<span class="badge ${s.cls}" title="Estado operacional de reservación">${s.label}</span>`;
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '—';
+        return new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    }
+
+    function formatCurrency(amount, currency) {
+        const sym = currency === 'USD' ? 'USD $' : '$';
+        return `${sym}${(amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function getServiceTypeIcon(type) {
+        const icons = {
+            transport: 'ti-car',
+            tour: 'ti-map-pin',
+            experience: 'ti-sparkles',
+            concepto: 'ti-tag',
+            'a-disposicion': 'ti-clock',
+        };
+        return icons[type] || 'ti-point';
+    }
+
+    async function loadReservation() {
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await response.json();
+            if (!result.success) {
+                document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservación</p>';
+                return;
+            }
+
+            reservationData = result.data;
+            renderReservation();
+        } catch (error) {
+            console.error('Error loading reservation:', error);
+            document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservación</p>';
+        }
+    }
+
+    function renderReservation() {
+        const d = reservationData;
+
+        document.getElementById('breadcrumbFolio').textContent = d.folio;
+        document.getElementById('pageTitle').innerHTML = `<i class="ti ti-clipboard-list me-2 text-primary"></i>${d.folio}`;
+        document.getElementById('infoFolio').textContent = d.folio;
+
+        const quoteLink = document.getElementById('infoQuoteLink');
+        if (d.quoteId) {
+            quoteLink.href = `/dashboard/end_client/quotes/${d.quoteId}?context=reservation`;
+            quoteLink.textContent = d.quoteFolio;
+        }
+
+        const quoteBadge = getQuoteStatusBadge(d.quoteStatus);
+        const reservationBadge = getReservationStatusBadge(d.status);
+        document.getElementById('infoStatus').innerHTML = `${quoteBadge} ${reservationBadge}`;
+        document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);
+        // Display company name first, then fallback to fullName or contactPerson
+        const clientDisplay = d.client?.companyName || d.client?.fullName || d.contactPerson || '—';
+        document.getElementById('infoClient').textContent = clientDisplay;
+        document.getElementById('infoContact').innerHTML = `${d.contactEmail || ''}${d.contactPhone ? '<br>' + d.contactPhone : ''}`;
+        document.getElementById('infoEventType').textContent = d.eventType || '—';
+        document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';
+        document.getElementById('infoStartDate').textContent = formatDate(d.startDate);
+        document.getElementById('infoEndDate').textContent = formatDate(d.endDate);
+        document.getElementById('infoPaymentType').textContent = d.paymentType || '—';
+        document.getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency);
+
+        // Service Customer
+        const scEl = document.getElementById('infoServiceCustomer');
+        if (d.serviceCustomer) {
+            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Seguidor', 'ti-user-star', 'primary');
+        } else {
+            scEl.innerHTML = '<span class="text-muted">Sin asignar</span>';
+        }
+
+        // Header actions — "Exportar" opens the public reservation view in a new tab,
+        // which has the PDF export + print-friendly layout. "Cancelar" only shows when
+        // the reservation can still be cancelled.
+        const actions = document.getElementById('headerActions');
+        const folio = encodeURIComponent(d.folio || '');
+        const canCancel = d.status !== 'cancelled' && d.status !== 'completed';
+        const exportBtnHtml = folio
+            ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir vista pública (incluye Exportar a PDF)"><i class="ti ti-file-export me-1"></i>Exportar</a>`
+            : '';
+        const cancelBtnHtml = canCancel
+            ? `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservación</button>`
+            : '';
+        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
+        if (canCancel) {
+            document.getElementById('cancelResBtn')?.addEventListener('click', cancelReservation);
+        }
+
+        // Render services grouped by day
+        renderServices(d.services);
+        renderFinancialSummary();
+
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('reservationContent').style.display = '';
+    }
+
+    function renderFinancialSummary() {
+        const d = reservationData;
+        const adjustments = d.adjustments || [];
+        // Fase 2d: propina global de la cotización (del snapshot).
+        const globalTip = d.globalTip;
+        const globalTipAmount = (globalTip && Number(globalTip.amount) > 0) ? Number(globalTip.amount) : 0;
+        if (adjustments.length === 0 && globalTipAmount <= 0) return;
+
+        const card = document.getElementById('financialSummaryCard');
+        const body = document.getElementById('financialSummaryBody');
+        const servicesSubtotal = d.servicesSubtotal || d.totalAmount || 0;
+        const curr = d.currency || 'MXN';
+
+        card.style.display = '';
+        let html = '';
+        html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+            <span class="text-muted"><i class="ti ti-list-details me-2"></i>Subtotal Servicios</span>
+            <span class="fw-semibold">${formatCurrency(servicesSubtotal, curr)}</span>
+        </div>`;
+
+        adjustments.filter(a => a.type === 'charge').forEach(adj => {
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-plus text-danger me-1"></i><span class="small">${adj.description}</span></div>
+                <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
+            </div>`;
+        });
+
+        adjustments.filter(a => a.type === 'discount').forEach(adj => {
+            const pctLabel = adj.percentage ? ` (${adj.percentage}%)` : '';
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-discount-2 text-success me-1"></i><span class="small">${adj.description}${pctLabel}</span></div>
+                <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
+            </div>`;
+        });
+
+        // Fase 2d: propina general (informativa; ya está incluida en el Total Final).
+        if (globalTipAmount > 0) {
+            const gtPct = (globalTip.type === 'percent' && globalTip.value) ? ` (${globalTip.value}%)` : '';
+            const gtMand = globalTip.mandatory ? ' · obligatoria' : '';
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propina general${gtPct}${gtMand}</span></div>
+                <span class="text-info fw-semibold">+${formatCurrency(globalTipAmount, curr)}</span>
+            </div>`;
+        }
+
+        html += `<div class="d-flex justify-content-between align-items-center py-2 mt-1">
+            <span class="fw-bold"><i class="ti ti-receipt me-2"></i>Total Final</span>
+            <span class="fw-bold fs-5 text-success">${formatCurrency(d.totalAmount || 0, curr)}</span>
+        </div>`;
+        body.innerHTML = html;
+    }
+
+    function getSubconceptDetails(svc) {
+        const sub = svc.subconcept;
+        if (!sub) return '';
+        const tags = [];
+        const tag = (icon, text, color) => `<span class="badge detail-tag bg-${color}-subtle text-${color}"><i class="ti ti-${icon} me-1"></i>${text}</span>`;
+
+        // Fase 2d: descuento y propina por servicio (ya reflejados en el total del servicio).
+        if (Number(sub.discountAmount) > 0) {
+            const dPct = (sub.discountType === 'percent' && sub.discountValue) ? ` ${sub.discountValue}%` : '';
+            tags.push(tag('discount-2', `Descuento${dPct} −${formatCurrency(sub.discountAmount, reservationData.currency)}`, 'success'));
+        }
+        if (Number(sub.tipAmount) > 0) {
+            const tPct = (sub.tipType === 'percent' && sub.tipValue) ? ` ${sub.tipValue}%` : '';
+            const tMand = sub.tipMandatory ? ' (oblig.)' : '';
+            tags.push(tag('coin', `Propina${tPct} +${formatCurrency(sub.tipAmount, reservationData.currency)}${tMand}`, 'info'));
+        }
+
+        // Vehicle quantity (applies to transport, a-disposicion, etc.)
+        if (sub.quantity && sub.quantity > 1) tags.push(tag('car', `${sub.quantity} vehículos`, 'primary'));
+
+        // Guide & Greeter status (applies to ALL service types)
+        if (sub.includeGuide === true) {
+            tags.push(tag('map-pin', 'Guía: Sí', 'success'));
+        } else if (sub.includeGuide === false && (svc.type === 'transport' || svc.type === 'tour')) {
+            tags.push(tag('map-pin', 'Guía: No', 'secondary'));
+        }
+        if (sub.includeGreeter === true) {
+            const inVehicle = sub.greeterInVehicle ? ' (en vehículo)' : ' (en punto)';
+            tags.push(tag('hand-stop', `Greeter: Sí${inVehicle}`, 'warning'));
+        } else if (sub.includeGreeter === false && (svc.type === 'transport' || svc.type === 'tour')) {
+            tags.push(tag('hand-stop', 'Greeter: No', 'secondary'));
+        }
+
+        // Transport-specific details
+        if (svc.type === 'transport') {
+            if (sub.tripType) {
+                const tripLabel = sub.tripType === 'round-trip' ? 'Redondo' : 'Sencillo';
+                const dirLabel = sub.directionType === 'arrival' ? 'Llegada' : 'Salida';
+                tags.push(tag('arrows-exchange', `${tripLabel} — ${dirLabel}`, 'info'));
+            }
+            const pax = [];
+            if (sub.transportAdults) pax.push(`${sub.transportAdults} adulto${sub.transportAdults > 1 ? 's' : ''}`);
+            if (sub.transportChildren) pax.push(`${sub.transportChildren} niño${sub.transportChildren > 1 ? 's' : ''}`);
+            if (sub.transportInfants) pax.push(`${sub.transportInfants} infante${sub.transportInfants > 1 ? 's' : ''}`);
+            if (sub.persons && !pax.length) pax.push(`${sub.persons} persona${sub.persons > 1 ? 's' : ''}`);
+            if (pax.length) tags.push(tag('users', pax.join(', '), 'primary'));
+            if (sub.airline || sub.flightNumber) {
+                const flightLabel = `${sub.airline || ''} ${sub.flightNumber || ''}`.trim();
+                // Hora real del vuelo (llegada o salida del avión), distinta al pick-up del Horario.
+                const fm = String(svc.time || sub.selectedSchedule || sub.time || '').match(/^(\d{1,2}:\d{2})/);
+                const flightTime = fm ? fm[1] : '';
+                tags.push(tag('plane', flightTime ? `${flightLabel} @ ${flightTime}` : flightLabel, 'info'));
+            }
+            if (sub.waitingTimeHours) tags.push(tag('clock-pause', `Espera: ${sub.waitingTimeHours}h`, 'warning'));
+            if (Array.isArray(sub.extraAdditionalVehicles)) {
+                sub.extraAdditionalVehicles.forEach((v) => {
+                    const wh = parseFloat(v && v.waitingHours) || 0;
+                    if (wh > 0) tags.push(tag('clock-pause', `Espera ${(v.vehicleTypeName || 'adicional')}: ${wh}h`, 'warning'));
+                });
+            }
+            if (sub.routeDuration) tags.push(tag('route', `Duración: ${sub.routeDuration} min`, 'secondary'));
+
+            // Horario = hora de pick-up del servicio (aeropuerto). Salida: la hora sugerida ES el
+            // pick-up; llegada: el pick-up ocurre a la hora de llegada del pasajero.
+            if (sub.transportType === 'aeropuerto') {
+                let pickup = '';
+                if (sub.directionType === 'departure') {
+                    pickup = sub.flightDepartureTimeSuggested || '';
+                } else if (sub.directionType === 'arrival') {
+                    const am = String(sub.time || svc.time || sub.selectedSchedule || '').match(/^(\d{1,2}:\d{2})/);
+                    pickup = am ? am[1] : '';
+                }
+                if (pickup) tags.push(tag('clock-hour-4', `Horario: ${pickup}`, 'success'));
+            }
+            if (sub.roundTripDepartureTimeSuggestedIda) {
+                tags.push(tag('clock-hour-4', `Horario ida: ${sub.roundTripDepartureTimeSuggestedIda}`, 'success'));
+            }
+            if (sub.roundTripDepartureTimeSuggestedVuelta) {
+                tags.push(tag('clock-hour-4', `Horario vuelta: ${sub.roundTripDepartureTimeSuggestedVuelta}`, 'success'));
+            }
+        }
+
+        // Tour-specific details
+        if (svc.type === 'tour') {
+            if (sub.hotelName) tags.push(tag('building', sub.hotelName, 'secondary'));
+            if (sub.isWalkingTour) tags.push(tag('walk', `Walking tour (${sub.walkingTourPeopleCount || 0} pax)`, 'info'));
+            if (sub.persons) tags.push(tag('users', `${sub.persons} persona${sub.persons > 1 ? 's' : ''}`, 'primary'));
+        }
+
+        // Experience-specific details
+        if (svc.type === 'experience') {
+            const tickets = [];
+            if (sub.adultsQuantity) tickets.push(`${sub.adultsQuantity} adulto${sub.adultsQuantity > 1 ? 's' : ''}`);
+            if (sub.childrenQuantity) tickets.push(`${sub.childrenQuantity} niño${sub.childrenQuantity > 1 ? 's' : ''}`);
+            if (sub.adultsNoAlcoholQuantity) tickets.push(`${sub.adultsNoAlcoholQuantity} sin alcohol`);
+            if (tickets.length) tags.push(tag('ticket', tickets.join(', '), 'primary'));
+            if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
+        }
+
+        // A Disposición-specific details
+        if (svc.type === 'a-disposicion') {
+            if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
+            if (sub.discountPercent) tags.push(tag('discount-2', `${sub.discountPercent}% desc.`, 'success'));
+        }
+
+        // General fields
+        if (sub.notes) tags.push(tag('note', `Admin: ${sub.notes}`, 'secondary'));
+        if (sub.agencyNotes) tags.push(tag('user', `Cliente: ${sub.agencyNotes}`, 'info'));
+
+        return tags.length ? `<div class="mt-1 d-flex flex-wrap gap-1">${tags.join('')}</div>` : '';
+    }
+
+    function renderServices(services) {
+        const container = document.getElementById('servicesContainer');
+
+        // Group by dayNumber
+        const days = {};
+        services.forEach(svc => {
+            const key = svc.dayNumber || 1;
+            if (!days[key]) days[key] = { title: svc.dayTitle || `Día ${key}`, date: svc.serviceDate, services: [] };
+            days[key].services.push(svc);
+        });
+
+        if (Object.keys(days).length === 0) {
+            container.innerHTML = '<div class="text-center py-4 text-muted">No hay servicios en esta reservación</div>';
+            return;
+        }
+
+        let html = '';
+        Object.keys(days).sort((a, b) => a - b).forEach(dayNum => {
+            const day = days[dayNum];
+            html += `<div class="day-header"><i class="ti ti-calendar-event me-1"></i>Día ${dayNum} — ${day.title}${day.date ? ' (' + formatDate(day.date) + ')' : ''}</div>`;
+
+            day.services.forEach(svc => {
+                const icon = getServiceTypeIcon(svc.type);
+                // Build person cards for assigned employees
+                let peopleHtml = '';
+                let vehiclesHtml = '';
+                peopleHtml += buildPersonCard(svc.assignedDriver, 'Conductor', 'ti-steering-wheel', 'info');
+                peopleHtml += buildPersonCard(svc.assignedGuide, 'Guía', 'ti-map-pin', 'success');
+                peopleHtml += buildPersonCard(svc.assignedGreeter, 'Greeter', 'ti-hand-stop', 'warning');
+                peopleHtml += buildPersonCard(svc.assignedServiceCustomer, 'Seguidor', 'ti-user-star', 'primary');
+
+                // Vehicle card
+                if (svc.assignedVehicle) vehiclesHtml += buildVehicleCard(svc.assignedVehicle);
+
+                // Extra assignments (additional vehicles/drivers)
+                const extras = svc.extraAssignments || [];
+                extras.forEach(ea => {
+                    if (ea.driverName) peopleHtml += buildPersonCard({ fullName: ea.driverName, phone: '', profilePhotoUrl: '' }, 'Conductor', 'ti-steering-wheel', 'info');
+                    if (ea.vehicleName) vehiclesHtml += buildVehicleCard({ name: ea.vehicleName, imageUrl: ea.vehicleImageUrl || '' });
+                });
+
+                const hasAssignments = peopleHtml || vehiclesHtml;
+
+                const route = svc.originName || svc.destinationName
+                    ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' → ' : ''}${svc.destinationName || ''}</small>`
+                    : '';
+
+                const canAssign = false; // Assignment is admin-only
+
+                html += `
+                <div class="service-row d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center flex-grow-1">
+                        <div>
+                            <div class="fw-semibold">${svc.concept || '—'}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
+                            ${route}
+                            ${svc.vehicleTypeName ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
+                            ${getSubconceptDetails(svc)}
+                            ${hasAssignments ? `<div class="row mt-2"><div class="col-md-7">${peopleHtml}</div><div class="col-md-5">${vehiclesHtml}</div></div>` : (svc.type === 'concepto' ? '<div class="mt-2"><small class="text-muted">No requiere asignación</small></div>' : '<div class="mt-2"><small class="text-muted">Sin asignar</small></div>')}
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        ${svc.type === 'concepto' && svc.status !== 'cancelled' ? '<span class="badge bg-success text-white">Lista</span>' : getReservationStatusBadge(svc.status)}
+                        <span class="text-end" style="min-width: 80px;">${formatCurrency(svc.total, reservationData.currency)}</span>
+                        ${canAssign ? `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}"><i class="ti ti-user-plus"></i></button>` : ''}
+                    </div>
+                </div>`;
+            });
+        });
+
+        container.innerHTML = html;
+
+        // Bind assign buttons
+        container.querySelectorAll('.assign-btn').forEach(btn => {
+            btn.addEventListener('click', () => openAssignModal(btn));
+        });
+    }
+
+    async function loadEmployees() {
+        if (employeesCache) return employeesCache;
+        try {
+            const response = await fetch('/api/employees?limit=500', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await response.json();
+            employeesCache = result.data?.users || result.data || result.results || [];
+            return employeesCache;
+        } catch { return []; }
+    }
+
+    async function loadVehicles() {
+        if (vehiclesCache) return vehiclesCache;
+        try {
+            const response = await fetch('/api/vehicles?limit=500', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const result = await response.json();
+            vehiclesCache = result.data || result.results || [];
+            return vehiclesCache;
+        } catch { return []; }
+    }
+
+    async function openAssignModal(btn) {
+        const serviceId = btn.dataset.serviceId;
+        const driverId = btn.dataset.driverId;
+        const guideId = btn.dataset.guideId;
+        const greeterId = btn.dataset.greeterId;
+        const vehicleId = btn.dataset.vehicleId;
+
+        document.getElementById('assignServiceId').value = serviceId;
+
+        // Load employees and vehicles
+        const [employees, vehicles] = await Promise.all([loadEmployees(), loadVehicles()]);
+
+        // Populate dropdowns
+        const driverSelect = document.getElementById('assignDriver');
+        const guideSelect = document.getElementById('assignGuide');
+        const greeterSelect = document.getElementById('assignGreeter');
+        const vehicleSelect = document.getElementById('assignVehicle');
+
+        // Filter employees by role
+        const drivers = employees.filter(e => e.role === 'driver' || e.role === 'employee_amexing');
+        const guides = employees.filter(e => e.role === 'guia' || e.role === 'employee_amexing');
+        const greeters = employees.filter(e => e.role === 'greeter' || e.role === 'employee_amexing');
+
+        function populateSelect(select, items, selectedId, nameField) {
+            select.innerHTML = '<option value="">Sin asignar</option>';
+            items.forEach(item => {
+                const name = item[nameField] || item.fullName || item.username || item.name || 'Sin nombre';
+                const id = item.id || item.objectId;
+                select.innerHTML += `<option value="${id}" ${id === selectedId ? 'selected' : ''}>${name}</option>`;
+            });
+        }
+
+        populateSelect(driverSelect, drivers, driverId, 'fullName');
+        populateSelect(guideSelect, guides, guideId, 'fullName');
+        populateSelect(greeterSelect, greeters, greeterId, 'fullName');
+        populateSelect(vehicleSelect, vehicles, vehicleId, 'name');
+
+        const modal = new bootstrap.Modal(document.getElementById('assignModal'));
+        modal.show();
+    }
+
+    document.getElementById('saveAssignmentBtn')?.addEventListener('click', async function() {
+        const serviceId = document.getElementById('assignServiceId').value;
+        const driverId = document.getElementById('assignDriver').value;
+        const guideId = document.getElementById('assignGuide').value;
+        const greeterId = document.getElementById('assignGreeter').value;
+        const vehicleId = document.getElementById('assignVehicle').value;
+
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/services/${serviceId}/assign`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ driverId, guideId, greeterId, vehicleId }),
+            });
+            const result = await response.json();
+            if (result.success) {
+                bootstrap.Modal.getInstance(document.getElementById('assignModal'))?.hide();
+                await loadReservation(); // Reload to show updated assignments
+            } else {
+                alert(result.error || 'Error al guardar asignación');
+            }
+        } catch (err) {
+            console.error('Assignment error:', err);
+            alert('Error al guardar asignación');
+        }
+    });
+
+    async function cancelReservation() {
+        if (!confirm('¿Estás seguro de cancelar esta reservación? Se cancelarán todos los servicios.')) return;
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/cancel`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            const result = await response.json();
+            if (result.success) {
+                await loadReservation();
+            } else {
+                alert(result.error || 'Error al cancelar');
+            }
+        } catch (err) {
+            console.error('Cancel error:', err);
+            alert('Error al cancelar reservación');
+        }
+    }
+
+    await loadReservation();
+});
+
+document.addEventListener('click', function(e) {
+    const trigger = e.target.closest('.photo-preview-trigger');
+    if (!trigger) return;
+    document.getElementById('photoPreviewImg').src = trigger.dataset.photo;
+    document.getElementById('photoPreviewName').textContent = trigger.dataset.name;
+    new bootstrap.Modal(document.getElementById('photoPreviewModal')).show();
+});
+</script>
+
+<!-- Photo Preview Modal -->
+<div class="modal fade" id="photoPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title" id="photoPreviewName"></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="photoPreviewImg" src="" class="rounded-circle img-fluid" style="max-width:200px;max-height:200px;object-fit:cover">
+            </div>
+        </div>
+    </div>
+</div>

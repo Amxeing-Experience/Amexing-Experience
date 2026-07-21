@@ -28,6 +28,7 @@ const Parse = require('parse/node');
 const Services = require('../../../domain/models/Services');
 const RatePrices = require('../../../domain/models/RatePrices');
 const logger = require('../../../infrastructure/logger');
+const { getEndClientCapabilities } = require('../../config/endClientCapabilities');
 
 /**
  * ServicesController class implementing RESTful API for Services table.
@@ -48,6 +49,7 @@ class ServicesController {
     this.updateService = this.updateService.bind(this);
     this.updateServiceRate = this.updateServiceRate.bind(this);
     this.toggleServiceStatus = this.toggleServiceStatus.bind(this);
+    this.togglePopular = this.togglePopular.bind(this);
     this.deleteService = this.deleteService.bind(this);
     // this.saveClientPrices = this.saveClientPrices.bind(this);
     this.getAllRatePricesForServiceWithClientPrices = this.getAllRatePricesForServiceWithClientPrices.bind(this);
@@ -961,6 +963,7 @@ class ServicesController {
                 note: service.get('note') || '',
                 routeDuration: service.get('routeDuration') || 0,
                 active: service.get('active') === true,
+                popular: service.get('popular') === true,
                 exists: service.get('exists') === true,
                 createdAt: service.get('createdAt'),
                 updatedAt: service.get('updatedAt'),
@@ -985,6 +988,7 @@ class ServicesController {
               note: '',
               routeDuration: 0,
               active: false,
+              popular: service.get('popular') === true,
               exists: true,
               createdAt: service.get('createdAt'),
               updatedAt: service.get('updatedAt'),
@@ -1020,12 +1024,24 @@ class ServicesController {
       // Check for specific Queretaro service in response for debugging
       // const queretaroService = data.find((item) => item.id === '6p4zqx7YCf');
 
+      // Catálogo restringido: end clients con catalogScope 'popular' (home_owner / wedding_planner)
+      // solo reciben traslados marcados como populares. Los demás roles reciben todo.
+      // req.user es un objeto Parse (usar .get); fallback a propiedad plana por si acaso.
+      let userClientCategory = null;
+      if (currentUser) {
+        userClientCategory = currentUser.get ? currentUser.get('clientCategory') : currentUser.clientCategory;
+      }
+      const caps = getEndClientCapabilities(userClientCategory);
+      const scopedData = caps && caps.catalogScope === 'popular'
+        ? data.filter((item) => item && item.popular === true)
+        : data;
+
       // Check if this is a simple client-side request (no draw parameter)
       // If no draw parameter, return simple format for client-side processing
       if (!req.query.draw) {
         return res.json({
           success: true,
-          data,
+          data: scopedData,
           timestamp: Date.now(), // Add timestamp for cache busting
         });
       }
@@ -1034,8 +1050,8 @@ class ServicesController {
       return res.json({
         draw,
         recordsTotal,
-        recordsFiltered,
-        data,
+        recordsFiltered: scopedData.length,
+        data: scopedData,
         timestamp: Date.now(), // Add timestamp for cache busting
       });
     } catch (error) {
@@ -2352,6 +2368,58 @@ class ServicesController {
   }
 
   /**
+   * PATCH /api/services/:id/popular - Toggle the "popular" curation flag (admin).
+   * Popular traslados are surfaced/filterable to end clients (quick-view / vista rápida).
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   */
+  async togglePopular(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const { id } = req.params;
+      if (!id) {
+        return this.sendError(res, 'ID de servicio requerido', 400);
+      }
+
+      const popular = req.body && (req.body.popular === true || req.body.popular === 'true');
+
+      const query = new Parse.Query('Services');
+      query.equalTo('exists', true);
+      const service = await query.get(id, { useMasterKey: true });
+
+      if (!service) {
+        return this.sendError(res, 'Servicio no encontrado', 404);
+      }
+
+      service.set('popular', popular);
+      await service.save(null, { useMasterKey: true });
+
+      logger.info('Service popular flag toggled', {
+        serviceId: service.id,
+        popular,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: { id: service.id, popular },
+      });
+    } catch (error) {
+      logger.error('Error in togglePopular', {
+        error: error.message,
+        serviceId: req.params.id,
+        userId: req.user?.id,
+      });
+      return this.sendError(res, 'Error al actualizar el estado popular del servicio', 500);
+    }
+  }
+
+  /**
    * DELETE /api/services/:id - Soft delete service.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
@@ -3602,6 +3670,7 @@ class ServicesController {
        * Busca POIs por nombre exacto (case-insensitive), solo los que existen.
        * @param {string} name - Nombre del POI a resolver.
        * @returns {Promise<Parse.Object[]>} POIs que coinciden con ese nombre.
+       * @example
        */
       const resolvePOIs = async (name) => {
         const q = new Parse.Query('POI');
@@ -3623,6 +3692,7 @@ class ServicesController {
        * @param {Parse.Object[]} originSet - POIs de origen.
        * @param {Parse.Object[]} destSet - POIs de destino.
        * @returns {Parse.Query} Query de Services para esa dirección.
+       * @example
        */
       const buildDirQuery = (originSet, destSet) => {
         const q = new Parse.Query('Services');
@@ -3886,6 +3956,7 @@ class ServicesController {
        * Obtiene la primera routeDuration válida (>0) de un set de rate prices.
        * @param {Parse.Object[]} rps - Rate prices con su `service` incluido.
        * @returns {number|null} La duración de ruta encontrada, o null.
+       * @example
        */
       const durationFrom = (rps) => rps
         .map((rp) => rp.get('service')?.get('routeDuration'))

@@ -246,6 +246,7 @@ class ToursController {
           availability: tour.get('availability') || null,
           availableDays: tour.get('availableDays') || null,
           active: tour.get('active') || false,
+          popular: tour.get('popular') === true,
           exists: tour.get('exists') || true,
           createdAt: tour.get('createdAt'),
           updatedAt: tour.get('updatedAt'),
@@ -1058,6 +1059,56 @@ class ToursController {
   }
 
   /**
+   * PATCH /api/tours/:id/popular - Toggle the "popular" curation flag (admin).
+   * Popular tours are surfaced first (quick-view) in the client catalog.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   */
+  async togglePopular(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const tourId = req.params.id;
+      if (!tourId) {
+        return this.sendError(res, 'ID de tour requerido', 400);
+      }
+
+      const popular = req.body && (req.body.popular === true || req.body.popular === 'true');
+
+      const query = new Parse.Query('Tour');
+      query.equalTo('exists', true);
+      // Only touch the current (non-versioned) record - price versioning
+      query.doesNotExist('valid_until');
+      const tour = await query.get(tourId, { useMasterKey: true });
+
+      if (!tour) {
+        return this.sendError(res, 'Tour no encontrado', 404);
+      }
+
+      tour.set('popular', popular);
+      await tour.save(null, { useMasterKey: true });
+
+      logger.info('Tour popular flag toggled', {
+        tourId: tour.id,
+        popular,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: { id: tour.id, popular },
+      });
+    } catch (error) {
+      logger.error('Error toggling tour popular flag:', error);
+      return this.sendError(res, 'Error al actualizar el estado popular del tour', 500);
+    }
+  }
+
+  /**
    * DELETE /api/tours/:id - Soft delete tour.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
@@ -1429,6 +1480,7 @@ class ToursController {
           description: tour.get('notes') || tour.get('description'),
           primaryPhoto,
           active: tour.get('active'),
+          popular: tour.get('popular') === true,
           exists: tour.get('exists'),
           createdAt: tour.get('createdAt'),
           updatedAt: tour.get('updatedAt'),

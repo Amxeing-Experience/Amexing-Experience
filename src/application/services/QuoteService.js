@@ -26,6 +26,7 @@ const Invoice = require('../../domain/models/Invoice');
 const Reservation = require('../../domain/models/Reservation');
 const ReservationService = require('../../domain/models/ReservationService');
 const Payment = require('../../domain/models/Payment');
+const { getEndClientCapabilities } = require('../config/endClientCapabilities');
 
 /**
  * QuoteService class implementing Quote business logic.
@@ -33,9 +34,35 @@ const Payment = require('../../domain/models/Payment');
 class QuoteService {
   constructor() {
     this.className = 'Quote';
-    this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client'];
+    this.allowedRoles = ['superadmin', 'admin', 'department_manager', 'client', 'end_client'];
     this.validStatuses = ['quoted', 'requested', 'hold', 'scheduled', 'rejected'];
     this.pdfService = new PDFReceiptService();
+  }
+
+  /**
+   * Para el rol end_client (cliente directo), valida que su tipo (clientCategory) permita
+   * crear/editar cotizaciones. Cliente directo y home owner son de solo lectura → lanza error.
+   * Otros roles no se ven afectados.
+   * @param {object} currentUser - Usuario autenticado (POJO del JWT o Parse.Object).
+   * @param {string} role - Rol resuelto del usuario.
+   * @returns {Promise<void>} Resuelve si puede escribir; lanza Error si su tipo es de solo lectura.
+   * @example
+   * await this.assertEndClientCanWrite(currentUser, 'end_client');
+   */
+  async assertEndClientCanWrite(currentUser, role) {
+    if (role !== 'end_client') return;
+    let clientCategory = (currentUser && (currentUser.clientCategory
+      || (typeof currentUser.get === 'function' ? currentUser.get('clientCategory') : null))) || null;
+    // Fallback: si el token/objeto no trae la categoría, la resolvemos por id (escrituras son raras).
+    if (!clientCategory && currentUser && (currentUser.id || currentUser.objectId)) {
+      try {
+        const u = await new Parse.Query('AmexingUser').get(currentUser.id || currentUser.objectId, { useMasterKey: true });
+        clientCategory = u.get('clientCategory') || null;
+      } catch (e) { /* si falla, cae al default (solo lectura) */ }
+    }
+    if (!getEndClientCapabilities(clientCategory).createQuotes) {
+      throw new Error('Unauthorized: este tipo de cliente no puede crear ni editar cotizaciones');
+    }
   }
 
   /**
@@ -81,6 +108,8 @@ class QuoteService {
         if (!this.allowedRoles.includes(role)) {
           throw new Error(`Unauthorized: Role '${role}' cannot update Quote status`);
         }
+        // Cliente directo/home owner (end_client de solo lectura) no pueden solicitar servicios.
+        await this.assertEndClientCanWrite(currentUser, role);
       } else if (newStatus === 'quoted') {
         // Only admin can revert to quoted status (allow in development for testing)
         if (!['admin', 'superadmin'].includes(role) && process.env.NODE_ENV !== 'development') {
@@ -258,6 +287,8 @@ class QuoteService {
       if (!this.allowedRoles.includes(role)) {
         throw new Error(`Unauthorized: Role '${role}' cannot update Quotes`);
       }
+      // Cliente directo/home owner (end_client de solo lectura) no pueden editar cotizaciones.
+      await this.assertEndClientCanWrite(currentUser, role);
 
       // Validate Quote ID
       if (!quoteId) {
@@ -905,6 +936,8 @@ class QuoteService {
    * @param {string} userRole - User role (optional).
    * @param includePaymentInfoOverride
    * @param paymentInfoId
+   * @param billingProfileId
+   * @param force
    * @returns {Promise<object>} Result with success status and receipt data.
    * @throws {Error} If validation fails or quote is not in scheduled status.
    * @example
@@ -916,7 +949,8 @@ class QuoteService {
     userRole = null,
     includePaymentInfoOverride = null,
     paymentInfoId = null,
-    billingProfileId = null
+    billingProfileId = null,
+    force = false
   ) {
     try {
       // Validate user authentication
@@ -993,6 +1027,51 @@ class QuoteService {
           });
           throw new Error(`Cannot generate receipt: ${createError.message}`);
         }
+      }
+
+      // Gate: el recibo solo se genera si la reservación está SALDADA (paymentStatus === 'paid',
+      // es decir pagado >= total). Admin/superadmin pueden forzar (force=true); agencia/agente no.
+      // Se usa el summary fresco de PaymentService (no depende del rollup persistido en la reservación).
+      const PaymentService = require('./PaymentService');
+      let paymentSummary = null;
+      try {
+        paymentSummary = await PaymentService.summarize(reservation.id);
+      } catch (payErr) {
+        logger.warn('generateReceipt: no se pudo calcular el summary de pagos', {
+          error: payErr.message,
+          reservationId: reservation.id,
+          quoteId: quote.id,
+        });
+      }
+      const paymentStatus = paymentSummary ? paymentSummary.paymentStatus : (reservation.get('paymentStatus') || 'pending');
+      const isSettled = paymentStatus === 'paid';
+      const canOverride = ['admin', 'superadmin'].includes(role) && force === true;
+      if (!isSettled && !canOverride) {
+        logger.info('generateReceipt bloqueado: reservación no saldada', {
+          reservationId: reservation.id,
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          paymentStatus,
+          role,
+        });
+        const blockErr = new Error('La reservación no está saldada: registra el pago total antes de generar el recibo.');
+        blockErr.code = 'RESERVATION_NOT_SETTLED';
+        blockErr.payment = {
+          paymentStatus,
+          paidAmount: paymentSummary ? paymentSummary.paidAmount : (reservation.get('paidAmount') || 0),
+          balance: paymentSummary ? paymentSummary.balance : (reservation.get('balance') || null),
+          total: paymentSummary ? paymentSummary.total : null,
+        };
+        throw blockErr;
+      }
+      if (!isSettled && canOverride) {
+        logger.info('generateReceipt: override de admin sobre reservación no saldada', {
+          reservationId: reservation.id,
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          paymentStatus,
+          role,
+        });
       }
 
       // Get service items if they exist
@@ -1837,21 +1916,29 @@ class QuoteService {
         if (!existingByKey.has(key)) existingByKey.set(key, rs);
       });
 
-      // Reconcile: update matched, create new
+      // Reconcile: update matched, create new. Se matchea por id y, si no hay match, se cae a
+      // la clave por contenido. Esto protege reservaciones legacy: sus ReservationService se
+      // crearon cuando el subconcepto no tenía id (clave por contenido); al asignarle un id
+      // después (backfill o updateServiceItems), el match por id fallaría y se recrearían los
+      // RS perdiendo asignaciones de chofer/vehículo. Con el fallback se ACTUALIZAN en su lugar.
       const seen = new Set();
       const toSave = [];
       for (const day of days) {
         const subconcepts = Array.isArray(day.subconcepts) ? day.subconcepts : [];
         for (const sub of subconcepts) {
-          const key = this.reservationServiceMatchKey(sub, day.dayNumber);
-          const match = existingByKey.get(key);
-          if (match && !seen.has(key)) {
-            seen.add(key);
+          const idKey = this.reservationServiceMatchKey(sub, day.dayNumber);
+          const contentKey = this.reservationServiceMatchKey({ ...sub, id: undefined }, day.dayNumber);
+          let matchedKey = null;
+          if (existingByKey.has(idKey) && !seen.has(idKey)) matchedKey = idKey;
+          else if (existingByKey.has(contentKey) && !seen.has(contentKey)) matchedKey = contentKey;
+          if (matchedKey) {
+            seen.add(matchedKey);
+            const match = existingByKey.get(matchedKey);
             this.applyReservationServiceDescriptiveFields(match, day, sub);
             toSave.push(match);
           } else {
             toSave.push(this.buildReservationServiceRecord(reservation, day, sub));
-            seen.add(key);
+            seen.add(idKey);
           }
         }
       }

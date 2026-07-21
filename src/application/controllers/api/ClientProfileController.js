@@ -360,6 +360,7 @@ class ClientProfileController {
    * @param {object} req - Express request.
    * @param {object} res - Express response.
    * @returns {Promise<void>}
+   * @example
    */
   async saveTravelPreferences(req, res) {
     const owner = await this.resolveOwner(req);
@@ -458,6 +459,7 @@ class ClientProfileController {
    * @param {Parse.Object} passport - El pasaporte a serializar.
    * @param {object} [ctx] - Contexto para toSafeJSON.
    * @returns {Promise<object>} JSON seguro del pasaporte (con passportDocument URL si aplica).
+   * @example
    */
   async serializePassport(passport, ctx = {}) {
     const json = await passport.toSafeJSON(ctx);
@@ -556,6 +558,7 @@ class ClientProfileController {
    * @param {object} req - Express request.
    * @param {object} res - Express response.
    * @returns {Promise<void>}
+   * @example
    */
   async uploadPassportDocument(req, res) {
     const owner = await this.resolveOwner(req);
@@ -676,6 +679,7 @@ class ClientProfileController {
    * Serializa un documento resolviendo la URL presignada (documentUrl) desde su S3 key.
    * @param {Parse.Object} doc - El documento a serializar.
    * @returns {Promise<object>} JSON seguro del documento (con documentUrl si aplica).
+   * @example
    */
   async serializeDocument(doc) {
     const json = doc.toSafeJSON();
@@ -686,7 +690,7 @@ class ClientProfileController {
   }
 
   async getDocuments(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const documents = await ClientDocument.getByOwner(owner.ownerType, owner.ownerId);
@@ -708,6 +712,7 @@ class ClientProfileController {
      * Crea un Error con `.status` 400 (el catch del caller lo convierte en la respuesta).
      * @param {string} msg - Mensaje de error.
      * @returns {Error} Error con status 400.
+     * @example
      */
     const fail = (msg) => Object.assign(new Error(msg), { status: 400 });
 
@@ -760,9 +765,10 @@ class ClientProfileController {
    * @param {object} req - Express request.
    * @param {object} res - Express response.
    * @returns {Promise<void>}
+   * @example
    */
   async uploadDocument(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
 
@@ -805,7 +811,7 @@ class ClientProfileController {
   // the PUT updates fields, and if a new file is sent it's stored via the same pipeline and the old
   // S3 object is cleaned up. Body: { label, [fileBase64, fileName, mimeType] }.
   async updateDocument(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const doc = await this.findOwnedRecord('ClientDocument', req.params.docId, owner);
@@ -852,7 +858,7 @@ class ClientProfileController {
    * @example
    */
   async deleteDocument(req, res) {
-    const owner = this.resolveOwner(req);
+    const owner = await this.resolveOwner(req);
     try {
       await this.validateOwnerExists(owner);
       const doc = await this.findOwnedRecord('ClientDocument', req.params.docId, owner);
@@ -884,6 +890,7 @@ class ClientProfileController {
        * Nombre visible de un usuario: nombre+apellido, o email/username como fallback.
        * @param {Parse.Object} u - AmexingUser (o null).
        * @returns {string} Nombre a mostrar, o cadena vacía.
+       * @example
        */
       const userName = (u) => (u
         ? (`${u.get('firstName') || ''} ${u.get('lastName') || ''}`.trim() || u.get('email') || u.get('username') || '')
@@ -893,6 +900,7 @@ class ClientProfileController {
        * role department_manager). Usa contextualData.companyName (p.ej. 'Nuba'), con fallbacks.
        * @param {Parse.Object} clientPtr - Pointer al cliente/agencia.
        * @returns {string} Nombre de la agencia, o cadena vacía si no aplica.
+       * @example
        */
       const agencyNameOf = (clientPtr) => {
         if (!clientPtr || clientPtr.get('role') !== 'department_manager') return '';

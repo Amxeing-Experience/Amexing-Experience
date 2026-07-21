@@ -72,7 +72,7 @@
                             <td class="text-muted small">${fmt(t.startDate)} – ${fmt(t.endDate)}</td>
                             <td class="text-center">${t.serviceCount || 0}</td>
                             <td><span class="badge ${STATUS[t.status] || 'bg-secondary'}">${esc(t.status) || '—'}</span></td>
-                            <td class="text-end"><a class="btn btn-sm btn-light" href="/dashboard/admin/quotes/${t.id}" title="Ver"><i class="ti ti-eye"></i></a></td>
+                            <td class="text-end"><a class="btn btn-sm btn-light" href="/dashboard/admin/quotes/${t.id}${['scheduled', 'hold'].includes(t.status) ? '?context=reservation' : ''}" title="Ver"><i class="ti ti-eye"></i></a></td>
                         </tr>`).join('')}</tbody>
                 </table></div>`;
             initDataTable();

@@ -49,6 +49,37 @@ const isAdminViewingOtherDashboard = actualUserRole === 'admin' &&
 const isSuperAdminViewingOtherDashboard = actualUserRole === 'superadmin' && 
   (userRole === 'client' || userRole === 'department_manager' || userRole === 'admin');
 
+// Cliente directo (end_client): el menú varía por tipo de cliente (capacidades). Preferimos
+// endClientCaps (de renderDashboard); si no llega, lo derivamos de la categoría (de clientCategory
+// o del objeto user, que sí llega a la vista). Debe reflejar endClientCapabilities.js.
+const ecCat = (typeof clientCategory !== 'undefined' && clientCategory)
+  ? clientCategory
+  : ((typeof user !== 'undefined' && user && user.clientCategory) ? user.clientCategory : null);
+const ecCaps = (typeof endClientCaps !== 'undefined' && endClientCaps)
+  ? endClientCaps
+  : {
+      // agency_client: SOLO reservaciones (sin cotizaciones ni tarifario).
+      viewQuotes: ecCat !== 'home_owner' && ecCat !== 'agency_client',
+      createQuotes: (ecCat === 'direct_client' || ecCat === 'wedding_planner' || ecCat === 'concierge'),
+      viewTarifario: !!ecCat && ecCat !== 'direct_client' && ecCat !== 'agency_client',
+      dashboardQuotes: ecCat !== 'home_owner' && ecCat !== 'agency_client',
+    };
+const endClientActivityItems = [];
+if (ecCaps.viewQuotes) {
+  endClientActivityItems.push({ name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/end_client/quotes', id: 'quotes' });
+}
+endClientActivityItems.push({ name: 'Reservaciones', icon: 'clipboard-list', path: '/dashboard/end_client/bookings', id: 'bookings' });
+
+// Sección Tarifario (catálogo completo): todos los tipos con viewTarifario (todos menos cliente directo).
+const endClientTarifarioItems = ecCaps.viewTarifario ? [
+  { name: 'Vehículos', icon: 'car', path: '/dashboard/end_client/vehicles', id: 'vehicles' },
+  { name: 'Traslados', icon: 'briefcase', path: '/dashboard/end_client/services', id: 'services' },
+  { name: 'A Disposición', icon: 'calculator', path: '/dashboard/end_client/a-disposicion', id: 'a-disposicion' },
+  { name: 'Experiencias', icon: 'star', path: '/dashboard/end_client/experiences', id: 'experiences' },
+  { name: 'Tours', icon: 'map', path: '/dashboard/end_client/tours', id: 'tours' },
+  { name: 'Exportar Tarifario', icon: 'download', path: '/dashboard/end_client/tarifario-export', id: 'tarifario-export' },
+] : [];
+
 // Navigation items based on role
 const navigationItems = {
     superadmin: [
@@ -72,6 +103,7 @@ const navigationItems = {
             { name: 'Gestión de Experiencias', icon: 'star', path: '/dashboard/superadmin/experiences', id: 'experiences' },
             { name: 'Gestión de Tours', icon: 'map', path: '/dashboard/superadmin/tours', id: 'tours' },
             { name: 'Greeter', icon: 'user-plus', path: '/dashboard/superadmin/greeter', id: 'greeter' },
+            { name: 'Entradas', icon: 'ticket', path: '/dashboard/superadmin/entradas', id: 'entradas' },
             { name: 'Exportar Tarifario', icon: 'download', path: '/dashboard/superadmin/tarifario-export', id: 'tarifario-export' }
         ]},
         // Equipo y Recursos Section
@@ -101,6 +133,7 @@ const navigationItems = {
             { name: 'A Disposición', icon: 'calculator', path: '/dashboard/admin/a-disposicion', id: 'a-disposicion' },
             { name: 'Experiencias', icon: 'star', path: '/dashboard/admin/experiences', id: 'experiences' },
             { name: 'Tours', icon: 'map', path: '/dashboard/admin/tours', id: 'tours' },
+            { name: 'Entradas', icon: 'ticket', path: '/dashboard/admin/entradas', id: 'entradas' },
             { name: 'Exportar Tarifario', icon: 'download', path: '/dashboard/admin/tarifario-export', id: 'tarifario-export' }
             // Hidden for practical purposes
             // { name: 'Greeter', icon: 'user-plus', path: '/dashboard/admin/greeter', id: 'greeter' }
@@ -116,6 +149,9 @@ const navigationItems = {
         ]}
     ],
     client: [
+        { section: 'Inicio', icon: 'ti-home', items: [
+            { name: 'Dashboard', icon: 'home', path: '/dashboard/client', id: 'home' }
+        ]},
         // Show System Management section if admin/superadmin is viewing this dashboard
         ...(isAdminViewingOtherDashboard ? [
             { section: 'System Management', icon: 'ti-settings', items: [
@@ -148,7 +184,20 @@ const navigationItems = {
             // { name: 'Greeter', icon: 'user-plus', path: '/dashboard/client/greeter', id: 'greeter' }
         ]}
     ],
+    // Cliente directo (end_client): menú acotado a lo suyo (sin gestión de agencia).
+    end_client: [
+        { section: 'Inicio', icon: 'ti-home', items: [
+            { name: 'Dashboard', icon: 'home', path: '/dashboard/end_client', id: 'home' }
+        ]},
+        { section: 'Mi Actividad', icon: 'ti-briefcase', items: endClientActivityItems },
+        ...(endClientTarifarioItems.length ? [
+            { section: 'Tarifario', icon: 'ti-receipt-2', items: endClientTarifarioItems }
+        ] : [])
+    ],
     department_manager: [
+        { section: 'Inicio', icon: 'ti-home', items: [
+            { name: 'Dashboard', icon: 'home', path: '/dashboard/department_manager', id: 'home' }
+        ]},
         // Show System Management section if admin/superadmin is viewing this dashboard
         ...(isAdminViewingOtherDashboard ? [
             { section: 'System Management', icon: 'ti-settings', items: [

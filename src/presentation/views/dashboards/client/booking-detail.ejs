@@ -385,7 +385,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const quoteLink = document.getElementById('infoQuoteLink');
         if (d.quoteId) {
-            quoteLink.href = `/dashboard/client/quotes/${d.quoteId}`;
+            quoteLink.href = `/dashboard/client/quotes/${d.quoteId}?context=reservation`;
             quoteLink.textContent = d.quoteFolio;
         }
 
@@ -592,6 +592,17 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!sub) return '';
         const tags = [];
         const tag = (icon, text, color) => `<span class="badge detail-tag bg-${color}-subtle text-${color}"><i class="ti ti-${icon} me-1"></i>${text}</span>`;
+
+        // Fase 2d: descuento y propina por servicio (ya reflejados en el total del servicio).
+        if (Number(sub.discountAmount) > 0) {
+            const dPct = (sub.discountType === 'percent' && sub.discountValue) ? ` ${sub.discountValue}%` : '';
+            tags.push(tag('discount-2', `Descuento${dPct} −${formatCurrency(sub.discountAmount, reservationData.currency)}`, 'success'));
+        }
+        if (Number(sub.tipAmount) > 0) {
+            const tPct = (sub.tipType === 'percent' && sub.tipValue) ? ` ${sub.tipValue}%` : '';
+            const tMand = sub.tipMandatory ? ' (oblig.)' : '';
+            tags.push(tag('coin', `Propina${tPct} +${formatCurrency(sub.tipAmount, reservationData.currency)}${tMand}`, 'info'));
+        }
 
         // Vehicle quantity (applies to transport, a-disposicion, etc.)
         if (sub.quantity && sub.quantity > 1) tags.push(tag('car', `${sub.quantity} vehículos`, 'primary'));

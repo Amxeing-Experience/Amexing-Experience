@@ -240,6 +240,21 @@ router.patch(
 );
 
 /**
+ * PATCH /api/services/:id/popular - Toggle "popular" curation flag.
+ *
+ * Access: Admin (level 6+)
+ * Body: { popular: boolean }
+ * Returns: { id, popular }
+ */
+router.patch(
+  '/:id/popular',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ServicesController.togglePopular(req, res)
+);
+
+/**
  * PUT /api/services/:id - Update service.
  *
  * Access: Admin (level 6+)

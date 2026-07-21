@@ -320,7 +320,7 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                             <div class="d-flex align-items-center mb-2 flex-wrap gap-1">
                                 <span class="badge bg-light text-dark me-2">Transporte</span>
                                 <span class="badge bg-primary-subtle text-primary">${transportLabel}</span>
-                                ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${service.transportType === 'local' ? (service.directionType === 'arrival' ? 'Llevar' : 'Recoger') : (service.directionType === 'arrival' ? 'Llegada' : 'Salida')}</span>` : ''}
+                                ${service.directionType ? `<span class="badge ${service.directionType === 'arrival' ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}">${(service.transportType === 'local' && service.waitingTimeHours > 0) ? (service.directionType === 'arrival' ? 'Ida' : 'Regreso') : (service.transportType === 'local' ? (service.directionType === 'arrival' ? 'Llevar' : 'Recoger') : (service.directionType === 'arrival' ? 'Llegada' : 'Salida'))}</span>` : ''}
                                 ${service.tripType === 'round-trip' ? '<span class="badge bg-info-subtle text-info"><i class="ti ti-arrows-left-right me-1"></i>Ida y Vuelta</span>' : ''}
                                 ${service.returnOrigin || service.returnDestination ? '<span class="badge bg-secondary-subtle text-secondary"><i class="ti ti-link me-1"></i>Conexión</span>' : ''}
                             </div>
@@ -623,6 +623,7 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                     </div>
                     <div class="d-flex flex-column align-items-end">
                         <div class="service-actions mb-2">
+                            ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <div class="btn-group btn-group-sm">
                                 <button type="button" class="btn btn-light edit-service-btn"
                                         data-day-id="${service.dayId}" data-service-id="${service.id}" title="Editar">
@@ -637,20 +638,26 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                                     <i class="ti ti-trash"></i>
                                 </button>
                             </div>
+                            ` : ''}
+                            ${this.renderServiceLockControls(service)}
                         </div>
                         ${!(service.type === 'concepto' && this.getServiceDisplayPrice(service) <= 0) ? `
                             ${service.includeInTotal === false ? `
                             <span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span>
                             ` : ''}
                             <div class="fw-semibold ${service.includeInTotal === false ? 'text-muted text-decoration-line-through' : 'text-primary'}">
-                                ${this.formatCurrency(this.getServiceDisplayPrice(service))}
+                                ${this.formatCurrency(this.getServiceDisplayPrice(service) + this.getServiceTipInPaymentType(service))}
                                 ${this.getPriceTypeLabel()}
                             </div>
+                            ${Number(service.discountAmount) > 0 ? `<div class="small text-success mt-1" title="Descuento aplicado"><i class="ti ti-discount-2 me-1"></i>Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>` : ''}
+                            ${this.getServiceTipInPaymentType(service) > 0 ? `<div class="small text-info mt-1" title="Propina"><i class="ti ti-coin me-1"></i>Propina ${service.tipType === 'percent' ? service.tipValue + '%' : ''} +${this.formatCurrency(this.getServiceTipInPaymentType(service))}${service.tipMandatory ? ' <span class="badge bg-info-subtle text-info ms-1">obligatoria</span>' : ''}</div>` : ''}
+                            ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
                                     data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
                                 <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
                                 <small class="${service.includeInTotal === false ? 'text-success' : 'text-muted'}" style="font-size: 0.7rem;">${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}</small>
                             </button>
+                            ` : ''}
                         ` : ''}
                     </div>
                 </div>

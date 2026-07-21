@@ -1,0 +1,32 @@
+<%
+/**
+ * Bookings Management Page
+ * Client dashboard page for viewing reservations
+ *
+ * @author Denisse Maldonado
+ * @version 2.0.0
+ */
+%>
+
+<!-- Page Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-1 fw-bold">
+                    <i class="ti ti-clipboard-list me-2 text-primary"></i>
+                    Mis Reservaciones
+                </h2>
+                <p class="text-muted mb-0">
+                    Consulta y gestiona tus reservaciones
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('../../organisms/datatable/reservations-table', {
+    basePath: 'end_client',
+    showAgencyClientFilter: false,
+    canManageReservations: false
+}) %>

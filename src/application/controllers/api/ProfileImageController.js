@@ -180,6 +180,86 @@ class ProfileImageController {
   }
 
   /**
+   * POST /api/profile/company-logo - Upload/replace the company (agency) logo.
+   * Mirrors uploadProfileImage but stores into companyLogo* fields.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   */
+  async uploadCompanyLogo(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      const { file } = req;
+      if (!file) {
+        return this.sendError(res, 'No file uploaded', 400);
+      }
+
+      const userId = currentUser.id;
+      const userEmail = currentUser.get('email');
+      const username = currentUser.get('username');
+
+      const fileExtension = file.originalname.split('.').pop().toLowerCase();
+      const timestamp = Date.now();
+      const uniqueFileName = `logo_${userId}_${timestamp}.${fileExtension}`;
+
+      const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
+        file.buffer,
+        uniqueFileName,
+        file.mimetype,
+        {
+          entityPath: `logos/${userId}`,
+          entityId: userId,
+          userContext: { userId, email: userEmail, username },
+        }
+      );
+
+      if (!optimizationResult || !optimizationResult.originalS3Key) {
+        throw new Error('Failed to upload and optimize company logo');
+      }
+
+      const presignedUrl = await this.fileStorageService.getPresignedUrl(optimizationResult.originalS3Key);
+
+      const user = currentUser;
+      user.set('companyLogo', presignedUrl);
+      user.set('companyLogoS3Key', optimizationResult.originalS3Key);
+      user.set('companyLogoOptimization', {
+        optimizedVariants: optimizationResult.optimizedVariants,
+        metadata: optimizationResult.metadata,
+      });
+
+      await user.save(null, { useMasterKey: true });
+
+      logger.info('Company logo uploaded successfully', {
+        userId,
+        s3Key: optimizationResult.originalS3Key,
+      });
+
+      return res.json({
+        success: true,
+        message: 'Company logo uploaded successfully',
+        data: {
+          url: presignedUrl,
+          s3Key: optimizationResult.originalS3Key,
+          optimization: optimizationResult.metadata,
+        },
+      });
+    } catch (error) {
+      logger.error('Error uploading company logo', {
+        userId: req.user?.id,
+        error: error.message,
+      });
+      if (error.message && error.message.includes('Invalid file type')) {
+        return this.sendError(res, error.message, 400);
+      }
+      return this.sendError(res, error.message || 'Failed to upload company logo', 500);
+    }
+  }
+
+  /**
    * Get optimized profile image URL.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.

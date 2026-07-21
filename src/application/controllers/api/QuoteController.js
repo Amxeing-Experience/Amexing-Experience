@@ -9,6 +9,8 @@ const QuoteOwnership = require('../../../domain/models/QuoteOwnership');
 const ReservationService = require('../../../domain/models/ReservationService');
 const Payment = require('../../../domain/models/Payment');
 const ExchangeRate = require('../../../domain/models/ExchangeRate');
+const ServiceChangeRequest = require('../../../domain/models/ServiceChangeRequest');
+const QuoteActivityService = require('../../services/QuoteActivityService');
 const QuoteService = require('../../services/QuoteService');
 const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
 const QuoteCollaborationService = require('../../services/QuoteCollaborationService');
@@ -186,6 +188,72 @@ async function injectServiceIncludes(serviceItems) {
 }
 
 /**
+ * Aplana los subconceptos de un serviceItems a un Map por id → { sc, dayNumber }.
+ * @param {object} serviceItems - ServiceItems con days[].subconcepts[].
+ * @returns {Map<string, object>} Map por id de subconcepto.
+ * @example flattenSubconcepts(quote.get('serviceItems'))
+ */
+function flattenSubconcepts(serviceItems) {
+  const map = new Map();
+  ((serviceItems && serviceItems.days) || []).forEach((d) => {
+    (d.subconcepts || []).forEach((sc) => {
+      if (sc && sc.id) map.set(sc.id, { sc, dayNumber: d.dayNumber });
+    });
+  });
+  return map;
+}
+
+/**
+ * Firma de contenido "significativo" de un subconcepto (ignora metadata de lock/solicitud)
+ * para detectar ediciones reales en el timeline.
+ * @param {object} sc - Subconcepto.
+ * @returns {string} Firma JSON.
+ * @example subconceptSignature(sc)
+ */
+function subconceptSignature(sc) {
+  return JSON.stringify({
+    concept: sc.concept || '',
+    time: sc.time || '',
+    quantity: sc.quantity ?? null,
+    unitPrice: sc.unitPrice ?? 0,
+    total: sc.total ?? 0,
+    notes: sc.notes || '',
+    originName: sc.originName || '',
+    destinationName: sc.destinationName || '',
+    vehicleTypeName: sc.vehicleTypeName || '',
+  });
+}
+
+/**
+ * Compara el serviceItems previo vs el nuevo y arma los eventos legibles del timeline
+ * (agregado/editado/quitado por servicio).
+ * @param {object} before - ServiceItems previo.
+ * @param {object} after - ServiceItems nuevo (ya guardado).
+ * @returns {Array<object>} Eventos { action, summary, meta }.
+ * @example buildServiceItemsActivities(before, after)
+ */
+function buildServiceItemsActivities(before, after) {
+  const b = flattenSubconcepts(before);
+  const a = flattenSubconcepts(after);
+  const events = [];
+  a.forEach(({ sc, dayNumber }, id) => {
+    const label = sc.concept || 'servicio';
+    if (!b.has(id)) {
+      events.push({ action: 'service_added', summary: `agregó "${label}" al Día ${dayNumber || '?'}`, meta: { serviceId: id, dayNumber } });
+    } else if (subconceptSignature(sc) !== subconceptSignature(b.get(id).sc)) {
+      events.push({ action: 'service_edited', summary: `editó "${label}" (Día ${dayNumber || '?'})`, meta: { serviceId: id, dayNumber } });
+    }
+  });
+  b.forEach(({ sc, dayNumber }, id) => {
+    if (!a.has(id)) {
+      const label = sc.concept || 'servicio';
+      events.push({ action: 'service_removed', summary: `quitó "${label}" (Día ${dayNumber || '?'})`, meta: { serviceId: id, dayNumber } });
+    }
+  });
+  return events;
+}
+
+/**
  * Quote Controller - Manages quote/cotización CRUD operations
  * Handles creation, retrieval, update, and deletion of quotes with rate assignments.
  * @class QuoteController
@@ -225,6 +293,23 @@ class QuoteController {
       const currentUser = req.user;
       if (!currentUser) {
         return this.sendError(res, 'Usuario no autenticado', 401);
+      }
+
+      // 1b. Cliente directo/home owner (end_client de solo lectura) no pueden crear cotizaciones.
+      if (req.userRole === 'end_client') {
+        // eslint-disable-next-line global-require
+        const { getEndClientCapabilities } = require('../../config/endClientCapabilities');
+        let clientCategory = currentUser.clientCategory
+          || (typeof currentUser.get === 'function' ? currentUser.get('clientCategory') : null) || null;
+        if (!clientCategory && (currentUser.id || currentUser.objectId)) {
+          try {
+            const u = await new Parse.Query('AmexingUser').get(currentUser.id || currentUser.objectId, { useMasterKey: true });
+            clientCategory = u.get('clientCategory') || null;
+          } catch (e) { /* cae al default (solo lectura) */ }
+        }
+        if (!getEndClientCapabilities(clientCategory).createQuotes) {
+          return this.sendError(res, 'Este tipo de cliente no puede crear cotizaciones', 403);
+        }
       }
 
       // 2. Extract fields from request body
@@ -635,8 +720,6 @@ class QuoteController {
 
       // Parse DataTables parameters
       const draw = parseInt(req.query.draw, 10) || 1;
-      const start = parseInt(req.query.start, 10) || 0;
-      const length = Math.min(parseInt(req.query.length, 10) || 25, 100);
       const searchValue = req.query.search?.value || '';
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'desc';
@@ -757,9 +840,14 @@ class QuoteController {
         filteredQuery.descending(sortField);
       }
 
-      // Apply pagination
-      filteredQuery.skip(start);
-      filteredQuery.limit(length);
+      // La tabla del front es client-side (serverSide:false): el navegador hace paginación,
+      // búsqueda y orden. Por eso el servidor debe devolver TODAS las cotizaciones que pasan el
+      // filtro de estado + el filtro de fecha (este último se aplica en JS más abajo porque la
+      // fecha vive dentro de serviceItems.days[].date y Parse no la puede consultar). Antes se
+      // aplicaba skip/limit ANTES del filtro de fecha, así que las cotizaciones cuya fecha caía
+      // fuera del lote paginado (p. ej. folios bajos con el orden por folio desc) desaparecían
+      // de "Actuales/Anteriores" y ni el buscador client-side las encontraba.
+      filteredQuery.limit(10000);
 
       // Execute query
       const quotes = await filteredQuery.find({ useMasterKey: true });
@@ -1526,6 +1614,26 @@ class QuoteController {
           req.userRole
         );
 
+        // Timeline (Fase A): registrar el cambio de estado en un texto legible.
+        if (result && result.success !== false) {
+          const STATUS_LABELS = {
+            quoted: 'COTIZADO',
+            requested: 'SOLICITADO',
+            hold: 'BLOQUEADO',
+            scheduled: 'AGENDADO',
+            rejected: 'RECHAZADO',
+            cancelled: 'CANCELADO',
+          };
+          await QuoteActivityService.log({
+            quoteId,
+            actor: currentUser,
+            actorRole: req.userRole,
+            action: 'status_changed',
+            summary: `cambió el estado a ${STATUS_LABELS[updates.status] || updates.status}`,
+            meta: { status: updates.status },
+          });
+        }
+
         // Add edit tracking info to result (handle null editRecord for status-only updates)
         if (editRecord) {
           result.editId = editRecord.id;
@@ -1554,6 +1662,32 @@ class QuoteController {
       result.editId = editRecord.id;
       result.version = editRecord.version;
       result.requiresApproval = editRecord.approvalStatus === 'pending';
+
+      // Timeline (Fase B1): edición de datos generales (personas/fechas/cliente/notas).
+      const FIELD_LABELS = {
+        numberOfPeople: 'personas',
+        eventType: 'tipo de evento',
+        startDate: 'fechas',
+        endDate: 'fechas',
+        eventDate: 'fechas',
+        clientFinalId: 'cliente final',
+        clientFinalName: 'cliente final',
+        clientType: 'tipo de cliente',
+        notes: 'notas',
+        clientNotes: 'notas',
+      };
+      const changedKeys = Object.keys(updates).filter((k) => k !== 'reason' && k !== 'status');
+      const changedLabels = [...new Set(changedKeys.map((k) => FIELD_LABELS[k]).filter(Boolean))];
+      if (changedLabels.length) {
+        await QuoteActivityService.log({
+          quoteId,
+          actor: currentUser,
+          actorRole: req.userRole,
+          action: 'quote_edited',
+          summary: `editó la cotización (${changedLabels.join(', ')})`,
+          meta: { fields: Object.keys(updates).filter((k) => k !== 'reason') },
+        });
+      }
 
       return res.json(result);
     } catch (error) {
@@ -1969,6 +2103,18 @@ class QuoteController {
         response: response.data,
       });
 
+      // Timeline (Fase B1): registrar la conversión a reservación.
+      if (reservationData) {
+        await QuoteActivityService.log({
+          quoteId,
+          actor: currentUser,
+          actorRole: req.userRole,
+          action: 'converted_to_reservation',
+          summary: `convirtió la cotización en reservación${reservationData.folio ? ` (${reservationData.folio})` : ''}`,
+          meta: { reservationId: reservationData.id, reservationFolio: reservationData.folio },
+        });
+      }
+
       return res.json(response);
     } catch (error) {
       logger.error('Error in QuoteController.convertToReservation', {
@@ -2058,6 +2204,8 @@ class QuoteController {
       const {
         days = [], subtotal = 0, iva = 0, total = 0,
         currency = 'MXN', paymentType = 'efectivo',
+        globalTip = null, // Fase 2b: propina global de la cotización (persistir tal cual).
+        suggestedTipPct = null, // Fase 2c: % de propina sugerida (default 10 en el front).
       } = req.body;
 
       // Enum guard: paymentType alimenta reservation.paymentType (ancla del carrito de pagos) y se
@@ -2245,6 +2393,9 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
+      // Timeline (Fase A): snapshot del serviceItems previo para diffear agregados/editados/quitados.
+      const beforeServiceItems = quote.get('serviceItems') || { days: [] };
+
       // Debug: Log transport services with suggested departure time fields
       days.forEach((day, dayIndex) => {
         if (day.subconcepts) {
@@ -2280,7 +2431,22 @@ class QuoteController {
         total,
         currency,
         paymentType,
+        globalTip, // Fase 2b: propina global de la cotización.
+        suggestedTipPct, // Fase 2c: % de propina sugerida.
       };
+
+      // Asegura un id estable por subconcepto ANTES de guardar. Los servicios agregados desde
+      // "Agregar a cotización" (tarifario) llegan sin id; sin id se rompen request-change y el
+      // bloqueo por-servicio, que keyean por sc.id. Se asigna solo a los que falten.
+      const nowId = Date.now();
+      serviceItems.days = (serviceItems.days || []).map((d, di) => ({
+        ...d,
+        subconcepts: (d.subconcepts || []).map((sc, si) => (
+          (sc && !sc.id)
+            ? { ...sc, id: `service_${nowId}_${di}_${si}_${Math.random().toString(36).slice(2, 8)}` }
+            : sc
+        )),
+      }));
 
       // Congelamiento del tipo de cambio: en cotizaciones USD se captura la tasa vigente que produjo
       // los pricesByType actuales, y viaja dentro del mismo blob serviceItems. Se re-captura en cada
@@ -2288,6 +2454,80 @@ class QuoteController {
       // congelamiento real ocurre al pasar de cotización a reservación (QuoteService no pisa uno existente).
       if (String(currency).toUpperCase() === 'USD') {
         serviceItems.exchangeRateSnapshot = await ExchangeRate.getCurrentValue();
+      }
+
+      // Bloqueo por-servicio: los subconceptos PROTEGIDOS no pueden ser editados ni eliminados
+      // por no-admins (el servidor los restaura), reforzando lo que la UI ya impide.
+      // Un subconcepto está protegido si:
+      //  - es adminLocked (agregado/editado por un admin), o
+      //  - la cotización ya es reservación (scheduled/hold): cualquier cambio a un servicio EXISTENTE
+      //    debe pasar por una solicitud aprobada por admin (agregar nuevos sí se permite directo,
+      //    porque un servicio nuevo aún no está en el estado guardado).
+      // Los locks son "sticky" por id. Solo admin/superadmin pueden editar directo.
+      const isAdminUser = ['admin', 'superadmin'].includes(req.userRole);
+      const isReservation = ['scheduled', 'hold'].includes(quote.get('status'));
+      const storedServiceItems = quote.get('serviceItems') || {};
+      const storedLockedById = new Map();
+      (Array.isArray(storedServiceItems.days) ? storedServiceItems.days : []).forEach((d) => {
+        (d.subconcepts || []).forEach((sc) => {
+          // Protegido: adminLocked, o cualquier servicio existente si la cotización ya es reservación.
+          if (sc && sc.id && (sc.adminLocked || isReservation)) {
+            storedLockedById.set(sc.id, { sub: sc, dayNumber: d.dayNumber });
+          }
+        });
+      });
+
+      if (storedLockedById.size > 0) {
+        const seenLockedIds = new Set();
+        const enforcedDays = serviceItems.days.map((d) => ({
+          ...d,
+          subconcepts: (d.subconcepts || []).map((sc) => {
+            if (!sc || !sc.id) return sc;
+            const locked = storedLockedById.get(sc.id);
+            if (locked) {
+              seenLockedIds.add(sc.id);
+              // Sticky: para no-admin se restaura el contenido guardado (no puede editar un
+              // servicio protegido); admin conserva sus cambios. Se PRESERVA el adminLocked
+              // original: un servicio de proveedor del owner (adminLocked=false) sigue sin
+              // marcarse como admin-locked; solo queda protegido por la regla de reservación.
+              return isAdminUser
+                ? { ...sc, adminLocked: true }
+                : { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
+            }
+            // Un no-admin no puede marcar como bloqueado un servicio nuevo.
+            if (!isAdminUser && sc.adminLocked) {
+              return { ...sc, adminLocked: false };
+            }
+            return sc;
+          }),
+        }));
+
+        // No-admin: re-insertar los servicios bloqueados que se hayan quitado del payload
+        // (intento de borrado no permitido).
+        if (!isAdminUser) {
+          storedLockedById.forEach((locked, id) => {
+            if (seenLockedIds.has(id)) return;
+            const restored = { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
+            let idx = enforcedDays.findIndex((d) => d.dayNumber === locked.dayNumber);
+            if (idx < 0) idx = enforcedDays.length > 0 ? 0 : -1;
+            if (idx >= 0) {
+              enforcedDays[idx] = {
+                ...enforcedDays[idx],
+                subconcepts: [...(enforcedDays[idx].subconcepts || []), restored],
+              };
+            } else {
+              enforcedDays.push({ dayNumber: locked.dayNumber || 1, dayTitle: '', subconcepts: [restored] });
+            }
+          });
+          logger.info('updateServiceItems: enforced protected services for non-admin', {
+            quoteId: quote.id,
+            userRole: req.userRole,
+            lockedCount: storedLockedById.size,
+            reinserted: storedLockedById.size - seenLockedIds.size,
+          });
+        }
+
+        serviceItems.days = enforcedDays;
       }
 
       quote.set('serviceItems', serviceItems);
@@ -2307,6 +2547,14 @@ class QuoteController {
 
       // Create or update ReservationService records for transport services with suggested departure times
       await this.persistSuggestedDepartureTimes(quote.id, sortedAndCleanedDays, currentUser);
+
+      // Timeline (Fase A): eventos legibles de agregados/editados/quitados de servicios.
+      const activityEvents = buildServiceItemsActivities(beforeServiceItems, serviceItems);
+      if (activityEvents.length) {
+        await QuoteActivityService.logMany(activityEvents.map((e) => ({
+          quoteId: quote.id, actor: currentUser, actorRole: req.userRole, ...e,
+        })));
+      }
 
       // If this quote is already a reservation, keep the reservation in sync with
       // the edited service items (preserving driver/vehicle assignments). Isolated
@@ -2352,6 +2600,337 @@ class QuoteController {
       return this.sendError(
         res,
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al actualizar los servicios',
+        500
+      );
+    }
+  }
+
+  /**
+   * POST /api/quotes/:id/services/:serviceId/request-change — Fase 2 del bloqueo por-servicio.
+   * El owner (no-admin) solicita BORRAR o MODIFICAR un servicio bloqueado por admin. Solo
+   * guarda la solicitud en el subconcepto (no elimina/edita nada); el admin la aprueba/rechaza.
+   * @param {object} req - Express request; params id/serviceId; body { type: 'delete'|'modify', note? }.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON con la solicitud creada.
+   * @example
+   *   POST /api/quotes/abc/services/service_17/request-change { "type": "delete", "note": "..." }
+   */
+  async requestServiceChange(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId, serviceId } = req.params;
+      const type = req.body?.type === 'modify' ? 'modify' : 'delete';
+      const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
+
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      const quote = await query.get(quoteId, { useMasterKey: true });
+      if (!quote) return this.sendError(res, 'Cotización no encontrada', 404);
+
+      const serviceItems = quote.get('serviceItems') || {};
+      let target = null;
+      (serviceItems.days || []).forEach((d) => (d.subconcepts || []).forEach((sc) => {
+        if (sc && sc.id === serviceId) target = sc;
+      }));
+      if (!target) return this.sendError(res, 'Servicio no encontrado en la cotización', 404);
+      // Se permite solicitar cambio si el servicio está protegido: adminLocked, o bien la
+      // cotización ya es reservación (scheduled/hold) — ahí cualquier servicio requiere aprobación.
+      const isReservation = ['scheduled', 'hold'].includes(quote.get('status'));
+      if (!target.adminLocked && !isReservation) {
+        return this.sendError(res, 'Este servicio no está bloqueado; puedes editarlo directamente', 400);
+      }
+      if (target.changeRequest && target.changeRequest.status === 'pending') {
+        return this.sendError(res, 'Este servicio ya tiene una solicitud pendiente', 400);
+      }
+
+      const requesterName = `${currentUser.get('firstName') || ''} ${currentUser.get('lastName') || ''}`.trim()
+        || currentUser.get('email') || currentUser.get('username') || 'Owner';
+      const serviceLabel = target.concept || target.name || 'Servicio';
+      const requestedAt = new Date();
+
+      // Registro durable (historial + contador). Sobrevive si el servicio se elimina.
+      const record = new ServiceChangeRequest();
+      record.set('active', true);
+      record.set('exists', true);
+      record.set('quote', { __type: 'Pointer', className: 'Quote', objectId: quote.id });
+      record.set('serviceId', serviceId);
+      record.set('serviceLabel', serviceLabel);
+      record.set('type', type);
+      record.set('note', note);
+      record.set('status', ServiceChangeRequest.STATUS.PENDING);
+      record.set('requestedBy', { __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id });
+      record.set('requestedByName', requesterName);
+      record.set('requestedAt', requestedAt);
+      record.set('seenByRequester', true); // el owner ya la conoce (la acaba de crear)
+      await record.save(null, { useMasterKey: true });
+
+      // Marcador inline en el subconcepto (UI de acción de Fase 2 + badge del owner).
+      target.changeRequest = {
+        requestId: record.id,
+        type,
+        note,
+        requestedBy: currentUser.id,
+        requestedByName: requesterName,
+        requestedAt: requestedAt.toISOString(),
+        status: 'pending',
+      };
+      quote.set('serviceItems', serviceItems);
+      await quote.save(null, { useMasterKey: true });
+
+      logger.info('Service change requested', {
+        quoteId: quote.id, serviceId, type, requestId: record.id, requestedBy: currentUser.id,
+      });
+      await QuoteActivityService.log({
+        quoteId: quote.id,
+        actor: currentUser,
+        actorRole: req.userRole,
+        action: 'change_requested',
+        summary: `solicitó ${type === 'delete' ? 'borrar' : 'modificar'} "${serviceLabel}"`,
+        meta: { serviceId, type, requestId: record.id },
+      });
+      return this.sendSuccess(res, { serviceId, changeRequest: target.changeRequest }, 'Solicitud enviada', 200);
+    } catch (error) {
+      logger.error('Error in requestServiceChange', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al solicitar el cambio',
+        500
+      );
+    }
+  }
+
+  /**
+   * POST /api/quotes/:id/services/:serviceId/review-change — Admin aprueba/rechaza la solicitud
+   * de cambio de un servicio. approve+delete elimina el servicio; approve+modify y reject dejan
+   * el servicio pero transicionan la solicitud (aprobada/rechazada) para el historial y el badge
+   * del owner. SOLO admin/superadmin (gate en la ruta).
+   * @param {object} req - Express request; params id/serviceId; body { decision, reviewNote? }.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON con la acción aplicada.
+   * @example
+   *   POST /api/quotes/abc/services/service_17/review-change { "decision": "approve" }
+   */
+  async reviewServiceChange(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId, serviceId } = req.params;
+      const decision = req.body?.decision === 'reject' ? 'reject' : 'approve';
+      const reviewNote = typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 1000) : '';
+
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      const quote = await query.get(quoteId, { useMasterKey: true });
+      if (!quote) return this.sendError(res, 'Cotización no encontrada', 404);
+
+      const serviceItems = quote.get('serviceItems') || {};
+      let target = null;
+      let targetDay = null;
+      (serviceItems.days || []).forEach((d) => (d.subconcepts || []).forEach((sc) => {
+        if (sc && sc.id === serviceId) { target = sc; targetDay = d; }
+      }));
+      if (!target) return this.sendError(res, 'Servicio no encontrado en la cotización', 404);
+      if (!target.changeRequest || target.changeRequest.status !== 'pending') {
+        return this.sendError(res, 'Este servicio no tiene una solicitud pendiente', 400);
+      }
+
+      const reqType = target.changeRequest.type;
+      const { requestId } = target.changeRequest;
+      const reviewerName = `${currentUser.get('firstName') || ''} ${currentUser.get('lastName') || ''}`.trim()
+        || currentUser.get('email') || currentUser.get('username') || 'Admin';
+      const reviewedAt = new Date();
+      const newStatus = decision === 'approve' ? 'approved' : 'rejected';
+      let action;
+      let serviceDeleted = false;
+
+      if (decision === 'approve' && reqType === 'delete') {
+        targetDay.subconcepts = (targetDay.subconcepts || []).filter((sc) => sc.id !== serviceId);
+        serviceDeleted = true;
+        action = 'deleted';
+      } else {
+        // modify-approve o reject: el servicio se queda; el marcador inline transiciona a
+        // aprobada/rechazada (badge del owner) hasta que lo vea (seenByRequester=false).
+        target.changeRequest = {
+          ...target.changeRequest,
+          status: newStatus,
+          reviewedByName: reviewerName,
+          reviewedAt: reviewedAt.toISOString(),
+          reviewNote,
+          seenByRequester: false,
+        };
+        action = decision === 'approve' ? 'modify-approved' : 'rejected';
+      }
+
+      quote.set('serviceItems', serviceItems);
+      await quote.save(null, { useMasterKey: true });
+
+      // Actualizar el registro durable (historial).
+      if (requestId) {
+        try {
+          const rec = await new Parse.Query('ServiceChangeRequest').get(requestId, { useMasterKey: true });
+          if (rec) {
+            rec.set('status', newStatus);
+            rec.set('reviewedBy', { __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id });
+            rec.set('reviewedByName', reviewerName);
+            rec.set('reviewedAt', reviewedAt);
+            rec.set('reviewNote', reviewNote);
+            rec.set('serviceDeleted', serviceDeleted);
+            rec.set('seenByRequester', false); // el owner debe enterarse del resultado
+            await rec.save(null, { useMasterKey: true });
+          }
+        } catch (recErr) {
+          logger.warn('reviewServiceChange: no se pudo actualizar el registro', { error: recErr.message, requestId });
+        }
+      }
+
+      logger.info('Service change reviewed', {
+        quoteId: quote.id, serviceId, decision, reqType, action, reviewedBy: currentUser.id,
+      });
+      const reviewedLabel = (target && target.concept) || 'servicio';
+      await QuoteActivityService.log({
+        quoteId: quote.id,
+        actor: currentUser,
+        actorRole: req.userRole,
+        action: decision === 'approve' ? 'change_approved' : 'change_rejected',
+        summary: `${decision === 'approve' ? 'aprobó' : 'rechazó'} la solicitud de ${reqType === 'delete' ? 'borrado' : 'modificación'} de "${reviewedLabel}"`,
+        meta: { serviceId, type: reqType, requestId },
+      });
+      return this.sendSuccess(res, { serviceId, action, type: reqType }, 'Solicitud revisada', 200);
+    } catch (error) {
+      logger.error('Error in reviewServiceChange', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al revisar la solicitud',
+        500
+      );
+    }
+  }
+
+  /**
+   * GET /api/quotes/:id/change-requests — Historial de solicitudes de cambio de la cotización
+   * (Fase 3). Devuelve la lista para el modal y un contador de novedades: admin = pendientes;
+   * owner = sus solicitudes resueltas sin ver.
+   * @param {object} req - Express request; params id.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { requests, counter }.
+   * @example
+   *   GET /api/quotes/abc/change-requests
+   */
+  async getServiceChangeRequests(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId } = req.params;
+      const isAdmin = ['admin', 'superadmin'].includes(req.userRole);
+
+      const q = new Parse.Query('ServiceChangeRequest');
+      q.equalTo('quote', { __type: 'Pointer', className: 'Quote', objectId: quoteId });
+      q.equalTo('exists', true);
+      q.descending('createdAt');
+      q.limit(500);
+      const records = await q.find({ useMasterKey: true });
+      const requests = records.map((r) => r.toDisplayJSON());
+
+      const counter = isAdmin
+        ? requests.filter((r) => r.status === 'pending').length
+        : requests.filter((r) => r.status !== 'pending' && !r.seenByRequester
+          && r.requestedById === currentUser.id).length;
+
+      return this.sendSuccess(res, { requests, counter, isAdmin }, 'OK', 200);
+    } catch (error) {
+      logger.error('Error in getServiceChangeRequests', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al obtener las solicitudes',
+        500
+      );
+    }
+  }
+
+  /**
+   * POST /api/quotes/:id/change-requests/mark-seen — Marca como vistas las solicitudes resueltas
+   * del owner (limpia el contador) y limpia los marcadores inline resueltos del subconcepto.
+   * @param {object} req - Express request; params id.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON.
+   * @example
+   *   POST /api/quotes/abc/change-requests/mark-seen
+   */
+  async markServiceChangeRequestsSeen(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId } = req.params;
+
+      const q = new Parse.Query('ServiceChangeRequest');
+      q.equalTo('quote', { __type: 'Pointer', className: 'Quote', objectId: quoteId });
+      q.equalTo('requestedBy', { __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id });
+      q.equalTo('exists', true);
+      q.notEqualTo('status', 'pending');
+      q.equalTo('seenByRequester', false);
+      q.limit(500);
+      const records = await q.find({ useMasterKey: true });
+      records.forEach((r) => r.set('seenByRequester', true));
+      if (records.length) await Parse.Object.saveAll(records, { useMasterKey: true });
+
+      // Limpiar los marcadores inline resueltos del owner en el subconcepto.
+      const quote = await new Parse.Query('Quote').equalTo('exists', true).get(quoteId, { useMasterKey: true }).catch(() => null);
+      if (quote) {
+        const serviceItems = quote.get('serviceItems') || {};
+        let changed = false;
+        const newDays = (serviceItems.days || []).map((d) => ({
+          ...d,
+          subconcepts: (d.subconcepts || []).map((sc) => {
+            const cr = sc && sc.changeRequest;
+            if (cr && cr.status && cr.status !== 'pending' && cr.requestedBy === currentUser.id) {
+              changed = true;
+              const rest = { ...sc };
+              delete rest.changeRequest;
+              return rest;
+            }
+            return sc;
+          }),
+        }));
+        if (changed) {
+          serviceItems.days = newDays;
+          quote.set('serviceItems', serviceItems);
+          await quote.save(null, { useMasterKey: true });
+        }
+      }
+
+      return this.sendSuccess(res, { seen: records.length }, 'OK', 200);
+    } catch (error) {
+      logger.error('Error in markServiceChangeRequestsSeen', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error',
+        500
+      );
+    }
+  }
+
+  /**
+   * GET /api/quotes/:id/activity — Timeline de actividades legible de la cotización (Fase A).
+   * Lo ven admin y owner/agencia (nivel 4+). Read-only.
+   * @param {object} req - Express request; params id.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { activities }.
+   * @example
+   *   GET /api/quotes/abc/activity
+   */
+  async getQuoteActivity(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId } = req.params;
+      const activities = await QuoteActivityService.list(quoteId);
+      return this.sendSuccess(res, { activities }, 'OK', 200);
+    } catch (error) {
+      logger.error('Error in getQuoteActivity', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al obtener la actividad',
         500
       );
     }
@@ -3498,7 +4077,8 @@ class QuoteController {
       // transfer via the denormalized `owner` pointer) PLUS quotes explicitly shared with
       // them via collaboration (QuoteAccess editor/viewer). No org-wide visibility.
       const userClientId = currentUser.clientId || currentUser.get('clientId');
-      if (userRole === 'client' || userClientId) {
+      // client y end_client (cliente directo) ven SOLO sus cotizaciones (propias/compartidas).
+      if (userRole === 'client' || userRole === 'end_client' || userClientId) {
         const currentUserPointer = {
           __type: 'Pointer',
           className: 'AmexingUser',
@@ -3602,7 +4182,13 @@ class QuoteController {
 
       // Get payment info parameters from request body (for admin role)
       // billingProfileId: perfil fiscal de la agencia a imprimir en el recibo (los 3 roles).
-      const { includePaymentInfo, paymentInfoId, billingProfileId } = req.body;
+      // force: solo admin/superadmin puede saltarse el bloqueo de "reservación no saldada".
+      const {
+        includePaymentInfo,
+        paymentInfoId,
+        billingProfileId,
+        force,
+      } = req.body;
 
       const result = await this.quoteService.generateReceipt(
         currentUser,
@@ -3610,7 +4196,8 @@ class QuoteController {
         req.userRole, // Pass userRole from JWT middleware
         includePaymentInfo, // Pass the flag from request
         paymentInfoId, // Pass the specific payment info ID
-        billingProfileId // Perfil de facturación elegido (o undefined)
+        billingProfileId, // Perfil de facturación elegido (o undefined)
+        force === true // Override admin del bloqueo de reservación no saldada
       );
 
       // If PDF buffer is returned, send it as a downloadable file
@@ -3626,6 +4213,17 @@ class QuoteController {
 
       return res.json(result);
     } catch (error) {
+      // Reservación no saldada: 409 estructurado para que el front muestre el saldo pendiente
+      // y (solo a admin/superadmin) ofrezca "Generar de todos modos".
+      if (error && error.code === 'RESERVATION_NOT_SETTLED') {
+        return res.status(409).json({
+          success: false,
+          code: 'RESERVATION_NOT_SETTLED',
+          error: error.message,
+          data: error.payment || null,
+        });
+      }
+
       logger.error('Error in QuoteController.generateReceipt', {
         error: error.message,
         stack: error.stack,

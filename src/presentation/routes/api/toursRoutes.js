@@ -618,6 +618,9 @@ router.delete('/:id', jwtMiddleware.authenticateToken, jwtMiddleware.requireRole
  */
 router.patch('/:id/toggle-status', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.toggleTourStatus(req, res));
 
+// PATCH /api/tours/:id/popular - Toggle "popular" curation flag (admin, level 6).
+router.patch('/:id/popular', jwtMiddleware.authenticateToken, jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.togglePopular(req, res));
+
 /**
  * @swagger
  * /api/tours/{id}/update-base-prices:
