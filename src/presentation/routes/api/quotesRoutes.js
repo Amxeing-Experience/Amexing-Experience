@@ -424,6 +424,66 @@ router.put(
 );
 
 /**
+ * POST /api/quotes/:id/services/:serviceId/request-change — El owner (no-admin) solicita
+ * borrar/modificar un servicio bloqueado por admin (Fase 2 del bloqueo por-servicio).
+ */
+router.post(
+  '/:id/services/:serviceId/request-change',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4) y arriba
+  (req, res) => QuoteController.requestServiceChange(req, res)
+);
+
+/**
+ * POST /api/quotes/:id/services/:serviceId/review-change — Admin aprueba/rechaza la solicitud
+ * de cambio de un servicio. SOLO admin/superadmin.
+ */
+router.post(
+  '/:id/services/:serviceId/review-change',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRole(['admin', 'superadmin']),
+  (req, res) => QuoteController.reviewServiceChange(req, res)
+);
+
+/**
+ * GET /api/quotes/:id/change-requests — Historial de solicitudes de cambio de la cotización
+ * (Fase 3) + contador de novedades. Nivel 4+ (owner y admin).
+ */
+router.get(
+  '/:id/change-requests',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.getServiceChangeRequests(req, res)
+);
+
+/**
+ * POST /api/quotes/:id/change-requests/mark-seen — Marca como vistas las solicitudes resueltas
+ * del owner (limpia el contador). Nivel 4+.
+ */
+router.post(
+  '/:id/change-requests/mark-seen',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.markServiceChangeRequestsSeen(req, res)
+);
+
+/**
+ * GET /api/quotes/:id/activity — Timeline de actividades legible de la cotización (Fase A).
+ * Nivel 4+ (admin y owner/agencia).
+ */
+router.get(
+  '/:id/activity',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.getQuoteActivity(req, res)
+);
+
+/**
  * GET /api/quotes/:id/available-services - Get available services filtered by quote's rate.
  * Private access (Department Manager, Admin and SuperAdmin).
  *

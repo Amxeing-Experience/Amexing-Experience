@@ -50,6 +50,7 @@ class Client extends BaseModel {
     client.set('name', clientData.name);
     client.set('email', clientData.email);
     client.set('phone', clientData.phone || null);
+    client.set('phoneCountry', clientData.phoneCountry || null); // ISO del país del teléfono (p. ej. 'MX')
     client.set('contactPerson', clientData.contactPerson || null);
     client.set('companyType', clientData.companyType || null);
     client.set('taxId', clientData.taxId || null);
@@ -618,6 +619,7 @@ class Client extends BaseModel {
         'name',
         'email',
         'phone',
+        'phoneCountry',
         'contactPerson',
         'companyType',
         'taxId',
@@ -690,6 +692,7 @@ class Client extends BaseModel {
       name: this.get('name'),
       email: this.get('email'),
       phone: this.get('phone'),
+      phoneCountry: this.get('phoneCountry') || null,
       contactPerson: this.get('contactPerson'),
       companyType: this.get('companyType'),
       clientCategory: this.get('clientCategory'),

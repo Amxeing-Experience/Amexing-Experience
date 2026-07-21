@@ -256,19 +256,19 @@ class PublicExperiencesService {
   }
 
   /**
-   * Formatea la duración (en HORAS) a horas y minutos legibles (p.ej. 6 → '6 hrs.',
-   * 1.5 → '1 hr. 30 min.', 0.5 → '30 min.'). Tanto `Experience` como `ProviderExperiencia`
-   * guardan `duration` en horas (admite fracciones).
-   * @param {number} duration - Duración en horas (admite fracciones, p.ej. 1.5).
+   * Formatea la duración (en MINUTOS) a horas y minutos legibles (p.ej. 360 → '6 hrs.',
+   * 90 → '1 hr. 30 min.', 30 → '30 min.'). Tanto `Experience` como `ProviderExperiencia`
+   * guardan `duration` en minutos (estandarizado).
+   * @param {number} duration - Duración en minutos.
    * @returns {string} Duración formateada o 'Por definir'.
    * @example
-   * service.formatDuration(1.5); // '1 hr. 30 min.'
+   * service.formatDuration(90); // '1 hr. 30 min.'
    */
   formatDuration(duration) {
     if (!duration) {
       return 'Por definir';
     }
-    const totalMinutes = Math.round(+duration * 60);
+    const totalMinutes = Math.round(+duration);
     if (!totalMinutes) {
       return 'Por definir';
     }

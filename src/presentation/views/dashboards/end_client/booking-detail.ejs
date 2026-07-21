@@ -334,7 +334,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const quoteLink = document.getElementById('infoQuoteLink');
         if (d.quoteId) {
-            quoteLink.href = `/dashboard/end_client/quotes/${d.quoteId}`;
+            quoteLink.href = `/dashboard/end_client/quotes/${d.quoteId}?context=reservation`;
             quoteLink.textContent = d.quoteFolio;
         }
 

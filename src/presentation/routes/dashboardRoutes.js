@@ -14,25 +14,32 @@ const guestController = require('../../application/controllers/dashboard/GuestCo
 
 // Import authentication middleware
 const dashboardAuth = require('../../application/middleware/dashboardAuthMiddleware');
+const { getEndClientCapabilities } = require('../../application/config/endClientCapabilities');
 
 // Apply only basic authentication - role checks handled per route to avoid conflicts
 router.use(dashboardAuth.requireAuth);
 
-// Solo en dev: expone la categoría del cliente directo (direct_client/wedding_planner/concierge/
-// home_owner) a la vista, para mostrarla como referencia interna en el header. En producción no se
-// consulta ni se muestra (el cliente final no ve su categorización interna).
-router.use('/end_client', async (req, res, next) => {
-  if (process.env.NODE_ENV === 'development' && req.user && req.user.id) {
-    try {
-      const Parse = require('parse/node');
-      const u = await new Parse.Query('AmexingUser').get(req.user.id, { useMasterKey: true });
-      res.locals.clientCategory = u.get('clientCategory') || null;
-    } catch (e) {
-      res.locals.clientCategory = null; // el header cae a ocultar/genérico
-    }
-  }
+// Cliente directo (end_client): expone las capacidades según su tipo (clientCategory, que ya viene
+// del JWT en res.locals) para que menú, vistas y controllers decidan qué mostrar/permitir.
+router.use('/end_client', (req, res, next) => {
+  res.locals.endClientCaps = getEndClientCapabilities(req.user && req.user.clientCategory);
   next();
 });
+
+/**
+ * Guard por capacidad para rutas de end_client (p. Ej. La sección Tarifario solo para wedding
+ * planner). Si el tipo de cliente no tiene la capacidad, lo regresa a su dashboard de inicio.
+ * @param {string} cap - Capacidad requerida (clave de endClientCapabilities, p. Ej. 'viewTarifario').
+ * @returns {Function} Middleware Express que permite o redirige según la capacidad del usuario.
+ * @example
+ * router.get('/end_client/vehicles', requireEndClientCap('viewTarifario'), handler);
+ */
+const requireEndClientCap = (cap) => (req, res, next) => {
+  const caps = getEndClientCapabilities(req.user && req.user.clientCategory);
+  // eslint-disable-next-line security/detect-object-injection
+  if (caps && caps[cap]) return next();
+  return res.redirect('/dashboard/end_client');
+};
 
 // SuperAdmin Routes
 router.get('/superadmin', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.index(req, res));
@@ -133,8 +140,15 @@ router.get('/end_client/profile', dashboardAuth.requireRole('end_client'), (req,
 router.get('/end_client/change-password', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.changePassword(req, res));
 router.get('/end_client/bookings', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.bookings(req, res));
 router.get('/end_client/bookings/:id', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.bookingDetail(req, res));
-router.get('/end_client/quotes', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.quotes(req, res));
-router.get('/end_client/quotes/:id', dashboardAuth.requireRole('end_client'), (req, res) => endClientController.quoteDetail(req, res));
+router.get('/end_client/quotes', dashboardAuth.requireRole('end_client'), requireEndClientCap('viewQuotes'), (req, res) => endClientController.quotes(req, res));
+router.get('/end_client/quotes/:id', dashboardAuth.requireRole('end_client'), requireEndClientCap('viewQuotes'), (req, res) => endClientController.quoteDetail(req, res));
+// Sección Tarifario (catálogo) — solo tipos con viewTarifario (wedding planner).
+router.get('/end_client/vehicles', dashboardAuth.requireRole('end_client'), requireEndClientCap('viewTarifario'), (req, res) => endClientController.vehicles(req, res));
+router.get('/end_client/services', dashboardAuth.requireRole('end_client'), requireEndClientCap('viewTarifario'), (req, res) => endClientController.services(req, res));
+router.get('/end_client/a-disposicion', dashboardAuth.requireRole('end_client'), requireEndClientCap('viewTarifario'), (req, res) => endClientController.aDisposicion(req, res));
+router.get('/end_client/experiences', dashboardAuth.requireRole('end_client'), requireEndClientCap('viewTarifario'), (req, res) => endClientController.experiences(req, res));
+router.get('/end_client/tours', dashboardAuth.requireRole('end_client'), requireEndClientCap('viewTarifario'), (req, res) => endClientController.tours(req, res));
+router.get('/end_client/tarifario-export', dashboardAuth.requireRole('end_client'), requireEndClientCap('viewTarifario'), (req, res) => endClientController.tarifarioExport(req, res));
 
 // Department Manager Routes
 router.get('/department_manager', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.index(req, res));

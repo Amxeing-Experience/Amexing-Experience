@@ -351,6 +351,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             </span>
             <span class="d-flex align-items-center gap-2 flex-shrink-0">
                 <span class="fw-semibold text-success small experiencia-acc-price"></span>
+                <button type="button" class="btn btn-sm btn-light toggle-experiencia-popular-btn experiencia-acc-popular d-none" title="Marcar como popular">
+                    <span class="popular-heart" style="display:inline-block;width:15px;height:15px;background-color:#c7c7c7;-webkit-mask:url('/images/heart_black.png') center/contain no-repeat;mask:url('/images/heart_black.png') center/contain no-repeat;vertical-align:-2px;"></span>
+                </button>
                 <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn experiencia-acc-delete" title="Eliminar experiencia">
                     <i class="ti ti-trash"></i>
                 </button>
@@ -998,6 +1001,57 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             console.log('✅ Modal state reset:', currentModalState);
             console.log('✅ Deleted experiences queue cleared');
+        });
+
+        // Marca visual del corazón "popular" en un botón de experiencia.
+        function setExperienciaPopularBtn(btn, isPopular) {
+            const heart = btn.querySelector('.popular-heart');
+            if (heart) heart.style.backgroundColor = isPopular ? '#e11d1d' : '#c7c7c7';
+            btn.setAttribute('data-current-popular', isPopular ? 'true' : 'false');
+            btn.setAttribute('title', isPopular ? 'Quitar de populares' : 'Marcar como popular');
+        }
+
+        // Toggle "popular" de una experiencia de establecimiento (PATCH instantáneo).
+        $(document).on('click', '.toggle-experiencia-popular-btn', function(e) {
+            e.preventDefault();
+            e.stopPropagation(); // no expandir/colapsar el acordeón
+            const btn = this;
+            const experienciaId = btn.getAttribute('data-id');
+            if (!experienciaId) return;
+            const isPopular = btn.getAttribute('data-current-popular') === 'true';
+            const newPopular = !isPopular;
+
+            if (btn.getAttribute('data-loading') === '1') return;
+            btn.setAttribute('data-loading', '1');
+            const heart = btn.querySelector('.popular-heart');
+            const prevHeartHtml = heart ? heart.outerHTML : '';
+            $(btn).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width:13px;height:13px;"></span>');
+
+            const token = getAccessToken();
+            $.ajax({
+                url: `/api/provider-experiencias/${experienciaId}/popular`,
+                type: 'PATCH',
+                contentType: 'application/json',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                data: JSON.stringify({ popular: newPopular }),
+                success: function(response) {
+                    btn.removeAttribute('data-loading');
+                    $(btn).html(prevHeartHtml);
+                    if (response && response.success) {
+                        setExperienciaPopularBtn(btn, newPopular);
+                        showSuccessAlert(newPopular ? 'Experiencia marcada como popular' : 'Experiencia removida de populares');
+                    } else {
+                        setExperienciaPopularBtn(btn, isPopular);
+                        showErrorAlert((response && response.error) || 'Error al actualizar el estado popular');
+                    }
+                },
+                error: function(xhr) {
+                    btn.removeAttribute('data-loading');
+                    $(btn).html(prevHeartHtml);
+                    setExperienciaPopularBtn(btn, isPopular);
+                    showErrorAlert(xhr.responseJSON?.error || 'Error al actualizar el estado popular');
+                }
+            });
         });
 
         // Event delegation for experience management
@@ -2837,6 +2891,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             card.setAttribute('data-index', index);
             card.setAttribute('data-id', experiencia.id || '');
+
+            // Botón "popular": solo para experiencias ya guardadas (con id).
+            const popBtn = card.querySelector('.toggle-experiencia-popular-btn');
+            if (popBtn && experiencia.id) {
+                popBtn.setAttribute('data-id', experiencia.id);
+                setExperienciaPopularBtn(popBtn, experiencia.popular === true);
+                popBtn.classList.remove('d-none');
+            }
 
             // Poblar el resumen de la cabecera del acordeón (nombre / precio / tipo)
             syncEstablishmentHeader(card, experiencia);

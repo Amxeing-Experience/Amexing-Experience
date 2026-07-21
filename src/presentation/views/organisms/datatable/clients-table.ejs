@@ -37,30 +37,10 @@ const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 %>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
-        <div class="row align-items-center">
-            <div class="col">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-building me-2"></i>
-                    Gestión de Clientes
-                </h5>
-                <small class="text-white" style="opacity: 0.9;">Administra empresas clientes y sus configuraciones</small>
-            </div>
-            <div class="col-auto">
-                <% if (canCreate) { %>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createClientModal">
-                            <i class="ti ti-plus me-1"></i>
-                            Nuevo Cliente
-                        </button>
-                    </div>
-                <% } %>
-            </div>
-        </div>
-    </div>
-
-    <div class="card-body">
+<!-- Look editorial "sin card blanca": el contenido va directo sobre el fondo de la página
+     (el título/acciones viven en el header de la página, no aquí). -->
+<div class="clients-table-area">
+    <div class="pt-1">
         <!-- Client Type Pills Filter -->
         <div class="row mb-3">
             <div class="col-12">
@@ -310,7 +290,10 @@ function initializeClientsDataTable(totalCount) {
                 defaultContent: '',
                 render: function(data, type, row) {
                     if (!data) return '<span class="text-muted">—</span>';
-                    return `<a href="tel:${data}" class="text-decoration-none">${data}</a>`;
+                    // Código de marcación por país (si el cliente tiene phoneCountry).
+                    var DIAL = { MX:'+52',US:'+1',CA:'+1',CO:'+57',AR:'+54',CL:'+56',PE:'+51',BR:'+55',EC:'+593',ES:'+34',GB:'+44',FR:'+33',DE:'+49',IT:'+39',PT:'+351',NL:'+31',BE:'+32',CH:'+41',SE:'+46',NO:'+47',DK:'+45',FI:'+358',PL:'+48',IE:'+353',AT:'+43',CN:'+86',JP:'+81',KR:'+82',IN:'+91',SG:'+65',TH:'+66',MY:'+60',PH:'+63',ID:'+62',VN:'+84',TW:'+886',HK:'+852',AE:'+971',SA:'+966',IL:'+972' };
+                    var code = DIAL[row.phoneCountry] ? DIAL[row.phoneCountry] + ' ' : '';
+                    return `<a href="tel:${code.replace(' ','')}${data}" class="text-decoration-none">${code}${data}</a>`;
                 }
             },
             {
@@ -480,19 +463,6 @@ function showErrorAlert(message) {
 // ============================================================================
 // 4. CLIENT ACTION FUNCTIONS
 // ============================================================================
-
-/**
- * Edit client - open edit modal and populate with client data
- * @param {string} clientId - Client ID
- * @param {string} clientType - Client type (agency or client)
- */
-function editClient(clientId, clientType) {
-    // Dispatch custom event to parent page to handle modal opening
-    // The parent page (admin/clients.ejs) will handle the modal logic
-    document.dispatchEvent(new CustomEvent('openEditClientModal', {
-        detail: { clientId, clientType }
-    }));
-}
 
 /**
  * Toggle client active status
@@ -710,14 +680,6 @@ function setupEventDelegation() {
             const clientType = target.getAttribute('data-client-type');
             const currentStatus = target.getAttribute('data-current-status') === 'true';
             toggleClientStatus(clientId, currentStatus, clientType);
-            return;
-        }
-
-        // Edit button
-        if (target.classList.contains('btn-edit-client')) {
-            const clientId = target.getAttribute('data-client-id');
-            const clientType = target.getAttribute('data-client-type');
-            editClient(clientId, clientType);
             return;
         }
 

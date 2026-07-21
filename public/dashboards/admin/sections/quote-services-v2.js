@@ -797,6 +797,16 @@ class ItineraryBuilder {
 
     // Experience selection handler
     document.getElementById('experienceSelect')?.addEventListener('change', (e) => {
+      // Nueva experiencia → limpiar los precios por persona para que se autollenen con los del
+      // catálogo de la experiencia seleccionada (el autollenado en handleExperienceSelection es
+      // solo-si-vacío; sin esto quedaban los precios de la experiencia anterior mientras el
+      // "Lista AAAA" sí mostraba los nuevos). No se toca en la restauración de edición.
+      if (!this._restoringExperienceData) {
+        ['adultPrice', 'childPrice', 'noAlcoholPrice'].forEach((id) => {
+          const f = document.getElementById(id);
+          if (f) f.value = '';
+        });
+      }
       this.handleExperienceSelection(e.target.value);
     });
 
@@ -1346,6 +1356,11 @@ class ItineraryBuilder {
     // Preview
     document.getElementById('previewItineraryBtn')?.addEventListener('click', () => this.showPreview());
     document.getElementById('exportPdfBtn')?.addEventListener('click', () => this.exportPdf());
+    // Fase 3: botón "Solicitudes" (historial de solicitudes de cambio) + carga del contador.
+    document.getElementById('changeRequestsBtn')?.addEventListener('click', () => this.runWithButtonLoading('changeRequestsBtn', () => this.openChangeRequestsModal()));
+    this.loadChangeRequests();
+    // Fase A: botón "Actividad" (timeline de actividades de la cotización).
+    document.getElementById('quoteActivityBtn')?.addEventListener('click', () => this.runWithButtonLoading('quoteActivityBtn', () => this.openActivityModal()));
 
     // Continue to Summary Button
     document.getElementById('continueToSummaryBtn')?.addEventListener('click', () => {
@@ -4807,6 +4822,12 @@ class ItineraryBuilder {
     // Display-only flag for the admin "Precio personalizado" label (does not affect pricing).
     data.isCustomPrice = this.computeServiceIsCustomPrice(data, basePrice);
 
+    // Bloqueo por-servicio: cualquier servicio que un admin/superadmin agrega o edita queda
+    // "adminLocked". Para los demás (aunque sean owners) queda solo lectura (no editar/borrar);
+    // podrán solicitar su borrado (Fase 2). El backend refuerza esto (locks sticky por id) para
+    // que no se pueda saltar manipulando el request.
+    data.adminLocked = ['admin', 'superadmin'].includes(this.userRole);
+
     return data;
   }
 
@@ -7911,6 +7932,7 @@ class ItineraryBuilder {
                     </div>
                     <div class="d-flex flex-column align-items-end">
                         <div class="service-actions mb-2">
+                            ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <div class="btn-group btn-group-sm">
                                 <button type="button" class="btn btn-light edit-service-btn"
                                         data-day-id="${service.dayId}" data-service-id="${service.id}" title="Editar">
@@ -7925,6 +7947,8 @@ class ItineraryBuilder {
                                     <i class="ti ti-trash"></i>
                                 </button>
                             </div>
+                            ` : ''}
+                            ${this.renderServiceLockControls(service)}
                         </div>
                         ${!(service.type === 'concepto' && this.getServiceDisplayPrice(service) <= 0) ? `
                             ${service.includeInTotal === false ? `
@@ -7934,14 +7958,17 @@ class ItineraryBuilder {
                                 ${this.formatCurrency(this.getServiceDisplayPrice(service))}
                                 ${this.getPriceTypeLabel()}
                             </div>
+                            ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
                                     data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
                                 <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
                                 <small class="${service.includeInTotal === false ? 'text-success' : 'text-muted'}" style="font-size: 0.7rem;">${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}</small>
                             </button>
+                            ` : ''}
                         ` : ''}
                     </div>
                 </div>
+                ${this.renderServiceReviewBanner(service)}
             </div>
         `;
   }
@@ -12175,6 +12202,10 @@ class ItineraryBuilder {
           const serviceData = {
             id: serviceId,
             dayId: dayData.id,
+            // Bloqueo por-servicio (Fase 1): restaura el candado guardado para el render.
+            adminLocked: subconcept.adminLocked || false,
+            // Fase 2: restaura la solicitud de cambio pendiente (si hay) para el render.
+            changeRequest: subconcept.changeRequest || null,
             type: subconcept.type || 'other',
             concept: subconcept.concept,
             startTime: subconcept.time || subconcept.startTime, // Backend sends 'time'
@@ -14144,7 +14175,8 @@ class ItineraryBuilder {
   fillExperienceFields(experience) {
     // Duración de catálogo de la experiencia — referencia para comparar contra la duración real
     // derivada del horario (updateExperienceDurationFromSchedule).
-    this._experienceCatalogDuration = experience.duration;
+    // El catálogo guarda duración en MINUTOS; el quote builder trabaja en horas → convertir.
+    this._experienceCatalogDuration = experience.duration ? (experience.duration / 60) : experience.duration;
     // Al (re)seleccionar experiencia se limpia el aviso de duración real (el restore lo re-muestra
     // si hay horario que difiere).
     document.getElementById('experienceRealDuration')?.classList.add('d-none');
@@ -14176,7 +14208,8 @@ class ItineraryBuilder {
       // Duración: autollenar del catálogo de la experiencia (editable). Solo NEW; en edición la
       // restauración pone la guardada.
       const expDurationField = document.getElementById('experienceDuration');
-      if (expDurationField) expDurationField.value = experience.duration || '';
+      // Catálogo en MINUTOS → el campo canónico del modal es horas decimales.
+      if (expDurationField) expDurationField.value = experience.duration ? (experience.duration / 60) : '';
       this._syncExperienceDurationInputs(); // reflejar en Horas/Minutos visibles
     } else {
 
@@ -14186,7 +14219,7 @@ class ItineraryBuilder {
     this.buildDetailsCard('experience', {
       title: experience.title || experience.name || '',
       description: experience.description || '',
-      duration: experience.duration ? `${experience.duration} horas` : null,
+      duration: experience.duration ? this.formatMinutesToHoursAndMinutes(experience.duration) : null,
       advanceBooking: experience.advance_booking_time ? this.formatMinutesToHoursAndMinutes(experience.advance_booking_time) : null,
       availabilitySchedule: this.extractAvailabilitySchedule(experience),
       languages: Array.isArray(experience.languages) ? experience.languages.join(', ') : experience.languages,
@@ -16215,9 +16248,19 @@ class ItineraryBuilder {
       // (con split de recargo) y podía diverger del precio guardado; ahora coincide 1:1.
       items.push(...this.collectServiceBreakdownItemsFromDev());
 
-      // Indicador de precios personalizados (si aplica)
-      const isPriceOverride = document.getElementById('experienceOverridePrices')?.checked || false;
-      if (isPriceOverride && this.canEditPrices) {
+      // Indicador de precios personalizados: SOLO si algún precio por persona difiere del
+      // catálogo/lista. (El override está forzado ON por "precio siempre editable", así que no
+      // sirve como señal.) Misma detección que computeServiceIsCustomPrice; campo vacío = no custom.
+      const expCat = (this.calculatedPrices && this.calculatedPrices.experience) || {};
+      const expDiff = (a, b) => a != null && b != null && Math.abs(Number(a) - Number(b)) > 0.01;
+      const expVal = (id) => {
+        const v = document.getElementById(id)?.value;
+        return (v === '' || v == null) ? null : parseFloat(v);
+      };
+      const expIsCustom = expDiff(expVal('adultPrice'), expCat.adult)
+        || expDiff(expVal('childPrice'), expCat.child)
+        || expDiff(expVal('noAlcoholPrice'), expCat.noAlcohol);
+      if (expIsCustom && this.canEditPrices) {
         items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precios personalizados</span>', amountMXN: 0 });
       }
     } else if (serviceType === 'a-disposicion') {
@@ -20206,6 +20249,11 @@ class ItineraryBuilder {
             // time/price/type) get stripped on save and vanish on reload.
             id: serviceId,
             type: service.type || 'regular',
+            // Bloqueo por-servicio (Fase 1): true si un admin lo agregó/editó → solo lectura
+            // para no-admins. Se persiste en el subconcepto para restaurarlo al recargar.
+            adminLocked: service.adminLocked || false,
+            // Fase 2: solicitud de cambio (borrar/modificar) pendiente de aprobación del admin.
+            changeRequest: service.changeRequest || null,
             concept: this.getServiceTitle(service),
             time: normalizeTimeHHMM(service.startTime), // Backend expects 'time' not 'startTime'
             endTime: normalizeTimeHHMM(service.endTime),
@@ -20607,9 +20655,520 @@ class ItineraryBuilder {
     this.showAlert('Día duplicado exitosamente', 'success');
   }
 
+  // Un servicio queda "protegido" para no-admins si lo bloqueó un admin (adminLocked), o si la
+  // cotización ya es reservación (window.__isReservation): en una reservación cualquier cambio a un
+  // servicio existente debe pasar por una solicitud aprobada por admin (agregar nuevos sí se permite).
+  isServiceProtected(service) {
+    if (!service) return false;
+    return !!(service.adminLocked || window.__isReservation);
+  }
+
+  // Bloqueo por-servicio: un servicio protegido solo lo pueden gestionar (editar/duplicar/borrar)
+  // admin/superadmin. Los demás lo ven en solo lectura y pueden solicitar el cambio.
+  canManageService(service) {
+    if (!service) return false;
+    if (['admin', 'superadmin'].includes(this.userRole)) return true;
+    return !this.isServiceProtected(service);
+  }
+
+  // Escapa texto para meterlo en HTML (nota de la solicitud, input del owner).
+  escapeHtmlText(str) {
+    return String(str == null ? '' : str).replace(/[<>&"']/g, (c) => ({
+      '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  // Muestra un spinner en un botón mientras corre una operación async (evita que parezca
+  // congelada la pantalla al abrir un modal que hace fetch). Restaura el botón al terminar.
+  async runWithButtonLoading(btnId, fn) {
+    const btn = document.getElementById(btnId);
+    const original = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Abriendo...';
+    }
+    try {
+      await fn();
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = original; }
+    }
+  }
+
+  // Limpieza defensiva al cerrar un modal inyectado dinámicamente: evita que el backdrop
+  // se quede pegado bloqueando la página (elimina instancia, elemento y backdrop huérfano).
+  disposeTempModal(modalEl, modal) {
+    try { modal?.dispose(); } catch (_) { /* noop */ }
+    modalEl?.remove();
+    document.querySelectorAll('.modal-backdrop').forEach((b) => b.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+  }
+
+  // Fase 2: controles COMPACTOS para la columna de acciones (solo owner en servicio bloqueado).
+  // El aviso de revisión del admin va en una franja de ancho completo (renderServiceReviewBanner),
+  // para no encimar los botones editar/duplicar/borrar.
+  renderServiceLockControls(service) {
+    if (['admin', 'superadmin'].includes(this.userRole)) return '';
+    if (!this.isServiceProtected(service)) return '';
+    const cr = service.changeRequest || null;
+    if (cr && cr.status === 'pending') {
+      const typeLabel = cr.type === 'delete' ? 'borrado' : 'modificación';
+      return `<span class="badge bg-warning-subtle text-warning-emphasis border d-inline-flex align-items-center"><i class="ti ti-clock me-1"></i>Solicitud de ${typeLabel} pendiente</span>`;
+    }
+    if (cr && cr.status === 'approved') {
+      const t = cr.reviewNote ? ` title="${this.escapeHtmlText(cr.reviewNote)}"` : '';
+      return `<span class="badge bg-success-subtle text-success-emphasis border d-inline-flex align-items-center"${t}><i class="ti ti-check me-1"></i>Tu solicitud fue aprobada</span>`;
+    }
+    if (cr && cr.status === 'rejected') {
+      const t = cr.reviewNote ? ` title="${this.escapeHtmlText(cr.reviewNote)}"` : '';
+      return `<span class="badge bg-danger-subtle text-danger-emphasis border d-inline-flex align-items-center"${t}><i class="ti ti-x me-1"></i>Tu solicitud fue rechazada</span>`;
+    }
+    return `<button type="button" class="btn btn-sm btn-outline-secondary request-change-btn" data-service-id="${service.id}"><i class="ti ti-message-2 me-1"></i>Solicitar cambio</button>`;
+  }
+
+  // Fase 2: franja de ancho completo, abajo del servicio (solo admin), con la solicitud
+  // pendiente + Aprobar/Rechazar. Deja limpios los botones de la columna de acciones.
+  renderServiceReviewBanner(service) {
+    if (!['admin', 'superadmin'].includes(this.userRole)) return '';
+    const cr = (service.changeRequest && service.changeRequest.status === 'pending')
+      ? service.changeRequest : null;
+    if (!cr) return '';
+    const verb = cr.type === 'delete' ? 'borrar' : 'modificar';
+    const who = this.escapeHtmlText(cr.requestedByName || 'El owner');
+    const note = cr.note ? ` <span class="text-muted">“${this.escapeHtmlText(cr.note)}”</span>` : '';
+    return `
+      <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2 mt-2 mb-0 py-2 px-3" style="font-size: 0.85rem;">
+        <span class="me-auto"><i class="ti ti-bell me-1"></i><strong>${who}</strong> solicitó <strong>${verb}</strong> este servicio${note}</span>
+        <span class="d-flex gap-1">
+          <button type="button" class="btn btn-sm btn-success review-change-btn" data-service-id="${service.id}" data-decision="approve"><i class="ti ti-check me-1"></i>Aprobar</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary review-change-btn" data-service-id="${service.id}" data-decision="reject"><i class="ti ti-x me-1"></i>Rechazar</button>
+        </span>
+      </div>`;
+  }
+
+  // Fase 2: abre el mini-modal para que el owner elija borrar/modificar + nota opcional.
+  openChangeRequestModal(serviceId) {
+    const service = this.services.get(serviceId);
+    if (!service) return;
+    document.getElementById('changeRequestModal')?.remove();
+    const html = `
+      <div class="modal fade" id="changeRequestModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title"><i class="ti ti-message-2 me-2"></i>Solicitar cambio</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p class="mb-1">Servicio: <strong>${this.escapeHtmlText(this.getServiceTitle(service))}</strong></p>
+              <p class="text-muted small">Este servicio lo gestiona un administrador. Envía tu solicitud y un administrador la revisará.</p>
+              <div class="mb-3">
+                <label class="form-label fw-semibold">¿Qué necesitas?</label>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="crType" id="crTypeModify" value="modify" checked>
+                  <label class="form-check-label" for="crTypeModify">Modificar el servicio</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="crType" id="crTypeDelete" value="delete">
+                  <label class="form-check-label" for="crTypeDelete">Borrar el servicio</label>
+                </div>
+              </div>
+              <div class="mb-1">
+                <label for="crNote" class="form-label fw-semibold">Nota (opcional)</label>
+                <textarea class="form-control" id="crNote" rows="3" placeholder="Describe qué quieres cambiar o por qué..."></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+              <button type="button" class="btn btn-primary" id="crSubmitBtn"><i class="ti ti-send me-1"></i>Enviar solicitud</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modalEl = document.getElementById('changeRequestModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modalEl.querySelector('#crSubmitBtn').addEventListener('click', () => {
+      const type = modalEl.querySelector('input[name="crType"]:checked')?.value || 'modify';
+      const note = modalEl.querySelector('#crNote')?.value || '';
+      this.submitChangeRequest(serviceId, type, note, modal);
+    });
+    modalEl.addEventListener('hidden.bs.modal', () => this.disposeTempModal(modalEl, modal));
+    modal.show();
+  }
+
+  // Fase 2: envía la solicitud de cambio al backend y refleja el estado localmente.
+  async submitChangeRequest(serviceId, type, note, modal) {
+    const btn = document.getElementById('crSubmitBtn');
+    const originalBtn = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Enviando...';
+    }
+    const restoreBtn = () => {
+      if (btn) { btn.disabled = false; btn.innerHTML = originalBtn; }
+    };
+    try {
+      const resp = await fetch(`/api/quotes/${this.quoteId}/services/${serviceId}/request-change`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.getAccessToken() || ''}` },
+        body: JSON.stringify({ type, note }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) {
+        this.showAlert((data && data.error) || 'No se pudo enviar la solicitud.', 'danger');
+        restoreBtn();
+        return;
+      }
+      const svc = this.services.get(serviceId);
+      if (svc) svc.changeRequest = (data.data && data.data.changeRequest) || { type, note, status: 'pending' };
+      modal?.hide();
+      this.renderItinerary();
+      this.loadChangeRequests();
+      this.showAlert('Solicitud enviada. Un administrador la revisará.', 'success');
+    } catch (e) {
+      this.showAlert('Error al enviar la solicitud.', 'danger');
+      restoreBtn();
+    }
+  }
+
+  // Fase 2: admin aprueba/rechaza la solicitud de cambio de un servicio.
+  async reviewServiceChange(serviceId, decision) {
+    try {
+      const resp = await fetch(`/api/quotes/${this.quoteId}/services/${serviceId}/review-change`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.getAccessToken() || ''}` },
+        body: JSON.stringify({ decision }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) {
+        this.showAlert((data && data.error) || 'No se pudo procesar la solicitud.', 'danger');
+        return;
+      }
+      const action = data.data && data.data.action;
+      if (action === 'deleted') {
+        const svc = this.services.get(serviceId);
+        if (svc) {
+          const day = this.days.find((d) => d.id === svc.dayId)
+            || this.days.find((d) => (d.services || []).includes(serviceId));
+          if (day) day.services = (day.services || []).filter((sid) => sid !== serviceId);
+        }
+        this.services.delete(serviceId);
+        this.renderItinerary();
+        // Persistir totales recalculados (el endpoint solo quitó el subconcepto).
+        this.saveToBackend();
+        this.loadChangeRequests();
+        this.showAlert('Servicio eliminado (solicitud aprobada).', 'success');
+      } else {
+        // Mantener el marcador con el status transicionado (consistente con el server) para
+        // que el badge del owner sobreviva si el admin re-guarda antes de que el owner lo vea.
+        const svc = this.services.get(serviceId);
+        if (svc && svc.changeRequest) {
+          svc.changeRequest = {
+            ...svc.changeRequest,
+            status: action === 'modify-approved' ? 'approved' : 'rejected',
+            seenByRequester: false,
+          };
+        }
+        this.renderItinerary();
+        this.loadChangeRequests();
+        this.showAlert(
+          action === 'modify-approved'
+            ? 'Solicitud aprobada. Edita el servicio para aplicar el cambio.'
+            : 'Solicitud rechazada.',
+          action === 'modify-approved' ? 'success' : 'info',
+        );
+      }
+    } catch (e) {
+      this.showAlert('Error al procesar la solicitud.', 'danger');
+    }
+  }
+
+  // Fase 3: carga el historial de solicitudes + contador y pinta el badge del botón.
+  async loadChangeRequests() {
+    try {
+      if (!this.quoteId) return;
+      const resp = await fetch(`/api/quotes/${this.quoteId}/change-requests`, {
+        headers: { Authorization: `Bearer ${this.getAccessToken() || ''}` },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) return;
+      this.changeRequests = (data.data && data.data.requests) || [];
+      const counter = (data.data && data.data.counter) || 0;
+      const badge = document.getElementById('changeRequestsCounter');
+      if (badge) {
+        badge.textContent = String(counter);
+        badge.classList.toggle('d-none', !counter);
+      }
+    } catch (e) { /* silencioso */ }
+  }
+
+  // Fase 3: abre el modal con el historial de solicitudes de la cotización.
+  async openChangeRequestsModal() {
+    // Refresca datos al abrir (además de justificar el spinner del botón).
+    await this.loadChangeRequests();
+    const isAdmin = ['admin', 'superadmin'].includes(this.userRole);
+    const reqs = this.changeRequests || [];
+    const fmtDate = (d) => {
+      if (!d) return '';
+      try { return new Date(d).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }); } catch (_) { return ''; }
+    };
+    const statusBadge = (s) => {
+      if (s === 'approved') return '<span class="badge bg-success-subtle text-success-emphasis border">Aprobada</span>';
+      if (s === 'rejected') return '<span class="badge bg-danger-subtle text-danger-emphasis border">Rechazada</span>';
+      return '<span class="badge bg-warning-subtle text-warning-emphasis border">Pendiente</span>';
+    };
+    const rows = reqs.length ? reqs.map((r) => `
+      <div class="border rounded p-2 mb-2">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <div><strong>${r.type === 'delete' ? 'Borrar' : 'Modificar'}</strong> · ${this.escapeHtmlText(r.serviceLabel || 'Servicio')}${r.serviceDeleted ? ' <span class="text-muted">(eliminado)</span>' : ''}</div>
+            <div class="small text-muted">Solicitó ${this.escapeHtmlText(r.requestedByName || '')} · ${fmtDate(r.requestedAt)}</div>
+            ${r.note ? `<div class="small mt-1">“${this.escapeHtmlText(r.note)}”</div>` : ''}
+            ${r.status !== 'pending' ? `<div class="small text-muted mt-1">${r.status === 'approved' ? 'Aprobada' : 'Rechazada'} por ${this.escapeHtmlText(r.reviewedByName || '')} · ${fmtDate(r.reviewedAt)}${r.reviewNote ? ` — “${this.escapeHtmlText(r.reviewNote)}”` : ''}</div>` : ''}
+          </div>
+          <div>${statusBadge(r.status)}</div>
+        </div>
+      </div>`).join('') : '<p class="text-muted mb-0">No hay solicitudes.</p>';
+
+    document.getElementById('changeRequestsModal')?.remove();
+    const html = `
+      <div class="modal fade" id="changeRequestsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title"><i class="ti ti-inbox me-2"></i>Historial de solicitudes</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">${rows}</div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modalEl = document.getElementById('changeRequestsModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modalEl.addEventListener('hidden.bs.modal', () => this.disposeTempModal(modalEl, modal));
+    modal.show();
+
+    // El owner marca como vistas sus solicitudes resueltas → limpia contador + badges inline.
+    if (!isAdmin) {
+      fetch(`/api/quotes/${this.quoteId}/change-requests/mark-seen`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.getAccessToken() || ''}` },
+      }).then(() => {
+        document.getElementById('changeRequestsCounter')?.classList.add('d-none');
+        (this.services || new Map()).forEach((svc) => {
+          if (svc.changeRequest && svc.changeRequest.status && svc.changeRequest.status !== 'pending') {
+            delete svc.changeRequest;
+          }
+        });
+        this.renderItinerary();
+      }).catch(() => {});
+    }
+  }
+
+  // Fase A: modal con el timeline de actividades de la cotización (read-only, ambos roles).
+  async openActivityModal() {
+    let activities = [];
+    try {
+      const resp = await fetch(`/api/quotes/${this.quoteId}/activity`, {
+        headers: { Authorization: `Bearer ${this.getAccessToken() || ''}` },
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) activities = (data.data && data.data.activities) || [];
+    } catch (e) { /* silencioso */ }
+
+    const COLORS = {
+      service_added: '#2e7d32',
+      service_edited: '#1565c0',
+      service_removed: '#c62828',
+      status_changed: '#6E7A50',
+      change_requested: '#b8894a',
+      change_approved: '#2e7d32',
+      change_rejected: '#c62828',
+      converted_to_reservation: '#6E7A50',
+      reservation_cancelled: '#c62828',
+      reverted_to_quote: '#b8894a',
+      ownership_transferred: '#1565c0',
+      quote_edited: '#6b7280',
+    };
+    const ICONS = {
+      service_added: 'ti-plus',
+      service_edited: 'ti-pencil',
+      service_removed: 'ti-trash',
+      status_changed: 'ti-flag',
+      change_requested: 'ti-message-2',
+      change_approved: 'ti-check',
+      change_rejected: 'ti-x',
+      converted_to_reservation: 'ti-calendar-check',
+      reservation_cancelled: 'ti-calendar-off',
+      reverted_to_quote: 'ti-arrow-back-up',
+      ownership_transferred: 'ti-user-share',
+      quote_edited: 'ti-edit',
+    };
+    const dayLabel = (d) => {
+      const dt = new Date(d);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const that = new Date(dt); that.setHours(0, 0, 0, 0);
+      const diff = Math.round((today - that) / 86400000);
+      if (diff === 0) return 'Hoy';
+      if (diff === 1) return 'Ayer';
+      try { return dt.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (_) { return ''; }
+    };
+    const timeLabel = (d) => {
+      try { return new Date(d).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; }
+    };
+
+    // Fase B2: filtros por categoría.
+    const CATEGORY = {
+      service_added: 'servicios',
+      service_edited: 'servicios',
+      service_removed: 'servicios',
+      change_requested: 'solicitudes',
+      change_approved: 'solicitudes',
+      change_rejected: 'solicitudes',
+      converted_to_reservation: 'reserva',
+      reservation_cancelled: 'reserva',
+      reverted_to_quote: 'reserva',
+      status_changed: 'otros',
+      ownership_transferred: 'otros',
+      quote_edited: 'otros',
+    };
+    // Fase B4: paginación en cliente ("ver más").
+    const PAGE_SIZE = 15;
+    const renderTimeline = (filter, limit) => {
+      const list = filter === 'all'
+        ? activities
+        : activities.filter((a) => (CATEGORY[a.action] || 'otros') === filter);
+      if (!list.length) {
+        return `<div class="text-center text-muted py-5">
+          <i class="ti ti-timeline-event" style="font-size:2.5rem;opacity:.35;"></i>
+          <p class="mb-0 mt-2">${activities.length ? 'No hay actividad de este tipo.' : 'Aún no hay actividad registrada.'}</p>
+          ${activities.length ? '' : '<small>Los cambios en servicios, solicitudes y estado aparecerán aquí.</small>'}
+        </div>`;
+      }
+      const shown = list.slice(0, limit);
+      const remaining = list.length - shown.length;
+      let lastDay = null;
+      const parts = [];
+      shown.forEach((a) => {
+        const dk = new Date(a.createdAt); dk.setHours(0, 0, 0, 0);
+        const key = dk.getTime();
+        if (key !== lastDay) {
+          lastDay = key;
+          parts.push(`<div class="qa-date-sep">${dayLabel(a.createdAt)}</div>`);
+        }
+        const color = COLORS[a.action] || '#9aa0a6';
+        const icon = ICONS[a.action] || 'ti-point';
+        parts.push(`
+          <div class="qa-item">
+            <span class="qa-dot" style="background:${color}"><i class="ti ${icon}"></i></span>
+            <div class="qa-title"><strong>${this.escapeHtmlText(a.actorName || 'Alguien')}</strong> ${this.escapeHtmlText(a.summary || '')}</div>
+            <div class="qa-time">${timeLabel(a.createdAt)}</div>
+          </div>`);
+      });
+      const moreBtn = remaining > 0
+        ? `<div class="qa-more"><button type="button" class="qa-more-btn">Ver más (${remaining} ${remaining === 1 ? 'restante' : 'restantes'})</button></div>`
+        : '';
+      return `<div class="qa-timeline">${parts.join('')}</div>${moreBtn}`;
+    };
+    const FILTERS = [
+      { key: 'all', label: 'Todos' },
+      { key: 'servicios', label: 'Servicios' },
+      { key: 'solicitudes', label: 'Solicitudes' },
+      { key: 'reserva', label: 'Reservación' },
+      { key: 'otros', label: 'Otros' },
+    ];
+    const filterBar = activities.length
+      ? `<div class="qa-filters">${FILTERS.map((f) => `<button type="button" class="qa-chip${f.key === 'all' ? ' active' : ''}" data-filter="${f.key}">${f.label}</button>`).join('')}</div>`
+      : '';
+    let currentFilter = 'all';
+    let currentLimit = PAGE_SIZE;
+    const body = `${filterBar}<div id="qa-timeline-container">${renderTimeline(currentFilter, currentLimit)}</div>`;
+
+    if (!document.getElementById('qa-timeline-styles')) {
+      const st = document.createElement('style');
+      st.id = 'qa-timeline-styles';
+      st.textContent = `
+        #quoteActivityModal .modal-content{border:none;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.15);}
+        #quoteActivityModal .modal-header{border-bottom:1px solid #f1f1f0;padding-bottom:.75rem;}
+        #quoteActivityModal .modal-body{padding-top:1rem;}
+        #quoteActivityModal .qa-timeline{padding:2px 6px 0;}
+        #quoteActivityModal .qa-date-sep{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#9aa0a6;font-weight:700;margin:14px 0 12px;}
+        #quoteActivityModal .qa-date-sep:first-child{margin-top:0;}
+        #quoteActivityModal .qa-item{position:relative;padding-left:46px;padding-bottom:18px;}
+        #quoteActivityModal .qa-item::before{content:'';position:absolute;left:16px;top:32px;bottom:-4px;width:2px;background:#ececeb;}
+        #quoteActivityModal .qa-item:last-child::before{display:none;}
+        #quoteActivityModal .qa-dot{position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1rem;box-shadow:0 1px 3px rgba(0,0,0,.18);}
+        #quoteActivityModal .qa-title{font-size:.9rem;line-height:1.4;color:#2b2b2b;}
+        #quoteActivityModal .qa-title strong{color:#1a1a1a;}
+        #quoteActivityModal .qa-time{font-size:.72rem;color:#9aa0a6;margin-top:2px;}
+        #quoteActivityModal .qa-filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+        #quoteActivityModal .qa-chip{border:1px solid #e2e2e0;background:#fff;color:#5f6368;border-radius:16px;padding:3px 12px;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .12s;}
+        #quoteActivityModal .qa-chip:hover{background:#f4f4f2;}
+        #quoteActivityModal .qa-chip.active{background:#2e2e2d;border-color:#2e2e2d;color:#fff;}
+        #quoteActivityModal .qa-more{text-align:center;padding:4px 0 8px;}
+        #quoteActivityModal .qa-more-btn{border:1px solid #e2e2e0;background:#fff;color:#5f6368;border-radius:16px;padding:5px 18px;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .12s;}
+        #quoteActivityModal .qa-more-btn:hover{background:#f4f4f2;color:#2e2e2d;}
+      `;
+      document.head.appendChild(st);
+    }
+
+    document.getElementById('quoteActivityModal')?.remove();
+    const html = `
+      <div class="modal fade" id="quoteActivityModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <div>
+                <h5 class="modal-title mb-0"><i class="ti ti-timeline-event me-2"></i>Actividad</h5>
+                <small class="text-muted">Quién hizo qué en esta cotización</small>
+              </div>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">${body}</div>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    const modalEl = document.getElementById('quoteActivityModal');
+    const modal = new bootstrap.Modal(modalEl);
+    modalEl.addEventListener('hidden.bs.modal', () => this.disposeTempModal(modalEl, modal));
+    const rerender = () => {
+      const cont = modalEl.querySelector('#qa-timeline-container');
+      if (cont) cont.innerHTML = renderTimeline(currentFilter, currentLimit);
+    };
+    // Fase B2: filtros por categoría — al cambiar de chip se resetea la paginación.
+    modalEl.querySelectorAll('.qa-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        modalEl.querySelectorAll('.qa-chip').forEach((c) => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentFilter = chip.dataset.filter;
+        currentLimit = PAGE_SIZE;
+        rerender();
+      });
+    });
+    // Fase B4: "Ver más" — delegado en el contenedor para sobrevivir re-renders.
+    modalEl.querySelector('#qa-timeline-container')?.addEventListener('click', (ev) => {
+      if (ev.target.closest('.qa-more-btn')) {
+        currentLimit += PAGE_SIZE;
+        rerender();
+      }
+    });
+    modal.show();
+  }
+
   duplicateService(serviceId) {
     const originalService = this.services.get(serviceId);
     if (!originalService) return;
+    if (!this.canManageService(originalService)) {
+      this.showAlert('Este servicio fue agregado por un administrador y no puedes modificarlo.', 'warning');
+      return;
+    }
 
     const newServiceId = this.generateId('service');
     // Deep copy so the duplicate doesn't share nested arrays/objects with the original
@@ -20639,6 +21198,13 @@ class ItineraryBuilder {
     const service = this.services.get(serviceId);
 
     if (!service) return;
+
+    // Bloqueo por-servicio: no-admin no puede borrar un servicio agregado por admin
+    // (en Fase 2 aquí irá "Solicitar borrado" con aprobación del admin).
+    if (!this.canManageService(service)) {
+      this.showAlert('Este servicio fue agregado por un administrador. No puedes borrarlo; pronto podrás solicitar su borrado.', 'warning');
+      return;
+    }
 
     const message = '¿Estás seguro de que deseas eliminar este servicio?';
     document.getElementById('deleteConfirmMessage').textContent = message;
@@ -21466,6 +22032,11 @@ class ItineraryBuilder {
       btn.addEventListener('click', (e) => {
         const { dayId } = btn.dataset;
         const { serviceId } = btn.dataset;
+        // Bloqueo por-servicio: no-admin no puede abrir a editar un servicio de admin.
+        if (!this.canManageService(this.services.get(serviceId))) {
+          this.showAlert('Este servicio fue agregado por un administrador y no puedes editarlo.', 'warning');
+          return;
+        }
         this.openServiceModal(dayId, serviceId);
       });
     });
@@ -21482,6 +22053,16 @@ class ItineraryBuilder {
         const { serviceId } = btn.dataset;
         this.deleteService(serviceId);
       });
+    });
+
+    // Fase 2: owner solicita cambio (borrar/modificar) de un servicio bloqueado.
+    container.querySelectorAll('.request-change-btn').forEach((btn) => {
+      btn.addEventListener('click', () => this.openChangeRequestModal(btn.dataset.serviceId));
+    });
+
+    // Fase 2: admin aprueba/rechaza una solicitud de cambio.
+    container.querySelectorAll('.review-change-btn').forEach((btn) => {
+      btn.addEventListener('click', () => this.reviewServiceChange(btn.dataset.serviceId, btn.dataset.decision));
     });
 
     container.querySelectorAll('.accept-overlap-btn').forEach((btn) => {

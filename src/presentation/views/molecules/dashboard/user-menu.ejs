@@ -51,7 +51,9 @@ const menuClientCategoryLabels = {
   concierge: 'Concierge',
   home_owner: 'Home Owner',
 };
-const menuRawClientCategory = (typeof clientCategory !== 'undefined' && clientCategory) ? clientCategory : null;
+const menuRawClientCategory = (typeof clientCategory !== 'undefined' && clientCategory)
+  ? clientCategory
+  : (menuUser && menuUser.clientCategory ? menuUser.clientCategory : null);
 let formattedRole = formatRoleName(menuUserRole);
 let showMenuRole = true;
 if (menuUserRole === 'end_client') {

@@ -96,6 +96,7 @@ class DashboardAuthMiddleware {
           role: decoded.role || 'guest',
           name: decoded.username || 'Unknown User',
           clientId: decoded.clientId,
+          clientCategory: decoded.clientCategory || null,
           organizationId: decoded.organizationId,
           isActive: true,
         };
@@ -123,6 +124,7 @@ class DashboardAuthMiddleware {
         name: req.session.user.name || req.session.user.username || 'Unknown User',
         email: req.session.user.email,
         clientId: req.session.user.clientId,
+        clientCategory: req.session.user.clientCategory || null,
         organizationId: req.session.user.organizationId,
         isActive: true,
       };
@@ -134,6 +136,7 @@ class DashboardAuthMiddleware {
     res.locals.userRole = user.role;
     res.locals.userName = user.name || user.username;
     res.locals.userId = user.id;
+    res.locals.clientCategory = user.clientCategory || null;
     res.locals.accessToken = accessToken; // Pass token to templates
 
     next();

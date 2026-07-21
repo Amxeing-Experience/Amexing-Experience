@@ -58,7 +58,11 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'client';
             tableId: 'quotes-table',
             apiEndpoint: '/api/quotes',
             userRole: currentUserRole,
-            showActions: true
+            showActions: true,
+            endClientCaps: typeof endClientCaps !== 'undefined' ? endClientCaps : null,
+            clientCategory: (typeof clientCategory !== 'undefined' && clientCategory)
+              ? clientCategory
+              : ((typeof user !== 'undefined' && user && user.clientCategory) ? user.clientCategory : null)
         }) %>
     </div>
 </div>

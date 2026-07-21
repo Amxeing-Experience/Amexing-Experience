@@ -1333,7 +1333,17 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('experiencePriceNoAlcohol').value = data.price_no_alcohol || '';
             document.getElementById('experiencePriceChild').value = data.price_child || '';
             document.getElementById('experiencePriceInfant').value = data.price_infant || '';
-            document.getElementById('experienceDuration').value = data.duration || '';
+            (function() {
+                // Duración ahora en MINUTOS (picker amigable), igual que trayecto/anticipación.
+                const durMin = parseInt(data.duration, 10) || 0;
+                const dHidden = document.getElementById('experienceDuration');
+                const dPicker = dHidden ? dHidden.closest('.advance-time-picker') : null;
+                if (dPicker && window.AdvanceTimePicker) {
+                    window.AdvanceTimePicker.set(dPicker, durMin);
+                } else if (dHidden) {
+                    dHidden.value = durMin || '';
+                }
+            })();
             (function() {
                 const travelMin = parseInt(data.travel_duration, 10) || 0;
                 const tHidden = document.getElementById('experienceTravelDuration');

@@ -14,6 +14,7 @@ const logger = require('../../../infrastructure/logger');
 const FileStorageService = require('../../services/FileStorageService');
 const PaymentService = require('../../services/PaymentService');
 const { notifyReservationCancellation } = require('../../services/ReservationCancellationNotifier');
+const QuoteActivityService = require('../../services/QuoteActivityService');
 // Models used via Parse.Query string references
 
 // Module-level FileStorageService for presigned S3 URLs (static class needs this)
@@ -1312,12 +1313,135 @@ class ReservationController {
           reason: req.body?.reason,
           cancellationType,
         });
+        // Timeline (Fase B1): registrar la cancelación en la cotización.
+        await QuoteActivityService.log({
+          quoteId: linkedQuote.id,
+          actor: req.user,
+          actorRole: req.userRole,
+          action: 'reservation_cancelled',
+          summary: `canceló la reservación${reservation.get('folio') ? ` (${reservation.get('folio')})` : ''}`,
+          meta: { reservationId: reservation.id, reservationFolio: reservation.get('folio') },
+        });
       }
 
       return res.json({ success: true, message: 'Reservación cancelada exitosamente' });
     } catch (error) {
       logger.error('Error cancelling reservation', { error: error.message });
       return res.status(500).json({ success: false, error: 'Error al cancelar reservación' });
+    }
+  }
+
+  /**
+   * POST /api/reservations/:id/revert-to-quote — Regresa una reservación a cotización
+   * (deshace una conversión hecha por error). SOLO admin/superadmin (gate en la ruta).
+   *
+   * Hace soft-delete (active=false, exists=false) de la reservación y de sus
+   * ReservationService, y regresa el status de la cotización a 'quoted' (o 'requested').
+   * Aborta si hay pagos registrados. NO es una cancelación: no manda correo ni deja la
+   * reservación en 'cancelled', simplemente la retira para que la cotización vuelva a serlo.
+   * @param {object} req - Express request; body: { targetStatus? } ('quoted' | 'requested').
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON con el resultado.
+   * @example
+   *   POST /api/reservations/abc123/revert-to-quote { "targetStatus": "quoted" }
+   */
+  static async revertToQuote(req, res) {
+    try {
+      const { id } = req.params;
+      const targetStatus = ['quoted', 'requested'].includes(req.body?.targetStatus)
+        ? req.body.targetStatus
+        : 'quoted';
+
+      const query = new Parse.Query('Reservation');
+      query.equalTo('exists', true);
+      const reservation = await ReservationController.safeGet(query, id);
+      if (!reservation) {
+        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      }
+
+      // Cotización ligada
+      const quotePtr = reservation.get('quotePtr');
+      let quote = null;
+      if (quotePtr) {
+        const quoteQuery = new Parse.Query('Quote');
+        quoteQuery.equalTo('exists', true);
+        quote = await quoteQuery.get(quotePtr.id, { useMasterKey: true });
+      }
+      if (!quote) {
+        return res.status(400).json({ success: false, error: 'La reservación no tiene una cotización ligada' });
+      }
+
+      // Seguridad: si hay pagos registrados, no revertir desde la UI (evita perder registros de pago).
+      const payQuery = new Parse.Query('Payment');
+      payQuery.equalTo('reservationPtr', reservation);
+      payQuery.equalTo('exists', true);
+      const paymentsCount = await payQuery.count({ useMasterKey: true });
+      if (paymentsCount > 0) {
+        return res.status(409).json({
+          success: false,
+          code: 'REVERT_HAS_PAYMENTS',
+          error: `La reservación tiene ${paymentsCount} pago(s) registrados. Elimina o reasigna los pagos antes de regresarla a cotización.`,
+        });
+      }
+
+      // Soft-delete de los ReservationService
+      const svcQuery = new Parse.Query('ReservationService');
+      svcQuery.equalTo('reservationPtr', reservation);
+      svcQuery.equalTo('exists', true);
+      svcQuery.limit(1000);
+      const services = await svcQuery.find({ useMasterKey: true });
+      for (const svc of services) {
+        svc.set('active', false);
+        svc.set('exists', false);
+      }
+      if (services.length > 0) {
+        await Parse.Object.saveAll(services, { useMasterKey: true });
+      }
+
+      // Soft-delete de la reservación
+      reservation.set('active', false);
+      reservation.set('exists', false);
+      await reservation.save(null, { useMasterKey: true });
+
+      // Regresar el status de la cotización (queda como cotización de nuevo)
+      const previousStatus = quote.get('status');
+      quote.set('status', targetStatus);
+      await quote.save(null, { useMasterKey: true });
+
+      logger.info('Reservación revertida a cotización', {
+        reservationId: id,
+        reservationFolio: reservation.get('folio'),
+        quoteId: quote.id,
+        quoteFolio: quote.get('folio'),
+        previousQuoteStatus: previousStatus,
+        targetStatus,
+        servicesReverted: services.length,
+        performedBy: req.user?.id,
+      });
+
+      // Timeline (Fase B1): registrar el regreso de reservación a cotización.
+      await QuoteActivityService.log({
+        quoteId: quote.id,
+        actor: req.user,
+        actorRole: req.userRole,
+        action: 'reverted_to_quote',
+        summary: `regresó la reservación${reservation.get('folio') ? ` (${reservation.get('folio')})` : ''} a cotización`,
+        meta: { reservationId: reservation.id, reservationFolio: reservation.get('folio') },
+      });
+
+      return res.json({
+        success: true,
+        message: 'Reservación regresada a cotización',
+        data: {
+          quoteId: quote.id,
+          quoteFolio: quote.get('folio'),
+          quoteStatus: targetStatus,
+          servicesReverted: services.length,
+        },
+      });
+    } catch (error) {
+      logger.error('Error reverting reservation to quote', { error: error.message });
+      return res.status(500).json({ success: false, error: 'Error al regresar la reservación a cotización' });
     }
   }
 

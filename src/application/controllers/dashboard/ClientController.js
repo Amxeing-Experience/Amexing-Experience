@@ -1,5 +1,6 @@
 const RoleBasedController = require('./base/RoleBasedController');
 const { getDashboardSummary } = require('./dashboardSummary');
+const { getEndClientCapabilities } = require('../../config/endClientCapabilities');
 
 /**
  * ClientController - Implements client-specific dashboard functionality.
@@ -416,9 +417,22 @@ class ClientController extends RoleBasedController {
   async quoteDetail(req, res) {
     try {
       const quoteId = req.params.id;
-      const section = req.query.section || 'information';
+      let section = req.query.section || 'information';
 
       const isNewQuote = quoteId === 'new';
+
+      // Cliente directo (end_client solo lectura): la info básica no le aporta; si no eligió
+      // sección explícita, entra directo a Servicios (el itinerario, que es lo que quiere ver).
+      const role = req.userRole || req.user?.role;
+      if (role === 'end_client' && !req.query.section && !isNewQuote) {
+        const caps = getEndClientCapabilities(req.user?.clientCategory);
+        if (!caps.createQuotes) section = 'services';
+      }
+
+      // El relabel a "Reservación" lo decide el CONTEXTO con que se abrió (abierto desde
+      // Reservaciones llega ?context=reservation), no si existe una reservación. Igual que admin.
+      const isReservation = req.query.context === 'reservation';
+      const entityLabel = isReservation ? 'Reservación' : 'Cotización';
 
       // Traer estado + total de la cotización para pintar el panel (timeline + botón
       // "Solicitar Servicios") server-side y que no espere al fetch del cliente.
@@ -438,10 +452,11 @@ class ClientController extends RoleBasedController {
       }
 
       await this.renderRoleView(req, res, 'quote-detail', {
-        title: isNewQuote ? 'Nueva Cotización' : `Cotización ${quoteId}`,
+        title: isNewQuote ? `Nueva ${entityLabel}` : `${entityLabel} ${quoteId}`,
         breadcrumb: null,
         quoteId,
         isNewQuote,
+        isReservation,
         quoteStatus,
         quoteTotal,
         currentSection: section,

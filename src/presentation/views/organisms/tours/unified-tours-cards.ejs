@@ -1375,6 +1375,13 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
 .expcard__badge { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; padding: 5px 11px; border-radius: 3px; line-height: 1.3; }
 .expcard__badge--cat { background: rgba(20, 20, 20, 0.62); color: #f3f0e8; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
 .expcard__badge--tipo { border: 1px solid rgba(243, 240, 232, 0.7); color: #f3f0e8; background: rgba(20, 20, 20, 0.28); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); font-weight: 600; }
+.expcard__badge--pop { display: inline-flex; align-items: center; gap: 4px; background: #e11d1d; color: #fff; font-weight: 700; }
+.expcard__badge--pop i { font-size: 0.85rem; }
+.exp-groupdiv { display: flex; align-items: center; gap: 12px; padding-top: 6px; }
+.exp-groupdiv:not(:first-child) { margin-top: 6px; }
+.exp-groupdiv__label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--exp-olive, #6E7A50); font-weight: 600; white-space: nowrap; }
+.exp-groupdiv__heart { color: #e11d1d; font-size: 0.9rem; }
+.exp-groupdiv::after { content: ''; flex: 1 1 auto; height: 1px; background: var(--exp-border, #e6e2d8); }
 
 /* Body */
 .expcard__body { padding: 20px 20px 18px; display: flex; flex-direction: column; flex: 1; }
@@ -1470,6 +1477,23 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentGuideFilter = 'guide-only'; // Filter for guide type - default to guide-only (Solo Guía)
     let selectedRateId = null; // Currently selected rate
     let currentTourTypeFilter = 'all'; // 'all', 'walking', 'vehicle'
+
+    // Orden del catálogo: populares primero, luego alfabético por destino.
+    // En Tours todos los roles ven populares + resto (no hay restricción solo-populares).
+    function compareTours(a, b) {
+        const popA = a && a.popular === true ? 0 : 1;
+        const popB = b && b.popular === true ? 0 : 1;
+        if (popA !== popB) return popA - popB;
+        const destA = (a.destinationPOI?.name || '').toLowerCase();
+        const destB = (b.destinationPOI?.name || '').toLowerCase();
+        return destA.localeCompare(destB, 'es', { numeric: true, sensitivity: 'base' });
+    }
+
+    // Encabezado de grupo (full-width) para separar "Populares" de "Todos" dentro del mismo grid.
+    function tourGroupDivider(label, withHeart) {
+        const heart = withHeart ? '<i class="ti ti-heart-filled exp-groupdiv__heart"></i> ' : '';
+        return `<div class="col-12 exp-groupdiv"><span class="exp-groupdiv__label">${heart}${label}</span></div>`;
+    }
 
     // DOM elements
     const toursLoading = document.getElementById('toursLoading');
@@ -1785,11 +1809,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success && data.data) {
                 allTours = data.data; // Include ALL tours (both walking and vehicle)
 
-                allTours.sort((a, b) => {
-                    const destA = (a.destinationPOI?.name || '').toLowerCase();
-                    const destB = (b.destinationPOI?.name || '').toLowerCase();
-                    return destA.localeCompare(destB, 'es', { numeric: true, sensitivity: 'base' });
-                });
+                // Populares primero, luego alfabético
+                allTours.sort(compareTours);
 
                 applyFilters();
             } else {
@@ -1824,12 +1845,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return searchMatch && tourTypeMatch;
         });
 
-        // Sort tours alphabetically by destination
-        filteredTours.sort((a, b) => {
-            const destA = (a.destinationPOI?.name || '').toLowerCase();
-            const destB = (b.destinationPOI?.name || '').toLowerCase();
-            return destA.localeCompare(destB, 'es', { numeric: true, sensitivity: 'base' });
-        });
+        // Populares primero, luego alfabético
+        filteredTours.sort(compareTours);
 
         displayTours();
     }
@@ -1853,7 +1870,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const currency = currencyFilterDesktop?.value || currencyFilterMobile?.value || 'MXN';
         const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'efectivo';
         
-        const cardsHTML = filteredTours.map(tour => {
+        const buildTourCard = (tour) => {
             // Map API data to display format first
             const destination = tour.destinationPOI?.name || 'Destino no especificado';
             
@@ -2101,6 +2118,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="expcard__media" data-image-container>
                             ${pictureElement}
                             <div class="expcard__tags">
+                                ${tour.popular === true ? `<span class="expcard__badge expcard__badge--pop"><i class="ti ti-heart-filled"></i> Popular</span>` : ''}
                                 <span class="expcard__badge expcard__badge--tipo">${tipoBadge}</span>
                             </div>
                         </div>
@@ -2143,8 +2161,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
             `;
-        }).join('');
-        
+        };
+
+        // Agrupación visual "Populares / Todos": solo cuando NO hay búsqueda ni filtro de tipo
+        // activos, y hay mezcla de populares y no-populares. Al filtrar, solo importa el orden.
+        const searchActive = !!((searchInputDesktop?.value || searchInputMobile?.value || '').trim());
+        const anyPopular = filteredTours.some(t => t && t.popular === true);
+        const anyRegular = filteredTours.some(t => t && t.popular !== true);
+        const showGroups = !searchActive && currentTourTypeFilter === 'all' && anyPopular && anyRegular;
+
+        let cardsHTML = '';
+        let regularHeaderDone = false;
+        filteredTours.forEach((tour, index) => {
+            if (showGroups) {
+                if (index === 0) cardsHTML += tourGroupDivider('Populares', true);
+                if (!regularHeaderDone && tour.popular !== true) {
+                    cardsHTML += tourGroupDivider('Todos los tours', false);
+                    regularHeaderDone = true;
+                }
+            }
+            cardsHTML += buildTourCard(tour);
+        });
+
         toursGrid.innerHTML = cardsHTML;
         showResults();
     }

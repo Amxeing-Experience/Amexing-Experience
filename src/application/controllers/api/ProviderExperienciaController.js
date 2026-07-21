@@ -79,6 +79,7 @@ class ProviderExperienciaController {
       query.equalTo('active', true);
       query.equalTo('exists', true);
       query.include('provider');
+      query.include('provider.destinationPOI'); // el destino vive en el proveedor/establecimiento
       query.ascending('provider');
       query.ascending('name');
       query.limit(1000); // Get many for selection
@@ -283,8 +284,18 @@ class ProviderExperienciaController {
               type: exp.get('provider').get('type'),
             }
             : null,
+          // El destino de una experiencia de proveedor vive en el proveedor/establecimiento.
+          // Se expone como destinationPOI top-level para que el front lo trate igual que las regulares.
+          destinationPOI: (exp.get('provider') && exp.get('provider').get('destinationPOI'))
+            ? {
+              id: exp.get('provider').get('destinationPOI').id,
+              name: exp.get('provider').get('destinationPOI').get('name'),
+            }
+            : null,
           createdAt: exp.createdAt,
           updatedAt: exp.updatedAt,
+
+          popular: exp.get('popular') === true,
 
           // Mark as provider experience for frontend identification
           type: 'provider_experience',
@@ -1391,9 +1402,62 @@ class ProviderExperienciaController {
       displayOrder: experiencia.getDisplayOrder(),
       active: experiencia.isActive(),
       availability: experiencia.getAvailability(),
+      popular: experiencia.get('popular') === true,
       createdAt: experiencia.createdAt,
       updatedAt: experiencia.updatedAt,
     };
+  }
+
+  /**
+   * PATCH /api/provider-experiencias/:id/popular - Toggle the "popular" curation flag (admin).
+   * Popular provider/establishment experiences are surfaced first in the client catalog.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   */
+  async togglePopular(req, res) {
+    try {
+      if (!req.user) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      const { id } = req.params;
+      if (!id) {
+        return this.sendError(res, 'Experiencia ID is required', 400);
+      }
+
+      const popular = req.body && (req.body.popular === true || req.body.popular === 'true');
+
+      const query = new Parse.Query('ProviderExperiencia');
+      query.equalTo('objectId', id);
+      query.equalTo('exists', true);
+      const experiencia = await query.first({ useMasterKey: true });
+
+      if (!experiencia) {
+        return this.sendError(res, 'Provider experiencia not found', 404);
+      }
+
+      experiencia.set('popular', popular);
+      await experiencia.save(null, { useMasterKey: true });
+
+      logger.info('Provider experiencia popular flag toggled', {
+        experienciaId: experiencia.id,
+        popular,
+        userId: req.user.id,
+      });
+
+      return res.json({
+        success: true,
+        data: { id: experiencia.id, popular },
+      });
+    } catch (error) {
+      logger.error('Error in ProviderExperienciaController.togglePopular', {
+        error: error.message,
+        experienciaId: req.params.id,
+        userId: req.user?.id,
+      });
+      return this.sendError(res, 'Failed to update popular flag', 500);
+    }
   }
 
   /**
