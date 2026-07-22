@@ -116,18 +116,30 @@ function populateDropdownsForTransportType(transportType, directionType) {
     directionType = document.querySelector('input[name="directionType"]:checked')?.value || 'arrival';
   }
 
-  // Origen/destino = CUALQUIER POI activo, en los 3 tipos (aeropuerto / punto-a-punto / local) y
-  // en ambas direcciones. El cliente pidió libertad total: cualquier POI de la BD en ambos lados.
   const allPois = window.allActivePois || [];
+  const isAirportPoi = (p) => String((p && p.serviceType && p.serviceType.name) || '').trim().toLowerCase() === 'aeropuerto';
+  const airportNames = allPois.filter(isAirportPoi).map((p) => p.label).filter(Boolean);
+  const nonAirportNames = allPois.filter((p) => !isAirportPoi(p)).map((p) => p.label).filter(Boolean);
   const allNames = allPois.map((p) => p.label).filter(Boolean);
 
-  const origins = new Set(allNames);
-  const destinations = new Set(allNames);
+  const isDeparture = directionType === 'departure';
+
+  // Regla de AEROPUERTO (por ahora solo este tipo): un traslado de aeropuerto siempre toca un
+  // aeropuerto de un lado y NO del otro. Arrival = origen aeropuerto → destino cualquiera MENOS
+  // aeropuerto; Departure = origen cualquiera MENOS aeropuerto → destino aeropuerto. Punto a Punto
+  // y Local mantienen libertad total (cualquier POI en ambos lados).
+  let origins;
+  let destinations;
+  if (transportType === 'aeropuerto') {
+    origins = new Set(isDeparture ? nonAirportNames : airportNames);
+    destinations = new Set(isDeparture ? airportNames : nonAirportNames);
+  } else {
+    origins = new Set(allNames);
+    destinations = new Set(allNames);
+  }
 
   // Create mapping from slugified values to original names (make it global)
   window.slugToOriginalMapping = new Map();
-
-  const isDeparture = directionType === 'departure';
 
   // Elements (one-way only — round trip uses populateRoundTripDropdowns)
   const originSelectEls = [
@@ -214,14 +226,20 @@ function populateDropdownsForTransportType(transportType, directionType) {
 function populateRoundTripDropdowns(transportType) {
   if (!window.allActivePois || window.allActivePois.length === 0) return;
 
-  // Origen/destino = CUALQUIER POI activo en ambas direcciones (ida y vuelta) para los 3 tipos.
   const allPois = window.allActivePois || [];
+  const isAirportPoi = (p) => String((p && p.serviceType && p.serviceType.name) || '').trim().toLowerCase() === 'aeropuerto';
+  const airportNames = allPois.filter(isAirportPoi).map((p) => p.label).filter(Boolean);
+  const nonAirportNames = allPois.filter((p) => !isAirportPoi(p)).map((p) => p.label).filter(Boolean);
   const allNames = allPois.map((p) => p.label).filter(Boolean);
 
-  const arrivalOrigins = new Set(allNames);
-  const arrivalDestinations = new Set(allNames);
-  const departureOrigins = new Set(allNames);
-  const departureDestinations = new Set(allNames);
+  // Regla de AEROPUERTO (round-trip): Ida = arrival (origen aeropuerto → destino cualquiera menos
+  // aeropuerto); Vuelta = departure (origen cualquiera menos aeropuerto → destino aeropuerto).
+  // Punto a Punto / Local: libertad total. Ver populateDropdownsForTransportType (one-way).
+  const isAirport = transportType === 'aeropuerto';
+  const arrivalOrigins = new Set(isAirport ? airportNames : allNames);
+  const arrivalDestinations = new Set(isAirport ? nonAirportNames : allNames);
+  const departureOrigins = new Set(isAirport ? nonAirportNames : allNames);
+  const departureDestinations = new Set(isAirport ? airportNames : allNames);
 
   // Ensure slug mapping exists
   if (!window.slugToOriginalMapping) window.slugToOriginalMapping = new Map();
