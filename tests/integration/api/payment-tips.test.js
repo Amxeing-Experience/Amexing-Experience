@@ -438,4 +438,163 @@ describe('Propina cobrada (Fase 2, integration)', () => {
       expect(after.get('totalAmount')).toBe(s.total); // header == motor, sin divergencia
     });
   });
+
+  describe('FIX 4 — propina fija por servicio: paridad server-side entre paymentType (regresión)', () => {
+    // El monto que se persiste (subconcept.tipAmount) y factura (PaymentService.sumServiceTips) es
+    // PLANO: no escala con el método de pago. El bug era solo de display; estas pruebas blindan que el
+    // motor de dinero nunca re-escale, en las 3 formas de pago.
+    const svc2000 = { pricesByType: { efectivo: 2000, transferencia: 2320, tarjeta: 2420 } };
+
+    it('F4-I01: 3 reservaciones idénticas salvo paymentType, tipAmount:100 fijo -> serviceTipsTotal===100 en las 3', async () => {
+      const items = (method) => [{ ...svc2000, total: svc2000.pricesByType[method], tipAmount: 100 }];
+      const idEf = await createReservation(items('efectivo'), 'efectivo');
+      const idTr = await createReservation(items('transferencia'), 'transferencia');
+      const idTj = await createReservation(items('tarjeta'), 'tarjeta');
+      const [sEf, sTr, sTj] = await Promise.all([
+        PaymentService.summarize(idEf), PaymentService.summarize(idTr), PaymentService.summarize(idTj),
+      ]);
+      expect(sEf.serviceTipsTotal).toBe(100);
+      expect(sTr.serviceTipsTotal).toBe(100); // nunca 116
+      expect(sTj.serviceTipsTotal).toBe(100); // nunca 121
+    });
+
+    it('F4-I02: PUT service-items paymentType tarjeta con tipType:amount,tipValue:100,tipAmount:100 -> 200; tipAmount persiste 100 (no recalcula)', async () => {
+      const quote = new Parse.Object('Quote');
+      quote.set('exists', true);
+      quote.set('active', true);
+      quote.set('status', 'draft');
+      quote.set('folio', `QTE-F4I02-${Date.now()}`);
+      quote.set('numberOfPeople', 2);
+      quote.set('serviceItems', {
+        days: [{ dayNumber: 1, dayTitle: '', subconcepts: [] }], subtotal: 0, iva: 0, total: 0, currency: 'MXN', paymentType: 'efectivo',
+      });
+      await quote.save(null, { useMasterKey: true });
+      created.quotes.push(quote.id);
+
+      const svcSub = {
+        id: 'svc1', concept: 'S', type: 'concepto', pricesByType: { efectivo: 2000, transferencia: 2320, tarjeta: 2420 }, total: 2420, includeInTotal: true, tipType: 'amount', tipValue: 100, tipAmount: 100,
+      };
+      const res = await request(app)
+        .put(`/api/quotes/${quote.id}/service-items`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          days: [{
+            dayNumber: 1, dayTitle: '', dayTotal: 2420, subconcepts: [svcSub],
+          }],
+          subtotal: 2420, iva: 0, total: 2420, currency: 'MXN', paymentType: 'tarjeta',
+        });
+      expect(res.status).toBe(200);
+      const saved = await new Parse.Query('Quote').get(quote.id, { useMasterKey: true });
+      const savedSub = saved.get('serviceItems').days[0].subconcepts.find((x) => x.id === 'svc1');
+      expect(savedSub.tipAmount).toBe(100); // literal: el server no lo re-escala a tarjeta (2420*5% etc.)
+    });
+
+    it('F4-I03: propina percent (tipAmount:300 = 15% de 2000 efectivo) -> serviceTipsTotal===300 anclada a efectivo Y a tarjeta', async () => {
+      const items = (method) => [{ ...svc2000, total: svc2000.pricesByType[method], tipAmount: 300 }];
+      const idEf = await createReservation(items('efectivo'), 'efectivo');
+      const idTj = await createReservation(items('tarjeta'), 'tarjeta');
+      const [sEf, sTj] = await Promise.all([PaymentService.summarize(idEf), PaymentService.summarize(idTj)]);
+      expect(sEf.serviceTipsTotal).toBe(300);
+      expect(sTj.serviceTipsTotal).toBe(300); // nunca 363
+    });
+
+    it('F4-I04: crear efectivo con tipAmount:100, cambiar reservation.paymentType a tarjeta -> serviceTipsTotal sigue 100 (congelado)', async () => {
+      const id = await createReservation([{ ...svc2000, total: 2000, tipAmount: 100 }], 'efectivo');
+      expect((await PaymentService.summarize(id)).serviceTipsTotal).toBe(100);
+      const reservation = await fetchReservation(id);
+      reservation.set('paymentType', 'tarjeta');
+      await reservation.save(null, { useMasterKey: true });
+      expect((await PaymentService.summarize(id)).serviceTipsTotal).toBe(100); // no re-escala al cambiar el ancla
+    });
+  });
+
+  describe('H7 — SUBIR la propina general tras un pago ya registrado', () => {
+    it('H7-I01: globalTip percent 5->15 con un pago de $1000 ya hecho (base 3000, serviceTips 400) -> tip=450, balance=2850, pago intacto', async () => {
+      const quote = await makeQuote(
+        { type: 'percent', value: 5, amount: 150 },
+        [subA, subB],
+        { subtotal: 3000, total: 3150 }
+      );
+      const result = await quoteService.createReservationFromQuote(quote, adminUser);
+      created.reservations.push(result.id);
+      const before = await fetchReservation(result.id);
+      expect(before.get('tip')).toBe(150); // 5% de 3000
+
+      await postPayment(result.id, { amount: 1000, currency: 'MXN', method: 'efectivo' });
+
+      // Re-edición: globalTip SUBE de 5% a 15%.
+      const newSI = {
+        paymentType: 'efectivo',
+        currency: 'MXN',
+        subtotal: 3000,
+        total: 3450,
+        globalTip: { type: 'percent', value: 15, amount: 0 },
+        days: [{ dayNumber: 1, date: '2026-08-15', subconcepts: [subA, subB] }],
+      };
+      await quoteService.syncReservationFromQuote(quote, newSI);
+
+      const after = await fetchReservation(result.id);
+      expect(after.get('tip')).toBe(450); // 15% de 3000, propina general recalculada al alza
+
+      const pays = await getPayments(result.id);
+      expect(pays.body.data.payments).toHaveLength(1); // el pago sobrevive
+      expect(pays.body.data.payments[0].amount).toBe(1000);
+      const s = pays.body.data.summary;
+      expect(s.total).toBe(3850); // 3000 + 450 general + 400 servicio
+      expect(s.balance).toBe(2850); // 3850 - 1000
+    });
+  });
+
+  describe('H9 — igualdad algebraica: total == subtotal + adjustments + generalTip + serviceTipsTotal', () => {
+    // Efectivo con precios múltiplo de 5 (sin recargo ni deriva de redondeo) para que la igualdad sea
+    // exacta término a término, no solo el número final.
+    const setAdjustments = async (id, adjustments) => {
+      const reservation = await fetchReservation(id);
+      reservation.set('adjustments', adjustments);
+      await reservation.save(null, { useMasterKey: true });
+    };
+
+    it('H9-I01: general 300 + servicio 200 + CARGO 500 -> total 11000, y la igualdad se cumple término a término', async () => {
+      const id = await createReservation(
+        [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 }, total: 10000, tipAmount: 200 }],
+        'efectivo',
+        { tip: 300 }
+      );
+      await setAdjustments(id, [{ id: 'adj_ch', type: 'charge', description: 'Extra', amount: 500 }]);
+      const s = await PaymentService.summarize(id);
+      expect(s.total).toBe(s.subtotal + s.adjustments + s.generalTip + s.serviceTipsTotal);
+      expect(s.total).toBe(11000); // 10000 + 500 + 300 + 200
+    });
+
+    it('H9-I02: general 300 + servicio 200 + DESCUENTO 400 -> total 10100, igualdad término a término', async () => {
+      const id = await createReservation(
+        [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 }, total: 10000, tipAmount: 200 }],
+        'efectivo',
+        { tip: 300 }
+      );
+      await setAdjustments(id, [{ id: 'adj_di', type: 'discount', description: 'Cortesía', amount: 400 }]);
+      const s = await PaymentService.summarize(id);
+      expect(s.adjustments).toBe(-400); // neto (descuento resta)
+      expect(s.total).toBe(s.subtotal + s.adjustments + s.generalTip + s.serviceTipsTotal);
+      expect(s.total).toBe(10100); // 10000 - 400 + 300 + 200
+    });
+  });
+
+  describe('H10 — pago parcial en método NO-ancla: la propina plana se suma igual en los 3 métodos', () => {
+    it('H10-I01: base efectivo 10000, tip 300, pago 6050 tarjeta -> montoParaSaldar.tarjeta === 6350 (servicios escalan, propina NO)', async () => {
+      const id = await createReservation(
+        [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 }, total: 10000, tipAmount: 0 }],
+        'efectivo',
+        { tip: 300 }
+      );
+      const pay = await postPayment(id, { amount: 6050, currency: 'MXN', method: 'tarjeta' });
+      expect(pay.status).toBe(200);
+      const s = await PaymentService.summarize(id);
+      // Cobertura equivalente-ancla del pago tarjeta 6050 = 5000 efectivo; restante servicios 5000.
+      // El restante de servicios escala por método; la propina de 300 se suma PLANA en los 3.
+      expect(s.montoParaSaldar.efectivo).toBe(5300); // 5000 + 300
+      expect(s.montoParaSaldar.transferencia).toBe(6100); // 5800 + 300
+      expect(s.montoParaSaldar.tarjeta).toBe(6350); // 6050 + 300 (nunca 300*1.21)
+    });
+  });
 });

@@ -2216,6 +2216,14 @@ class QuoteController {
         return this.sendError(res, `Forma de pago inválida. Use: ${Payment.METHODS.join(', ')}`, 400);
       }
 
+      // FIX 3: tope de 100% en la propina general de tipo porcentaje. El monto fijo (type 'amount') no
+      // lleva límite. Se rechaza (400) antes de tocar la BD; computeGeneralTip además recorta a 100 en
+      // la función pura (defensa en profundidad). Se valida ANTES de la comparación RBAC para que un
+      // porcentaje imposible se rechace con 400 sin importar el rol.
+      if (globalTip && globalTip.type === 'percent' && Number(globalTip.value) > 100) {
+        return this.sendError(res, 'El porcentaje de propina no puede ser mayor a 100%', 400);
+      }
+
       // Validate serviceItems structure
       if (!Array.isArray(days)) {
         return this.sendError(res, 'El campo days debe ser un array', 400);
@@ -2321,6 +2329,16 @@ class QuoteController {
               );
             }
           }
+
+          // FIX 3: tope de 100% en la propina POR SERVICIO de tipo porcentaje (el monto fijo no se
+          // limita). Rechaza aquí, antes de persistir, identificando el subconcepto/día.
+          if (sub.tipType === 'percent' && Number(sub.tipValue) > 100) {
+            return this.sendError(
+              res,
+              `El porcentaje de propina no puede ser mayor a 100% (subconcepto ${j + 1} del día ${day.dayNumber})`,
+              400
+            );
+          }
         }
 
         // Validate dayTotal (new field - must equal sum of subconcepts totals)
@@ -2395,6 +2413,27 @@ class QuoteController {
 
       // Timeline (Fase A): snapshot del serviceItems previo para diffear agregados/editados/quitados.
       const beforeServiceItems = quote.get('serviceItems') || { days: [] };
+
+      // FIX 1: RBAC server-side de la propina. El wizard oculta los controles de propina a los no-admin,
+      // pero el server persistía globalTip/suggestedTipPct + tipType/tipValue/tipMandatory/tipAmount por
+      // subconcepto sin validar rol -> un agente/agencia podía FIJAR cualquier propina por API directa.
+      // Solo admin/superadmin puede fijar o cambiar la propina; un no-admin únicamente puede REENVIAR la
+      // misma propina ya guardada (el wizard la reenvía para no perderla). El guard va DENTRO del
+      // controller y condicional a si la propina realmente cambia: en la ruta bloquearía TODA edición de
+      // servicios (horario/precio) de agentes/agencias, que sí está permitida.
+      // Se prioriza req.roleObject (fila fresca de Role en DB, ya cargada por el middleware) sobre
+      // req.userRole (claim del JWT, puede quedar stale hasta 8h tras un cambio de rol — council
+      // L3F1): un admin recién degradado no debe conservar el privilegio de tocar propina solo porque
+      // su token viejo todavía diga 'admin'. Fallback a userRole SOLO si no hay roleObject fresco.
+      const isAdminForTip = req.roleObject
+        ? (typeof req.roleObject.getLevel === 'function' && req.roleObject.getLevel() >= 6)
+        : ['admin', 'superadmin'].includes(req.userRole);
+      if (!isAdminForTip && this.tipFieldsChanged(beforeServiceItems, { globalTip, suggestedTipPct, days })) {
+        logger.warn('updateServiceItems: non-admin attempted to set/change tip fields', {
+          quoteId: quote.id, userRole: req.userRole,
+        });
+        return this.sendError(res, 'Solo un administrador puede modificar la propina', 403);
+      }
 
       // Debug: Log transport services with suggested departure time fields
       days.forEach((day, dayIndex) => {
@@ -2622,6 +2661,108 @@ class QuoteController {
         500
       );
     }
+  }
+
+  /**
+   * FIX 1: detecta si un payload de service-items INTENTA fijar/cambiar/quitar CUALQUIER campo de propina
+   * respecto a lo ya guardado. Se usa para bloquear (403) a los no-admin, que solo pueden reenviar la
+   * misma propina existente. Compara: globalTip (type/value/mandatory; ignora `amount`, que es derivado y
+   * lo recomputa el server), suggestedTipPct (solo se protege MODIFICAR/QUITAR una sugerencia ya guardada
+   * — el wizard SIEMPRE manda un default 10, bloquearlo sobre cotizaciones legacy sin sugerencia rompería
+   * ediciones legítimas; además es una nota, no se cobra) y, por subconcepto emparejado por id,
+   * tipType/tipValue/tipMandatory/tipAmount. Un subconcepto NUEVO (sin id previo o id desconocido) que
+   * llega con propina también cuenta como cambio. Números con tolerancia de centavo.
+   * @param {object} storedSI - serviceItems actualmente guardado en la cotización.
+   * @param {object} incoming - Datos del request { globalTip, suggestedTipPct, days }.
+   * @returns {boolean} true si algún campo de propina cambia (debe bloquearse para no-admin).
+   * @example
+   * this.tipFieldsChanged(quote.get('serviceItems'), { globalTip, suggestedTipPct, days });
+   */
+  tipFieldsChanged(storedSI, incoming) {
+    const CENT = 0.01;
+    const numEq = (a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      return Math.abs((Number.isFinite(na) ? na : 0) - (Number.isFinite(nb) ? nb : 0)) <= CENT;
+    };
+    const stored = storedSI || {};
+    const inc = incoming || {};
+
+    const normType = (t) => {
+      if (t === 'amount') return 'amount';
+      if (t === 'percent') return 'percent';
+      return null;
+    };
+    // globalTip normalizado: propina efectiva o null. `amount` se ignora (lo recomputa computeGeneralTip).
+    const normGT = (gt) => {
+      if (!gt || typeof gt !== 'object') return null;
+      const type = normType(gt.type);
+      const value = Number(gt.value);
+      if (!type || !Number.isFinite(value) || value <= 0) return null;
+      return { type, value, mandatory: gt.mandatory === true };
+    };
+    const storedGT = normGT(stored.globalTip);
+    const incomingGT = normGT(inc.globalTip);
+    if (!storedGT !== !incomingGT) return true; // se agrega o se quita la propina general
+    if (storedGT && incomingGT && (
+      storedGT.type !== incomingGT.type
+      || !numEq(storedGT.value, incomingGT.value)
+      || storedGT.mandatory !== incomingGT.mandatory
+    )) return true;
+
+    // suggestedTipPct: solo se protege MODIFICAR/QUITAR una sugerencia ya guardada (>0).
+    const storedPct = Number(stored.suggestedTipPct);
+    if (Number.isFinite(storedPct) && storedPct > 0) {
+      const inPct = Number(inc.suggestedTipPct);
+      const normInPct = Number.isFinite(inPct) && inPct > 0 ? inPct : 0;
+      if (!numEq(storedPct, normInPct)) return true;
+    }
+
+    // Propina por subconcepto, emparejada por id.
+    const storedSubById = new Map();
+    const storedDays = Array.isArray(stored.days) ? stored.days : [];
+    storedDays.forEach((d) => {
+      ((d && Array.isArray(d.subconcepts)) ? d.subconcepts : []).forEach((sc) => {
+        if (sc && sc.id) storedSubById.set(sc.id, sc);
+      });
+    });
+    const hasTip = (sc) => !!(sc && (
+      normType(sc.tipType)
+      || (Number(sc.tipValue) || 0) > 0
+      || (Number(sc.tipAmount) || 0) > 0
+      || sc.tipMandatory === true
+    ));
+    const subChanged = (sc) => {
+      if (!sc) return false;
+      const prev = sc.id ? storedSubById.get(sc.id) : null;
+      // Subconcepto NUEVO (sin id o id desconocido): si trae propina, es un cambio.
+      if (!prev) return hasTip(sc);
+      return normType(prev.tipType) !== normType(sc.tipType)
+        || !numEq(prev.tipValue, sc.tipValue)
+        || !numEq(prev.tipAmount, sc.tipAmount)
+        || (prev.tipMandatory === true) !== (sc.tipMandatory === true);
+    };
+    const incomingDays = Array.isArray(inc.days) ? inc.days : [];
+
+    // Reverso (council L0F0): un subconcepto que YA tenía propina guardada por un admin no puede
+    // "perderla" en silencio — ni borrando el servicio entero, ni reenviándolo con un id vacío/distinto
+    // (subChanged, arriba, solo revisa subconceptos PRESENTES en el payload entrante; nunca detecta uno
+    // que desaparece). Si el id de un subconcepto con propina no aparece en NINGÚN subconcepto entrante,
+    // se trata como cambio de propina y se bloquea para no-admin.
+    const incomingSubIds = new Set();
+    incomingDays.forEach((d) => {
+      ((d && Array.isArray(d.subconcepts)) ? d.subconcepts : []).forEach((sc) => {
+        if (sc && sc.id) incomingSubIds.add(sc.id);
+      });
+    });
+    const tipSilentlyRemoved = Array.from(storedSubById.entries())
+      .some(([id, sc]) => hasTip(sc) && !incomingSubIds.has(id));
+    if (tipSilentlyRemoved) return true;
+
+    return incomingDays.some((d) => {
+      const subs = (d && Array.isArray(d.subconcepts)) ? d.subconcepts : [];
+      return subs.some(subChanged);
+    });
   }
 
   /**
@@ -5194,9 +5335,23 @@ class QuoteController {
         const scTotal = parseFloat(sc.total) || 0;
         sumOfSubconceptTotals += scTotal;
         if (sc.pricesByType && typeof sc.pricesByType === 'object') {
-          const expected = parseFloat(sc.pricesByType[paymentType]);
-          if (!Number.isNaN(expected)) {
-            const diff = Math.abs(r2(expected) - r2(scTotal));
+          const base = parseFloat(sc.pricesByType[paymentType]);
+          if (!Number.isNaN(base)) {
+            // El descuento por servicio (Fase 1) se captura en efectivo y ya viene restado del precio
+            // neto guardado (sc.total). Se escala por el mismo factor multiplicativo que el front
+            // (getServiceDiscountInPaymentType) para que ambos lados comparen la misma fórmula; sin
+            // restarlo aquí, cualquier servicio con descuento divergiría del pricesByType bruto y se
+            // rechazaría por error.
+            const discEf = parseFloat(sc.discountAmount) || 0;
+            let discountInType = 0;
+            if (discEf > 0) {
+              const efBase = Number(sc.pricesByType.efectivo);
+              discountInType = (efBase > 0 && sc.pricesByType[paymentType] != null)
+                ? r2(discEf * (base / efBase))
+                : discEf;
+            }
+            const expected = Math.max(0, r2(base - discountInType));
+            const diff = Math.abs(expected - r2(scTotal));
             if (diff > 0.01) {
               subconceptMismatches += 1;
               if (diff > PRICE_MISMATCH_TOLERANCE && !subconceptHardMismatch) {

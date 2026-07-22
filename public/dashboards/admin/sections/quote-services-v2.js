@@ -1184,6 +1184,7 @@ class ItineraryBuilder {
     document.getElementById('applyServiceTip')?.addEventListener('change', (e) => {
       this.serviceModified = true;
       document.getElementById('serviceTipFields')?.classList.toggle('d-none', !e.target.checked);
+      this.syncTipValueMax('serviceTipType', 'serviceTipValue');
       this.updateServicePriceBreakdown();
     });
     ['serviceTipType', 'serviceTipValue', 'serviceTipMandatory'].forEach((id) => {
@@ -1196,11 +1197,16 @@ class ItineraryBuilder {
         this.updateServicePriceBreakdown();
       });
     });
+    // FIX 3: el input de valor es compartido % / monto fijo; sincroniza su `max` al cambiar el tipo.
+    document.getElementById('serviceTipType')?.addEventListener('change', () => this.syncTipValueMax('serviceTipType', 'serviceTipValue'));
+    this.syncTipValueMax('serviceTipType', 'serviceTipValue');
 
     // Propina GLOBAL de la cotización (Fase 2b): sincroniza this.globalTip y recalcula el total.
     const syncGlobalTip = () => {
       const apply = document.getElementById('applyGlobalTip')?.checked;
       document.getElementById('globalTipFields')?.classList.toggle('d-none', !apply);
+      // FIX 3: input de valor compartido % / monto fijo; topa a 100 solo en porcentaje.
+      this.syncTipValueMax('globalTipType', 'globalTipValue');
       if (apply) {
         const type = document.getElementById('globalTipType')?.value === 'amount' ? 'amount' : 'percent';
         const value = parseFloat(document.getElementById('globalTipValue')?.value || 0) || 0;
@@ -1219,6 +1225,8 @@ class ItineraryBuilder {
       document.getElementById(id)?.addEventListener('change', syncGlobalTip);
       document.getElementById(id)?.addEventListener('input', syncGlobalTip);
     });
+    // FIX 3: estado inicial del `max` del valor de propina general (default 'percent' → topa a 100).
+    this.syncTipValueMax('globalTipType', 'globalTipValue');
     // El template de totales no recibe canEditPrices; mostramos el control de propina general
     // solo si el rol puede editar precios (los demás roles ven el efecto en el total, no el control).
     if (this.canEditPrices) {
@@ -5491,6 +5499,7 @@ class ItineraryBuilder {
       if (tValR) tValR.value = hasTip ? service.tipValue : '';
       const tMandR = document.getElementById('serviceTipMandatory');
       if (tMandR) tMandR.checked = !!service.tipMandatory;
+      this.syncTipValueMax('serviceTipType', 'serviceTipValue'); // FIX 3
     }
 
     // Apply price override toggle effects (toggle is already checked earlier)
@@ -12328,6 +12337,7 @@ class ItineraryBuilder {
     if (tValReset) tValReset.value = '';
     const tMandReset = document.getElementById('serviceTipMandatory');
     if (tMandReset) tMandReset.checked = false;
+    this.syncTipValueMax('serviceTipType', 'serviceTipValue'); // FIX 3: reset a 'percent' → max 100
     const aDispGivCont = document.getElementById('aDisposicionGreeterInVehicleContainer');
     if (aDispGivCont) aDispGivCont.classList.add('d-none');
   }
@@ -12482,6 +12492,7 @@ class ItineraryBuilder {
       if (gtValue) gtValue.value = this.globalTip ? this.globalTip.value : '';
       const gtMand = document.getElementById('globalTipMandatory');
       if (gtMand) gtMand.checked = !!(this.globalTip && this.globalTip.mandatory);
+      this.syncTipValueMax('globalTipType', 'globalTipValue'); // FIX 3
     }
 
     // Fase 2c: restaurar el % de propina sugerida (default 10).
@@ -15529,8 +15540,9 @@ class ItineraryBuilder {
 
   /**
    * Fase 2: línea de PROPINA para el desglose live (común a todos los tipos). ADITIVA: se suma al
-   * total (a diferencia del descuento, que resta). El % va sobre el total neto (ya con descuento);
-   * el monto fijo se escala a la forma de pago. Solo presentación.
+   * total (a diferencia del descuento, que resta). La propina es PLANA (base efectivo), igual que la
+   * que se persiste y factura: el % va sobre el total neto EN EFECTIVO (nunca sobre el total escalado
+   * por método) y el monto fijo es literal. Solo presentación.
    * @param {number} netTotal - Total ya con descuento aplicado (en la forma de pago actual).
    * @returns {{tipLineHTML: string, addedTotal: number}} Línea y total con la propina sumada.
    * @example
@@ -15545,10 +15557,13 @@ class ItineraryBuilder {
       if (tv > 0) {
         let tip;
         if (tt === 'percent') {
-          tip = Math.round(netTotal * (tv / 100) * 100) / 100;
+          // % sobre la base EFECTIVA neta (netTotal viene en la forma de pago actual; se convierte a
+          // efectivo con getBasePriceFromCurrent) → mismo monto plano que se factura, no el escalado.
+          const efNetTotal = this.getBasePriceFromCurrent ? this.getBasePriceFromCurrent(netTotal) : netTotal;
+          tip = Math.round(efNetTotal * (tv / 100) * 100) / 100;
         } else {
-          const pt = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-          tip = this.getDisplayPriceForType ? Math.round(this.getDisplayPriceForType(tv, pt) * 100) / 100 : tv;
+          // Monto fijo: literal (efectivo), sin escalar por método.
+          tip = Math.round(tv * 100) / 100;
         }
         if (tip > 0) {
           addedTotal = netTotal + tip;
@@ -15562,6 +15577,27 @@ class ItineraryBuilder {
       }
     }
     return { tipLineHTML, addedTotal };
+  }
+
+  /**
+   * FIX 3: mantiene el atributo `max` del input de VALOR de propina en sync con el tipo activo. El
+   * mismo input se reutiliza para porcentaje y monto fijo: en porcentaje se topa a 100 (capa UX),
+   * en monto fijo se quita el max (el monto fijo no lleva límite). El server rechaza >100 igual, así
+   * que esto es solo ayuda visual (no valida por sí solo).
+   * @param {string} typeSelectId - id del <select> de tipo ('percent'|'amount').
+   * @param {string} valueInputId - id del <input type="number"> del valor.
+   * @example
+   * this.syncTipValueMax('serviceTipType', 'serviceTipValue');
+   */
+  syncTipValueMax(typeSelectId, valueInputId) {
+    const typeEl = document.getElementById(typeSelectId);
+    const valEl = document.getElementById(valueInputId);
+    if (!typeEl || !valEl) return;
+    if (typeEl.value === 'percent') {
+      valEl.setAttribute('max', '100');
+    } else {
+      valEl.removeAttribute('max');
+    }
   }
 
   /**
@@ -20599,6 +20635,10 @@ class ItineraryBuilder {
   async saveToBackend() {
     // Totals will be calculated from display prices (with surcharge + currency)
     let grandSubtotal = 0;
+    // Propina por servicio agregada aparte del subtotal (mismo patrón que la propina
+    // global): el subtotal guarda SOLO precio, la propina se suma una única vez en el
+    // total del payload. Evita el doble conteo que causaba hornearla dentro de subtotal.
+    let serviceTipsTotalSave = 0;
 
     // Backend requires strict HH:MM (00:00 - 23:59). Coerce loose inputs
     // ("9:00", "9:00 AM", " ") to valid HH:MM or null so legacy/typo'd
@@ -20634,11 +20674,14 @@ class ItineraryBuilder {
           // guardado, el PDF y la reserva sin reflejar el descuento. getServiceDisplayPrice es la
           // misma fuente que usa el total en pantalla → lo guardado == lo mostrado.
           const servicePrice = this.getServiceDisplayPrice(service);
-          // Fase 2: la propina por servicio es aditiva → se hornea en el TOTAL guardado (no en
-          // unitPrice) para que dayTotal/serviceItems.total/reserva/PDF la incluyan. La propina
-          // se conserva además como metadata (tipAmount) para mostrarse como línea aparte.
+          // Fase 2: la propina por servicio se acumula APARTE (serviceTipsTotalSave) y se suma
+          // una única vez en el total del payload, igual que la propina global. El subconcepto
+          // (unitPrice/total) guarda SOLO precio; hornearla aquí causaba doble conteo porque el
+          // servidor vuelve a sumarla vía sumServiceTipsFromDays. La propina se conserva como
+          // metadata (tipAmount/tipType/tipValue) para mostrarse como línea aparte.
           const serviceTip = this.getServiceTipInPaymentType ? this.getServiceTipInPaymentType(service) : 0;
-          const serviceTotal = servicePrice + serviceTip;
+          serviceTipsTotalSave += serviceTip;
+          const serviceTotal = servicePrice;
           dayTotal += serviceTotal;
 
           qsDevLog('📊 Service total calculation:', {
@@ -20892,7 +20935,9 @@ class ItineraryBuilder {
       : null;
     // Fase 2c: % de propina sugerida (default 10; ajustable por admin). Solo informativo.
     serviceItemsData.suggestedTipPct = Number(this.suggestedTipPct) > 0 ? Number(this.suggestedTipPct) : 10;
-    serviceItemsData.total = Math.round((serviceItemsData.subtotal + globalTipSave) * 100) / 100;
+    // El total del payload incluye AMBAS propinas (global + por servicio) de forma explícita:
+    // subtotal ya no las contiene, así que se suman aquí una sola vez cada una.
+    serviceItemsData.total = Math.round((serviceItemsData.subtotal + globalTipSave + serviceTipsTotalSave) * 100) / 100;
 
     // Get access token from cookie
     const accessToken = this.getAccessToken();

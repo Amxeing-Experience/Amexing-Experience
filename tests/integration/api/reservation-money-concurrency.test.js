@@ -187,4 +187,78 @@ describe('Reservation money-write serialization (integration)', () => {
       expect(res.status).toBe(404);
     });
   });
+
+  describe('H8 — descuento que se come servicios + propina: total 0 y header == motor (sin "tercer total")', () => {
+    const h8 = { reservations: [] };
+
+    // Reservación efectivo con propina general (reservation.tip) + propina por servicio (subconcept.tipAmount).
+    // servicesSubtotal = base efectivo múltiplo de 5, para que el header (recalculateTotal) y el motor
+    // (summarize, que deriva servicesTotal de pricesByType) coincidan exactamente.
+    const createWithTips = async (efectivo, generalTip, serviceTip) => {
+      const reservation = new Parse.Object('Reservation');
+      reservation.set('active', true);
+      reservation.set('exists', true);
+      reservation.set('status', 'confirmed');
+      reservation.set('paymentType', 'efectivo');
+      reservation.set('currency', 'MXN');
+      reservation.set('servicesSubtotal', efectivo);
+      reservation.set('tip', generalTip);
+      await reservation.save(null, { useMasterKey: true });
+      h8.reservations.push(reservation.id);
+
+      const rs = new Parse.Object('ReservationService');
+      rs.set('active', true);
+      rs.set('exists', true);
+      rs.set('reservationPtr', reservation);
+      rs.set('subconcept', {
+        includeInTotal: true,
+        pricesByType: { efectivo, transferencia: efectivo * 1.16, tarjeta: efectivo * 1.21 },
+        total: efectivo,
+        tipAmount: serviceTip,
+      });
+      await rs.save(null, { useMasterKey: true });
+      return reservation.id;
+    };
+
+    afterAll(async () => {
+      for (const id of h8.reservations) {
+        try {
+          const ptr = new Parse.Object('Reservation');
+          ptr.id = id;
+          const svcQuery = new Parse.Query('ReservationService');
+          svcQuery.equalTo('reservationPtr', ptr);
+          const services = await svcQuery.find({ useMasterKey: true });
+          await Parse.Object.destroyAll(services, { useMasterKey: true });
+        } catch (e) { /* already gone */ }
+        try {
+          const reservation = await fetchReservation(id);
+          await reservation.destroy({ useMasterKey: true });
+        } catch (e) { /* already gone */ }
+      }
+    });
+
+    it('H8-I01: descuento 20000 > servicios 10000 + propina 500 -> total 0, header (totalAmount) == motor (summarize.total), ambos 0', async () => {
+      const id = await createWithTips(10000, 300, 200); // total antes del descuento = 10500
+      const res = await postAdjustment(id, { type: 'discount', description: 'Descuentazo', amount: 20000 });
+      expect(res.status).toBe(200);
+
+      const reservation = await fetchReservation(id);
+      const s = await PaymentService.summarize(id);
+      expect(reservation.get('totalAmount')).toBe(0); // header no-negativo
+      expect(s.total).toBe(0); // motor no-negativo
+      expect(reservation.get('totalAmount')).toBe(s.total); // sin "tercer total"
+    });
+
+    it('H8-I02: descuento EXACTO = servicios 10000 + propina 500 = 10500 -> total 0 (borde no-negativo), header == motor', async () => {
+      const id = await createWithTips(10000, 300, 200);
+      const res = await postAdjustment(id, { type: 'discount', description: 'Descuento exacto', amount: 10500 });
+      expect(res.status).toBe(200);
+
+      const reservation = await fetchReservation(id);
+      const s = await PaymentService.summarize(id);
+      expect(reservation.get('totalAmount')).toBe(0);
+      expect(s.total).toBe(0);
+      expect(reservation.get('totalAmount')).toBe(s.total);
+    });
+  });
 });

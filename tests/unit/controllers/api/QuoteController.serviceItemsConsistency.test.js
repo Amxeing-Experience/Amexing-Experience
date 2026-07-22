@@ -22,6 +22,7 @@ jest.mock('../../../../src/application/services/QuoteCollaborationService', () =
 jest.mock('../../../../src/application/services/QuoteVersioningService', () => jest.fn().mockImplementation(() => ({})));
 
 const QuoteController = require('../../../../src/application/controllers/api/QuoteController');
+const { buildSubconcept } = require('../../../helpers/serviceItemsFixture');
 
 // Un día con un único subconcepto cuyo total = pricesByType[efectivo] (subconcepto consistente).
 const dayWith = (subconcepts) => ({ dayNumber: 1, dayTitle: 'Día 1', subconcepts });
@@ -113,6 +114,112 @@ describe('QuoteController.evaluateTotalsConsistency (decisión pura)', () => {
   it('días o subconcepts vacíos/ausentes no rompen la evaluación', () => {
     expect(evalC({ days: [], subtotal: 0 }).rejectMessage).toBeNull();
     expect(evalC({ days: [{ dayNumber: 1 }], subtotal: 0 }).rejectMessage).toBeNull();
+  });
+});
+
+describe('QuoteController.evaluateTotalsConsistency — propina por servicio (doble conteo)', () => {
+  // Regresión del bug del "tercer total": cuando la propina por servicio se HORNEA en sc.total
+  // (bakeTipBug:true) el motor la ve divergir de pricesByType y rechaza; cuando el subconcepto
+  // guarda SOLO precio (la forma corregida) no hay divergencia y el guardado pasa.
+  const evalSc = (sc, subtotal, total) => QuoteController.evaluateTotalsConsistency({
+    days: [{ subconcepts: [sc] }], subtotal, iva: 0, total, paymentType: 'efectivo',
+  });
+
+  it('U1: propina horneada ($150 fijo sobre $2000) reproduce el rechazo (regresión permanente)', () => {
+    const sc = buildSubconcept({
+      id: 's1', priceEfectivo: 2000, tipType: 'amount', tipValue: 150, bakeTipBug: true,
+    });
+    const r = evalSc(sc, 2150, 2150);
+    expect(r.rejectMessage).not.toBeNull(); // sigue detectándose si alguien vuelve a hornear
+  });
+
+  it('U2: mismo caso pero subconcepto SIN hornear (forma corregida) no rechaza ni marca mismatch', () => {
+    const sc = buildSubconcept({
+      id: 's1', priceEfectivo: 2000, tipType: 'amount', tipValue: 150, bakeTipBug: false,
+    });
+    const r = evalSc(sc, 2000, 2000);
+    expect(r.rejectMessage).toBeNull();
+    expect(r.subconceptMismatches).toBe(0);
+  });
+
+  it('U3: propina 10% ($200 sobre $2000) sin hornear tampoco rechaza', () => {
+    const sc = buildSubconcept({
+      id: 's1', priceEfectivo: 2000, tipType: 'percent', tipValue: 10, bakeTipBug: false,
+    });
+    const r = evalSc(sc, 2000, 2000);
+    expect(r.rejectMessage).toBeNull();
+  });
+
+  it('U4: propina horneada de exactamente $1.00 (borde de tolerancia) NO rechaza (solo warning)', () => {
+    const sc = buildSubconcept({
+      id: 's1', priceEfectivo: 2000, tipType: 'amount', tipValue: 1, bakeTipBug: true,
+    });
+    const r = evalSc(sc, 2001, 2001);
+    expect(r.rejectMessage).toBeNull();
+  });
+
+  it('U5: propina horneada de $1.01 (sobrepasa la tolerancia por un centavo) RECHAZA', () => {
+    const sc = buildSubconcept({
+      id: 's1', priceEfectivo: 2000, tipType: 'amount', tipValue: 1.01, bakeTipBug: true,
+    });
+    const r = evalSc(sc, 2001.01, 2001.01);
+    expect(r.rejectMessage).not.toBeNull();
+  });
+});
+
+describe('QuoteController.evaluateTotalsConsistency — descuento por servicio (Fase 1)', () => {
+  // Regresión de un bug pre-existente: el descuento por servicio (sc.discountAmount) resta de forma
+  // legítima el precio neto (sc.total) por debajo del pricesByType bruto. La validación comparaba
+  // sc.total contra pricesByType[paymentType] SIN restar el descuento -> cualquier descuento neto
+  // > $1.00 rechazaba el guardado por error. El fix resta el descuento ESCALADO por el mismo factor
+  // de forma de pago que usa el front (getServiceDiscountInPaymentType) antes de comparar.
+  const evalSc = (sc, subtotal, total, paymentType = 'efectivo') => QuoteController.evaluateTotalsConsistency({
+    days: [{ subconcepts: [sc] }], subtotal, iva: 0, total, paymentType,
+  });
+
+  it('D1: descuento $300 en efectivo (repro en vivo) -> ya NO rechaza', () => {
+    const sc = buildSubconcept({ id: 'disc1', priceEfectivo: 2000, discountAmount: 300 });
+    expect(sc.total).toBe(1700); // el helper ya restó el descuento neto
+    const r = evalSc(sc, sc.total, sc.total);
+    expect(r.rejectMessage).toBeNull();
+    expect(r.subconceptMismatches).toBe(0);
+  });
+
+  it('D2: descuento escalado en tarjeta (300 * 2420/2000 = 363) -> no rechaza', () => {
+    const sc = buildSubconcept({
+      id: 'disc2', priceEfectivo: 2000, priceTarjeta: 2420, discountAmount: 300, paymentType: 'tarjeta',
+    });
+    expect(sc.total).toBe(2057); // 2420 - 363 (descuento escalado por el factor de tarjeta)
+    const r = evalSc(sc, sc.total, sc.total, 'tarjeta');
+    expect(r.rejectMessage).toBeNull();
+    expect(r.subconceptMismatches).toBe(0);
+  });
+
+  it('D3: descuento $300 + propina fija $100 en el mismo servicio no interfieren -> no rechaza', () => {
+    const sc = buildSubconcept({
+      id: 'disc3', priceEfectivo: 2000, discountAmount: 300, tipType: 'amount', tipValue: 100,
+    });
+    expect(sc.total).toBe(1700); // total = SOLO precio neto (la propina va aparte, no horneada)
+    expect(sc.tipAmount).toBe(100);
+    const r = evalSc(sc, sc.total, sc.total);
+    expect(r.rejectMessage).toBeNull();
+    expect(r.subconceptMismatches).toBe(0);
+  });
+
+  it('D4: descuento de exactamente $1.00 (borde de tolerancia) -> no rechaza', () => {
+    const sc = buildSubconcept({ id: 'disc4', priceEfectivo: 2000, discountAmount: 1 });
+    expect(sc.total).toBe(1999);
+    const r = evalSc(sc, sc.total, sc.total);
+    expect(r.rejectMessage).toBeNull();
+  });
+
+  it('D5: anti-regresión — un error real de $50 (no atribuible a descuento/propina) SIGUE rechazando', () => {
+    const sc = buildSubconcept({ id: 'disc5', priceEfectivo: 2000, discountAmount: 300 });
+    sc.total = 1750; // esperado neto = 1700; $50 de más que no corresponde a ningún descuento declarado
+    const r = evalSc(sc, sc.total, sc.total);
+    expect(r.rejectMessage).not.toBeNull();
+    expect(r.rejectMessage).toMatch(/disc5/);
+    expect(r.rejectMessage).toContain('$50.00');
   });
 });
 

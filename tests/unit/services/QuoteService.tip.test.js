@@ -101,4 +101,69 @@ describe('QuoteService.sumServiceTipsFromDays (propina por servicio del snapshot
     expect(svc.sumServiceTipsFromDays({ days: [] })).toBe(0);
     expect(svc.sumServiceTipsFromDays({})).toBe(0);
   });
+
+  // H6: propina por servicio en un servicio split (ida/vuelta) donde solo un tramo cuenta al total.
+  it('H6-U01: split ida/vuelta, solo el tramo includeInTotal:true aporta su propina', () => {
+    const si = {
+      days: [{
+        subconcepts: [
+          { id: 'ida', tipAmount: 100, includeInTotal: true },
+          { id: 'vuelta', tipAmount: 100, includeInTotal: false },
+        ],
+      }],
+    };
+    expect(svc.sumServiceTipsFromDays(si)).toBe(100);
+  });
+
+  it('H6-U02: ambos tramos excluidos del total -> 0', () => {
+    const si = {
+      days: [{
+        subconcepts: [
+          { id: 'ida', tipAmount: 100, includeInTotal: false },
+          { id: 'vuelta', tipAmount: 100, includeInTotal: false },
+        ],
+      }],
+    };
+    expect(svc.sumServiceTipsFromDays(si)).toBe(0);
+  });
+});
+
+describe('QuoteService.computeGeneralTip — tope 100% en percent (FIX 3)', () => {
+  // Base daysOf([2000]) => base efectivo neta 2000, así el % topado a 100 da exactamente 2000.
+  it('F3-U01: percent=100 -> 2000 (límite exacto, sin recorte)', () => {
+    expect(svc.computeGeneralTip({ globalTip: { type: 'percent', value: 100 }, ...daysOf([2000]) })).toBe(2000);
+  });
+
+  it('F3-U02: percent=100.01 -> clamp a 100 -> 2000', () => {
+    expect(svc.computeGeneralTip({ globalTip: { type: 'percent', value: 100.01 }, ...daysOf([2000]) })).toBe(2000);
+  });
+
+  it('F3-U03: percent=101 -> clamp a 100 -> 2000', () => {
+    expect(svc.computeGeneralTip({ globalTip: { type: 'percent', value: 101 }, ...daysOf([2000]) })).toBe(2000);
+  });
+
+  it('F3-U04: percent=150 (el typo real) -> clamp a 100 -> 2000, NUNCA 3000', () => {
+    const out = svc.computeGeneralTip({ globalTip: { type: 'percent', value: 150 }, ...daysOf([2000]) });
+    expect(out).toBe(2000);
+    expect(out).not.toBe(3000);
+  });
+
+  it('F3-U07: amount=50000 (monto fijo) SIN límite, aunque la base sea 100 -> 50000 (anti-regresión)', () => {
+    expect(svc.computeGeneralTip({ globalTip: { type: 'amount', value: 50000 }, ...daysOf([100]) })).toBe(50000);
+  });
+
+  it('H11-U01: percent=10 con TODOS los servicios includeInTotal:false -> 0, sin NaN', () => {
+    const si = {
+      globalTip: { type: 'percent', value: 10 },
+      days: [{
+        subconcepts: [
+          { pricesByType: { efectivo: 2000 }, includeInTotal: false },
+          { pricesByType: { efectivo: 5000 }, includeInTotal: false },
+        ],
+      }],
+    };
+    const out = svc.computeGeneralTip(si);
+    expect(out).toBe(0);
+    expect(Number.isNaN(out)).toBe(false);
+  });
 });

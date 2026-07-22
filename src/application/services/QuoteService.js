@@ -1856,7 +1856,10 @@ class QuoteService {
         }
       }
     }
-    return round2(netBaseEfectivo * (value / 100));
+    // Tope de 100%: un porcentaje mayor se RECORTA aquí (no se rechaza) en la función pura, paralelo al
+    // Math.min del descuento por servicio. El endpoint (updateServiceItems) sí rechaza >100 con 400.
+    const pct = Math.min(value, 100);
+    return round2(netBaseEfectivo * (pct / 100));
   }
 
   /**
@@ -1927,11 +1930,14 @@ class QuoteService {
     // are provided (i.e. called from the service-items save).
     if (serviceItems) {
       reservation.set('serviceItemsSnapshot', serviceItems);
-      // servicesSubtotal = SUBTOTAL de servicios SIN la propina general horneada (serviceItems.subtotal,
-      // no .total). serviceItems.total incluye el globalTip (potencialmente escalado por el método de pago)
-      // y era la raíz del "tercer total": el header quedaba por encima del motor de pagos. El subtotal
-      // limpio es la BASE a la que recalculateTotal netea los ajustes YA EXISTENTES (cargos − descuentos)
-      // y suma la propina cobrada (general + por servicio) para producir totalAmount. Así una
+      // servicesSubtotal = SUBTOTAL de servicios SIN NINGUNA propina horneada — ni la general ni la por
+      // servicio (serviceItems.subtotal, no .total). Invariante garantizado por saveToBackend (el front
+      // guarda el subconcepto con SOLO precio y acumula ambas propinas aparte); antes era un supuesto no
+      // verificado que se rompía con la propina por servicio y causaba doble conteo. serviceItems.total
+      // incluye el globalTip (potencialmente escalado por el método de pago) y era la raíz del "tercer
+      // total": el header quedaba por encima del motor de pagos. El subtotal limpio es la BASE a la que
+      // recalculateTotal netea los ajustes YA EXISTENTES (cargos − descuentos) y suma la propina cobrada
+      // (general + por servicio, cada una UNA sola vez) para producir totalAmount. Así una
       // re-sincronización de una cotización editada NUNCA borra un ajuste aplicado después de crear la
       // reservación (council L0F1). El motor de pagos (loadAndCompute) ignora este campo (recomputa desde
       // los ReservationService), así que el saldo cobrado nunca dependió del bug. require diferido: el
@@ -2181,6 +2187,8 @@ class QuoteService {
           // cancelar): si el vendedor editó la cotización mientras la reservación estaba cancelada (nadie
           // la sincroniza en ese estado), reactivar debe reflejar la versión más reciente, igual que
           // cualquier otra re-sincronización. Los ajustes manuales existentes se preservan (no se tocan).
+          // servicesSubtotal viene limpio de ambas propinas (invariante de saveToBackend); recalculateTotal
+          // vuelve a sumar la propina por servicio una sola vez, sin doble conteo.
           existing.set('tip', this.computeGeneralTip(serviceItems));
           existing.set('servicesSubtotal', serviceItems.subtotal || 0);
           // eslint-disable-next-line global-require
@@ -2246,9 +2254,11 @@ class QuoteService {
 
       // Create Reservation
       // Propina cobrada (Fase 2): general recalculada (pesos fijos, sin escalar por método) + Σ propina
-      // por servicio del snapshot. servicesSubtotal = SUBTOTAL limpio (serviceItems.subtotal, sin la propina
-      // general horneada — .total sí la incluye y era la raíz del "tercer total"). totalAmount (header) se
-      // fija ya con la propina para no divergir del motor de pagos desde el primer render (sin ajustes aún).
+      // por servicio del snapshot. servicesSubtotal = SUBTOTAL limpio (serviceItems.subtotal, sin NINGUNA
+      // propina horneada — ni la general ni la por servicio; invariante garantizado por saveToBackend, ver
+      // syncReservationFromQuote). serviceItems.total sí incluye las propinas y era la raíz del "tercer
+      // total". totalAmount (header) se fija ya con ambas propinas (cada una una sola vez) para no divergir
+      // del motor de pagos desde el primer render (sin ajustes aún).
       const generalTip = this.computeGeneralTip(serviceItems);
       const serviceTipsTotal = this.sumServiceTipsFromDays(serviceItems);
       const cleanSubtotal = serviceItems.subtotal || 0;
