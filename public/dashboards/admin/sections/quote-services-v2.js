@@ -6005,6 +6005,16 @@ class ItineraryBuilder {
               return;
             }
           }
+          // Tolerancia a datos viejos: el valor guardado no está entre las opciones (p. ej. un
+          // origen/destino que ya no cumple la regla de aeropuerto por dirección). Se agrega la
+          // opción para no perder el valor guardado al editar; el usuario puede cambiarlo.
+          const slug = val.trim().toLowerCase().replace(/\s+/g, '-');
+          const opt = document.createElement('option');
+          opt.value = slug;
+          opt.textContent = val.trim();
+          selectEl.appendChild(opt);
+          selectEl.value = slug;
+          if (window.slugToOriginalMapping) window.slugToOriginalMapping.set(slug, val.trim());
         };
 
         // Helper: split "San Miguel de Allende, Hotel Rosewood" → { baseName, specificLocation }
