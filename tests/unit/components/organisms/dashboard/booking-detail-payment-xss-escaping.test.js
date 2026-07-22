@@ -51,7 +51,8 @@ describe('Booking Detail admin - escapa reference/notes/adj.description (XSS)', 
 describe.each([
   ['department_manager'],
   ['client'],
-])('Booking Detail %s (agencia) - escapa adj.description (XSS)', (role) => {
+  ['end_client'],
+])('Booking Detail %s - escapa adj.description (XSS)', (role) => {
   let html;
   beforeAll(async () => { html = await renderComponent(`dashboards/${role}/booking-detail`, params); });
 

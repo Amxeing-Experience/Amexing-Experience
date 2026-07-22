@@ -2038,6 +2038,18 @@ class QuoteService {
       }
       updatedOrCreated = toSave.length;
       removed = toRemove.length;
+
+      // Mantiene el rollup de pago (paidAmount/balance/paymentStatus) en sync con el nuevo total: sin
+      // esto, esos campos STORED quedaban obsoletos tras editar la cotización (council L4F0) — algunos
+      // dashboards filtran "Pendientes de pago" por el campo guardado ANTES de recomputar, escondiendo
+      // saldo real adeudado. No-fatal (mismo patrón que addAdjustment/removeAdjustment): la sincronización
+      // ya se guardó, un fallo aquí solo deja el rollup temporalmente desactualizado.
+      try {
+        const PaymentService = require('./PaymentService');
+        await PaymentService.recalculate(reservation.id);
+      } catch (e) {
+        logger.warn('Reservation synced but payment recalculate failed', { reservationId: reservation.id, error: e.message });
+      }
     }
 
     logger.info('Synced reservation from quote', {
@@ -2194,6 +2206,17 @@ class QuoteService {
             reservationId: existing.id,
             servicesReactivated: services.length,
           });
+
+          // Mantiene el rollup de pago (paidAmount/balance/paymentStatus) en sync con el total recien
+          // recalculado (council L4F0) -- sin esto, una reservacion reactivada con pagos existentes podia
+          // quedar con el saldo/estado STORED desactualizado hasta el proximo pago o edicion.
+          try {
+            const PaymentService = require('./PaymentService');
+            await PaymentService.recalculate(existing.id);
+          } catch (e) {
+            logger.warn('Reservation reactivated but payment recalculate failed', { reservationId: existing.id, error: e.message });
+          }
+
           return { id: existing.id, folio: existing.get('folio'), servicesCount: services.length };
         }
 

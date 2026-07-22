@@ -2528,6 +2528,25 @@ class QuoteController {
         }
 
         serviceItems.days = enforcedDays;
+
+        // Re-deriva subtotal/total desde el contenido YA restaurado (protegido), nunca desde lo que
+        // mandó el front. evaluateTotalsConsistency (arriba) solo valida que el payload sea
+        // AUTOCONSISTENTE contra SUS PROPIOS days -- un payload manipulado por un no-admin puede pasar
+        // esa validación trayendo un subtotal/total fabricados a juego con un precio de servicio
+        // protegido alterado. El bloqueo de arriba ya restauró el contenido real en `enforcedDays`;
+        // sin este recálculo, ese subtotal/total fabricados se persistían igual (council L2F0/L5F1),
+        // reintroduciendo el "tercer total" en el header de las 4 vistas para un rol nivel 4 (agencia/
+        // agente), no solo admin. El motor de pagos real (PaymentService) no depende de este campo.
+        const pricingEngine = require('../../../domain/pricing/pricingEngine');
+        const r2 = pricingEngine.round2;
+        let enforcedSubtotal = 0;
+        enforcedDays.forEach((day) => {
+          (day.subconcepts || []).forEach((sc) => {
+            if (sc && sc.includeInTotal !== false) enforcedSubtotal += (parseFloat(sc.total) || 0);
+          });
+        });
+        serviceItems.subtotal = r2(enforcedSubtotal);
+        serviceItems.total = r2(serviceItems.subtotal + (r2(parseFloat(serviceItems.iva) || 0)));
       }
 
       quote.set('serviceItems', serviceItems);

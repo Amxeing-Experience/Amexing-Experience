@@ -233,17 +233,34 @@ class PaymentService {
     const remainingBase = Math.abs(rawRemaining) <= tolerance ? 0 : Math.max(0, rawRemaining);
     const remainingPercent = totalDue > 0 ? round2((remainingBase / totalDue) * 100) : 0;
     const montoParaSaldar = {};
-    validMethods.forEach((m) => {
-      if (baseTotal > 0) {
-        montoParaSaldar[m] = round2(remainingBase * (this.totalForMethod(serviceItems, m, currency) / baseTotal));
-      } else {
-        // Sin base de servicios (baseTotal<=0) el saldo proviene solo de ajustes/cargos manuales: pesos
-        // fijos sin tarifa por método, no hay "regla de tres" que aplicar — el monto a saldar en cualquier
-        // método es el remanente completo. Antes quedaba en 0 aunque remainingPercent mostrara 100%,
-        // contradiciendo la UI ("restante 100%: $0.00 en los 3 métodos", council L0F0).
-        montoParaSaldar[m] = remainingBase;
-      }
-    });
+    // La parte PLANA (ajustes + propina) del remanente NUNCA debe pasar por el ratio de conversión entre
+    // métodos (council L0F0/L5F0): multiplicar remainingBase completo por totalForMethod(m)/baseTotal
+    // re-escalaba tambien esa parte plana con el recargo de tarjeta/transferencia (ej. propina de $300
+    // se cobraba como $363 en tarjeta). Se separa el remanente en dos componentes con un criterio simple
+    // y determinista (cobertura aplicada primero a servicios, el excedente a lo plano): solo el componente
+    // de SERVICIOS escala por método; lo plano se suma igual, sin importar el método.
+    const flatDue = round2((Number(adjustmentsNet) || 0) + tipDue);
+    if (remainingBase <= 0) {
+      validMethods.forEach((m) => { montoParaSaldar[m] = 0; });
+    } else {
+      const coverageTowardServices = Math.min(coverageAmount, baseTotal);
+      const remainingServices = Math.max(0, round2(baseTotal - coverageTowardServices));
+      const coverageTowardFlat = Math.max(0, round2(coverageAmount - baseTotal));
+      const remainingFlat = Math.max(0, round2(flatDue - coverageTowardFlat));
+      validMethods.forEach((m) => {
+        if (baseTotal > 0) {
+          montoParaSaldar[m] = round2(
+            remainingServices * (this.totalForMethod(serviceItems, m, currency) / baseTotal) + remainingFlat
+          );
+        } else {
+          // Sin base de servicios (baseTotal<=0) el saldo proviene solo de ajustes/cargos manuales: pesos
+          // fijos sin tarifa por método, no hay "regla de tres" que aplicar — el monto a saldar en cualquier
+          // método es el remanente completo. Antes quedaba en 0 aunque remainingPercent mostrara 100%,
+          // contradiciendo la UI ("restante 100%: $0.00 en los 3 métodos", council L0F0 original).
+          montoParaSaldar[m] = remainingBase;
+        }
+      });
+    }
     return {
       totalDue, coverageAmount, remainingBase, remainingPercent, montoParaSaldar,
     };

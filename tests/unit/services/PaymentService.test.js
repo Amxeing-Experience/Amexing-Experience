@@ -507,7 +507,7 @@ describe('PaymentService pure helpers', () => {
       expect(b.remainingPercent).toBe(100);
     });
 
-    it('ajuste manual (hallazgo #3): el ratio de conversión usa servicesTotal; el ajuste se suma una vez al saldo', () => {
+    it('ajuste manual (hallazgo #3, corregido por council L0F0/L5F0): el ajuste NUNCA escala por método, solo la parte de servicios', () => {
       const withAdj = [{ pricesByType: { efectivo: 100000, transferencia: 116000, tarjeta: 120000 } }];
       const b = PaymentService.remainingBreakdown(
         [],
@@ -517,9 +517,41 @@ describe('PaymentService pure helpers', () => {
       );
       expect(b.totalDue).toBe(110000); // 100000 servicios + 10000 ajuste
       expect(b.remainingBase).toBe(110000); // sin pagos, todo el saldo (incluye el ajuste)
-      // El ratio de tarjeta usa servicesTotal (120000/100000 = 1.2) sobre el saldo, no .total.
-      expect(b.montoParaSaldar.tarjeta).toBe(132000); // 110000 × (120000/100000)
+      // Fix council: el ratio de tarjeta (120000/100000=1.2) SOLO escala los 100000 de servicios; el
+      // ajuste de 10000 se suma PLANO, sin escalar. Antes (bug L0F0/L5F0) se multiplicaba TODO el saldo
+      // (incluido el ajuste) por 1.2, dando 132000 -- $2,000 de más cobrados de haberse saldado en tarjeta.
+      expect(b.montoParaSaldar.tarjeta).toBe(130000); // 100000×1.2 + 10000
       expect(b.montoParaSaldar.efectivo).toBe(110000);
+    });
+
+    it('FIX council (L0F0/L5F0): la propina NUNCA escala por método en montoParaSaldar', () => {
+      const svc = [{ pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } }];
+      // Sin pagos: remainingServices=1000 (toda la base sin cubrir), remainingFlat=300 (la propina, plana).
+      const sinPagos = PaymentService.remainingBreakdown(
+        [],
+        { serviceItems: svc, anchoredMethod: 'efectivo', reservationTip: 300 }
+      );
+      expect(sinPagos.totalDue).toBe(1300);
+      // Antes (bug): 1300 × 1.21 = 1573. Correcto: 1000×1.21 + 300 = 1510 (la propina no escala).
+      expect(sinPagos.montoParaSaldar.tarjeta).toBe(1510);
+      expect(sinPagos.montoParaSaldar.efectivo).toBe(1300); // == remainingBase, sin cambio
+
+      // Pago parcial de 700 en efectivo: remainingServices=300 (1000-700), remainingFlat=300 (sin tocar).
+      const pagoParcial = PaymentService.remainingBreakdown(
+        [{ amount: 700, method: 'efectivo' }],
+        { serviceItems: svc, anchoredMethod: 'efectivo', reservationTip: 300 }
+      );
+      expect(pagoParcial.remainingBase).toBe(600);
+      expect(pagoParcial.montoParaSaldar.efectivo).toBe(600); // == remainingBase (identidad del ancla)
+      expect(pagoParcial.montoParaSaldar.tarjeta).toBe(663); // 300×1.21 + 300, no 600×1.21=726
+
+      // Pago de 1100 en efectivo: ya cubrió TODA la base de servicios + parte de la propina.
+      // remainingServices=0, remainingFlat=200 (300-100) => el remanente es IGUAL en los 3 métodos.
+      const serviciosCubiertos = PaymentService.remainingBreakdown(
+        [{ amount: 1100, method: 'efectivo' }],
+        { serviceItems: svc, anchoredMethod: 'efectivo', reservationTip: 300 }
+      );
+      expect(serviciosCubiertos.montoParaSaldar).toEqual({ efectivo: 200, transferencia: 200, tarjeta: 200 });
     });
 
     it('ajuste manual + pago cross-tier que cubre exactamente el saldo => cierra en $0 sin residuo (hallazgo #3)', () => {
