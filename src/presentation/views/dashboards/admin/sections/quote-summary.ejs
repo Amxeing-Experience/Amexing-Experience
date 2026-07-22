@@ -819,9 +819,10 @@ const e = __isRes ? 'reservación' : 'cotización';
         crossorigin="anonymous" 
         referrerpolicy="no-referrer"></script>
 
-<!-- Services Renderer Scripts -->
-<script src="/js/services-renderer-config.js"></script>
-<script src="/js/services-renderer.js"></script>
+<!-- Services Renderer Scripts. Cache-bust (?v=Date.now) para evitar servir versiones viejas del
+     JS estático: sin esto, un renderer cacheado sin getServiceTip rompía el resumen tras deploy. -->
+<script src="/js/services-renderer-config.js?v=<%= Date.now() %>"></script>
+<script src="/js/services-renderer.js?v=<%= Date.now() %>"></script>
 
 <script>
     // Entity label (client-side): "Reservación" once the quote is scheduled.
@@ -1545,8 +1546,11 @@ const e = __isRes ? 'reservación' : 'cotización';
                 (day.services || []).forEach(svc => {
                     if (svc.includeInTotal === false) return;
                     const net = renderer.getServicePrice(svc);
+                    // Guard defensivo: si por caché se cargó un renderer viejo sin getServiceTip, no
+                    // reventar todo el resumen (se omite la propina hasta que el JS se refresque).
+                    const tip = (typeof renderer.getServiceTip === 'function') ? renderer.getServiceTip(svc) : 0;
                     netSubtotal += net;
-                    serviceTotal += net + renderer.getServiceTip(svc);
+                    serviceTotal += net + tip;
                 });
             });
 
