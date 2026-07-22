@@ -635,10 +635,11 @@ class ItineraryBuilder {
     const isLocalTransport = () => document.querySelector('input[name="transportType"]:checked')?.value === 'local';
     // El campo "Dirección (Hotel, Airbnb...)" solo aplica para aeropuerto; local y punto-a-punto
     // usan POIs directamente, así que no se muestra.
-    const usesSpecificLocation = () => {
-      const t = document.querySelector('input[name="transportType"]:checked')?.value;
-      return t !== 'local' && t !== 'punto-a-punto';
-    };
+    // El campo "Dirección (Hotel, Airbnb, Particular…)" (specificLocation) quedó REDUNDANTE: para
+    // aeropuerto (único tipo donde salía) la dirección de la ciudad ya se captura en "Dirección de
+    // pick-up" (departure) o "Dirección de drop-off" (arrival). Se deja de mostrar; el valor
+    // guardado sigue restaurándose/persistiéndose para no perder datos viejos.
+    const usesSpecificLocation = () => false;
 
     // Show specific location when destination is selected (arrival only — destination is city/hotel)
     document.getElementById('transportDestinationSelect')?.addEventListener('change', (e) => {
@@ -6142,8 +6143,8 @@ class ItineraryBuilder {
           if (specificToRestore && service.transportType !== 'punto-a-punto') {
             const specificLocationField = document.getElementById('transportSpecificLocation');
             if (specificLocationField) specificLocationField.value = specificToRestore;
-            const specificLocationRow = document.getElementById('specificLocationRow');
-            if (specificLocationRow) specificLocationRow.classList.remove('d-none');
+            // Campo redundante: ya NO se muestra el row (la dirección va en pick-up/drop-off). El
+            // valor se conserva en el campo oculto para no perderlo al re-guardar datos viejos.
           }
 
           // Restore pickup / drop-off addresses (Punto a Punto + Local)
