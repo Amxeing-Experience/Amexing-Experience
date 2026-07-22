@@ -11800,7 +11800,8 @@ class ItineraryBuilder {
   serviceIncludesMentionGuide(service) {
     const info = this.getServiceIncludesInfo(service);
     const lower = String(info.includes || '').toLowerCase();
-    return lower.includes('guia') || lower.includes('guía');
+    // Palabra completa "guía/guías": NO cuenta "guiado/guiada" (recorrido guiado ≠ incluye guía).
+    return /\bgu[ií]as?\b/.test(lower);
   }
 
   getServiceIncludesInfo(service) {

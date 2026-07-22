@@ -701,7 +701,9 @@
             // guarda) para poder asignar el guía en reservas; esto es solo presentación.
             const includesRaw = Array.isArray(service.includes) ? service.includes.join(' ') : (service.includes || '');
             const includesLower = String(includesRaw).toLowerCase();
-            const includesMentionsGuide = includesLower.includes('guia') || includesLower.includes('guía');
+            // Palabra completa "guía/guías": NO cuenta "guiado/guiada" (recorrido guiado ≠ incluye
+            // guía), que antes matcheaban por subcadena y ocultaban el label de forma incorrecta.
+            const includesMentionsGuide = /\bgu[ií]as?\b/.test(includesLower);
             // Guía aplica en: tours/a-disposición (includeGuide) y experiencias (experienceGuide).
             // Para tours y experiencias, si el "Incluye" ya menciona guía, se omite el label (no duplicar).
             const guideApplies = ((service.type === 'tour' || service.type === 'a-disposicion') && service.includeGuide)
@@ -1176,7 +1178,7 @@
             } else if (service.type === 'experience' && service.experienceGuide) {
                 // Experiencia con guía: label "Incluye Guía", salvo que el "Incluye" ya mencione guía.
                 const inclG = String(Array.isArray(service.includes) ? service.includes.join(' ') : (service.includes || '')).toLowerCase();
-                if (!(inclG.includes('guia') || inclG.includes('guía'))) {
+                if (!/\bgu[ií]as?\b/.test(inclG)) {
                     html += `<div class="service-detail-item mt-1" style="color: #7a7f6b;">
                         <i class="ti ti-user me-1"></i>
                         <strong>Incluye Guía</strong>
@@ -1335,7 +1337,7 @@
             } else if (service.type === 'experience' && service.experienceGuide) {
                 // Experiencia con guía: label "Incluye Guía", salvo que el "Incluye" ya mencione guía.
                 const inclG = String(Array.isArray(service.includes) ? service.includes.join(' ') : (service.includes || '')).toLowerCase();
-                if (!(inclG.includes('guia') || inclG.includes('guía'))) {
+                if (!/\bgu[ií]as?\b/.test(inclG)) {
                     html += `<div class="service-detail-item text-success">
                         <i class="ti ti-user me-1"></i>
                         <strong>Incluye Guía</strong>
