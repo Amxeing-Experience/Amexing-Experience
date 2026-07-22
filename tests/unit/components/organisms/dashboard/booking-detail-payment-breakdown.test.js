@@ -5,8 +5,9 @@
  * embebido no se ejecuta, así que se verifica la presencia/ausencia de contenedores y marcadores
  * literales). Cubre: los 3 cargan el módulo compartido; el comparativo por método + botón de ajuste
  * viven solo en admin; la fila de propina y el desglose por servicio salieron de scope y están
- * AUSENTES del DOM en las 3 (junto con el selector de pago); y — crítico para RBAC —
- * los controles de ajuste/pago están AUSENTES DEL DOM (no solo ocultos) en department_manager/client.
+ * AUSENTES del DOM en las 3 (junto con el selector de pago); y — crítico para RBAC — el control de
+ * AJUSTE sigue AUSENTE del DOM en department_manager/client (adjustments = admin-only), mientras que el
+ * formulario de registro de PAGO ahora SÍ vive en ellos (agencia/agente cobran sus reservaciones, nivel 4+).
  */
 
 const { renderComponent } = require('../../../../helpers/ejsTestUtils');
@@ -111,12 +112,16 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).not.toContain('remove-adj-btn');
   });
 
-  it.each(AGENCY_ROLES)('%s: formulario de registro de pago AUSENTE del DOM (offcanvas es SOLO LECTURA)', async (role) => {
+  // INVERSIÓN (política confirmada): agencia (department_manager) y agente (client) AHORA registran /
+  // editan / eliminan pagos de SUS reservaciones (backend nivel 4+). Portan el mismo formulario que admin.
+  it.each(AGENCY_ROLES)('%s: AHORA porta el formulario de registro de pago (agencia/agente cobran, nivel 4+)', async (role) => {
     const html = await render(role);
-    expect(html).not.toContain('id="paymentFormWrap"');
-    expect(html).not.toContain('id="addPaymentBtn"');
-    expect(html).not.toContain('id="savePaymentBtn"');
-    expect(html).not.toContain('id="showPaymentFormBtn"');
+    expect(html).toContain('id="paymentFormWrap"');
+    expect(html).toContain('id="addPaymentBtn"');
+    expect(html).toContain('id="showPaymentFormBtn"');
+    // savePaymentBtn se emite dentro de renderPaymentForm (marcador literal en el <script>).
+    expect(html).toContain('id="savePaymentBtn"');
+    expect(html).toContain('function renderPaymentForm');
   });
 
   // INVERSIÓN Fase D: antes agencia/agente NO tenían historial de pagos; ahora SÍ (offcanvas de lectura).
@@ -126,7 +131,7 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).not.toContain('id="paymentsCard"');
   });
 
-  it.each(AGENCY_ROLES)('%s: Offcanvas de solo lectura con chips/cobertura/saldo restante/descuento + botón "Ver pagos"', async (role) => {
+  it.each(AGENCY_ROLES)('%s: Offcanvas con chips/cobertura/saldo restante/descuento + botón "Agregar pago" (ya no "Ver pagos")', async (role) => {
     const html = await render(role);
     expect(html).toContain('id="paymentsOffcanvas"');
     expect(html).toContain('offcanvas offcanvas-end');
@@ -134,7 +139,8 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).toContain('id="paymentCoverageCard"');
     expect(html).toContain('id="paymentRemainingByMethod"');
     expect(html).toContain('id="paymentDiscountEmphasis"');
-    expect(html).toContain('id="viewPaymentsBtn"');
+    expect(html).toContain('id="addPaymentBtn"');
+    expect(html).not.toContain('id="viewPaymentsBtn"');
     // Consume el endpoint AMPLIO (GET .../payments), no el objeto angosto de getReservationById.
     expect(html).toContain('/payments');
   });

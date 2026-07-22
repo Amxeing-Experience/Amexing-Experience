@@ -115,8 +115,8 @@
                 <h5 class="card-title mb-0 text-white">
                     <i class="ti ti-calculator me-2"></i>Resumen Financiero
                 </h5>
-                <button class="btn btn-sm btn-light d-none" id="viewPaymentsBtn">
-                    <i class="ti ti-cash me-1"></i>Ver pagos
+                <button class="btn btn-sm btn-light d-none" id="addPaymentBtn">
+                    <i class="ti ti-cash me-1"></i>Agregar pago
                 </button>
             </div>
         </div>
@@ -179,9 +179,9 @@
     </div>
 </div>
 
-<!-- Pagos — Offcanvas de SOLO LECTURA (Bootstrap 5 nativo). Mismos chips / cobertura / saldo restante
-     por método / énfasis de descuento / historial que admin, pero SIN formulario de registro ni acciones
-     de editar/eliminar. Se abre con "Ver pagos". Ancho 680px; full-width bajo el breakpoint sm (576px). -->
+<!-- Pagos — Offcanvas (Bootstrap 5 nativo). Agencia (department_manager) y agente (client) registran,
+     editan y eliminan pagos de SUS reservaciones (backend nivel 4+), con el mismo formulario, validación y
+     manejo de comprobante que admin. Se abre con "Agregar pago". Ancho 680px; full-width bajo sm (576px). -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="paymentsOffcanvas" aria-labelledby="paymentsOffcanvasLabel">
     <div class="offcanvas-header border-bottom">
         <h5 class="offcanvas-title mb-0" id="paymentsOffcanvasLabel"><i class="ti ti-cash me-2"></i>Pagos</h5>
@@ -192,10 +192,18 @@
         <div class="mb-3" id="paymentDiscountEmphasis" style="display:none;"></div>
         <div class="mb-3" id="paymentChips"></div>
         <div class="p-3 mb-3" id="paymentRemainingByMethod" style="display:none;"></div>
-        <button class="btn btn-sm btn-link text-decoration-none ps-0 fw-bold mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#paymentsHistoryCollapse">
-            <i class="ti ti-history me-1"></i>Historial de pagos <i class="ti ti-chevron-down ms-1" style="font-size:0.75rem;"></i>
-        </button>
-        <div class="collapse" id="paymentsHistoryCollapse"><div class="p-2" id="paymentsBody"></div></div>
+        <!-- Historial de pagos (colapsado) + registro (agencia/agente) -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <button class="btn btn-sm btn-link text-decoration-none ps-0 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#paymentsHistoryCollapse" id="paymentsHistoryToggle">
+                <i class="ti ti-history me-1"></i>Historial de pagos <i class="ti ti-chevron-down ms-1" style="font-size:0.75rem;"></i>
+            </button>
+            <button class="btn btn-sm btn-primary d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
+        </div>
+        <!-- Formulario de pago inline (mismo patrón que admin: renderPaymentForm) -->
+        <div id="paymentFormWrap" class="p-3 mb-3" style="display:none;"></div>
+        <div class="collapse" id="paymentsHistoryCollapse">
+            <div class="p-2" id="paymentsBody"></div>
+        </div>
     </div>
 </div>
 
@@ -207,6 +215,7 @@
 #paymentCoverageCard.payment-coverage-highlight,
 #paymentChips .payment-chip-card,
 #paymentRemainingByMethod,
+#paymentFormWrap,
 #paymentsBody {
     background: #fff;
     border: 1px solid #e0e6ed;
@@ -216,6 +225,7 @@
 #paymentCoverageCard.payment-coverage-highlight { border-left: 4px solid #969b81; }
 #paymentChips .payment-chip-card,
 #paymentRemainingByMethod,
+#paymentFormWrap,
 #paymentsBody {
     border-left: 4px solid #c0c3b3;
 }
@@ -454,7 +464,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // La tarjeta financiera se pinta SIEMPRE que haya datos de reservación, con o sin ajustes.
         // (Antes un early-return con 0 ajustes ocultaba también Subtotal/Total/Saldo — bug corregido.)
         card.style.display = '';
-        document.getElementById('viewPaymentsBtn')?.classList.remove('d-none');
+        document.getElementById('addPaymentBtn')?.classList.remove('d-none');
 
         // Esta plantilla es SIEMPRE de agencia: los ajustes se enmarcan como cargo/ajuste, nunca como
         // "descuento".
@@ -505,7 +515,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Bloque de pago (agencia/agente): Estado / Total a pagar / Pagado / Saldo. El "Saldo" se resuelve
         // con resolveDisplayedBalance (0 cuando está pagado; línea de ahorro aparte si se pagó en un método
         // más barato que el ancla). El detalle completo (chips, cobertura, saldo por método, descuento e
-        // historial) vive de solo lectura en #paymentsOffcanvas ("Ver pagos").
+        // historial) vive en #paymentsOffcanvas, junto al formulario de registro ("Agregar pago").
         if (pay) {
             const resolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
             const balanceCls = resolved.displayedBalance > 0 ? 'text-danger' : 'text-success';
@@ -538,12 +548,54 @@ document.addEventListener('DOMContentLoaded', async function() {
         body.innerHTML = html;
     }
 
-    // ===== PAGOS (solo lectura) =====
+    // ===== PAGOS (registrar / editar / eliminar) =====
+    // Portado de admin/booking-detail.ejs: agencia (department_manager) y agente (client) registran,
+    // editan y eliminan pagos de SUS reservaciones (backend nivel 4+, requireRoleLevel(4)). Mismo
+    // formulario, misma validación (fecha obligatoria, receivedBy condicional a efectivo, maxlength,
+    // escapeHtml en texto libre) y mismo manejo de comprobante que admin. end_client NO porta esto: queda
+    // de solo lectura por política de negocio.
 
     // Último summary AMPLIO de GET .../payments (coveragePercent/availableMethods/anchoredMethod/
     // montoParaSaldar). El summary ANGOSTO de getReservationById NO los trae — el carrito se puebla solo
     // desde aquí.
     let latestSummary = null;
+    let paymentsCache = [];
+
+    const PAYMENT_METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
+
+    // Live thousands formatting for the amount input (mismo comportamiento que admin).
+    function formatThousandsInput(el) {
+        const raw = el.value;
+        const caret = el.selectionStart || 0;
+        const digitsBeforeCaret = (raw.slice(0, caret).match(/\d/g) || []).length;
+        let clean = raw.replace(/[^\d.]/g, '');
+        const dot = clean.indexOf('.');
+        if (dot !== -1) clean = clean.slice(0, dot + 1) + clean.slice(dot + 1).replace(/\./g, '');
+        let [intPart = '', decPart] = clean.split('.');
+        intPart = intPart.replace(/^0+(?=\d)/, '');
+        const grouped = intPart ? Number(intPart).toLocaleString('en-US') : '';
+        let out = grouped;
+        if (decPart !== undefined) out += `.${decPart.slice(0, 2)}`;
+        el.value = out;
+        let pos = 0;
+        let seen = 0;
+        while (pos < out.length && seen < digitsBeforeCaret) {
+            if (/\d/.test(out[pos])) seen += 1;
+            pos += 1;
+        }
+        el.setSelectionRange(pos, pos);
+    }
+
+    function attachThousands(el) {
+        if (!el) return;
+        el.addEventListener('input', () => formatThousandsInput(el));
+        if (el.value) formatThousandsInput(el);
+    }
+
+    // Parse an amount that may carry thousands separators ("1,234.56" -> 1234.56).
+    function parseAmount(value) {
+        return parseFloat(String(value == null ? '' : value).replace(/,/g, ''));
+    }
 
     function paymentsOffcanvasInstance() {
         const el = document.getElementById('paymentsOffcanvas');
@@ -556,19 +608,78 @@ document.addEventListener('DOMContentLoaded', async function() {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             const result = await response.json();
-            const payments = result?.data?.payments || [];
+            paymentsCache = result?.data?.payments || [];
             if (result?.data?.summary) applyPaymentSummary(result.data.summary);
-            renderPaymentsHistory(payments);
         } catch (err) {
             console.error('Error loading payments:', err);
         }
+        renderPayments();
     }
 
-    function renderPaymentsHistory(payments) {
+    function renderPayments() {
         const body = document.getElementById('paymentsBody');
+        const showFormBtn = document.getElementById('showPaymentFormBtn');
         if (!body) return;
-        const curr = reservationData?.currency || 'MXN';
-        body.innerHTML = PaymentBreakdownHelpers.buildPaymentsHistoryTable(payments, curr);
+
+        const d = reservationData;
+        const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
+        const curr = d.currency || 'MXN';
+
+        // "Registrar pago" (dentro del carrito) solo si la reservación sigue editable (no cancelada/completada).
+        if (showFormBtn) { if (canEdit) showFormBtn.classList.remove('d-none'); else showFormBtn.classList.add('d-none'); }
+
+        if (!paymentsCache.length) {
+            body.innerHTML = '<div class="text-center py-3 text-muted">Sin pagos registrados</div>';
+            return;
+        }
+
+        const rows = paymentsCache.map((p) => {
+            const ref = p.reference ? PaymentBreakdownHelpers.escapeHtml(p.reference) : '<span class="text-muted">—</span>';
+            // "Recibió" solo aplica al efectivo; en otros métodos es irrelevante y se muestra un guion.
+            const received = (p.method === 'efectivo' && p.receivedBy)
+                ? PaymentBreakdownHelpers.escapeHtml(p.receivedBy) : '<span class="text-muted">—</span>';
+            const receipt = p.receiptUrl
+                ? `<a href="${PaymentBreakdownHelpers.escapeHtml(p.receiptUrl)}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
+                : '<span class="text-muted">—</span>';
+            return `<tr>
+                <td>${formatDate(p.paidAt || p.createdAt)}</td>
+                <td><span class="badge bg-secondary-subtle text-secondary">${PAYMENT_METHOD_LABELS[p.method] || p.method || '—'}</span></td>
+                <td>${ref}</td>
+                <td>${received}</td>
+                <td class="text-end">${formatCurrency(p.amount, curr)}</td>
+                <td>${p.origCurrency || curr}</td>
+                <td class="text-center">${receipt}</td>
+                <td class="text-end">
+                    ${canEdit ? `<button class="btn btn-sm btn-outline-primary py-0 px-1 edit-payment-btn" data-payment-id="${p.id}" title="Editar"><i class="ti ti-edit"></i></button>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1 delete-payment-btn" data-payment-id="${p.id}" title="Eliminar"><i class="ti ti-trash"></i></button>` : ''}
+                </td>
+            </tr>`;
+        }).join('');
+
+        body.innerHTML = `<div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0 small">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Método</th>
+                        <th>Referencia</th>
+                        <th>Recibió</th>
+                        <th class="text-end">Monto</th>
+                        <th>Moneda</th>
+                        <th class="text-center">Comprobante</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+
+        body.querySelectorAll('.edit-payment-btn').forEach((btn) => {
+            btn.addEventListener('click', () => renderPaymentForm(btn.dataset.paymentId));
+        });
+        body.querySelectorAll('.delete-payment-btn').forEach((btn) => {
+            btn.addEventListener('click', () => deletePayment(btn.dataset.paymentId));
+        });
     }
 
     // Rellena las secciones del offcanvas (chips / cobertura / saldo restante / descuento) desde el
@@ -605,7 +716,352 @@ document.addEventListener('DOMContentLoaded', async function() {
         renderPaymentsOffcanvas();
     }
 
-    document.getElementById('viewPaymentsBtn')?.addEventListener('click', () => paymentsOffcanvasInstance()?.show());
+    // Read a File as base64 (strip the "data:...;base64," prefix) for the JSON receipt upload.
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+            reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Upload a payment receipt in a SEPARATE request (decoupled from the save). El pago ya está
+    // persistido, así que esto nunca lo arriesga: devuelve null si sube, o un aviso si falla.
+    async function uploadReceipt(paymentId, file) {
+        try {
+            const body = JSON.stringify({
+                fileBase64: await fileToBase64(file), fileName: file.name, mimeType: file.type,
+            });
+            const resp = await fetch(`/api/reservations/${reservationId}/payments/${paymentId}/receipt`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body,
+            });
+            const r = await resp.json().catch(() => ({}));
+            if (resp.ok && r.success) return null;
+            return r.error
+                ? `Pago guardado, pero el comprobante no se subió: ${r.error}`
+                : 'Pago guardado, pero el comprobante no se subió. Reinténtalo editando el pago.';
+        } catch (err) {
+            console.error('Receipt upload error:', err);
+            return 'Pago guardado, pero el comprobante no se subió (se cortó la conexión). Reinténtalo editando el pago.';
+        }
+    }
+
+    // Inline payment form (dentro de #paymentsOffcanvas). null = nuevo, id = editar el pago.
+    function renderPaymentForm(paymentId) {
+        const wrap = document.getElementById('paymentFormWrap');
+        if (!wrap) return;
+        const existing = paymentId ? paymentsCache.find((p) => p.id === paymentId) : null;
+        const curr = existing?.origCurrency || 'MXN';
+        const paidAt = existing?.paidAt ? new Date(existing.paidAt).toISOString().slice(0, 10) : '';
+        // Payment date allows the future (reservations later); shared standard 1900 .. today + 20y.
+        const paidAtMax = (() => { const dt = new Date(); dt.setFullYear(dt.getFullYear() + 20); return dt.toISOString().slice(0, 10); })();
+        const opt = (v, label, sel) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${label}</option>`;
+        const receiptLink = existing?.receiptUrl
+            ? `<a href="${existing.receiptUrl}" target="_blank" class="small d-block mt-1"><i class="ti ti-file-invoice me-1"></i>Ver comprobante actual</a>` : '';
+
+        // Método: poblado dinámicamente desde availableMethods (Fase C), NUNCA hardcodeado a 3 opciones.
+        // Al editar, se conserva el método guardado aunque ya no esté disponible (no cambiarlo en silencio).
+        // Sin métodos disponibles (H3): select deshabilitado con mensaje y guardado bloqueado.
+        const available = (latestSummary && Array.isArray(latestSummary.availableMethods)) ? latestSummary.availableMethods.slice() : [];
+        const method = existing?.method || available[0] || '';
+        const methodOrder = available.slice();
+        if (existing?.method && !methodOrder.includes(existing.method)) methodOrder.push(existing.method);
+        const methodDisabled = methodOrder.length === 0;
+        const methodSelectHtml = methodDisabled
+            ? `<select class="form-select form-select-sm" id="paymentMethod" disabled><option value="">Sin métodos disponibles</option></select>
+               <div class="form-text text-danger">No hay métodos de pago disponibles para esta reservación.</div>`
+            : `<select class="form-select form-select-sm" id="paymentMethod">${methodOrder.map((m) => opt(m, PAYMENT_METHOD_LABELS[m] || m, method)).join('')}</select>`;
+
+        const amountInit = existing ? (existing.origAmount ?? existing.amount ?? '') : '';
+
+        wrap.innerHTML = `
+            <h6 class="fw-bold mb-2">${existing ? '<i class="ti ti-edit me-1"></i>Editar pago' : '<i class="ti ti-cash me-1"></i>Registrar pago'}</h6>
+            <input type="hidden" id="paymentId" value="${existing ? existing.id : ''}">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="paymentAmount">Monto</label>
+                    <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentAmount" placeholder="0.00" value="${amountInit}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="paymentCurrency">Moneda</label>
+                    <select class="form-select form-select-sm" id="paymentCurrency">${opt('MXN', 'MXN', curr)}${opt('USD', 'USD', curr)}</select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="paymentMethod">Método</label>
+                    ${methodSelectHtml}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
+                    <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}" required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
+                    <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${PaymentBreakdownHelpers.escapeHtml(existing?.reference || '')}">
+                </div>
+                <div class="col-md-6" id="paymentReceivedByWrap" style="display:${method === 'efectivo' ? '' : 'none'};">
+                    <label class="form-label fw-semibold small" for="paymentReceivedBy">¿Quién recibió el efectivo?</label>
+                    <input type="text" class="form-control form-control-sm" id="paymentReceivedBy" maxlength="100" placeholder="Nombre de quien recibió" value="${PaymentBreakdownHelpers.escapeHtml(existing?.receivedBy || '')}" ${method === 'efectivo' ? 'required' : ''}>
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold small" for="paymentReceipt">Comprobante (imagen o PDF)</label>
+                    <input type="file" class="form-control form-control-sm" id="paymentReceipt" accept="image/*,application/pdf">
+                    ${receiptLink}
+                </div>
+                <div class="col-12">
+                    <label class="form-label fw-semibold small" for="paymentNotes">Notas</label>
+                    <textarea class="form-control form-control-sm" id="paymentNotes" rows="2" maxlength="300" placeholder="Notas del pago">${PaymentBreakdownHelpers.escapeHtml(existing?.notes || '')}</textarea>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end gap-2 mt-3">
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelPaymentBtn">Cancelar</button>
+                <button type="button" class="btn btn-sm btn-primary px-4" id="savePaymentBtn"><i class="ti ti-check me-1"></i>Guardar</button>
+            </div>`;
+        // El formulario vive dentro del offcanvas (posición fija con scroll propio): se muestra en su
+        // sitio y se desplaza a la vista dentro del panel, sin scrollIntoView de página ni borde inline.
+        wrap.style.display = '';
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const saveBtn = document.getElementById('savePaymentBtn');
+        // Sin métodos disponibles (H3): no se puede registrar/editar el pago — bloquea el guardado.
+        if (methodDisabled && saveBtn) saveBtn.disabled = true;
+        document.getElementById('cancelPaymentBtn').addEventListener('click', () => { wrap.style.display = 'none'; wrap.innerHTML = ''; });
+        saveBtn.addEventListener('click', () => savePayment(existing ? existing.id : ''));
+        attachThousands(document.getElementById('paymentAmount'));
+
+        // "¿Quién recibió el efectivo?" es visible + required SOLO cuando el método es efectivo, y
+        // reacciona en vivo si el usuario cambia el método DESPUÉS de abrir el formulario.
+        const methodSel = document.getElementById('paymentMethod');
+        function syncReceivedByVisibility() {
+            const isCash = methodSel && methodSel.value === 'efectivo';
+            const wrapEl = document.getElementById('paymentReceivedByWrap');
+            const inputEl = document.getElementById('paymentReceivedBy');
+            if (wrapEl) wrapEl.style.display = isCash ? '' : 'none';
+            if (inputEl) inputEl.required = !!isCash;
+        }
+        if (methodSel) methodSel.addEventListener('change', syncReceivedByVisibility);
+        syncReceivedByVisibility();
+    }
+
+    // "Agregar pago" (header): abre el carrito. El formulario queda colapsado detrás de "Registrar pago".
+    document.getElementById('addPaymentBtn')?.addEventListener('click', () => {
+        paymentsOffcanvasInstance()?.show();
+    });
+    // "Registrar pago" (dentro del carrito): muestra el formulario de nuevo pago sin reabrir el panel.
+    document.getElementById('showPaymentFormBtn')?.addEventListener('click', () => renderPaymentForm(null));
+    // Cerrar el carrito (backdrop-click / Escape / botón) descarta el formulario en silencio (H5).
+    document.getElementById('paymentsOffcanvas')?.addEventListener('hidden.bs.offcanvas', () => {
+        const wrap = document.getElementById('paymentFormWrap');
+        if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+    });
+
+    async function savePayment(paymentId) {
+        const amount = parseAmount(document.getElementById('paymentAmount').value);
+        const paidAt = document.getElementById('paymentPaidAt').value;
+        const method = document.getElementById('paymentMethod').value;
+        const receivedByEl = document.getElementById('paymentReceivedBy');
+        const receivedBy = receivedByEl ? receivedByEl.value.trim() : '';
+
+        if (!amount || amount <= 0) { pmToast('El monto debe ser mayor a 0', 'warning'); return; }
+        if (amount > 100000000) { pmToast('El monto no puede exceder 100,000,000', 'warning'); return; }
+        if (!paidAt) { pmToast('La fecha de pago es obligatoria', 'warning'); return; }
+        if (method === 'efectivo' && !receivedBy) { pmToast('Indica quién recibió el efectivo', 'warning'); return; }
+
+        const payload = {
+            amount,
+            currency: document.getElementById('paymentCurrency').value,
+            method,
+            reference: document.getElementById('paymentReference').value.trim(),
+            notes: document.getElementById('paymentNotes').value.trim(),
+        };
+        if (paidAt) payload.paidAt = paidAt;
+        if (receivedBy) payload.receivedBy = receivedBy;
+
+        // Receipt (optional) — validado aquí pero subido en una petición SEPARADA DESPUÉS de guardar el
+        // pago (ver uploadReceipt), para que una subida lenta a S3 nunca bloquee ni pierda el pago.
+        const fileInput = document.getElementById('paymentReceipt');
+        const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+        if (file) {
+            if (file.size > 10 * 1024 * 1024) { pmToast('El comprobante supera el límite de 10MB', 'warning'); return; }
+            if (!/^image\//.test(file.type) && file.type !== 'application/pdf') { pmToast('El comprobante debe ser imagen o PDF', 'warning'); return; }
+        }
+
+        const isEdit = !!paymentId;
+        const url = isEdit
+            ? `/api/reservations/${reservationId}/payments/${paymentId}`
+            : `/api/reservations/${reservationId}/payments`;
+        const httpMethod = isEdit ? 'PUT' : 'POST';
+        // Snapshot del conteo actual para reconciliar si la RESPUESTA se pierde: el request suele llegar
+        // al servidor y guardar aunque la respuesta no regrese.
+        const prevCount = paymentsCache.length;
+
+        const btn = document.getElementById('savePaymentBtn');
+        if (btn) btn.disabled = true;
+        try {
+            const response = await fetch(url, {
+                method: httpMethod,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+            // Leer el body crudo primero para que una respuesta no-JSON (p. ej. página HTML de error)
+            // muestre un mensaje claro en vez del genérico.
+            const rawBody = await response.text();
+            let result;
+            try {
+                result = JSON.parse(rawBody);
+            } catch (parseErr) {
+                pmToast(`Error del servidor (HTTP ${response.status})`, 'error');
+                if (btn) btn.disabled = false;
+                return;
+            }
+            if (result.success) {
+                const savedId = result.data?.payment?.id || paymentId;
+                // Sube el comprobante en su propia petición ahora que el pago está guardado. Si falla,
+                // el pago se queda — solo avisamos para que el usuario reintente el comprobante.
+                let receiptWarn = result.warning || null;
+                if (file && savedId) receiptWarn = await uploadReceipt(savedId, file);
+                const wrap = document.getElementById('paymentFormWrap');
+                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+                applyPaymentSummary(result.data?.summary);
+                await loadPayments();
+                if (receiptWarn) pmToast(receiptWarn, 'warning');
+                else pmToast('Pago guardado', 'success');
+            } else {
+                let msg = result.error || 'No se pudo guardar el pago';
+                if (result.detail) msg += ` — ${result.detail}`;
+                if (response.status === 401) {
+                    msg = `Sesión/token inválido (${result.detail || result.code || '401'}). Recarga la página (Ctrl+Shift+R) e intenta de nuevo.`;
+                }
+                pmToast(msg, 'error');
+                if (btn) btn.disabled = false;
+            }
+        } catch (err) {
+            // Error de red: el request suele llegar al servidor y guardar aunque la respuesta se pierda.
+            // En vez de un falso fallo, reconciliamos desde el servidor (lo mismo que un Ctrl+R manual).
+            console.error('Save payment network error, reconciling from server:', err);
+            await loadPayments();
+            let saved = !isEdit && paymentsCache.length > prevCount;
+            if (!saved && !isEdit) {
+                await new Promise((resolve) => setTimeout(resolve, 700));
+                await loadPayments();
+                saved = paymentsCache.length > prevCount;
+            }
+            const wrap = document.getElementById('paymentFormWrap');
+            if (saved) {
+                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+                pmToast('Pago guardado (se recuperó tras un corte de conexión)', 'success');
+            } else if (isEdit) {
+                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+                pmToast('La respuesta se perdió, pero la lista ya se actualizó — verifica que el pago sea correcto.', 'warning');
+            } else {
+                pmToast('No se pudo confirmar el guardado. Revisa la lista; si el pago no aparece, regístralo otra vez.', 'warning');
+                if (btn) btn.disabled = false;
+            }
+        }
+    }
+
+    // ---- Styled confirm + toasts (reemplazan el confirm/alert nativo en el carrito de pagos) ----
+    const pmEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    function pmConfirm({ title = 'Confirmar', message = '', confirmText = 'Aceptar', danger = false } = {}) {
+        return new Promise((resolve) => {
+            let el = document.getElementById('pmConfirmModal');
+            if (!el) {
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal fade" id="pmConfirmModal" tabindex="-1" aria-hidden="true">
+                      <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg" style="border-radius:0.85rem;overflow:hidden">
+                          <div class="modal-body text-center px-4 pt-4 pb-2">
+                            <div data-pm-icon class="d-inline-flex align-items-center justify-content-center mb-3" style="width:56px;height:56px;border-radius:50%"></div>
+                            <h5 class="fw-bold mb-2" data-pm-title></h5>
+                            <p class="text-muted mb-0" data-pm-msg></p>
+                          </div>
+                          <div class="modal-footer border-0 justify-content-center pt-1 pb-4 gap-2">
+                            <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn px-4" data-pm-ok></button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>`);
+                el = document.getElementById('pmConfirmModal');
+            }
+            el.querySelector('[data-pm-title]').textContent = title;
+            el.querySelector('[data-pm-msg]').textContent = message;
+            const icon = el.querySelector('[data-pm-icon]');
+            icon.classList.remove('bg-danger-subtle', 'text-danger', 'bg-primary-subtle', 'text-primary');
+            icon.classList.add(danger ? 'bg-danger-subtle' : 'bg-primary-subtle', danger ? 'text-danger' : 'text-primary');
+            icon.innerHTML = `<i class="ti ${danger ? 'ti-alert-triangle' : 'ti-help-circle'}" style="font-size:1.75rem"></i>`;
+            const old = el.querySelector('[data-pm-ok]');
+            const ok = old.cloneNode(true);
+            ok.textContent = confirmText;
+            ok.className = `btn px-4 ${danger ? 'btn-danger' : 'btn-primary'}`;
+            old.replaceWith(ok);
+            const modal = bootstrap.Modal.getOrCreateInstance(el);
+            let confirmed = false;
+            ok.addEventListener('click', () => { confirmed = true; modal.hide(); });
+            el.addEventListener('hidden.bs.modal', () => resolve(confirmed), { once: true });
+            modal.show();
+        });
+    }
+
+    function pmToast(message, type = 'info') {
+        let c = document.getElementById('pmToastContainer');
+        if (!c) {
+            document.body.insertAdjacentHTML('beforeend', '<div id="pmToastContainer" class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1090"></div>');
+            c = document.getElementById('pmToastContainer');
+        }
+        const bg = {
+            error: 'bg-danger text-white', success: 'bg-success text-white',
+            warning: 'bg-warning text-dark', info: 'bg-dark text-white',
+        }[type] || 'bg-dark text-white';
+        const wrap = document.createElement('div');
+        wrap.className = `toast align-items-center ${bg} border-0`;
+        wrap.setAttribute('role', 'alert');
+        wrap.innerHTML = `<div class="d-flex"><div class="toast-body">${pmEsc(message)}</div>`
+            + `<button type="button" class="btn-close ${type === 'warning' ? '' : 'btn-close-white'} me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>`;
+        c.appendChild(wrap);
+        const t = new bootstrap.Toast(wrap, { delay: 4500 });
+        t.show();
+        wrap.addEventListener('hidden.bs.toast', () => wrap.remove());
+    }
+
+    async function deletePayment(paymentId) {
+        if (!(await pmConfirm({
+            title: 'Eliminar pago', message: '¿Eliminar este pago? Esta acción no se puede deshacer.',
+            confirmText: 'Eliminar', danger: true,
+        }))) return;
+        const existedBefore = paymentsCache.some((p) => p.id === paymentId);
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/payments/${paymentId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const result = await response.json();
+            if (result.success) {
+                applyPaymentSummary(result.data?.summary);
+                await loadPayments();
+                pmToast('Pago eliminado', 'success');
+            } else {
+                pmToast(result.error || 'Error al eliminar el pago', 'error');
+            }
+        } catch (err) {
+            // Respuesta perdida — el delete pudo haber pasado. Reconciliamos desde el servidor en vez de
+            // reportar un falso fallo (misma idea que el guardado).
+            console.error('Delete payment network error, reconciling from server:', err);
+            await loadPayments();
+            const stillThere = paymentsCache.some((p) => p.id === paymentId);
+            if (existedBefore && !stillThere) {
+                pmToast('Pago eliminado (se recuperó tras un corte de conexión)', 'success');
+            } else {
+                pmToast('No se pudo confirmar la eliminación. Revisa la lista; si el pago sigue ahí, inténtalo otra vez.', 'warning');
+            }
+        }
+    }
 
     function getSubconceptDetails(svc) {
         const sub = svc.subconcept;
