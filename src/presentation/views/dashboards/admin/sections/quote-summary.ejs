@@ -1066,7 +1066,7 @@ const e = __isRes ? 'reservación' : 'cotización';
     function getAccessToken() {
         return document.cookie
             .split('; ')
-            .find(row => row.startsWith('accessToken='))
+            .find(row => row.startsWith('accessToken=') || row.startsWith('clientAccessToken='))
             ?.split('=')[1];
     }
 

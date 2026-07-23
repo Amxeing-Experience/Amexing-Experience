@@ -2113,7 +2113,7 @@ function setupExperienceFilters() {
     // Get access token for API calls
     function getAccessToken() {
         return document.cookie.split('; ')
-            .find(row => row.startsWith('accessToken='))
+            .find(row => row.startsWith('accessToken=') || row.startsWith('clientAccessToken='))
             ?.split('=')[1] || null;
     }
 
