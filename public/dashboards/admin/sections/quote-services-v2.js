@@ -20734,9 +20734,17 @@ class ItineraryBuilder {
           // servidor vuelve a sumarla vía sumServiceTipsFromDays. La propina se conserva como
           // metadata (tipAmount/tipType/tipValue) para mostrarse como línea aparte.
           const serviceTip = this.getServiceTipInPaymentType ? this.getServiceTipInPaymentType(service) : 0;
-          serviceTipsTotalSave += serviceTip;
           const serviceTotal = servicePrice;
-          dayTotal += serviceTotal;
+          // Un servicio "Pago externo" (includeInTotal:false) NO suma a los acumuladores agregados
+          // del día (dayTotal → grandSubtotal → subtotal, y serviceTipsTotalSave), igual que
+          // netSubtotalForTip más abajo. Si sumara, el subtotal del payload divergiría de la suma
+          // de subconceptos ACTIVOS que recalcula el servidor (evaluateTotalsConsistency) y el
+          // guardado se rechazaría con 400. El subconcepto individual conserva su propio precio y
+          // propina reales sin alterar (unitPrice/total/tipAmount abajo).
+          if (service.includeInTotal !== false) {
+            serviceTipsTotalSave += serviceTip;
+            dayTotal += serviceTotal;
+          }
 
           qsDevLog('📊 Service total calculation:', {
             serviceType: service.type,
