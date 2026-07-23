@@ -23,8 +23,13 @@ describe('Propina en service-items: RBAC server-side (integration)', () => {
   let superadminToken;
   let endClientToken; // forjado: rol end_client, sin roleId (roleObject null -> fallback nivel 4)
   let endClientUser;
+  let agentUser; // client (Agente) seeded — dueño real de las quotes de prueba
+  let agencyUser; // department_manager (Agencia) seeded — client pointer de las quotes de prueba
   const created = { quotes: [], users: [] };
 
+  // Las quotes se crean como propiedad legítima del agente (owner) y de la agencia (client pointer)
+  // que hacen los PUT: tras el check de aislamiento entre agencias de updateServiceItems, un usuario
+  // sin relación de ownership recibiría 403 antes de llegar al guard de propina que estos tests validan.
   const makeQuote = async (serviceItems, status = 'draft') => {
     const quote = new Parse.Object('Quote');
     quote.set('exists', true);
@@ -33,6 +38,8 @@ describe('Propina en service-items: RBAC server-side (integration)', () => {
     quote.set('folio', `QTE-TIPRBAC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
     quote.set('numberOfPeople', 2);
     quote.set('serviceItems', serviceItems);
+    quote.set('owner', agentUser); // el agente (client) pasa checkQuoteAccess por ownership
+    quote.set('client', agencyUser); // la agencia (department_manager) pasa por su client pointer
     await quote.save(null, { useMasterKey: true });
     created.quotes.push(quote.id);
     return quote;
@@ -109,6 +116,8 @@ describe('Propina en service-items: RBAC server-side (integration)', () => {
     agencyToken = await AuthTestHelper.loginAs('department_manager', app);
     adminToken = await AuthTestHelper.loginAs('admin', app);
     superadminToken = await AuthTestHelper.loginAs('superadmin', app);
+    agentUser = await AuthTestHelper.getUserByRole('client');
+    agencyUser = await AuthTestHelper.getUserByRole('department_manager');
 
     // No hay end_client sembrado: se crea un AmexingUser real (activo) y se forja un JWT con rol
     // end_client SIN roleId (roleObject queda null -> requireRoleLevel usa el mapa de fallback,

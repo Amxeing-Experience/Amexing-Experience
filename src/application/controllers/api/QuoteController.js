@@ -2447,6 +2447,19 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
+      // Aislamiento entre agencias: sin esto, cualquier department_manager/client autenticado podía
+      // sobrescribir servicios/precios de una cotización de OTRA agencia mandando el PUT directo con su
+      // quoteId (bypass de tenant). Mismo control de acceso que la LECTURA en getQuoteById: hasAccess
+      // (colaboración) con fallback legacy a checkQuoteAccess (admin/superadmin pasan siempre; la agencia
+      // por su client pointer/departamento; el agente solo por ownership).
+      const hasAccess = await this.collaborationService.hasAccess(quoteId, currentUser.id);
+      if (!hasAccess) {
+        const hasLegacyAccess = await this.checkQuoteAccess(currentUser, quote, req.userRole);
+        if (!hasLegacyAccess) {
+          return this.sendError(res, 'No tienes permisos para modificar esta cotización', 403);
+        }
+      }
+
       // Timeline (Fase A): snapshot del serviceItems previo para diffear agregados/editados/quitados.
       const beforeServiceItems = quote.get('serviceItems') || { days: [] };
 

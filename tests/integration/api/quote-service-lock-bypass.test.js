@@ -16,12 +16,14 @@ const AuthTestHelper = require('../../helpers/authTestHelper');
 describe('Bloqueo por-servicio: subtotal/total se recalculan desde el contenido restaurado (integration)', () => {
   let app;
   let agencyToken;
+  let agencyUser; // department_manager seeded — client pointer de las quotes (aislamiento entre agencias)
   const created = { quotes: [] };
 
   beforeAll(async () => {
     app = require('../../../src/index');
     await new Promise((resolve) => { setTimeout(resolve, 1000); });
     agencyToken = await AuthTestHelper.loginAs('department_manager', app);
+    agencyUser = await AuthTestHelper.getUserByRole('department_manager');
   }, 30000);
 
   afterAll(async () => {
@@ -42,6 +44,7 @@ describe('Bloqueo por-servicio: subtotal/total se recalculan desde el contenido 
     quote.set('status', 'scheduled');
     quote.set('folio', `QTE-LOCK-${Date.now()}`);
     quote.set('numberOfPeople', 2);
+    quote.set('client', agencyUser); // la agencia que edita es dueña (aislamiento entre agencias)
     const realSub = {
       id: 'svc1',
       concept: 'Servicio real',
@@ -114,6 +117,7 @@ describe('Bloqueo por-servicio: subtotal/total se recalculan desde el contenido 
     quote.set('status', 'draft'); // draft + sin adminLocked => NINGÚN servicio protegido
     quote.set('folio', `QTE-LOCK0-${Date.now()}`);
     quote.set('numberOfPeople', 2);
+    quote.set('client', agencyUser); // la agencia que edita es dueña (aislamiento entre agencias)
     quote.set('serviceItems', {
       days: [{
         dayNumber: 1,

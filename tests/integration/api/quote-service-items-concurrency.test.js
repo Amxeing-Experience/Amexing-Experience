@@ -16,6 +16,7 @@ describe('PUT service-items concurrente (H12, integration)', () => {
   let app;
   let adminToken;
   let agentToken;
+  let agentUser; // client (Agente) seeded — owner de las quotes (aislamiento entre agencias)
   const created = { quotes: [] };
 
   const makeQuote = async (subs) => {
@@ -26,6 +27,7 @@ describe('PUT service-items concurrente (H12, integration)', () => {
     quote.set('status', 'draft');
     quote.set('folio', `QTE-H12-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
     quote.set('numberOfPeople', 2);
+    quote.set('owner', agentUser); // el agente que edita concurrentemente es dueño real
     quote.set('serviceItems', {
       days: [{ dayNumber: 1, dayTitle: '', subconcepts: subs }],
       subtotal, iva: 0, total: subtotal, currency: 'MXN', paymentType: 'efectivo',
@@ -70,6 +72,7 @@ describe('PUT service-items concurrente (H12, integration)', () => {
     await new Promise((resolve) => { setTimeout(resolve, 1000); });
     adminToken = await AuthTestHelper.loginAs('admin', app);
     agentToken = await AuthTestHelper.loginAs('client', app);
+    agentUser = await AuthTestHelper.getUserByRole('client');
   }, 30000);
 
   afterAll(async () => {
