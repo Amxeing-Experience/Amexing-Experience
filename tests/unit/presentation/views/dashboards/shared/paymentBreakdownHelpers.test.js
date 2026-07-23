@@ -66,6 +66,42 @@ describe('PaymentBreakdownHelpers.getServicePriceByType', () => {
     expect(H.getServicePriceByType({ total: 42 }, 'tarjeta')).toBe(42);
     expect(H.getServicePriceByType(null, 'tarjeta')).toBe(0);
   });
+
+  // FIX 2 (council): getServicePriceByType duplicaba chargeAmount SIN restar el descuento por servicio,
+  // así que el staff veía el desglose por servicio en BRUTO mientras el motor real (PaymentService) ya
+  // restaba el descuento — dos fuentes de verdad divergentes en la misma pantalla. Ahora resta
+  // discountAmount escalado por pricesByType[método]/pricesByType.efectivo, idéntico a chargeAmount.
+  it('FIX 2: en efectivo resta discountAmount directo (factor 1)', () => {
+    expect(H.getServicePriceByType({ subconcept: { pricesByType: { efectivo: 2000 }, discountAmount: 300 } }, 'efectivo')).toBe(1700);
+  });
+
+  it('FIX 2: en tarjeta el descuento se escala por pricesByType[tarjeta]/pricesByType.efectivo', () => {
+    // discEf 100, efectivo 1000, tarjeta 1210 -> descuento en tarjeta = 100 * (1210/1000) = 121; neto 1089.
+    expect(H.getServicePriceByType(
+      { subconcept: { pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 }, discountAmount: 100 } },
+      'tarjeta'
+    )).toBe(1089);
+    // Mismo servicio en efectivo: 1000 - 100 = 900.
+    expect(H.getServicePriceByType(
+      { subconcept: { pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 }, discountAmount: 100 } },
+      'efectivo'
+    )).toBe(900);
+  });
+
+  it('FIX 2: un descuento mayor al precio del método hace clamp a 0 (nunca negativo)', () => {
+    expect(H.getServicePriceByType({ subconcept: { pricesByType: { efectivo: 200 }, discountAmount: 500 } }, 'efectivo')).toBe(0);
+  });
+
+  it('FIX 2: sin base efectivo utilizable, resta el discountAmount bruto (mismo fallback que chargeAmount)', () => {
+    // Sin pricesByType.efectivo (>0): el factor no se puede escalar, se resta el bruto. tarjeta 500 - 100 = 400.
+    expect(H.getServicePriceByType({ subconcept: { pricesByType: { tarjeta: 500 }, discountAmount: 100 } }, 'tarjeta')).toBe(400);
+  });
+
+  it('FIX 2: discountAmount ausente/0/negativo no altera el precio (comportamiento previo intacto)', () => {
+    expect(H.getServicePriceByType({ subconcept: { pricesByType: { efectivo: 1000 } } }, 'efectivo')).toBe(1000);
+    expect(H.getServicePriceByType({ subconcept: { pricesByType: { efectivo: 1000 }, discountAmount: 0 } }, 'efectivo')).toBe(1000);
+    expect(H.getServicePriceByType({ subconcept: { pricesByType: { efectivo: 1000 }, discountAmount: -50 } }, 'efectivo')).toBe(1000);
+  });
 });
 
 describe('PaymentBreakdownHelpers.computeServicesSubtotalByType (comparativo 3 métodos)', () => {
@@ -103,6 +139,17 @@ describe('PaymentBreakdownHelpers.computeServicesSubtotalByType (comparativo 3 m
       { subconcept: { pricesByType: { tarjeta: 121 } } },
     ];
     expect(H.computeServicesSubtotalByType(corrupt, 'tarjeta', 'MXN')).toBe(181);
+  });
+
+  it('FIX 2: el descuento por servicio se propaga al subtotal (getServicePriceByType lo resta por servicio)', () => {
+    const withDiscount = [
+      { subconcept: { pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 }, discountAmount: 100 } },
+      { subconcept: { pricesByType: { efectivo: 500, transferencia: 580, tarjeta: 605 } } },
+    ];
+    // efectivo: (1000-100) + 500 = 1400 (múltiplo de 5, sin ruido de redondeo).
+    expect(H.computeServicesSubtotalByType(withDiscount, 'efectivo', 'MXN')).toBe(1400);
+    // tarjeta: (1210 - 100*1210/1000) + 605 = 1089 + 605 = 1694.
+    expect(H.computeServicesSubtotalByType(withDiscount, 'tarjeta', 'MXN')).toBe(1694);
   });
 });
 

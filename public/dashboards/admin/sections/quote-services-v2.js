@@ -3203,6 +3203,26 @@ class ItineraryBuilder {
    * Save round-trip transport as two separate one-way services on their respective days.
    * Ida goes to the day matching startDate, Vuelta to the day matching endDate.
    * Creates days automatically if they don't exist.
+   *
+   * Al partir, todo lo ABSOLUTO se divide /2 (price, basePrice, pricesByType, discountAmount,
+   * tipAmount, y los VALORES de monto fijo discountValue/tipValue cuando su tipo es 'amount'); lo
+   * PROPORCIONAL se mantiene igual (discountType/tipType y, cuando es 'percent', discountValue/tipValue
+   * — el % es invariante al partir el precio). discountValue DEBE dividirse igual que tipValue porque no
+   * es la fuente de verdad persistente: collectServiceData recalcula discountAmount desde discountValue
+   * en cada guardado, así que un discountValue de monto fijo sin dividir duplicaría el descuento de la
+   * pierna al reabrirla y reguardarla.
+   *
+   * additionalVehiclePrice (override manual del vehículo adicional PRINCIPAL) y
+   * extraAdditionalVehicles[].customPrice (override por cada vehículo adicional EXTRA) también se dividen
+   * /2 por pierna, por la MISMA razón que discountValue/tipValue de monto fijo: son montos ABSOLUTOS y no
+   * son la fuente de verdad persistente — el valor guardado se repuebla tal cual en su campo editable al
+   * reabrir el servicio (addPriceInput / .extra-price-input) y alimenta el precio total ya calculado
+   * (getPrimaryAdditionalVehiclePrice / getExtraAdditionalVehiclesBreakdownItems). Sin dividirlos, llegan
+   * a idaData/vueltaData solo vía {...serviceData} con el valor COMPLETO, y reabrir + reguardar SOLO una
+   * pierna infla en silencio el vehículo adicional de esa pierna (mismo bug que discountValue). Un
+   * customPrice null (usa el precio de lista del catálogo por vehículo) NO se divide: el precio de lista
+   * ya es por vehículo/pierna, no un total a repartir. waitingHours/waitingPricePerHour tampoco se dividen
+   * (cada pierna tiene su propio tiempo de espera físico, no es un absoluto a repartir).
    * @param serviceData
    * @example
    */
@@ -3250,10 +3270,18 @@ class ItineraryBuilder {
         };
       }
 
-      // Descuento por servicio (Fase 1): el monto (efectivo) se reparte por pierna igual que el
-      // precio; el TIPO y el VALOR (%/$) se quedan iguales (el % es el mismo por pierna). Sin
-      // esto cada pierna heredaba el descuento completo vía {...serviceData} y descontaba de más.
+      // Descuento por servicio (Fase 1): el monto efectivo (discountAmount) se reparte por pierna igual
+      // que el precio. discountValue se divide con el MISMO criterio que tipValue: si es MONTO FIJO
+      // (discountType==='amount') se divide /2 (es absoluto); si es PORCENTAJE se mantiene igual (el %
+      // es invariante al partir el precio). Es indispensable porque discountAmount NO es la fuente de
+      // verdad persistente: collectServiceData lo RECALCULA desde discountValue cada vez que se guarda un
+      // servicio (amt = dt==='percent' ? efBase*(dv/100) : dv). Si discountValue viajara sin dividir vía
+      // {...serviceData}, reabrir y reguardar SOLO la pierna Ida (aunque sea por un cambio no relacionado)
+      // recalcularía el descuento con el valor COMPLETO, duplicándolo en silencio sin ningún rechazo.
       const splitDiscountAmount = Math.round((Math.abs(parseFloat(serviceData.discountAmount) || 0) / 2) * 100) / 100;
+      const splitDiscountValue = serviceData.discountType === 'amount'
+        ? Math.round((Math.abs(parseFloat(serviceData.discountValue) || 0) / 2) * 100) / 100
+        : (serviceData.discountValue || 0);
 
       // Propina por servicio (Fase 2): el % se mantiene igual por pierna (se recalcula sobre el
       // precio ya /2). El MONTO FIJO sí se divide /2 (es absoluto). tipAmount (efectivo) también /2.
@@ -3261,6 +3289,22 @@ class ItineraryBuilder {
         ? Math.round((Math.abs(parseFloat(serviceData.tipValue) || 0) / 2) * 100) / 100
         : (serviceData.tipValue || 0);
       const splitTipAmount = Math.round((Math.abs(parseFloat(serviceData.tipAmount) || 0) / 2) * 100) / 100;
+
+      // Vehículo adicional (Fase 4): additionalVehiclePrice y extraAdditionalVehicles[].customPrice son
+      // overrides ABSOLUTOS que se repueblan tal cual al reabrir y alimentan el total ya calculado; se
+      // dividen /2 por pierna igual que discountAmount/tipAmount (ver JSDoc). Un valor null/ausente se
+      // preserva (no hay override que repartir). Cada pierna recibe su PROPIA copia del array (map por
+      // llamada) para no compartir referencias mutables entre ida y vuelta.
+      const splitAdditionalVehiclePrice = (serviceData.additionalVehiclePrice != null)
+        ? Math.round((Math.abs(parseFloat(serviceData.additionalVehiclePrice) || 0) / 2) * 100) / 100
+        : serviceData.additionalVehiclePrice;
+      const splitExtraAdditionalVehicles = () => (Array.isArray(serviceData.extraAdditionalVehicles)
+        ? serviceData.extraAdditionalVehicles.map((v) => {
+          if (!v || typeof v !== 'object') return v;
+          if (v.customPrice == null) return { ...v };
+          return { ...v, customPrice: Math.round((Math.abs(parseFloat(v.customPrice) || 0) / 2) * 100) / 100 };
+        })
+        : serviceData.extraAdditionalVehicles);
 
       // Validation: Check if split prices add up to original (with small tolerance for rounding)
       const priceValidation = {
@@ -3301,11 +3345,16 @@ class ItineraryBuilder {
         price: splitPrice,
         basePrice: splitBasePrice,
         pricesByType: { ...splitPricesByType },
-        // Descuento repartido por pierna (el % se mantiene vía {...serviceData}).
+        // Descuento repartido por pierna (discountType se mantiene vía {...serviceData}; discountValue
+        // se divide para el monto fijo y se mantiene para el porcentaje, igual que tipValue).
         discountAmount: splitDiscountAmount,
+        discountValue: splitDiscountValue,
         // Propina repartida por pierna (tipType/tipMandatory se mantienen vía {...serviceData}).
         tipValue: splitTipValue,
         tipAmount: splitTipAmount,
+        // Vehículo adicional repartido por pierna (override absoluto, mismo criterio que discountAmount).
+        additionalVehiclePrice: splitAdditionalVehiclePrice,
+        extraAdditionalVehicles: splitExtraAdditionalVehicles(),
         // Ensure quantity is appropriate for single leg (usually 1)
         quantity: 1,
       };
@@ -3338,11 +3387,16 @@ class ItineraryBuilder {
         price: splitPrice,
         basePrice: splitBasePrice,
         pricesByType: { ...splitPricesByType },
-        // Descuento repartido por pierna (el % se mantiene vía {...serviceData}).
+        // Descuento repartido por pierna (discountType se mantiene vía {...serviceData}; discountValue
+        // se divide para el monto fijo y se mantiene para el porcentaje, igual que tipValue).
         discountAmount: splitDiscountAmount,
+        discountValue: splitDiscountValue,
         // Propina repartida por pierna (tipType/tipMandatory se mantienen vía {...serviceData}).
         tipValue: splitTipValue,
         tipAmount: splitTipAmount,
+        // Vehículo adicional repartido por pierna (override absoluto, mismo criterio que discountAmount).
+        additionalVehiclePrice: splitAdditionalVehiclePrice,
+        extraAdditionalVehicles: splitExtraAdditionalVehicles(),
         // Ensure quantity is appropriate for single leg (usually 1)
         quantity: 1,
       };

@@ -163,8 +163,17 @@ class QuoteService {
         resQuery.equalTo('exists', true);
         const existingReservation = await resQuery.first({ useMasterKey: true });
 
-        if (!existingReservation) {
-          logger.info('Creating reservation for transition to scheduled/hold status', {
+        // Una reservación CANCELADA no cuenta como "ya existe": reactivar (volver a scheduled/hold) debe
+        // llamar createReservationFromQuote, que toma su rama de reactivación (revive la reservación y
+        // reconcilia sus servicios contra el snapshot vigente). Sin esto, la reservación quedaba
+        // 'cancelled' para siempre aunque la cotización dijera "Agendada".
+        const reservationNeedsReactivation = !!existingReservation
+          && existingReservation.get('status') === 'cancelled';
+
+        if (!existingReservation || reservationNeedsReactivation) {
+          logger.info(reservationNeedsReactivation
+            ? 'Reactivating cancelled reservation for transition to scheduled/hold status'
+            : 'Creating reservation for transition to scheduled/hold status', {
             quoteId: quote.id,
             quoteFolio: quote.get('folio'),
             previousStatus,
@@ -607,8 +616,15 @@ class QuoteService {
         resQuery.equalTo('exists', true);
         const existingReservation = await resQuery.first({ useMasterKey: true });
 
-        if (!existingReservation) {
-          logger.info('Creating reservation for quote with scheduled status via updateQuote', {
+        // Una reservación CANCELADA no cuenta como "ya existe": reactivar debe llamar
+        // createReservationFromQuote (rama de reactivación), no solo voltear la cotización a scheduled.
+        const reservationNeedsReactivation = !!existingReservation
+          && existingReservation.get('status') === 'cancelled';
+
+        if (!existingReservation || reservationNeedsReactivation) {
+          logger.info(reservationNeedsReactivation
+            ? 'Reactivating cancelled reservation for quote with scheduled status via updateQuote'
+            : 'Creating reservation for quote with scheduled status via updateQuote', {
             quoteId: quote.id,
             quoteFolio: quote.get('folio'),
             previousStatus: currentStatus,
@@ -873,7 +889,9 @@ class QuoteService {
       resQuery.equalTo('exists', true);
       const existingReservation = await resQuery.first({ useMasterKey: true });
 
-      if (existingReservation) {
+      // Una reservación CANCELADA no cuenta como "ya la tiene": debe reactivarse (crear/reconciliar vía
+      // createReservationFromQuote), no devolverse tal cual con status 'cancelled'.
+      if (existingReservation && existingReservation.get('status') !== 'cancelled') {
         logger.info('Scheduled quote already has reservation', {
           quoteId: quote.id,
           quoteFolio,
@@ -1006,9 +1024,14 @@ class QuoteService {
       resQuery.equalTo('exists', true);
       let reservation = await resQuery.first({ useMasterKey: true });
 
-      if (!reservation) {
-        // Try to create reservation if missing
-        logger.warn('Receipt generation attempted but no reservation found, attempting to create', {
+      // Una reservación CANCELADA no sirve para el recibo: se reactiva (crear/reconciliar vía
+      // createReservationFromQuote) igual que si faltara.
+      const reservationCancelled = !!reservation && reservation.get('status') === 'cancelled';
+      if (!reservation || reservationCancelled) {
+        // Try to create/reactivate reservation if missing or cancelled
+        logger.warn(reservationCancelled
+          ? 'Receipt generation: reservation is cancelled, reactivating before generating'
+          : 'Receipt generation attempted but no reservation found, attempting to create', {
           quoteId: quote.id,
           quoteFolio: quote.get('folio'),
           currentStatus,
@@ -1016,14 +1039,14 @@ class QuoteService {
 
         try {
           const reservationData = await this.createReservationFromQuote(quote, currentUser);
-          if (reservationData && reservationData.reservation) {
-            const { reservation: createdReservation } = reservationData;
-            reservation = createdReservation;
-            // Update reservation status to confirmed since quote is scheduled
-            reservation.set('status', 'confirmed');
-            await reservation.save(null, { useMasterKey: true });
+          if (reservationData && reservationData.id) {
+            // createReservationFromQuote devuelve { id, folio, servicesCount } (no el objeto): se recarga
+            // la reservación creada/reactivada para el resto de la generación del recibo.
+            const refetchQuery = new Parse.Query('Reservation');
+            refetchQuery.equalTo('exists', true);
+            reservation = await refetchQuery.get(reservationData.id, { useMasterKey: true });
 
-            logger.info('Successfully created missing reservation for receipt generation', {
+            logger.info('Successfully created/reactivated reservation for receipt generation', {
               reservationId: reservation.id,
               quoteId: quote.id,
               quoteFolio: quote.get('folio'),
@@ -1824,6 +1847,88 @@ class QuoteService {
   }
 
   /**
+   * Reconcilia los ReservationService de una reservación contra los días del snapshot VIGENTE de la
+   * cotización: los emparejados se refrescan en su lugar (campos descriptivos + subconcept), los nuevos
+   * se crean y los que ya no están se soft-eliminan. Emparejamiento por clave de id con fallback a clave
+   * por contenido (registros legacy sin id). NO toca pagos/rollup: eso lo recalcula el llamador. Extraído
+   * de syncReservationFromQuote para reutilizarlo también al reactivar una reservación cancelada, donde el
+   * subconcepto pudo editarse mientras estuvo cancelada. Con reactivateCancelled, un servicio emparejado
+   * que siga en 'cancelled' (lo dejó cancelReservation) vuelve a 'pending' para que el motor de pagos (que
+   * suma los servicios existentes) y el header cuadren.
+   * @param {object} reservation - Parse Reservation object (ya guardado).
+   * @param {Array<object>} days - serviceItems.days del snapshot vigente.
+   * @param {object} [options] - Opciones de reconciliación.
+   * @param {boolean} [options.reactivateCancelled] - Devuelve a 'pending' los servicios emparejados cancelados.
+   * @returns {Promise<{updatedOrCreated: number, removed: number}>} Conteos de la reconciliación.
+   * @private
+   * @example
+   * await this.reconcileReservationServices(reservation, days, { reactivateCancelled: true });
+   */
+  async reconcileReservationServices(reservation, days, options = {}) {
+    const { reactivateCancelled = false } = options;
+    const dayList = Array.isArray(days) ? days : [];
+
+    const existingQuery = new Parse.Query('ReservationService');
+    existingQuery.equalTo('reservationPtr', reservation);
+    existingQuery.equalTo('exists', true);
+    existingQuery.limit(1000);
+    const existing = await existingQuery.find({ useMasterKey: true });
+
+    const existingByKey = new Map();
+    existing.forEach((rs) => {
+      const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
+      if (!existingByKey.has(key)) existingByKey.set(key, rs);
+    });
+
+    // Reconcile: update matched, create new. Se matchea por id y, si no hay match, se cae a la clave por
+    // contenido. Protege reservaciones legacy: sus ReservationService se crearon cuando el subconcepto no
+    // tenía id (clave por contenido); al asignarle un id después, el match por id fallaría y se recrearían
+    // los RS perdiendo asignaciones de chofer/vehículo. Con el fallback se ACTUALIZAN en su lugar.
+    const seen = new Set();
+    const toSave = [];
+    for (const day of dayList) {
+      const subconcepts = Array.isArray(day.subconcepts) ? day.subconcepts : [];
+      for (const sub of subconcepts) {
+        const idKey = this.reservationServiceMatchKey(sub, day.dayNumber);
+        const contentKey = this.reservationServiceMatchKey({ ...sub, id: undefined }, day.dayNumber);
+        let matchedKey = null;
+        if (existingByKey.has(idKey) && !seen.has(idKey)) matchedKey = idKey;
+        else if (existingByKey.has(contentKey) && !seen.has(contentKey)) matchedKey = contentKey;
+        if (matchedKey) {
+          seen.add(matchedKey);
+          const match = existingByKey.get(matchedKey);
+          this.applyReservationServiceDescriptiveFields(match, day, sub);
+          // Reactivación: un servicio emparejado que cancelReservation dejó en 'cancelled' vuelve a
+          // 'pending' para que cuente otra vez en el motor de pagos y en el header.
+          if (reactivateCancelled && match.get('status') === 'cancelled') {
+            match.set('status', 'pending');
+          }
+          toSave.push(match);
+        } else {
+          toSave.push(this.buildReservationServiceRecord(reservation, day, sub));
+          seen.add(idKey);
+        }
+      }
+    }
+
+    // Soft-delete records whose service is no longer present
+    const toRemove = existing.filter((rs) => {
+      const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
+      return !seen.has(key);
+    });
+    toRemove.forEach((rs) => {
+      rs.set('active', false);
+      rs.set('exists', false);
+    });
+
+    const all = toSave.concat(toRemove);
+    if (all.length > 0) {
+      await Parse.Object.saveAll(all, { useMasterKey: true });
+    }
+    return { updatedOrCreated: toSave.length, removed: toRemove.length };
+  }
+
+  /**
    * Recalcula la propina GENERAL de la cotización a pesos FIJOS en efectivo, desde serviceItems.globalTip.
    * NO se confía en globalTip.amount persistido por el wizard: se calculó contra el método de pago que
    * estuviera seleccionado y puede venir inflado con recargo de tarjeta (incluso para type 'amount'). Se
@@ -1989,61 +2094,7 @@ class QuoteService {
     let updatedOrCreated = 0;
     let removed = 0;
     if (serviceItems) {
-      const existingQuery = new Parse.Query('ReservationService');
-      existingQuery.equalTo('reservationPtr', reservation);
-      existingQuery.equalTo('exists', true);
-      existingQuery.limit(1000);
-      const existing = await existingQuery.find({ useMasterKey: true });
-
-      const existingByKey = new Map();
-      existing.forEach((rs) => {
-        const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
-        if (!existingByKey.has(key)) existingByKey.set(key, rs);
-      });
-
-      // Reconcile: update matched, create new. Se matchea por id y, si no hay match, se cae a
-      // la clave por contenido. Esto protege reservaciones legacy: sus ReservationService se
-      // crearon cuando el subconcepto no tenía id (clave por contenido); al asignarle un id
-      // después (backfill o updateServiceItems), el match por id fallaría y se recrearían los
-      // RS perdiendo asignaciones de chofer/vehículo. Con el fallback se ACTUALIZAN en su lugar.
-      const seen = new Set();
-      const toSave = [];
-      for (const day of days) {
-        const subconcepts = Array.isArray(day.subconcepts) ? day.subconcepts : [];
-        for (const sub of subconcepts) {
-          const idKey = this.reservationServiceMatchKey(sub, day.dayNumber);
-          const contentKey = this.reservationServiceMatchKey({ ...sub, id: undefined }, day.dayNumber);
-          let matchedKey = null;
-          if (existingByKey.has(idKey) && !seen.has(idKey)) matchedKey = idKey;
-          else if (existingByKey.has(contentKey) && !seen.has(contentKey)) matchedKey = contentKey;
-          if (matchedKey) {
-            seen.add(matchedKey);
-            const match = existingByKey.get(matchedKey);
-            this.applyReservationServiceDescriptiveFields(match, day, sub);
-            toSave.push(match);
-          } else {
-            toSave.push(this.buildReservationServiceRecord(reservation, day, sub));
-            seen.add(idKey);
-          }
-        }
-      }
-
-      // Soft-delete records whose service is no longer present
-      const toRemove = existing.filter((rs) => {
-        const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
-        return !seen.has(key);
-      });
-      toRemove.forEach((rs) => {
-        rs.set('active', false);
-        rs.set('exists', false);
-      });
-
-      const all = toSave.concat(toRemove);
-      if (all.length > 0) {
-        await Parse.Object.saveAll(all, { useMasterKey: true });
-      }
-      updatedOrCreated = toSave.length;
-      removed = toRemove.length;
+      ({ updatedOrCreated, removed } = await this.reconcileReservationServices(reservation, days));
 
       // Mantiene el rollup de pago (paidAmount/balance/paymentStatus) en sync con el nuevo total: sin
       // esto, esos campos STORED quedaban obsoletos tras editar la cotización (council L4F0) — algunos
@@ -2196,23 +2247,22 @@ class QuoteService {
           await ReservationController.recalculateTotal(existing, this.sumServiceTipsFromDays(serviceItems));
           await existing.save(null, { useMasterKey: true });
 
-          const svcQuery = new Parse.Query('ReservationService');
-          svcQuery.equalTo('reservationPtr', existing);
-          svcQuery.equalTo('exists', true);
-          svcQuery.equalTo('status', 'cancelled');
-          svcQuery.limit(1000);
-          const services = await svcQuery.find({ useMasterKey: true });
-          for (const svc of services) {
-            svc.set('status', 'pending');
-          }
-          if (services.length > 0) {
-            await Parse.Object.saveAll(services, { useMasterKey: true });
-          }
+          // Reconcilia los ReservationService reales contra el snapshot VIGENTE (no solo voltea el status):
+          // actualiza el subconcept (precio/descuento/propina) si el vendedor editó el servicio mientras la
+          // reservación estuvo cancelada, crea los agregados y soft-elimina los quitados. Sin esto, el motor
+          // de pagos leía los subconceptos viejos y summarize().total divergía de reservation.totalAmount (el
+          // mismo "tercer total" que otros fixes cerraron, en esta rama). Mismo mecanismo que
+          // syncReservationFromQuote; reactivateCancelled devuelve los servicios emparejados a 'pending'.
+          const { updatedOrCreated } = await this.reconcileReservationServices(
+            existing,
+            days,
+            { reactivateCancelled: true }
+          );
 
           logger.info('♻️ Reactivated cancelled reservation for quote', {
             quoteId: quote.id,
             reservationId: existing.id,
-            servicesReactivated: services.length,
+            servicesReactivated: updatedOrCreated,
           });
 
           // Mantiene el rollup de pago (paidAmount/balance/paymentStatus) en sync con el total recien
@@ -2225,7 +2275,7 @@ class QuoteService {
             logger.warn('Reservation reactivated but payment recalculate failed', { reservationId: existing.id, error: e.message });
           }
 
-          return { id: existing.id, folio: existing.get('folio'), servicesCount: services.length };
+          return { id: existing.id, folio: existing.get('folio'), servicesCount: updatedOrCreated };
         }
 
         logger.info('🔄 Reservation already exists for quote, skipping creation', {

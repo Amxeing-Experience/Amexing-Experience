@@ -2414,6 +2414,21 @@ class QuoteController {
       // Timeline (Fase A): snapshot del serviceItems previo para diffear agregados/editados/quitados.
       const beforeServiceItems = quote.get('serviceItems') || { days: [] };
 
+      // Deduplicación (keep-first) + ordenamiento ADELANTADOS aquí, ANTES del guard RBAC de propina, para
+      // que el guard evalúe EXACTAMENTE los datos que se van a persistir (antes se deduplicaba después del
+      // guard). Sin esto, un no-admin podía mandar en el mismo día DOS subconceptos con el MISMO id (el
+      // primero con tip bajo/cero, el segundo con el tip real): tipFieldsChanged sumaba AMBAS ocurrencias
+      // sobre el payload crudo -> la suma cuadraba con lo guardado -> no bloqueaba (200); pero al persistir,
+      // sortAndCleanServiceDays deja solo la PRIMERA ocurrencia (tip bajo/cero), bajando/anulando la propina
+      // fijada por un admin sin disparar 403. Al deduplicar antes, ambas ocurrencias colapsan en una sola y
+      // el guard ve el tip real que quedaría guardado -> el intento se bloquea con 403.
+      // evaluateTotalsConsistency (arriba) se deja intencionalmente sobre `days` crudos: valida el
+      // subtotal/total COSMÉTICO del header (PaymentService no depende de él, y los servicios bloqueados se
+      // recomputan más abajo desde el contenido restaurado); correrlo sobre los días deduplicados
+      // rechazaría con 400 quotes legítimos con servicios idénticos sin id (que el dedup colapsa por
+      // contenido), un cambio de comportamiento fuera del alcance de este fix de propina.
+      const sortedAndCleanedDays = this.sortAndCleanServiceDays(days);
+
       // FIX 1: RBAC server-side de la propina. El wizard oculta los controles de propina a los no-admin,
       // pero el server persistía globalTip/suggestedTipPct + tipType/tipValue/tipMandatory/tipAmount por
       // subconcepto sin validar rol -> un agente/agencia podía FIJAR cualquier propina por API directa.
@@ -2428,7 +2443,9 @@ class QuoteController {
       const isAdminForTip = req.roleObject
         ? (typeof req.roleObject.getLevel === 'function' && req.roleObject.getLevel() >= 6)
         : ['admin', 'superadmin'].includes(req.userRole);
-      if (!isAdminForTip && this.tipFieldsChanged(beforeServiceItems, { globalTip, suggestedTipPct, days })) {
+      // El guard evalúa los días YA deduplicados (sortedAndCleanedDays), no el payload crudo (ver arriba).
+      const incomingTipData = { globalTip, suggestedTipPct, days: sortedAndCleanedDays };
+      if (!isAdminForTip && this.tipFieldsChanged(beforeServiceItems, incomingTipData)) {
         logger.warn('updateServiceItems: non-admin attempted to set/change tip fields', {
           quoteId: quote.id, userRole: req.userRole,
         });
@@ -2459,10 +2476,7 @@ class QuoteController {
         }
       });
 
-      // Apply sorting and deduplication to days before saving
-      const sortedAndCleanedDays = this.sortAndCleanServiceDays(days);
-
-      // Update serviceItems
+      // Update serviceItems (days ya deduplicados/ordenados arriba, antes del guard de propina)
       const serviceItems = {
         days: sortedAndCleanedDays,
         subtotal,
@@ -2664,17 +2678,18 @@ class QuoteController {
   }
 
   /**
-   * FIX 1: detecta si un payload de service-items INTENTA fijar/cambiar/quitar CUALQUIER campo de propina
-   * respecto a lo ya guardado. Se usa para bloquear (403) a los no-admin, que solo pueden reenviar la
-   * misma propina existente. Compara: globalTip (type/value/mandatory; ignora `amount`, que es derivado y
-   * lo recomputa el server), suggestedTipPct (solo se protege MODIFICAR/QUITAR una sugerencia ya guardada
-   * — el wizard SIEMPRE manda un default 10, bloquearlo sobre cotizaciones legacy sin sugerencia rompería
-   * ediciones legítimas; además es una nota, no se cobra) y, por subconcepto emparejado por id,
-   * tipType/tipValue/tipMandatory/tipAmount. Un subconcepto NUEVO (sin id previo o id desconocido) que
-   * llega con propina también cuenta como cambio. Números con tolerancia de centavo.
+   * FIX 1: detecta si un payload de service-items INTENTA fijar/cambiar/quitar la propina respecto a lo
+   * ya guardado. Se usa para bloquear (403) a los no-admin, que solo pueden reenviar la misma propina
+   * existente. Compara: globalTip (type/value/mandatory; ignora `amount`, que es derivado y lo recomputa
+   * el server), suggestedTipPct (solo se protege MODIFICAR/QUITAR una sugerencia ya guardada — el wizard
+   * SIEMPRE manda un default 10, bloquearlo sobre cotizaciones legacy sin sugerencia rompería ediciones
+   * legítimas; además es una nota, no se cobra) y la SUMA AGREGADA de la propina por servicio (Σ tipAmount
+   * de los subconceptos activos, sin emparejar por id) — si esa suma cambia, es un cambio de propina. La
+   * suma agregada permite splits/fusiones que preservan el total (ej. round-trip que parte la propina de
+   * un servicio en dos piernas) y bloquea cualquier subida/bajada real. Números con tolerancia de centavo.
    * @param {object} storedSI - serviceItems actualmente guardado en la cotización.
    * @param {object} incoming - Datos del request { globalTip, suggestedTipPct, days }.
-   * @returns {boolean} true si algún campo de propina cambia (debe bloquearse para no-admin).
+   * @returns {boolean} true si la propina cambia (debe bloquearse para no-admin).
    * @example
    * this.tipFieldsChanged(quote.get('serviceItems'), { globalTip, suggestedTipPct, days });
    */
@@ -2718,51 +2733,36 @@ class QuoteController {
       if (!numEq(storedPct, normInPct)) return true;
     }
 
-    // Propina por subconcepto, emparejada por id.
-    const storedSubById = new Map();
-    const storedDays = Array.isArray(stored.days) ? stored.days : [];
-    storedDays.forEach((d) => {
-      ((d && Array.isArray(d.subconcepts)) ? d.subconcepts : []).forEach((sc) => {
-        if (sc && sc.id) storedSubById.set(sc.id, sc);
+    // Propina por subconcepto: se compara la SUMA AGREGADA de tipAmount (lo que realmente se cobra) de
+    // TODOS los subconceptos activos, sea cual sea su id, en lo guardado vs lo entrante. NO se empareja
+    // por id ni se comparan campos uno a uno: un split ida-vuelta reparte la propina de un servicio en
+    // dos piernas (id reutilizado para Ida + id nuevo para Vuelta) conservando la suma total; empatar por
+    // id daba un falso positivo (el id existente pasa de 200 a 100 y el id nuevo aporta 100 "sin previo")
+    // y bloqueaba con 403 a un no-admin aunque la SUMA no cambiara (100+100=200). Con la suma agregada,
+    // cualquier reparto/fusión que preserve el total se permite, y toda subida/bajada real (o la
+    // desaparición de un servicio con propina sin compensación) mueve la suma y se bloquea.
+    //
+    // Esto subsume de raíz el chequeo previo "tipSilentlyRemoved" (council L0F0: borrar el servicio o
+    // reenviarlo con id vacío para quitar la propina): al desaparecer su tipAmount la suma baja y se
+    // detecta sin necesitar rastrear ids que se pierden. Se usa el MISMO criterio que el motor de dinero
+    // (QuoteService.sumServiceTipsFromDays / PaymentService.sumServiceTips): tipAmount finito y > 0 de los
+    // subconceptos con includeInTotal !== false.
+    const sumServiceTips = (si) => {
+      const days = Array.isArray(si.days) ? si.days : [];
+      let sum = 0;
+      days.forEach((d) => {
+        ((d && Array.isArray(d.subconcepts)) ? d.subconcepts : []).forEach((sc) => {
+          if (sc && sc.includeInTotal !== false) {
+            const tip = Number(sc.tipAmount);
+            if (Number.isFinite(tip) && tip > 0) sum += tip;
+          }
+        });
       });
-    });
-    const hasTip = (sc) => !!(sc && (
-      normType(sc.tipType)
-      || (Number(sc.tipValue) || 0) > 0
-      || (Number(sc.tipAmount) || 0) > 0
-      || sc.tipMandatory === true
-    ));
-    const subChanged = (sc) => {
-      if (!sc) return false;
-      const prev = sc.id ? storedSubById.get(sc.id) : null;
-      // Subconcepto NUEVO (sin id o id desconocido): si trae propina, es un cambio.
-      if (!prev) return hasTip(sc);
-      return normType(prev.tipType) !== normType(sc.tipType)
-        || !numEq(prev.tipValue, sc.tipValue)
-        || !numEq(prev.tipAmount, sc.tipAmount)
-        || (prev.tipMandatory === true) !== (sc.tipMandatory === true);
+      return sum;
     };
-    const incomingDays = Array.isArray(inc.days) ? inc.days : [];
+    if (!numEq(sumServiceTips(stored), sumServiceTips(inc))) return true;
 
-    // Reverso (council L0F0): un subconcepto que YA tenía propina guardada por un admin no puede
-    // "perderla" en silencio — ni borrando el servicio entero, ni reenviándolo con un id vacío/distinto
-    // (subChanged, arriba, solo revisa subconceptos PRESENTES en el payload entrante; nunca detecta uno
-    // que desaparece). Si el id de un subconcepto con propina no aparece en NINGÚN subconcepto entrante,
-    // se trata como cambio de propina y se bloquea para no-admin.
-    const incomingSubIds = new Set();
-    incomingDays.forEach((d) => {
-      ((d && Array.isArray(d.subconcepts)) ? d.subconcepts : []).forEach((sc) => {
-        if (sc && sc.id) incomingSubIds.add(sc.id);
-      });
-    });
-    const tipSilentlyRemoved = Array.from(storedSubById.entries())
-      .some(([id, sc]) => hasTip(sc) && !incomingSubIds.has(id));
-    if (tipSilentlyRemoved) return true;
-
-    return incomingDays.some((d) => {
-      const subs = (d && Array.isArray(d.subconcepts)) ? d.subconcepts : [];
-      return subs.some(subChanged);
-    });
+    return false;
   }
 
   /**

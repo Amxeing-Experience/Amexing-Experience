@@ -53,20 +53,39 @@ function round2(n) {
 class PaymentService {
   /**
    * Lee el precio YA calculado y aprobado por la cotización para un método de pago
-   * (pricesByType[paymentType]), sin recalcular con ninguna tasa. Fallback a item.total
-   * cuando ese método no está presente (dato viejo o incompleto), igual que antes.
-   * @param {object} item - Plain service item { includeInTotal, pricesByType, total }.
+   * (pricesByType[paymentType]), MENOS el descuento por servicio (Fase 1). pricesByType es la base
+   * PURA sin descuento; el descuento se captura en efectivo (item.discountAmount) y se resta aquí
+   * escalado por el mismo factor multiplicativo que el front (getServiceDiscountInPaymentType) y el
+   * server (evaluateTotalsConsistency), de modo que el cobro coincida EXACTO con reservation.totalAmount.
+   * Sin restarlo, un servicio con descuento cobraba el bruto y el saldo quedaba positivo (= el descuento)
+   * para siempre, con paymentStatus atascado en 'partial'. Fallback a item.total (ya neto) cuando ese
+   * método no está presente (dato viejo o incompleto), igual que antes.
+   * @param {object} item - Plain service item { includeInTotal, pricesByType, total, discountAmount }.
    * @param {string} paymentType - Método (efectivo|transferencia|tarjeta).
-   * @returns {number} Monto a cobrar por ese método (0 si está excluido del total).
+   * @returns {number} Monto a cobrar por ese método, neto de descuento (0 si está excluido o si el descuento lo supera).
    * @example
-   * PaymentService.chargeAmount({ pricesByType: { tarjeta: 121 } }, 'tarjeta') // 121
+   * PaymentService.chargeAmount({ pricesByType: { efectivo: 2000 }, discountAmount: 300 }, 'efectivo') // 1700
    */
   static chargeAmount(item, paymentType) {
     if (!item || item.includeInTotal === false) return 0;
     const prices = item.pricesByType;
     if (prices && typeof prices === 'object') {
       const amount = Number(prices[paymentType]);
-      if (Number.isFinite(amount)) return amount;
+      if (Number.isFinite(amount)) {
+        const discEf = Number(item.discountAmount) || 0;
+        let discountInType = 0;
+        if (discEf > 0) {
+          const efBase = Number(prices.efectivo);
+          // El recargo por forma de pago es multiplicativo: descontar sobre la base y recargar ==
+          // recargar y descontar el monto escalado por pricesByType[método]/pricesByType.efectivo. En
+          // efectivo el factor es 1 (resta directa). Sin base efectivo utilizable, se resta el bruto.
+          discountInType = (efBase > 0 && prices[paymentType] != null)
+            ? round2(discEf * (amount / efBase))
+            : discEf;
+        }
+        // Clamp a 0: un descuento mayor al precio del método nunca da un cobro negativo.
+        return Math.max(0, round2(amount - discountInType));
+      }
     }
     const total = Number(item.total);
     return Number.isFinite(total) ? total : 0;
@@ -289,9 +308,10 @@ class PaymentService {
   /**
    * Map reservation services to plain pricing items for computeTotals(). Expone tipAmount (la propina
    * por servicio, YA resuelta a pesos fijos por el wizard en subconcept.tipAmount) para que sumServiceTips
-   * la agregue; solo se LEE, nunca se recalcula aquí.
+   * la agregue, y discountAmount (el descuento por servicio en efectivo) para que chargeAmount lo reste;
+   * ambos solo se LEEN, nunca se recalculan aquí.
    * @param {Array<object>} services - ReservationService Parse objects.
-   * @returns {Array<object>} Plain items { id, includeInTotal, pricesByType, total, tipAmount }.
+   * @returns {Array<object>} Plain items { id, includeInTotal, pricesByType, total, tipAmount, discountAmount }.
    * @example
    * PaymentService.toServiceItems(services)
    */
@@ -300,12 +320,14 @@ class PaymentService {
       const sub = svc.get('subconcept') || {};
       const rawTotal = Number(sub.total);
       const rawTip = Number(sub.tipAmount);
+      const rawDisc = Number(sub.discountAmount);
       return {
         id: svc.id,
         includeInTotal: sub.includeInTotal !== false,
         pricesByType: sub.pricesByType || null,
         total: Number.isFinite(rawTotal) ? rawTotal : (Number(svc.get('total')) || 0),
         tipAmount: Number.isFinite(rawTip) ? rawTip : 0,
+        discountAmount: Number.isFinite(rawDisc) ? rawDisc : 0,
       };
     });
   }

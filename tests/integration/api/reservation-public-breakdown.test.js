@@ -71,6 +71,7 @@ describe('Public reservation payment breakdown (integration)', () => {
         includeInTotal: true,
         pricesByType: svc.pricesByType || null,
         total: svc.total !== undefined ? svc.total : 0,
+        ...(svc.discountAmount !== undefined ? { discountAmount: svc.discountAmount } : {}),
       });
       await rs.save(null, { useMasterKey: true });
       createdServiceIds.push(rs.id);
@@ -203,6 +204,39 @@ describe('Public reservation payment breakdown (integration)', () => {
       const res = await getPublic(folio);
       expect(res.status).toBe(200);
       expect(/\bIVA\b/.test(paySection(res.text))).toBe(false);
+    });
+  });
+
+  describe('FIX 1 (council) — el total público (sin auth) resta el descuento por servicio', () => {
+    // Bug: preparePublicReservationData construía totalItems SIN discountAmount, así que
+    // PaymentService.computeTotals cobraba el precio BRUTO en la vista/PDF públicos (ruta sin auth),
+    // divergiendo de PaymentService.summarize (que sí resta el descuento vía toServiceItems). La
+    // reservación es agencia + efectivo: la fila "Subtotal" muestra servicesTotal (svc.total), que ahora
+    // debe ser NETO y coincidir con "Total a pagar" (= summarize().total). Ejemplo: efectivo 10000,
+    // descuento 300 -> neto 9700 (ya múltiplo de 5, sin ruido de redondeo a efectivo).
+    it('agency + efectivo con discountAmount>0: Subtotal y Total a pagar netos (= summarize().total), nunca el bruto', async () => {
+      const agency = await makeUser({ role: 'department_manager' });
+      const { id, folio } = await makeReservation({
+        services: [{
+          pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 }, total: 10000, discountAmount: 300,
+        }],
+        paymentType: 'efectivo',
+        clientPtr: agency,
+      });
+
+      // El motor real (summarize) ya resta el descuento: 10000 - 300 = 9700.
+      const summary = await PaymentService.summarize(id);
+      expect(summary.total).toBe(9700);
+
+      const res = await getPublic(folio);
+      expect(res.status).toBe(200);
+      const s = paySection(res.text);
+      // Agencia + efectivo: "Subtotal" = svc.total (servicesTotal), ahora NETO.
+      expect(/Subtotal<\/span><span class="v">\$9,700\b/.test(s)).toBe(true);
+      // "Total a pagar" = summarize().total = 9700, idéntico al Subtotal mostrado.
+      expect(/Total a pagar<\/span><span class="v">\$9,700\b/.test(s)).toBe(true);
+      // El BRUTO (10000) ya NO aparece en el resumen de pago (antes del fix, "Subtotal" mostraba $10,000).
+      expect(s).not.toContain('$10,000');
     });
   });
 

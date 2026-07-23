@@ -302,4 +302,74 @@ describe('Propina en service-items: RBAC server-side (integration)', () => {
     const si = await fetchSI(quote.id);
     expect(findSub(si, 'svc1').tipAmount).toBe(50);
   });
+
+  // Council (round-trip split): la detección de cambio de propina compara la SUMA AGREGADA de tipAmount,
+  // sin emparejar por id. Un split ida-vuelta reparte la propina de un servicio (id reutilizado para Ida +
+  // id nuevo para Vuelta) conservando la suma total; empatar por id daba un falso 403 (el id existente baja
+  // de 200 a 100 y el id nuevo aporta 100 "sin previo") pese a que la suma no cambia (100+100=200).
+  it('F1-12: Agente convierte un servicio con propina en round-trip (split 200 -> 100+100, suma igual) -> 200; ambas piernas persisten con tipAmount 100', async () => {
+    const quote = await makeQuote(storedSI([
+      sub('rt1', { tipType: 'amount', tipValue: 200, tipAmount: 200 }),
+    ]));
+    const res = await putSI(
+      quote.id,
+      putBody([
+        sub('rt1', { tipType: 'amount', tipValue: 100, tipAmount: 100 }),
+        sub('rt1-new', { tipType: 'amount', tipValue: 100, tipAmount: 100 }),
+      ]),
+      agentToken
+    );
+    expect(res.status).toBe(200); // ya NO 403: la suma de propina no cambió (100 + 100 = 200)
+    const si = await fetchSI(quote.id);
+    expect(findSub(si, 'rt1').tipAmount).toBe(100);
+    expect(findSub(si, 'rt1-new').tipAmount).toBe(100);
+  });
+
+  // Comportamiento ACEPTADO y documentado (NO es el foco de este fix): el criterio de suma agregada
+  // permite redistribuir propina entre 2 servicios DISTINTOS mientras el total no cambie. No es un split
+  // legítimo, pero tampoco altera cuánto se cobra de propina en la reservación; bloquearlo exigiría volver
+  // a emparejar por id (justo lo que causaba el falso 403 del round-trip). Se deja pasar a conciencia.
+  it('F1-13: Agente sube la propina de un servicio y baja la de otro por el mismo monto (suma igual) -> 200 (aceptado por suma agregada)', async () => {
+    const quote = await makeQuote(storedSI([
+      sub('svcA', { tipType: 'amount', tipValue: 100, tipAmount: 100 }),
+      sub('svcB', { tipType: 'amount', tipValue: 100, tipAmount: 100 }),
+    ]));
+    const res = await putSI(
+      quote.id,
+      putBody([
+        sub('svcA', { tipType: 'amount', tipValue: 150, tipAmount: 150 }),
+        sub('svcB', { tipType: 'amount', tipValue: 50, tipAmount: 50 }),
+      ]),
+      agentToken
+    );
+    expect(res.status).toBe(200);
+    const si = await fetchSI(quote.id);
+    expect(findSub(si, 'svcA').tipAmount).toBe(150);
+    expect(findSub(si, 'svcB').tipAmount).toBe(50);
+  });
+
+  // Council (bypass via id duplicado + dedup keep-first): el guard tipFieldsChanged corría sobre el
+  // payload CRUDO, antes de sortAndCleanServiceDays (que deduplica por id manteniendo SOLO la primera
+  // ocurrencia). Un no-admin mandaba, en el mismo día, DOS subconceptos con el MISMO id: el primero con
+  // tip 0 y el segundo con el tip real (500). El guard sumaba ambas ocurrencias (0 + 500 = 500 = lo
+  // guardado) -> no bloqueaba; pero al persistir, el dedup dejaba solo la PRIMERA (tip 0) -> la propina
+  // fijada por un admin bajaba a 0 sin 403. Fix: deduplicar ANTES del guard, así ambas ocurrencias
+  // colapsan en una sola (la primera, tip 0) y el guard ve sum 0 != 500 -> 403, sin persistir nada.
+  it('F1-14: Agente baja una propina admin (500->0) mandando 2 subconceptos con el MISMO id (tip 0 primero) -> 403, propina intacta', async () => {
+    const quote = await makeQuote(storedSI([
+      sub('A', { tipType: 'amount', tipValue: 500, tipAmount: 500 }),
+    ]));
+    const res = await putSI(
+      quote.id,
+      putBody([
+        sub('A', { tipType: 'amount', tipValue: 0, tipAmount: 0 }),
+        sub('A', { tipType: 'amount', tipValue: 500, tipAmount: 500 }),
+      ]),
+      agentToken
+    );
+    expect(res.status).toBe(403);
+    const si = await fetchSI(quote.id);
+    // Nada se persistió: sigue habiendo un solo 'A' con su propina original de 500 (nunca 0).
+    expect(findSub(si, 'A').tipAmount).toBe(500);
+  });
 });

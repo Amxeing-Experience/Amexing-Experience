@@ -560,7 +560,15 @@ class PublicReservationController {
     const totalItems = [];
     for (const day of days) {
       for (const sc of day.subconcepts) {
-        totalItems.push({ includeInTotal: sc.includeInTotal, pricesByType: sc.pricesByType, total: sc.total });
+        // discountAmount es obligatorio: chargeAmount lo resta del bruto; sin él la vista pública y el
+        // PDF (misma construcción, ambos vía este método) mostraban el precio sin descuento. Alimenta
+        // dispTotals (Subtotal/Total de la vista) Y methodTotals (desglose por método) por igual.
+        totalItems.push({
+          includeInTotal: sc.includeInTotal,
+          pricesByType: sc.pricesByType,
+          total: sc.total,
+          discountAmount: sc.discountAmount,
+        });
       }
     }
     // Servicios solos (sin ajustes) para el desglose Subtotal/recargo/Total de la vista.
@@ -868,6 +876,14 @@ class PublicReservationController {
       isWalkingTour: sub.isWalkingTour || false,
       pricesByType: sub.pricesByType || null,
       includeInTotal: sub.includeInTotal !== false,
+      // Descuento por servicio (Fase 1): se expone para que preparePublicReservationData lo pase a
+      // PaymentService.computeTotals (chargeAmount resta discountAmount del precio bruto). Sin este
+      // campo la vista/PDF PÚBLICOS (sin auth) mostraban/cobraban el precio BRUTO, divergiendo de
+      // PaymentService.summarize (que sí lo resta vía toServiceItems). discountType/discountValue
+      // viajan para el desglose por servicio, igual que en el subconcepto del lado cotización.
+      discountAmount: Number(sub.discountAmount) || 0,
+      discountType: sub.discountType || '',
+      discountValue: Number(sub.discountValue) || 0,
       category: sub.category || '',
       categoryName,
       categoryColor,

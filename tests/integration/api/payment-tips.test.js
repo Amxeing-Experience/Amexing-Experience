@@ -382,11 +382,9 @@ describe('Propina cobrada (Fase 2, integration)', () => {
   });
 
   describe('reactivar una reservación cancelada recalcula la propina GENERAL desde la cotización ACTUAL', () => {
-    // Cubre SOLO el recálculo de propina general + subtotal + total al reactivar (el fix de esta
-    // sesión). NO cubre reconciliar servicios agregados/quitados durante la cancelación — reactivar
-    // hoy solo revive los ReservationService que ya existían, no agrega/quita según la cotización
-    // actual (misma limitación preexistente que ya tenía el subtotal antes de este fix; señalado al
-    // dueño como un alcance mayor, no resuelto aquí).
+    // Recálculo de propina general + subtotal + total al reactivar. La reconciliación de los
+    // ReservationService editados/agregados/quitados mientras la reservación estuvo cancelada se prueba
+    // aparte (quote-reactivation.test.js, REACT-I1); aquí los 2 servicios no cambian, sólo baja la general.
     it('la cotización se edita MIENTRAS la reservación está cancelada (baja la propina general); al reactivar, refleja lo nuevo, no lo congelado', async () => {
       const quote = await makeQuote(
         { type: 'percent', value: 10, amount: 300 },
@@ -595,6 +593,80 @@ describe('Propina cobrada (Fase 2, integration)', () => {
       expect(s.montoParaSaldar.efectivo).toBe(5300); // 5000 + 300
       expect(s.montoParaSaldar.transferencia).toBe(6100); // 5800 + 300
       expect(s.montoParaSaldar.tarjeta).toBe(6350); // 6050 + 300 (nunca 300*1.21)
+    });
+  });
+
+  describe('H11 — editar descuento/propina POR SERVICIO tras un pago ya registrado', () => {
+    // El pago YA hecho no se toca; sólo cambian el total y el saldo. El descuento/propina por servicio se
+    // editan MEDIANTE una re-sincronización (syncReservationFromQuote) que reconcilia el subconcepto.
+    const svc = (over = {}) => ({
+      id: over.id || 'pe',
+      concept: 'Servicio PE',
+      type: 'concepto',
+      pricesByType: { efectivo: 2000, transferencia: 2320, tarjeta: 2420 },
+      discountAmount: 0,
+      tipAmount: 0,
+      total: 2000,
+      includeInTotal: true,
+      ...over,
+    });
+    const newSI = (subs, { subtotal, total }) => ({
+      paymentType: 'efectivo',
+      currency: 'MXN',
+      subtotal,
+      total,
+      globalTip: null,
+      days: [{ dayNumber: 1, date: '2026-08-15', subconcepts: subs }],
+    });
+
+    it('PAYEDIT-I1: pago $1000 hecho; luego se agrega descuento 300 + propina $100 -> total 1800, balance 800, partial, pago intacto', async () => {
+      const quote = await makeQuote(null, [svc({ id: 'pe1' })], { subtotal: 2000, total: 2000 });
+      const result = await quoteService.createReservationFromQuote(quote, adminUser);
+      created.reservations.push(result.id);
+
+      const pay = await postPayment(result.id, { amount: 1000, currency: 'MXN', method: 'efectivo' });
+      expect(pay.status).toBe(200);
+
+      // Edición POR SERVICIO: mismo subconcepto (id 'pe1') con descuento 300 + propina fija $100.
+      const edited = svc({
+        id: 'pe1', discountAmount: 300, tipType: 'amount', tipValue: 100, tipAmount: 100, total: 1700,
+      });
+      await quoteService.syncReservationFromQuote(quote, newSI([edited], { subtotal: 1700, total: 1800 }));
+
+      const reservation = await fetchReservation(result.id);
+      expect(reservation.get('totalAmount')).toBe(1800); // 1700 + 100 propina
+
+      const pays = await getPayments(result.id);
+      expect(pays.body.data.payments).toHaveLength(1);
+      expect(pays.body.data.payments[0].amount).toBe(1000); // el pago viejo sigue intacto
+
+      const s = pays.body.data.summary;
+      expect(s.total).toBe(1800);
+      expect(s.balance).toBe(800); // 1800 - 1000
+      expect(s.paymentStatus).toBe('partial');
+      expect(s.serviceTipsTotal).toBe(100);
+    });
+
+    it('PAYEDIT-I2: pago $2000 (cubría el original); luego SOLO descuento 300 -> total 1700, balance -300 (sobrepago), sigue paid', async () => {
+      const quote = await makeQuote(null, [svc({ id: 'pe2' })], { subtotal: 2000, total: 2000 });
+      const result = await quoteService.createReservationFromQuote(quote, adminUser);
+      created.reservations.push(result.id);
+
+      const pay = await postPayment(result.id, { amount: 2000, currency: 'MXN', method: 'efectivo' });
+      expect(pay.status).toBe(200);
+      expect(pay.body.data.summary.paymentStatus).toBe('paid'); // cubría el total original
+
+      // Edición POR SERVICIO: SOLO descuento 300 (sin propina). Nuevo total 1700.
+      const edited = svc({ id: 'pe2', discountAmount: 300, total: 1700 });
+      await quoteService.syncReservationFromQuote(quote, newSI([edited], { subtotal: 1700, total: 1700 }));
+
+      const reservation = await fetchReservation(result.id);
+      expect(reservation.get('totalAmount')).toBe(1700);
+
+      const s = await PaymentService.summarize(result.id);
+      expect(s.total).toBe(1700);
+      expect(s.balance).toBe(-300); // sobrepago permitido (2000 - 1700)
+      expect(s.paymentStatus).toBe('paid'); // no se rompe por aplicar el descuento después
     });
   });
 });

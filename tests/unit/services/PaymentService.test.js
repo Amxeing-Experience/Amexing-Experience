@@ -44,6 +44,74 @@ describe('PaymentService pure helpers', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Descuento por servicio (Fase 1): pricesByType es la base PURA; el descuento (discountAmount,
+  // en efectivo) se resta ESCALADO por el factor de forma de pago, con la misma fórmula que el front
+  // (getServiceDiscountInPaymentType) y el server (evaluateTotalsConsistency). Antes chargeAmount
+  // devolvía el bruto y el motor de pagos divergía de reservation.totalAmount por el monto del descuento.
+  // ---------------------------------------------------------------------------
+  describe('chargeAmount / computeTotals con descuento por servicio (Fase 1)', () => {
+    it('U-DISC1: resta el descuento en efectivo (factor 1) del precio bruto', () => {
+      expect(PaymentService.chargeAmount({ pricesByType: { efectivo: 2000 }, discountAmount: 300 }, 'efectivo')).toBe(1700);
+    });
+
+    it('U-DISC2: computeTotals refleja el descuento (efectivo 2000 − 300 = 1700)', () => {
+      const t = PaymentService.computeTotals(
+        [{ pricesByType: { efectivo: 2000, tarjeta: 2320 }, total: 1700, discountAmount: 300 }],
+        'efectivo'
+      );
+      expect(t.total).toBe(1700);
+    });
+
+    it('U-DISC3: descuento + propina juntos (2000 − 200 + 180 = 1980, NO 2180)', () => {
+      const t = PaymentService.computeTotals(
+        [{
+          pricesByType: { efectivo: 2000 }, total: 1800, discountAmount: 200, tipAmount: 180,
+        }],
+        'efectivo', 0, 'MXN', 180
+      );
+      expect(t.total).toBe(1980);
+    });
+
+    it('U-DISC4: un descuento mayor al precio del método no da negativo (clamp a 0)', () => {
+      expect(PaymentService.chargeAmount({ pricesByType: { efectivo: 100 }, discountAmount: 150 }, 'efectivo')).toBe(0);
+    });
+
+    // --- Edge cases (QA adversarial) ---
+
+    it('escala el descuento por el factor de tarjeta (mismo % de descuento que en efectivo)', () => {
+      // efectivo 2000 / tarjeta 2320 (factor 1.16). Descuento efectivo 300 -> en tarjeta 300*1.16 = 348.
+      // Cobro tarjeta = 2320 − 348 = 1972.
+      expect(PaymentService.chargeAmount(
+        { pricesByType: { efectivo: 2000, tarjeta: 2320 }, discountAmount: 300 }, 'tarjeta'
+      )).toBe(1972);
+    });
+
+    it('descuento 0 / negativo / no numérico se ignora (cobra el bruto tal cual)', () => {
+      const prices = { efectivo: 1000 };
+      expect(PaymentService.chargeAmount({ pricesByType: prices, discountAmount: 0 }, 'efectivo')).toBe(1000);
+      expect(PaymentService.chargeAmount({ pricesByType: prices, discountAmount: -50 }, 'efectivo')).toBe(1000);
+      expect(PaymentService.chargeAmount({ pricesByType: prices, discountAmount: 'abc' }, 'efectivo')).toBe(1000);
+      expect(PaymentService.chargeAmount({ pricesByType: prices }, 'efectivo')).toBe(1000);
+    });
+
+    it('sin base efectivo utilizable (efBase<=0): resta el descuento bruto, sin escalar', () => {
+      // pricesByType.efectivo ausente/0 -> no hay factor; se resta discEf directo del método pedido.
+      expect(PaymentService.chargeAmount({ pricesByType: { tarjeta: 500 }, discountAmount: 100 }, 'tarjeta')).toBe(400);
+    });
+
+    it('el fallback a item.total (dato legacy sin pricesByType) NO vuelve a restar el descuento (total ya es neto)', () => {
+      // total ya viene neto del wizard; aplicar el descuento otra vez lo doble-contaría.
+      expect(PaymentService.chargeAmount({ total: 1700, discountAmount: 300 }, 'efectivo')).toBe(1700);
+    });
+
+    it('un servicio excluido del total aporta 0 aunque tenga descuento', () => {
+      expect(PaymentService.chargeAmount(
+        { includeInTotal: false, pricesByType: { efectivo: 2000 }, discountAmount: 300 }, 'efectivo'
+      )).toBe(0);
+    });
+  });
+
   describe('serviceBase', () => {
     it('reads the efectivo price regardless of other tiers (es chargeAmount(item, "efectivo"))', () => {
       const item = { pricesByType: { efectivo: 100, transferencia: 110, tarjeta: 120 } };

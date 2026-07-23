@@ -79,14 +79,18 @@ const PaymentBreakdownHelpers = (() => {
   }
 
   /**
-   * Precio ya aprobado por la cotizacion para este metodo (pricesByType[paymentType]), igual que
-   * PaymentService.chargeAmount. Guard Number.isFinite (no !Number.isNaN) para que Infinity/NaN
-   * caigan al mismo fallback (item.total, tambien finite-guarded) que un valor ausente — nunca $Infinity.
-   * @param {object} svc - Servicio { subconcept: { includeInTotal, pricesByType }, total }.
+   * Precio ya aprobado por la cotizacion para este metodo (pricesByType[paymentType]), MENOS el
+   * descuento por servicio (Fase 1) — paridad EXACTA con PaymentService.chargeAmount del servidor.
+   * discountAmount se captura en efectivo y se resta escalado por el mismo factor multiplicativo que el
+   * server (pricesByType[metodo]/pricesByType.efectivo) y el front (getServiceDiscountInPaymentType). Sin
+   * esta resta, el staff veia un desglose por servicio con el precio BRUTO mientras el motor real ya lo
+   * restaba: dos fuentes de verdad divergentes en la misma pantalla. Guard Number.isFinite (no !Number.isNaN)
+   * para que Infinity/NaN caigan al mismo fallback (item.total, tambien finite-guarded) que un valor ausente.
+   * @param {object} svc - Servicio { subconcept: { includeInTotal, pricesByType, discountAmount }, total }.
    * @param {string} paymentType - Metodo (efectivo|transferencia|tarjeta).
-   * @returns {number} Monto a cobrar por ese metodo (0 si esta excluido del total).
+   * @returns {number} Monto a cobrar por ese metodo, neto de descuento (0 si esta excluido o si el descuento lo supera).
    * @example
-   * getServicePriceByType({ subconcept: { pricesByType: { tarjeta: 121 } } }, 'tarjeta') // 121
+   * getServicePriceByType({ subconcept: { pricesByType: { efectivo: 2000 }, discountAmount: 300 } }, 'efectivo') // 1700
    */
   function getServicePriceByType(svc, paymentType) {
     if (svc && svc.subconcept && svc.subconcept.includeInTotal === false) return 0;
@@ -96,7 +100,21 @@ const PaymentBreakdownHelpers = (() => {
     // vez de caer al fallback item.total (antes divergían: cliente=item.total vs servidor=0).
     if (pbt && typeof pbt === 'object') {
       const v = Number(pbt[paymentType]);
-      if (Number.isFinite(v)) return v;
+      if (Number.isFinite(v)) {
+        // Descuento escalado por método, idéntico a chargeAmount: el recargo por forma de pago es
+        // multiplicativo, así que descontar sobre la base y recargar == recargar y descontar el monto
+        // escalado por pricesByType[método]/pricesByType.efectivo. En efectivo el factor es 1 (resta
+        // directa). Sin base efectivo utilizable se resta el bruto. Clamp a 0: nunca un cobro negativo.
+        const discEf = Number(svc.subconcept.discountAmount) || 0;
+        let discountInType = 0;
+        if (discEf > 0) {
+          const efBase = Number(pbt.efectivo);
+          discountInType = (efBase > 0 && pbt[paymentType] != null)
+            ? round2(discEf * (v / efBase))
+            : discEf;
+        }
+        return Math.max(0, round2(v - discountInType));
+      }
     }
     const total = Number(svc && svc.total);
     return Number.isFinite(total) ? total : 0;
