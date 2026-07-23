@@ -176,4 +176,102 @@ describe('Bloqueo por-servicio: subtotal/total se recalculan desde el contenido 
     expect(si.subtotal).toBe(1000);
     expect(si.total).toBe(1000);
   });
+
+  // Regresión "Pago externo" (includeInTotal:false): el chequeo por-DÍA (dayTotal) sumaba el total de
+  // TODOS los subconceptos del día sin excluir los includeInTotal:false, a diferencia de
+  // evaluateTotalsConsistency. El wizard (quote-services-v2.saveToBackend) manda un dayTotal que YA
+  // excluye los "Pago externo", así que la comparación divergía por el monto completo del externo y
+  // rechazaba con 400 todo guardado que llevara uno. Fix: el reduce del dayTotal excluye
+  // includeInTotal:false, igual que el resto del motor.
+  it('un día con un servicio "Pago externo" (includeInTotal:false) y dayTotal que lo excluye se ACEPTA (200), no se rechaza por el chequeo de día', async () => {
+    const quote = new Parse.Object('Quote');
+    quote.set('exists', true);
+    quote.set('active', true);
+    quote.set('status', 'draft'); // sin servicios protegidos
+    quote.set('folio', `QTE-EXT-${Date.now()}`);
+    quote.set('numberOfPeople', 2);
+    quote.set('client', agencyUser);
+    quote.set('serviceItems', {
+      days: [{ dayNumber: 1, dayTitle: 'Día 1', subconcepts: [] }],
+      subtotal: 0, iva: 0, total: 0, currency: 'MXN', paymentType: 'efectivo',
+    });
+    await quote.save(null, { useMasterKey: true });
+    created.quotes.push(quote.id);
+
+    const normalSub = {
+      id: 'norm1', concept: 'Traslado', type: 'concepto',
+      pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 },
+      total: 1000, includeInTotal: true,
+    };
+    const externalSub = {
+      id: 'ext1', concept: 'Pago externo', type: 'concepto',
+      pricesByType: { efectivo: 2000, transferencia: 2000, tarjeta: 2000 },
+      total: 2000, includeInTotal: false,
+    };
+
+    const res = await request(app)
+      .put(`/api/quotes/${quote.id}/service-items`)
+      .set('Authorization', `Bearer ${agencyToken}`)
+      .send({
+        days: [{
+          dayNumber: 1, dayTitle: 'Día 1', dayTotal: 1000, // excluye el externo (1000, no 3000)
+          subconcepts: [normalSub, externalSub],
+        }],
+        subtotal: 1000, iva: 0, total: 1000, currency: 'MXN', paymentType: 'efectivo',
+      });
+
+    // Antes del fix: 400 "El total del día 1 ($1000) no coincide con la suma de subconceptos ($3000)".
+    expect(res.status).toBe(200);
+
+    const after = await new Parse.Query('Quote').get(quote.id, { useMasterKey: true });
+    const si = after.get('serviceItems');
+    // El externo se conserva pero NO cuenta para subtotal/total del header.
+    expect(si.subtotal).toBe(1000);
+    expect(si.total).toBe(1000);
+    const savedExt = si.days[0].subconcepts.find((s) => s.id === 'ext1');
+    expect(savedExt).toBeTruthy();
+    expect(savedExt.includeInTotal).toBe(false);
+  });
+
+  it('control: un dayTotal que no cuadra NI excluyendo el "Pago externo" SIGUE rechazando con 400 (la validación sigue siendo real)', async () => {
+    const quote = new Parse.Object('Quote');
+    quote.set('exists', true);
+    quote.set('active', true);
+    quote.set('status', 'draft');
+    quote.set('folio', `QTE-EXT0-${Date.now()}`);
+    quote.set('numberOfPeople', 2);
+    quote.set('client', agencyUser);
+    quote.set('serviceItems', {
+      days: [{ dayNumber: 1, dayTitle: 'Día 1', subconcepts: [] }],
+      subtotal: 0, iva: 0, total: 0, currency: 'MXN', paymentType: 'efectivo',
+    });
+    await quote.save(null, { useMasterKey: true });
+    created.quotes.push(quote.id);
+
+    const res = await request(app)
+      .put(`/api/quotes/${quote.id}/service-items`)
+      .set('Authorization', `Bearer ${agencyToken}`)
+      .send({
+        days: [{
+          dayNumber: 1, dayTitle: 'Día 1', dayTotal: 500, // debería ser 1000 excluyendo el externo
+          subconcepts: [
+            {
+              id: 'norm1', concept: 'Traslado', type: 'concepto',
+              pricesByType: { efectivo: 1000 }, total: 1000, includeInTotal: true,
+            },
+            {
+              id: 'ext1', concept: 'Pago externo', type: 'concepto',
+              pricesByType: { efectivo: 2000 }, total: 2000, includeInTotal: false,
+            },
+          ],
+        }],
+        subtotal: 1000, iva: 0, total: 1000, currency: 'MXN', paymentType: 'efectivo',
+      });
+
+    expect(res.status).toBe(400);
+    // El error viene del chequeo por-día y su suma esperada EXCLUYE el externo ($1000, no $3000).
+    expect(res.body.error).toMatch(/no coincide con la suma de subconceptos/);
+    expect(res.body.error).toContain('$1000');
+    expect(res.body.error).not.toContain('$3000');
+  });
 });

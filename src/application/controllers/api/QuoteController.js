@@ -2382,7 +2382,13 @@ class QuoteController {
           return this.sendError(res, `El total del día ${day.dayNumber} debe ser un número positivo`, 400);
         }
 
-        const calculatedDayTotal = day.subconcepts.reduce((sum, sub) => sum + (parseFloat(sub.total) || 0), 0);
+        // Excluye los subconceptos "Pago externo" (includeInTotal === false) igual que
+        // evaluateTotalsConsistency: el wizard manda un dayTotal que ya los excluye, así que sumarlos
+        // aquí divergiría siempre por el monto completo del servicio externo y rechazaría el guardado.
+        const calculatedDayTotal = day.subconcepts.reduce(
+          (sum, sub) => (sub.includeInTotal === false ? sum : sum + (parseFloat(sub.total) || 0)),
+          0
+        );
 
         const dayTotalRounded = Math.round(day.dayTotal * 100) / 100;
         const expectedRounded = Math.round(calculatedDayTotal * 100) / 100;

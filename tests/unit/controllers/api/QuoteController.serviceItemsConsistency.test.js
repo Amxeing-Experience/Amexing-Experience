@@ -280,4 +280,39 @@ describe('QuoteController.updateServiceItems (cableado del rechazo, sin BD)', ()
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json.mock.calls[0][0].error).toMatch(/Traslado/);
   });
+
+  // Regresión "Pago externo": el chequeo por-DÍA (dayTotal) debe excluir los subconceptos
+  // includeInTotal:false igual que evaluateTotalsConsistency. Antes los sumaba y rechazaba con 400
+  // cualquier día que llevara un "Pago externo" (el wizard ya manda un dayTotal que los excluye).
+  // Este caso de CONTROL manda un dayTotal que no cuadra NI excluyendo el externo -> debe seguir
+  // rechazando (la validación sigue siendo real), y su suma esperada demuestra que el externo NO
+  // se contó ($1000, no $3000). Corta ANTES del query a la BD, por eso vive en el archivo unitario.
+  it('el chequeo por-día excluye includeInTotal:false: un dayTotal que no cuadra ni así RECHAZA, y la suma esperada NO incluye el "Pago externo"', async () => {
+    const req = {
+      user: { id: 'u1' },
+      params: { id: 'q1' },
+      body: baseBody({
+        subtotal: 1000, // suma real = solo el servicio incluido
+        total: 1000,
+        days: [{
+          dayNumber: 1,
+          dayTitle: 'Día 1',
+          dayTotal: 500, // debería ser 1000 (excluyendo el externo); 500 no cuadra ni así
+          subconcepts: [
+            sc(1000, 1000, 'Traslado'), // includeInTotal:true
+            { concept: 'Pago externo', total: 2000, includeInTotal: false, pricesByType: { efectivo: 2000 } },
+          ],
+        }],
+      }),
+    };
+    const res = mockRes();
+
+    await QuoteController.updateServiceItems(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    const msg = res.json.mock.calls[0][0].error;
+    expect(msg).toMatch(/no coincide con la suma de subconceptos/);
+    expect(msg).toContain('$1000'); // suma esperada excluye el externo
+    expect(msg).not.toContain('$3000'); // NUNCA suma el externo ($1000 + $2000)
+  });
 });
