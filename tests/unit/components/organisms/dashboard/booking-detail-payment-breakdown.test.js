@@ -145,3 +145,31 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).toContain('/payments');
   });
 });
+
+// Fix bug ALTA: un servicio "Pago externo" (includeInTotal:false) se mostraba distinto en cada vista —
+// $0.00 sin badge en admin, precio completo sin badge en agencia/agente. Ahora las 3 marcan el servicio
+// con el badge "Pago externo" (condición svc.subconcept?.includeInTotal === false) igual que la vista
+// pública. El <script> no se ejecuta en el cascarón; se verifica el literal en su fuente renderizada.
+describe('Booking Detail — servicio "Pago externo" (includeInTotal:false) unificado entre roles', () => {
+  let htmlAdmin;
+
+  beforeAll(async () => { htmlAdmin = await render('admin'); });
+
+  it.each(['admin', 'department_manager', 'client'])('%s: pinta el badge "Pago externo" condicionado a includeInTotal === false', async (role) => {
+    const html = await render(role);
+    expect(html).toContain('Pago externo');
+    expect(html).toContain('svc.subconcept?.includeInTotal === false');
+  });
+
+  // Admin era la única que ponía la LÍNEA del servicio en $0 (usaba getServicePriceByType). Ahora la
+  // línea usa getServicePriceByTypeGross (precio real, sin zero-out); el agregado financiero sigue
+  // excluyendo vía computeServicesSubtotalByType (getServicePriceByType), que no debe tocarse.
+  it('admin: la línea del servicio usa getServicePriceByTypeGross (precio real), no getServicePriceByType', () => {
+    // Marcador literal del call site del renglón dentro del <script>.
+    expect(htmlAdmin).toContain('getServicePriceByTypeGross(svc, reservationData.paymentType)');
+  });
+
+  it('admin: el agregado financiero sigue usando computeServicesSubtotalByType (excluye Pago externo, no se tocó)', () => {
+    expect(htmlAdmin).toContain('computeServicesSubtotalByType');
+  });
+});

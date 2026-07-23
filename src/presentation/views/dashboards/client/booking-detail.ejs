@@ -1222,13 +1222,20 @@ document.addEventListener('DOMContentLoaded', async function() {
                     ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' → ' : ''}${svc.destinationName || ''}</small>`
                     : '';
 
+                // "Pago externo" (includeInTotal:false): el cliente lo paga directo a un tercero, NO es un
+                // cargo que la agencia deba cobrar. Se marca junto al título (el precio ya se muestra
+                // completo). Estilo tomado de .service-badge.external (services-renderer.js), no cargado aquí.
+                const externalBadge = svc.subconcept?.includeInTotal === false
+                    ? '<span class="badge me-1" style="background:rgba(150,155,129,0.15);color:#969b81;border:1px solid rgba(150,155,129,0.3);font-weight:600;">Pago externo</span>'
+                    : '';
+
                 const canAssign = false; // Assignment is admin-only
 
                 html += `
                 <div class="service-row d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center flex-grow-1">
                         <div>
-                            <div class="fw-semibold">${svc.concept || '—'}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
+                            <div class="fw-semibold">${externalBadge}${svc.concept || '—'}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
                             ${route}
                             ${svc.vehicleTypeName ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
                             ${getSubconceptDetails(svc)}

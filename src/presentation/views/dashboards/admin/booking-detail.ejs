@@ -403,6 +403,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     function getServicePriceByType(svc, paymentType) {
         return PaymentBreakdownHelpers.getServicePriceByType(svc, paymentType);
     }
+    // Precio REAL para la LÍNEA del servicio: no pone $0 en "Pago externo" (includeInTotal:false); la
+    // exclusión del Total/Saldo la sigue haciendo getServicePriceByType en el agregado financiero.
+    function getServicePriceByTypeGross(svc, paymentType) {
+        return PaymentBreakdownHelpers.getServicePriceByTypeGross(svc, paymentType);
+    }
+    function getServiceDiscountByType(svc, paymentType) {
+        return PaymentBreakdownHelpers.getServiceDiscountByType(svc, paymentType);
+    }
     function computeServicesSubtotalByType(services, paymentType) {
         const currency = (reservationData && reservationData.currency) || 'MXN';
         return PaymentBreakdownHelpers.computeServicesSubtotalByType(services, paymentType, currency);
@@ -1030,10 +1038,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (svc.type === 'a-disposicion' && sub.discountPercent) {
             otrosItems.push(detailLine('discount-2', `${sub.discountPercent}% descuento`));
         }
-        // Fase 2d: descuento y propina por servicio (ya reflejados en el total del servicio).
+        // Fase 2d: descuento y propina por servicio (ya reflejados en el total del servicio). El
+        // descuento se escala por la forma de pago (getServiceDiscountByType) para coincidir con el
+        // precio por método mostrado arriba (getServicePriceByType), en vez del monto bruto en efectivo.
         if (Number(sub.discountAmount) > 0) {
             const dPct = (sub.discountType === 'percent' && sub.discountValue) ? ` ${sub.discountValue}%` : '';
-            otrosItems.push(detailLine('discount-2', `Descuento${dPct} −${formatCurrency(sub.discountAmount, reservationData.currency)}`));
+            const dScaled = getServiceDiscountByType(svc, reservationData.paymentType);
+            otrosItems.push(detailLine('discount-2', `Descuento${dPct} −${formatCurrency(dScaled, reservationData.currency)}`));
         }
         if (Number(sub.tipAmount) > 0) {
             const tPct = (sub.tipType === 'percent' && sub.tipValue) ? ` ${sub.tipValue}%` : '';
@@ -1185,6 +1196,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                     ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' &rarr; ' : ''}${svc.destinationName || ''}</small>`
                     : '';
 
+                // "Pago externo" (includeInTotal:false): el cliente lo paga directo a un tercero. Se
+                // marca junto al título y se muestra su precio REAL (nunca $0), igual que la vista
+                // pública, para no aparentar un servicio gratis ni un cargo que la agencia debe cobrar.
+                // Estilo tomado de .service-badge.external (services-renderer.js), que estas vistas no cargan.
+                const externalBadge = svc.subconcept?.includeInTotal === false
+                    ? '<span class="badge me-1" style="background:rgba(150,155,129,0.15);color:#969b81;border:1px solid rgba(150,155,129,0.3);font-weight:600;">Pago externo</span>'
+                    : '';
+
                 const includeGuide = svc.subconcept?.includeGuide;
                 const includeGreeter = svc.subconcept?.includeGreeter;
                 // Decide whether this service actually needs vehicle assignment slots.
@@ -1213,7 +1232,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 <div class="service-row d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center flex-grow-1">
                         <div>
-                            <div class="fw-semibold">${getDisplayConcept(svc)}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
+                            <div class="fw-semibold">${externalBadge}${getDisplayConcept(svc)}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
                             ${route}
                             ${(svc.vehicleTypeName && needsVehicle && vehicleQty === 1) ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
                             ${getSubconceptDetails(svc)}
@@ -1227,7 +1246,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         ${svc.type === 'concepto' && svc.status !== 'cancelled' ? '<span class="badge bg-success text-white">Lista</span>' : getReservationStatusBadge(svc.status)}
-                        <span class="text-end" style="min-width: 80px;">${formatCurrency(getServicePriceByType(svc, reservationData.paymentType), reservationData.currency)}</span>
+                        <span class="text-end" style="min-width: 80px;">${formatCurrency(getServicePriceByTypeGross(svc, reservationData.paymentType), reservationData.currency)}</span>
                         ${canAssign && svc.status !== 'cancelled' && svc.type !== 'concepto' ? `<button class="btn btn-sm ${svc.status === 'completed' ? 'btn-success' : (svc.status === 'assigned' ? 'btn-outline-success' : 'btn-outline-secondary')} status-toggle-btn" data-service-id="${svc.id}" data-current-status="${svc.status}" title="${svc.status === 'completed' ? 'Revertir a asignada' : (svc.status === 'assigned' ? 'Marcar completada' : 'Marcar asignada')}"><i class="ti ${svc.status === 'completed' ? 'ti-circle-check-filled' : (svc.status === 'assigned' ? 'ti-circle-check' : 'ti-circle')}"></i></button>` : ''}
                         ${canAssign ? (() => {
             // Build the extras payload merging the REQUESTED list (from subconcept blob — never

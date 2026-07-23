@@ -600,9 +600,10 @@
                     html += `<div class="service-price">${this.formatCurrency(price + this.getServiceTip(service))}</div>`;
                 }
                 // Fase 1: descuento por servicio. El precio de arriba ya viene con descuento (pricesByType);
-                // esta línea lo hace visible en el resumen. El monto se muestra en efectivo (como la tarjeta).
+                // esta línea lo hace visible en el resumen. Se escala por la forma de pago (getServiceDiscount)
+                // para que coincida con el descuento que getServicePrice ya restó al precio mostrado.
                 if (Number(service.discountAmount) > 0) {
-                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>`;
+                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(this.getServiceDiscount(service))}</div>`;
                 }
                 // Fase 2: propina por servicio (línea aparte, aditiva; se suma al total).
                 const svcTip = this.getServiceTip(service);
@@ -1208,9 +1209,10 @@
                 } else {
                     html += `<div class="service-price">${this.formatCurrency(price + this.getServiceTip(service))}</div>`;
                 }
-                // Fase 1: descuento por servicio (transporte). El precio ya viene con descuento (pricesByType).
+                // Fase 1: descuento por servicio (transporte). El precio ya viene con descuento (pricesByType);
+                // la etiqueta se escala por la forma de pago (getServiceDiscount) para coincidir con él.
                 if (Number(service.discountAmount) > 0) {
-                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>`;
+                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(this.getServiceDiscount(service))}</div>`;
                 }
                 // Fase 2: propina por servicio (línea aparte, aditiva; se suma al total).
                 const svcTip = this.getServiceTip(service);
@@ -2157,9 +2159,27 @@
             return service.price || service.total || 0;
         }
 
+        // Helper: descuento por servicio (Fase 1) en la forma de pago actual, para MOSTRARLO en la
+        // etiqueta. El descuento se guarda en efectivo (discountAmount); como el recargo por forma de
+        // pago es multiplicativo, se escala por el mismo factor pricesByType[pt]/efectivo con el que
+        // getServicePrice lo resta al precio. Así la etiqueta refleja el descuento REAL aplicado en
+        // tarjeta/transferencia, no el monto crudo en efectivo. En efectivo el factor es 1.
+        getServiceDiscount(service) {
+            const disc = Number(service.discountAmount) || 0;
+            if (disc <= 0) return 0;
+            const pbt = service.pricesByType;
+            const pt = this.paymentType || 'efectivo';
+            if (pbt && Number(pbt.efectivo) > 0 && pbt[pt] != null) {
+                const factor = Number(pbt[pt]) / Number(pbt.efectivo);
+                return Math.round(disc * factor * 100) / 100;
+            }
+            return Math.round(disc * 100) / 100;
+        }
+
         // Helper: propina por servicio (Fase 2) en la forma de pago actual. Aditiva, línea aparte.
-        // Porcentaje: sobre el precio neto (con descuento). Monto fijo (efectivo): escalado por el
-        // recargo de la forma de pago (mismo factor pricesByType[pt]/efectivo que el descuento).
+        // Porcentaje: sobre el precio neto (con descuento). Monto fijo: literal, NUNCA escala por la
+        // forma de pago (paridad con el servidor: PaymentService.sumServiceTips y
+        // QuoteService.sumServiceTipsFromDays suman tipAmount tal cual, sin factor de recargo).
         getServiceTip(service) {
             const type = service.tipType;
             const val = Number(service.tipValue) || 0;
@@ -2167,13 +2187,8 @@
             if (type === 'percent') {
                 return Math.round(this.getServicePrice(service) * (val / 100) * 100) / 100;
             }
-            const pbt = service.pricesByType;
-            const pt = this.paymentType || 'efectivo';
-            if (pbt && Number(pbt.efectivo) > 0 && pbt[pt] != null) {
-                const factor = Number(pbt[pt]) / Number(pbt.efectivo);
-                return Math.round(val * factor * 100) / 100;
-            }
-            return val;
+            // Monto fijo: se muestra y se cobra literal, sin escalar por método de pago.
+            return Math.round(val * 100) / 100;
         }
 
         // Helper: Calculate day total

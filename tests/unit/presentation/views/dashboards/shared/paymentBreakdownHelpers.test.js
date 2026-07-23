@@ -104,6 +104,91 @@ describe('PaymentBreakdownHelpers.getServicePriceByType', () => {
   });
 });
 
+describe('PaymentBreakdownHelpers.getServiceDiscountByType (etiqueta "Descuento" escalada por método — M1)', () => {
+  it('en efectivo el descuento es literal (factor 1)', () => {
+    expect(H.getServiceDiscountByType({ subconcept: { pricesByType: { efectivo: 2000 }, discountAmount: 300 } }, 'efectivo')).toBe(300);
+  });
+
+  it('en tarjeta el descuento se escala por pricesByType[tarjeta]/pricesByType.efectivo', () => {
+    // discEf 100, efectivo 1000, tarjeta 1210 -> descuento en tarjeta = 100 * (1210/1000) = 121.
+    expect(H.getServiceDiscountByType(
+      { subconcept: { pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 }, discountAmount: 100 } },
+      'tarjeta'
+    )).toBe(121);
+    expect(H.getServiceDiscountByType(
+      { subconcept: { pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 }, discountAmount: 100 } },
+      'transferencia'
+    )).toBe(116);
+  });
+
+  it('PARIDAD: getServicePriceByType === precio del método − getServiceDiscountByType (misma fuente)', () => {
+    // La etiqueta y el precio mostrado justo arriba deben restar EXACTAMENTE el mismo descuento.
+    const svc = { subconcept: { pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 }, discountAmount: 100 } };
+    ['efectivo', 'transferencia', 'tarjeta'].forEach((m) => {
+      const price = H.getServicePriceByType(svc, m);
+      const disc = H.getServiceDiscountByType(svc, m);
+      expect(H.round2(svc.subconcept.pricesByType[m] - disc)).toBe(price);
+    });
+  });
+
+  it('descuento ausente/0/negativo devuelve 0 (sin etiqueta)', () => {
+    expect(H.getServiceDiscountByType({ subconcept: { pricesByType: { efectivo: 1000 } } }, 'efectivo')).toBe(0);
+    expect(H.getServiceDiscountByType({ subconcept: { pricesByType: { efectivo: 1000 }, discountAmount: 0 } }, 'efectivo')).toBe(0);
+    expect(H.getServiceDiscountByType({ subconcept: { pricesByType: { efectivo: 1000 }, discountAmount: -50 } }, 'efectivo')).toBe(0);
+  });
+
+  it('sin base efectivo utilizable, devuelve el descuento bruto (mismo fallback que getServicePriceByType)', () => {
+    expect(H.getServiceDiscountByType({ subconcept: { pricesByType: { tarjeta: 500 }, discountAmount: 100 } }, 'tarjeta')).toBe(100);
+  });
+
+  it('un método null explícito cae al bruto (no escala con un factor 0)', () => {
+    // pbt.tarjeta === null -> Number(null)=0 finito, pero pbt[método] != null es false -> bruto.
+    expect(H.getServiceDiscountByType({ subconcept: { pricesByType: { efectivo: 1000, tarjeta: null }, discountAmount: 100 } }, 'tarjeta')).toBe(100);
+  });
+
+  it('sin subconcept devuelve 0 (no crashea)', () => {
+    expect(H.getServiceDiscountByType({ total: 500 }, 'tarjeta')).toBe(0);
+    expect(H.getServiceDiscountByType(null, 'tarjeta')).toBe(0);
+  });
+});
+
+describe('PaymentBreakdownHelpers.getServicePriceByTypeGross (línea del servicio — Pago externo NO se pone en $0)', () => {
+  // Fix bug ALTA: un servicio "Pago externo" (includeInTotal:false) se pintaba en $0.00 en la línea
+  // individual (usaba getServicePriceByType, que lo pone a 0 para el agregado). La línea debe mostrar
+  // el precio REAL; el zero-out solo aplica al Total/Saldo. gross NO excluye; el resto es idéntico.
+  it('DIFERENCIA CLAVE: un servicio excluido devuelve su precio REAL, no 0 (al revés que getServicePriceByType)', () => {
+    const svc = { subconcept: { includeInTotal: false, pricesByType: { tarjeta: 99 } }, total: 99 };
+    expect(H.getServicePriceByType(svc, 'tarjeta')).toBe(0);   // agregado: sigue excluyendo
+    expect(H.getServicePriceByTypeGross(svc, 'tarjeta')).toBe(99); // línea: precio real
+  });
+
+  it('excluido con descuento: muestra el precio real NETO de descuento (no 0, no bruto)', () => {
+    // efectivo 2000 - descuento 300 = 1700 aunque esté excluido del total.
+    const svc = { subconcept: { includeInTotal: false, pricesByType: { efectivo: 2000 }, discountAmount: 300 } };
+    expect(H.getServicePriceByType(svc, 'efectivo')).toBe(0);
+    expect(H.getServicePriceByTypeGross(svc, 'efectivo')).toBe(1700);
+  });
+
+  it('PARIDAD: para un servicio NO excluido devuelve EXACTAMENTE lo mismo que getServicePriceByType', () => {
+    const cases = [
+      [{ subconcept: { pricesByType: { tarjeta: 121 } } }, 'tarjeta'],
+      [{ subconcept: { pricesByType: { efectivo: 1000, tarjeta: 1210 }, discountAmount: 100 } }, 'tarjeta'],
+      [{ subconcept: { pricesByType: { tarjeta: null } }, total: 99 }, 'tarjeta'],
+      [{ subconcept: { pricesByType: { tarjeta: Infinity } }, total: 50 }, 'tarjeta'],
+      [{ total: 42 }, 'tarjeta'],
+      [null, 'tarjeta'],
+    ];
+    cases.forEach(([svc, pt]) => {
+      expect(H.getServicePriceByTypeGross(svc, pt)).toBe(H.getServicePriceByType(svc, pt));
+    });
+  });
+
+  it('excluido + método ausente cae al fallback total (no 0)', () => {
+    const svc = { subconcept: { includeInTotal: false, pricesByType: { efectivo: 100 } }, total: 50 };
+    expect(H.getServicePriceByTypeGross(svc, 'tarjeta')).toBe(50);
+  });
+});
+
 describe('PaymentBreakdownHelpers.computeServicesSubtotalByType (comparativo 3 métodos)', () => {
   const services = [
     { subconcept: { pricesByType: { efectivo: 100, transferencia: 116, tarjeta: 121 } } },
