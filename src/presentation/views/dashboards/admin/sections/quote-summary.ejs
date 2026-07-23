@@ -1621,11 +1621,17 @@ const e = __isRes ? 'reservación' : 'cotización';
                     ivaRow.classList.remove('d-none');
                 }
             }
-            // El Subtotal mostrado conserva las propinas horneadas (la línea "Propina general" es
-            // informativa y no existe una fila de "propina por servicio" en este bloque): Subtotal =
-            // Total − IVA, de modo que Subtotal + IVA = Total se mantiene consistente en la vista y en el
-            // PDF (que sólo imprime esas tres filas).
-            subtotal = Math.round((total - iva) * 100) / 100;
+            // Subtotal = neto de servicios (SIN ninguna propina), igual a netSubtotal (arriba) y a
+            // serviceItems.subtotal ya persistido por el servidor (QuoteController.updateServiceItems).
+            // NUNCA "total - iva": total INCLUYE ambas propinas y en efectivo iva=0 siempre, así que esa
+            // resta colapsaba Subtotal=Total (la propina general quedaba "horneada" en el Subtotal
+            // mostrado — bug DISC-100). Se prioriza el subtotal del servidor (misma fuente de verdad que
+            // Total) sobre netSubtotal por si difieren tras un descuento/propina por servicio a medio
+            // guardar; netSubtotal queda de fallback si el servidor no mandó un valor válido.
+            const serverSubtotal = Number(serviceItems.subtotal);
+            subtotal = (Number.isFinite(serverSubtotal) && serverSubtotal >= 0)
+                ? Math.round(serverSubtotal * 100) / 100
+                : Math.round(netSubtotal * 100) / 100;
 
             const perPerson = numberOfPeople > 0 ? total / numberOfPeople : 0;
 
