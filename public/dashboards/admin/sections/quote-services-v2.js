@@ -841,6 +841,10 @@ class ItineraryBuilder {
       this.renderAdditionalDestinationChips();
       this.populateAdditionalDestinationSelect();
       this.recalcTourMinHours();
+      // Walking: regenerar los inputs de tier desde el tour ganador (más caro) antes de recalcular
+      // el precio (el desglose lee esos inputs). En vehículo no aplica (no cambia el precio).
+      this.refreshWalkingTourGroupInputs();
+      this.updateServicePriceBreakdown();
       this.serviceModified = true;
     });
     // Destinos adicionales del tour: quitar (delegado en los chips)
@@ -851,6 +855,8 @@ class ItineraryBuilder {
       this.renderAdditionalDestinationChips();
       this.populateAdditionalDestinationSelect();
       this.recalcTourMinHours();
+      this.refreshWalkingTourGroupInputs();
+      this.updateServicePriceBreakdown();
       this.serviceModified = true;
     });
 
@@ -3717,7 +3723,9 @@ class ItineraryBuilder {
           // Fallback calculation
           const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1);
           const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
-          const baseTotal = this.getWalkingTourPrice(selectedTourData, peopleCount, duration);
+          // Multi-destino: precio = el destino más caro (mismas personas y duración).
+          const pricingTour = this.getEffectiveWalkingTour(selectedTourData);
+          const baseTotal = this.getWalkingTourPrice(pricingTour, peopleCount, duration);
 
           // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
           const walkingPricing = window.PricingEngine
@@ -9832,8 +9840,6 @@ class ItineraryBuilder {
         const peopleCount = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1);
         const duration = parseFloat(document.getElementById('tourDuration')?.value || 1);
 
-        const priceCurrency = selectedTourData.walkingPriceCurrency || 'MXN';
-
         // Modo "group": los inputs por tier SON los precios (override implícito) — no depende de un
         // checkbox #tourOverridePrices, que no existe en este modal. Se leen los precios editados.
         const walkingMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value;
@@ -9845,6 +9851,13 @@ class ItineraryBuilder {
             if (tn) overridePrices[tn] = parseFloat(inp.value) || 0;
           });
         }
+
+        // Multi-destino: el precio del walking combinado toma el destino MÁS CARO (mismas personas
+        // y duración compartida). Los inputs de tier (modo 'group', el default) se generan desde
+        // este mismo tour ganador, así que resolveTierPrice ya lee sus precios. La duración es el
+        // máximo de los mínimos de todos los destinos.
+        const pricingTour = this.getEffectiveWalkingTour(selectedTourData);
+        const priceCurrency = (pricingTour && pricingTour.walkingPriceCurrency) || 'MXN';
 
         // Resolve effective price per tier: override wins, otherwise tour's tier price
         // (with USD→MXN conversion applied to default values when needed).
@@ -9859,8 +9872,8 @@ class ItineraryBuilder {
           return p;
         };
 
-        // Calculate groups for breakdown text
-        const groups = this.calculateWalkingTourGroups(selectedTourData, peopleCount);
+        // Calculate groups for breakdown text (con el tour de pricing: el más caro en multi-destino).
+        const groups = this.calculateWalkingTourGroups(pricingTour, peopleCount);
 
         // Override de TOTAL manual: el precio capturado es la BASE en efectivo; el recargo
         // por forma de pago se aplica después (decisión del cliente). En modo automático o
@@ -11981,10 +11994,16 @@ class ItineraryBuilder {
     const sel = document.getElementById('tourAdditionalDestinationSelect');
     const main = document.getElementById('tourSelect');
     if (!sel || !main) return;
+    // Solo se combinan destinos del MISMO tipo que el principal (walking con walking, vehículo
+    // con vehículo): mezclar tipos no tiene sentido de precio/duración.
+    const mainTour = main.value ? this.findTourById(main.value) : null;
+    const mainIsWalking = !!(mainTour && mainTour.isWalkingTour);
     const excluded = new Set([main.value, ...(this.additionalTourIds || [])].filter(Boolean));
     sel.innerHTML = '<option value="">-- Selecciona un destino a combinar --</option>';
     Array.from(main.options).forEach((opt) => {
       if (!opt.value || excluded.has(opt.value)) return;
+      const t = this.findTourById(opt.value);
+      if (!t || !!t.isWalkingTour !== mainIsWalking) return;
       const o = document.createElement('option');
       o.value = opt.value;
       o.textContent = opt.textContent;
@@ -12083,16 +12102,19 @@ class ItineraryBuilder {
     const container = document.getElementById('tourAdditionalDestinationsContainer');
     const mainId = document.getElementById('tourSelect')?.value;
     const tour = mainId ? this.findTourById(mainId) : null;
-    const isVehicleTour = !!tour && !tour.isWalkingTour;
-    if (container) container.classList.toggle('d-none', !isVehicleTour);
-    if (isVehicleTour) {
+    // Multi-destino aplica a walking Y vehículo (antes solo vehículo). En walking el precio toma el
+    // destino más caro; en vehículo el precio es del principal. La duración usa el mismo máximo de
+    // mínimos en ambos.
+    const isTour = !!tour;
+    if (container) container.classList.toggle('d-none', !isTour);
+    if (isTour) {
       this.populateAdditionalDestinationSelect();
     } else {
       this.additionalTourIds = [];
     }
     this.renderAdditionalDestinationChips();
-    // Dev hint del mínimo aplicado (solo tour con vehículo).
-    if (isVehicleTour) {
+    // Dev hint del mínimo aplicado (cualquier tour).
+    if (isTour) {
       const info = this.getTourMinHoursInfo();
       this.updateTourMinHoursDevHint(info.winner, info.entries);
     } else {
@@ -16447,8 +16469,10 @@ class ItineraryBuilder {
           } else {
             // FALLBACK: Calculate walking tour price breakdown (original logic)
             qsDevLog('🔄 SERVICE BREAKDOWN: Dev breakdown not available, calculating walking tour breakdown');
-            const groups = this.calculateWalkingTourGroups(walkingTourData, peopleCount);
-            const baseWalkingPrice = this.getWalkingTourPrice(walkingTourData, peopleCount, duration);
+            // Multi-destino: el precio toma el destino más caro (mismas personas y duración).
+            const pricingWalkingTour = this.getEffectiveWalkingTour(walkingTourData);
+            const groups = this.calculateWalkingTourGroups(pricingWalkingTour, peopleCount);
+            const baseWalkingPrice = this.getWalkingTourPrice(pricingWalkingTour, peopleCount, duration);
 
             // Apply payment type surcharge to match devBreakdown
             let walkingPrice = baseWalkingPrice;
@@ -19419,6 +19443,44 @@ class ItineraryBuilder {
     }
 
     return groups;
+  }
+
+  /**
+   * Multi-destino walking: el precio del walking combinado es el del destino MÁS CARO (a las mismas
+   * personas y duración compartida). Devuelve ese tour "ganador" (principal o adicional). En modo
+   * override manual se debe seguir usando el principal (el precio capturado manda).
+   * @param {object} primaryTour - Walking tour principal (#tourSelect).
+   * @param {number} peopleCount - Total de personas.
+   * @param {number} duration - Duración compartida (horas).
+   * @returns {object} El tour con mayor precio (principal o algún adicional).
+   */
+  /**
+   * Multi-destino walking: construye un tour "efectivo" sintético donde CADA tier (Small/Medium/
+   * Large) toma el precio MÁS CARO entre el principal y los destinos adicionales (normalizado a
+   * MXN). Los rangos son los del principal (se asumen consistentes entre destinos). Sin adicionales
+   * devuelve el principal tal cual.
+   * @param {object} primaryTour - Walking tour principal (#tourSelect).
+   * @returns {object} Tour sintético con precios por tier = máximo entre destinos (en MXN).
+   */
+  getEffectiveWalkingTour(primaryTour) {
+    if (!primaryTour) return primaryTour;
+    const additionals = (this.additionalTourIds || [])
+      .map((id) => this.findTourById(id))
+      .filter((t) => t && t.isWalkingTour);
+    if (!additionals.length) return primaryTour;
+    const tours = [primaryTour, ...additionals];
+    const toMxn = (val, cur) => ((cur === 'USD' && this.exchangeRate)
+      ? Math.round((parseFloat(val) || 0) * this.exchangeRate)
+      : (parseFloat(val) || 0));
+    const maxTier = (field) => Math.max(...tours.map((t) => toMxn(t[field], t.walkingPriceCurrency)));
+    return {
+      ...primaryTour,
+      // Ya normalizado a MXN → evita doble conversión aguas abajo.
+      walkingPriceCurrency: 'MXN',
+      walkingPriceSmall: maxTier('walkingPriceSmall'),
+      walkingPriceMedium: maxTier('walkingPriceMedium'),
+      walkingPriceLarge: maxTier('walkingPriceLarge'),
+    };
   }
 
   getWalkingTourPrice(tour, peopleCount, duration = 1) {
@@ -22695,6 +22757,19 @@ class ItineraryBuilder {
   }
 
   // Generate dynamic input fields for each walking tour group
+  /**
+   * Regenera los inputs de tier del walking tour desde el tour ganador (más caro) — usado al
+   * agregar/quitar destinos combinados. No-op si el tour actual no es walking.
+   * @returns {void}
+   * @example this.refreshWalkingTourGroupInputs();
+   */
+  refreshWalkingTourGroupInputs() {
+    const mainTour = this.findTourById(document.getElementById('tourSelect')?.value);
+    if (!mainTour || !mainTour.isWalkingTour) return;
+    const pc = parseInt(document.getElementById('walkingTourPeopleCount')?.value || 1, 10) || 1;
+    this.generateWalkingTourGroupInputs(mainTour, pc);
+  }
+
   generateWalkingTourGroupInputs(tour, peopleCount) {
     const priceMode = document.querySelector('input[name="walkingPriceMode"]:checked')?.value || 'total';
     const groupPricesContainer = document.getElementById('walkingTourGroupPricesContainer');
@@ -22715,11 +22790,14 @@ class ItineraryBuilder {
       // Render one input per configured tier (Small/Medium/Large) so the user
       // can override each tier's price independently. Tiers are fixed per tour
       // — not dynamic — so no add/remove buttons.
-      const priceCurrency = tour.walkingPriceCurrency || 'MXN';
+      // Multi-destino: cada tier toma el precio más caro entre el principal y los adicionales.
+      // Sin adicionales, es el principal.
+      const effTour = this.getEffectiveWalkingTour(tour) || tour;
+      const priceCurrency = effTour.walkingPriceCurrency || 'MXN';
       const tiers = [
-        { name: 'Small', label: tour.walkingRangeSmall, price: parseFloat(tour.walkingPriceSmall || 0) },
-        { name: 'Medium', label: tour.walkingRangeMedium, price: parseFloat(tour.walkingPriceMedium || 0) },
-        { name: 'Large', label: tour.walkingRangeLarge, price: parseFloat(tour.walkingPriceLarge || 0) },
+        { name: 'Small', label: effTour.walkingRangeSmall, price: parseFloat(effTour.walkingPriceSmall || 0) },
+        { name: 'Medium', label: effTour.walkingRangeMedium, price: parseFloat(effTour.walkingPriceMedium || 0) },
+        { name: 'Large', label: effTour.walkingRangeLarge, price: parseFloat(effTour.walkingPriceLarge || 0) },
       ].filter((t) => t.label);
 
       let html = '<div class="row g-3">';
