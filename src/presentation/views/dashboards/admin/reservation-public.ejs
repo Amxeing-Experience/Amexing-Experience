@@ -401,12 +401,20 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                     <% } %>
                 <% } %>
             <% } else { %>
-                <%# Sin pricesByType: fallback exacto al comportamiento previo (Subtotal / Recargo / ...). %>
+                <%# Sin pricesByType (dato legacy): la fila de método se enmarca por tipo de cliente
+                    igual que el bloque con pricesByType. Agencia ve "Recargo"; un cliente directo
+                    NUNCA (el delta legado solo aparece por redondeo a efectivo, <= 0, que para el
+                    cliente directo es justamente un descuento). %>
                 <% if (sumSubtotal) { %>
                 <div class="rc-pay-row"><span class="l">Subtotal</span><span class="v"><%= fmtMoney(sumSubtotal) %></span></div>
                 <% } %>
                 <% if (sumIva) { %>
-                <div class="rc-pay-row"><span class="l">Recargo <%= paymentLabel ? ('(' + paymentLabel + ')') : '' %></span><span class="v"><%= fmtMoney(sumIva) %></span></div>
+                    <% if (isAgency) { %>
+                    <div class="rc-pay-row"><span class="l">Recargo <%= paymentLabel ? ('(' + paymentLabel + ')') : '' %></span><span class="v"><%= fmtMoney(sumIva) %></span></div>
+                    <% } else if (sumIva < 0) { %>
+                        <% var legacyDiscLabel = (paymentType === 'transferencia') ? 'Descuento pago transferencia' : 'Descuento pago efectivo'; %>
+                    <div class="rc-pay-row"><span class="l"><%= legacyDiscLabel %></span><span class="v rc-adj-discount">-<%= fmtMoney(-sumIva) %></span></div>
+                    <% } %>
                 <% } %>
             <% } %>
             <% if (adjustments.length) { %>

@@ -160,6 +160,54 @@ describe('Public reservation payment breakdown (integration)', () => {
     });
   });
 
+  describe('legacy sin pricesByType — el framing por método NO expone "Recargo" a un cliente final', () => {
+    // Sin pricesByType, PaymentService.computeTotals cae a item.total (ignora el método), así que
+    // base === chargeSum y el único "recargo" != 0 posible es el delta negativo del redondeo a
+    // efectivo MXN (102 -> 100 = -2). La agencia lo ve como "Recargo"; un cliente final NUNCA debe
+    // verlo (para él ese delta es un descuento).
+    const LEGACY = [{ total: 102 }]; // sin pricesByType
+
+    it('end_client (clientPtr null) + efectivo legacy: nunca "Recargo", muestra el descuento cliente-final', async () => {
+      const { folio } = await makeReservation({
+        services: LEGACY, paymentType: 'efectivo', currency: 'MXN', clientPtr: null,
+      });
+
+      const res = await getPublic(folio);
+      expect(res.status).toBe(200);
+      const s = paySection(res.text);
+      // El bug: el bloque legacy imprimía "Recargo" sin mirar isAgency. Un cliente final NUNCA debe verlo.
+      expect(/recargo/i.test(res.text)).toBe(false);
+      // Muestra el mismo framing de descuento cliente-final que los casos con pricesByType.
+      expect(s).toContain('Descuento pago efectivo');
+    });
+
+    it('end_client explícito (role end_client) + efectivo legacy: idéntico framing de descuento, sin "Recargo"', async () => {
+      const endClient = await makeUser({ role: 'end_client' });
+      const { folio } = await makeReservation({
+        services: LEGACY, paymentType: 'efectivo', currency: 'MXN', clientPtr: endClient,
+      });
+
+      const res = await getPublic(folio);
+      expect(res.status).toBe(200);
+      expect(/recargo/i.test(res.text)).toBe(false);
+      expect(paySection(res.text)).toContain('Descuento pago efectivo');
+    });
+
+    it('agencia (department_manager) + efectivo legacy: SIGUE mostrando "Recargo" (no romper ese lado)', async () => {
+      const agency = await makeUser({ role: 'department_manager' });
+      const { folio } = await makeReservation({
+        services: LEGACY, paymentType: 'efectivo', currency: 'MXN', clientPtr: agency,
+      });
+
+      const res = await getPublic(folio);
+      expect(res.status).toBe(200);
+      const s = paySection(res.text);
+      expect(s).toContain('Recargo');
+      // La agencia jamás ve el framing de descuento cliente-final.
+      expect(s).not.toContain('Descuento pago efectivo');
+    });
+  });
+
   describe('summarize() throws — degraded architecture', () => {
     it('framing/discount rows render, paid/balance fall back, y Total a pagar = balance + paidAmount', async () => {
       const { folio } = await makeReservation({
