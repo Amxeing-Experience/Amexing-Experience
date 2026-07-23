@@ -124,15 +124,17 @@ function populateDropdownsForTransportType(transportType, directionType) {
 
   const isDeparture = directionType === 'departure';
 
-  // Regla de AEROPUERTO (por ahora solo este tipo): un traslado de aeropuerto siempre toca un
-  // aeropuerto de un lado y NO del otro. Arrival = origen aeropuerto → destino cualquiera MENOS
-  // aeropuerto; Departure = origen cualquiera MENOS aeropuerto → destino aeropuerto. Punto a Punto
-  // y Local mantienen libertad total (cualquier POI en ambos lados).
+  // Reglas por tipo: AEROPUERTO siempre toca un aeropuerto de un lado y NO del otro (arrival =
+  // origen aeropuerto → destino no-aeropuerto; departure al revés). LOCAL nunca toca un aeropuerto
+  // (ambos lados solo no-aeropuerto). Punto a Punto mantiene libertad total.
   let origins;
   let destinations;
   if (transportType === 'aeropuerto') {
     origins = new Set(isDeparture ? nonAirportNames : airportNames);
     destinations = new Set(isDeparture ? airportNames : nonAirportNames);
+  } else if (transportType === 'local') {
+    origins = new Set(nonAirportNames);
+    destinations = new Set(nonAirportNames);
   } else {
     origins = new Set(allNames);
     destinations = new Set(allNames);
@@ -232,14 +234,16 @@ function populateRoundTripDropdowns(transportType) {
   const nonAirportNames = allPois.filter((p) => !isAirportPoi(p)).map((p) => p.label).filter(Boolean);
   const allNames = allPois.map((p) => p.label).filter(Boolean);
 
-  // Regla de AEROPUERTO (round-trip): Ida = arrival (origen aeropuerto → destino cualquiera menos
-  // aeropuerto); Vuelta = departure (origen cualquiera menos aeropuerto → destino aeropuerto).
-  // Punto a Punto / Local: libertad total. Ver populateDropdownsForTransportType (one-way).
+  // Reglas por tipo (round-trip): AEROPUERTO → Ida=arrival (origen aeropuerto → destino no-aeropuerto),
+  // Vuelta=departure (origen no-aeropuerto → destino aeropuerto). LOCAL → ambos lados no-aeropuerto.
+  // Punto a Punto → libertad total. Ver populateDropdownsForTransportType (one-way).
   const isAirport = transportType === 'aeropuerto';
-  const arrivalOrigins = new Set(isAirport ? airportNames : allNames);
-  const arrivalDestinations = new Set(isAirport ? nonAirportNames : allNames);
-  const departureOrigins = new Set(isAirport ? nonAirportNames : allNames);
-  const departureDestinations = new Set(isAirport ? airportNames : allNames);
+  const isLocal = transportType === 'local';
+  const anySide = isLocal ? nonAirportNames : allNames; // base para los lados no forzados a aeropuerto
+  const arrivalOrigins = new Set(isAirport ? airportNames : anySide);
+  const arrivalDestinations = new Set(isAirport ? nonAirportNames : anySide);
+  const departureOrigins = new Set(isAirport ? nonAirportNames : anySide);
+  const departureDestinations = new Set(isAirport ? airportNames : anySide);
 
   // Ensure slug mapping exists
   if (!window.slugToOriginalMapping) window.slugToOriginalMapping = new Map();
