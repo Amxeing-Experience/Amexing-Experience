@@ -445,8 +445,9 @@ describe('reservation-public payment breakdown (Fase 2)', () => {
   });
 
   describe('Degraded / legacy data', () => {
-    test('no pricesByType on any service => legacy Subtotal/Recargo fallback (no "Precio de lista")', async () => {
+    test('no pricesByType on any service, isAgency (agencia) => legacy Subtotal/Recargo fallback (no "Precio de lista")', async () => {
       const html = await render(quote({
+        isAgency: true,
         serviceItems: {
           paymentType: 'transferencia',
           subtotal: 100,
@@ -461,6 +462,28 @@ describe('reservation-public payment breakdown (Fase 2)', () => {
       }));
       const s = paySection(html);
       expect(s).toContain('Recargo');
+      expect(s).not.toContain('Precio de lista');
+    });
+
+    // Fix A1 (2026-07-23, commit 8bd7a055): el bloque legacy (sin pricesByType) ahora bifurca en
+    // isAgency igual que el bloque con pricesByType — un cliente final (isAgency:false, el default
+    // de este helper) NUNCA debe ver "Recargo", solo el framing de descuento.
+    test('no pricesByType on any service, cliente final (isAgency default false) => framing de descuento, nunca Recargo', async () => {
+      const html = await render(quote({
+        serviceItems: {
+          paymentType: 'transferencia',
+          subtotal: 100,
+          iva: 16,
+          total: 116,
+          hasPricesByType: false,
+          days: [{ date: '2026-07-20', subconcepts: [service({ pricesByType: null, total: 116 })] }],
+        },
+        payment: {
+          paymentStatus: 'pending', paidAmount: 0, balance: 116, tip: 0, total: 116,
+        },
+      }));
+      const s = paySection(html);
+      expect(/recargo/i.test(s)).toBe(false);
       expect(s).not.toContain('Precio de lista');
     });
 
