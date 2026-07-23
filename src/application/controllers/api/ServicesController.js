@@ -3753,6 +3753,7 @@ class ServicesController {
       const destPOIQuery = new Parse.Query('POI');
       destPOIQuery.matches('name', `^${destinationPOIName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       destPOIQuery.equalTo('exists', true);
+      destPOIQuery.include('serviceType'); // para el fallback de ciudad base (saber si es aeropuerto)
       const destinationPOIs = await destPOIQuery.find({ useMasterKey: true });
 
       let originPOIs = [];
@@ -3760,6 +3761,7 @@ class ServicesController {
         const originPOIQuery = new Parse.Query('POI');
         originPOIQuery.matches('name', `^${originPOIName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
         originPOIQuery.equalTo('exists', true);
+        originPOIQuery.include('serviceType');
         originPOIs = await originPOIQuery.find({ useMasterKey: true });
       }
 
@@ -3837,6 +3839,7 @@ class ServicesController {
       // Try exact direction first (origin → destination)
       let ratePrices = filterRatePricesByDirection(originPOIs, destinationPOIs);
       let searchDirection = 'exact';
+      let usedBaseCityFallback = false;
 
       // If no results and both origin and destination specified, try reverse direction
       if (ratePrices.length === 0 && originPOIs.length > 0 && destinationPOIs.length > 0) {
@@ -3846,6 +3849,39 @@ class ServicesController {
 
         if (ratePrices.length > 0) {
           console.log(`Found ${ratePrices.length} routes in reverse direction`);
+        }
+      }
+
+      // Fallback de CIUDAD BASE (solo aeropuerto): si la ruta no tiene tarifa para el POI
+      // específico pero un extremo es un aeropuerto, se cotiza como si el extremo NO-aeropuerto
+      // fuera la ciudad base (el POI marcado isBaseCity). Cubre el caso de orígenes/destinos
+      // "sub-locales" (haciendas, hoteles) que no tienen tarifa propia pero están en la ciudad base.
+      if (ratePrices.length === 0) {
+        const destIsAirport = destinationPOIs.some((poi) => String((poi.get('serviceType') && poi.get('serviceType').get('name')) || '').trim().toLowerCase() === 'aeropuerto');
+        const originIsAirport = originPOIs.some((poi) => String((poi.get('serviceType') && poi.get('serviceType').get('name')) || '').trim().toLowerCase() === 'aeropuerto');
+        // Solo si EXACTAMENTE un extremo es aeropuerto (traslado de aeropuerto real).
+        if (destIsAirport !== originIsAirport) {
+          const baseQuery = new Parse.Query('POI');
+          baseQuery.equalTo('isBaseCity', true);
+          baseQuery.equalTo('exists', true);
+          const baseCity = await baseQuery.first({ useMasterKey: true });
+          if (baseCity) {
+            const baseArr = [baseCity];
+            if (destIsAirport) {
+              // Origen no-aeropuerto → usar la ciudad base como origen.
+              ratePrices = filterRatePricesByDirection(baseArr, destinationPOIs);
+              if (ratePrices.length === 0) ratePrices = filterRatePricesByDirection(destinationPOIs, baseArr);
+            } else {
+              // Destino no-aeropuerto → usar la ciudad base como destino.
+              ratePrices = filterRatePricesByDirection(originPOIs, baseArr);
+              if (ratePrices.length === 0) ratePrices = filterRatePricesByDirection(baseArr, originPOIs);
+            }
+            if (ratePrices.length > 0) {
+              usedBaseCityFallback = true;
+              searchDirection = 'base-city-fallback';
+              console.log(`Base-city fallback (${baseCity.get('name')}): found ${ratePrices.length} routes`);
+            }
+          }
         }
       }
 
@@ -3975,6 +4011,8 @@ class ServicesController {
           vehicles,
           routeDuration,
           routeFound: true,
+          // Fase: precio tomado de la ciudad base (el POI específico no tenía tarifa de aeropuerto).
+          fallbackToBaseCity: usedBaseCityFallback,
         },
       });
     } catch (error) {
