@@ -1112,6 +1112,15 @@ class ItineraryBuilder {
         field.addEventListener('change', update);
       });
 
+    // Precio por persona del tour (editable) → recalcular el desglose al cambiar.
+    ['tourAdultPrice', 'tourChildPrice'].forEach((id) => {
+      const field = document.getElementById(id);
+      if (!field) return;
+      const update = () => this.updateServicePriceBreakdown();
+      field.addEventListener('input', update);
+      field.addEventListener('change', update);
+    });
+
     // Concepto client price and surcharge listeners
     const conceptoClientPriceField = document.getElementById('conceptoClientPrice');
     if (conceptoClientPriceField) {
@@ -4462,6 +4471,11 @@ class ItineraryBuilder {
           data.adultsNoAlcoholQuantity = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
           data.infantsQuantity = parseInt(document.getElementById('tourInfantsQuantity')?.value || 0);
 
+          // Precio por persona del tour (editable). Se persiste para restaurarlo al editar (el
+          // total ya lo incluye vía pricesByType). adultPrice/childPrice ya están en las whitelists.
+          data.adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
+          data.childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
+
           // Additional vehicle fields (hasAdditionalVehicle / additionalVehicleSegment /
           // additionalVehicleId / additionalVehicleTypeName / additionalVehicleSegmentName)
           // are already collected and cleaned by the shared block above.
@@ -5233,6 +5247,19 @@ class ItineraryBuilder {
       this._mainPriceManuallyEdited = true;
       this.handleServiceTypeChange(service.type);
       this._populatingForm = false;
+
+      // Restaurar los precios por persona del tour DESPUÉS del auto-fill del catálogo (deferred),
+      // para que los valores editados por el admin manden. Solo vehicle tour y solo si se guardó un
+      // precio (>0) — en tours viejos sin este dato se deja el auto-fill del catálogo.
+      if (service.type === 'tour' && !service.isWalkingTour) {
+        setTimeout(() => {
+          const ap = document.getElementById('tourAdultPrice');
+          const cp = document.getElementById('tourChildPrice');
+          if (ap && Number(service.adultPrice) > 0) ap.value = service.adultPrice;
+          if (cp && Number(service.childPrice) > 0) cp.value = service.childPrice;
+          this.updateServicePriceBreakdown();
+        }, 150);
+      }
 
       // Debug: Log service object AFTER handleServiceTypeChange for walking tours
       if (service.isWalkingTour) {
@@ -7445,11 +7472,20 @@ class ItineraryBuilder {
     const extrasEfectivoBase = extraVehicleItemsForTour.reduce(
       (sum, item) => sum + ((parseFloat(item.efectivoPrice) || 0) * tourDuration), 0,
     );
+    // Costo POR PERSONA del tour (editable, autollenado del catálogo). Se SUMA al total; NO se
+    // multiplica por duración (decisión de negocio). Infantes gratis (sin precio). Es ortogonal a
+    // los vehículos (principal/adicionales) → no los altera.
+    const tourAdultsQty = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0, 10) || 0;
+    const tourChildrenQty = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0, 10) || 0;
+    const tourAdultUnitPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0) || 0;
+    const tourChildUnitPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0) || 0;
+    const peopleEfectivoBase = (tourAdultsQty * tourAdultUnitPrice) + (tourChildrenQty * tourChildUnitPrice);
     const tourNodes = [
       { key: 'vehicle', efectivo: vehicleEfectivoBase, surcharge: true },
       { key: 'guide', efectivo: guideEfectivoBase, surcharge: true },
       { key: 'additionalVehicle', efectivo: additionalEfectivoBase, surcharge: true },
       { key: 'extraVehicles', efectivo: extrasEfectivoBase, surcharge: true },
+      { key: 'people', efectivo: peopleEfectivoBase, surcharge: true },
     ];
     const tourPricing = window.PricingEngine
       ? window.PricingEngine.composeServiceNodes({ transferRate: this.transferRate, agencyRate: this.agencyRate, nodes: tourNodes })
@@ -7478,6 +7514,7 @@ class ItineraryBuilder {
       const guideCost = tourPricing.nodes.guide[paymentType]; // Guide doesn't get surcharge
       const additionalCost = tourPricing.nodes.additionalVehicle[paymentType];
       const extraVehiclesTotal = tourPricing.nodes.extraVehicles[paymentType];
+      const peopleCost = tourPricing.nodes.people[paymentType]; // costo por persona (no × duración)
 
       // Debug guide cost calculation
       qsDevLog(`👨‍🦯 ${paymentType} - Guide cost calculation:`, {
@@ -7488,7 +7525,7 @@ class ItineraryBuilder {
         guideGetsNoSurcharge: 'Guide cost is NOT multiplied by payment surcharge',
       });
 
-      const total = vehicleCost + guideCost + additionalCost + extraVehiclesTotal;
+      const total = vehicleCost + guideCost + additionalCost + extraVehiclesTotal + peopleCost;
 
       qsDevLog(`🚗 ${paymentType} calculation:`, {
         mainVehicleCost,
@@ -7564,8 +7601,16 @@ class ItineraryBuilder {
         breakdownText += `Vehículo adicional (${item.vehicleType}${segmentSuffix}): $${surcharged.toFixed(2)} × ${tourDuration}h = $${lineCost.toFixed(2)}\n`;
       });
 
+      // Línea de personas (costo por persona; NO se multiplica por duración). Infantes gratis.
+      if (peopleCost > 0) {
+        const pParts = [];
+        if (tourAdultsQty > 0 && tourAdultUnitPrice > 0) pParts.push(`${tourAdultsQty} adulto(s) × $${(tourAdultUnitPrice * multiplier).toFixed(2)}`);
+        if (tourChildrenQty > 0 && tourChildUnitPrice > 0) pParts.push(`${tourChildrenQty} niño(s) × $${(tourChildUnitPrice * multiplier).toFixed(2)}`);
+        breakdownText += `Personas: ${pParts.join(' + ')} = $${peopleCost.toFixed(2)}\n`;
+      }
+
       // Add subtotal and total
-      const subtotal = vehicleCost + guideCost + additionalCost + extraVehiclesTotal;
+      const subtotal = vehicleCost + guideCost + additionalCost + extraVehiclesTotal + peopleCost;
       breakdownText += `Subtotal: $${subtotal.toFixed(2)}\n`;
       breakdownText += `Total: $${total.toFixed(2)}`;
 

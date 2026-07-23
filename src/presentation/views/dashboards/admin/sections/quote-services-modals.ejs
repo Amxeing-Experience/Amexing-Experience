@@ -328,6 +328,28 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                     <input type="number" class="form-control tour-quantity-input" id="tourInfantsQuantity" min="0" max="50" placeholder="0">
                                 </div>
                             </div>
+                            <!-- Precio por persona (editable; se autollena del catálogo del tour). Se SUMA al
+                                 precio de vehículo(s) × horas; NO se multiplica por duración. Infantes gratis. -->
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="tourAdultPrice" class="form-label">Precio Adulto <small class="text-muted">(efectivo · por persona)</small></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control tour-person-price" id="tourAdultPrice" placeholder="0.00" step="0.01" min="0">
+                                        <span class="input-group-text">MXN</span>
+                                    </div>
+                                    <small class="text-muted d-block" id="tourAdultPriceListPrice"></small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="tourChildPrice" class="form-label">Precio Niño <small class="text-muted">(efectivo · por persona)</small></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" class="form-control tour-person-price" id="tourChildPrice" placeholder="0.00" step="0.01" min="0">
+                                        <span class="input-group-text">MXN</span>
+                                    </div>
+                                    <small class="text-muted d-block" id="tourChildPriceListPrice"></small>
+                                </div>
+                            </div>
                             </div>
 
                             <div id="walkingTourPricingSection" class="d-none">
