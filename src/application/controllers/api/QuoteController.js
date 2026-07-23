@@ -2339,6 +2339,42 @@ class QuoteController {
               400
             );
           }
+
+          // FIX (council LOW): el descuento por servicio nunca se validaba server-side. Un discountAmount
+          // negativo infla la base neta de la propina general porcentual en computeGeneralTip
+          // (netBaseEfectivo += Math.max(0, ef - disc): con disc<0 => ef + |disc|), cobrando MÁS propina
+          // en vez de menos. Se rechaza aquí, antes de persistir, con el mismo patrón que los demás campos.
+          if (sub.discountAmount !== null && sub.discountAmount !== undefined) {
+            if (typeof sub.discountAmount !== 'number' || sub.discountAmount < 0) {
+              return this.sendError(
+                res,
+                `Descuento inválido en subconcepto ${j + 1} del día ${day.dayNumber}`,
+                400
+              );
+            }
+          }
+
+          // Descuento porcentual: tope de 100% (un descuento no puede exceder el precio), análogo al tope
+          // de tipValue de FIX 3. El monto fijo ('amount') no lleva tope superior, igual que el tip fijo.
+          if (sub.discountType === 'percent' && sub.discountValue !== null && sub.discountValue !== undefined) {
+            if (typeof sub.discountValue !== 'number' || sub.discountValue < 0 || sub.discountValue > 100) {
+              return this.sendError(
+                res,
+                `El porcentaje de descuento no puede ser mayor a 100% (subconcepto ${j + 1} del día ${day.dayNumber})`,
+                400
+              );
+            }
+          }
+
+          if (sub.discountType === 'amount' && sub.discountValue !== null && sub.discountValue !== undefined) {
+            if (typeof sub.discountValue !== 'number' || sub.discountValue < 0) {
+              return this.sendError(
+                res,
+                `Monto de descuento inválido en subconcepto ${j + 1} del día ${day.dayNumber}`,
+                400
+              );
+            }
+          }
         }
 
         // Validate dayTotal (new field - must equal sum of subconcepts totals)
