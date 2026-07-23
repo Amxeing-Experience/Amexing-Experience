@@ -52,6 +52,13 @@ describe('Propina en service-items: RBAC server-side (integration)', () => {
     return null;
   };
 
+  // Suma agregada de tipAmount de TODOS los subconceptos (mismo criterio que el motor de dinero) — para
+  // afirmar que la propina persistida nunca se duplica.
+  const sumTips = (si) => (((si && si.days) || []).reduce(
+    (s, d) => s + (d.subconcepts || []).reduce((t, sc) => t + (Number(sc.tipAmount) || 0), 0),
+    0
+  ));
+
   const putSI = (quoteId, body, token) => request(app)
     .put(`/api/quotes/${quoteId}/service-items`)
     .set('Authorization', `Bearer ${token}`)
@@ -371,5 +378,87 @@ describe('Propina en service-items: RBAC server-side (integration)', () => {
     const si = await fetchSI(quote.id);
     // Nada se persistió: sigue habiendo un solo 'A' con su propina original de 500 (nunca 0).
     expect(findSub(si, 'A').tipAmount).toBe(500);
+  });
+
+  // Council (bypass RBAC de propina via decoy + restauración): el guard tipFieldsChanged corría sobre los
+  // días DEDUPLICADOS pero ANTES del bloqueo por-servicio. Un no-admin ponía en $0 la propina de un
+  // servicio PROTEGIDO (adminLocked, con propina fijada por un admin) y "la movía" a un servicio NUEVO
+  // (decoy) con el mismo monto: la suma agregada pre-restauración (0 del protegido + 500 del decoy = 500)
+  // cuadraba con lo guardado -> el guard no bloqueaba (200). Pero la restauración revertía el protegido a
+  // su tip real (500) y el decoy, al no estar protegido, sobrevivía con sus 500 -> la propina persistida
+  // quedaba en 1000 (el DOBLE) sin que ningún admin la aprobara. Fix: el guard corre DESPUÉS del bloqueo,
+  // sobre el contenido restaurado -> ve 500 (protegido) + 500 (decoy) = 1000 != 500 -> 403, sin persistir.
+  it('F1-15: Agente pone en $0 la propina de un servicio PROTEGIDO (adminLocked) y la "mueve" a un decoy nuevo (mismo monto) -> 403, propina NO se duplica', async () => {
+    const quote = await makeQuote(storedSI([
+      sub('P', { adminLocked: true, tipType: 'amount', tipValue: 500, tipAmount: 500 }),
+    ]));
+    // Decoy NUEVO sin precio (total 0) pero con propina 500, para aislar el mecanismo de la propina.
+    const decoy = sub('decoy', {
+      pricesByType: { efectivo: 0, transferencia: 0, tarjeta: 0 },
+      total: 0,
+      tipType: 'amount',
+      tipValue: 500,
+      tipAmount: 500,
+    });
+    const res = await putSI(
+      quote.id,
+      putBody([sub('P', { tipType: 'amount', tipValue: 0, tipAmount: 0 }), decoy]),
+      agentToken
+    );
+    expect(res.status).toBe(403);
+    const si = await fetchSI(quote.id);
+    // El servicio protegido conserva su propina original; el decoy nunca se persistió.
+    expect(findSub(si, 'P').tipAmount).toBe(500);
+    expect(findSub(si, 'decoy')).toBeNull();
+    // La suma de propina persistida sigue siendo 500 (original), jamás 1000 (duplicada).
+    expect(sumTips(si)).toBe(500);
+  });
+
+  it('F1-16: mismo ataque decoy pero el servicio protegido lo es por ser reservación (scheduled), no por adminLocked -> 403, sin duplicar', async () => {
+    const quote = await makeQuote(storedSI([
+      sub('P', { tipType: 'amount', tipValue: 500, tipAmount: 500 }),
+    ]), 'scheduled');
+    const decoy = sub('decoy', {
+      pricesByType: { efectivo: 0, transferencia: 0, tarjeta: 0 },
+      total: 0,
+      tipType: 'amount',
+      tipValue: 500,
+      tipAmount: 500,
+    });
+    const res = await putSI(
+      quote.id,
+      putBody([sub('P', { tipType: 'amount', tipValue: 0, tipAmount: 0 }), decoy]),
+      agentToken
+    );
+    expect(res.status).toBe(403);
+    const si = await fetchSI(quote.id);
+    expect(findSub(si, 'P').tipAmount).toBe(500);
+    expect(findSub(si, 'decoy')).toBeNull();
+    expect(sumTips(si)).toBe(500);
+  });
+
+  // Contra-prueba del round-trip legítimo tras mover el guard post-enforcement: reenviar la MISMA propina
+  // agregada reordenando/renombrando ids de servicios NO protegidos debe seguir en 200 (no reintroducir el
+  // falso 403 que ya se corrigió). Los ids del payload (legA/legB) ni siquiera coinciden con el guardado
+  // (rt1): lo único que importa es que la suma agregada de propina no cambie.
+  it('F1-17: Agente reparte la MISMA propina agregada entre ids NO protegidos renombrados/reordenados -> 200; ambas piernas persisten', async () => {
+    const quote = await makeQuote(storedSI([
+      sub('rt1', { tipType: 'amount', tipValue: 200, tipAmount: 200 }),
+    ]));
+    const leg = (id) => sub(id, {
+      pricesByType: { efectivo: 500, transferencia: 580, tarjeta: 605 },
+      total: 500,
+      tipType: 'amount',
+      tipValue: 100,
+      tipAmount: 100,
+    });
+    const res = await putSI(quote.id, putBody([leg('legB'), leg('legA')]), agentToken);
+    expect(res.status).toBe(200); // la suma de propina no cambió (100 + 100 = 200)
+    const si = await fetchSI(quote.id);
+    expect(findSub(si, 'legA').tipAmount).toBe(100);
+    expect(findSub(si, 'legB').tipAmount).toBe(100);
+    expect(findSub(si, 'rt1')).toBeNull(); // el id viejo se renombró; no hay duplicado fantasma
+    expect(sumTips(si)).toBe(200);
+    expect(si.subtotal).toBe(1000); // subtotal recomputado desde el contenido real (500 + 500)
   });
 });

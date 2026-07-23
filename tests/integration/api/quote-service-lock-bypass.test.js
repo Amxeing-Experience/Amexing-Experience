@@ -100,4 +100,76 @@ describe('Bloqueo por-servicio: subtotal/total se recalculan desde el contenido 
     expect(si.subtotal).toBe(1000);
     expect(si.total).toBe(1000);
   });
+
+  // "Cuarto total" (council MEDIUM): el recálculo de subtotal/total desde el contenido real vivía dentro
+  // de `if (storedLockedById.size > 0)`, así que una cotización SIN ningún servicio protegido persistía el
+  // subtotal/total tal cual venían del payload. Un no-admin podía mandar un subtotal/total que NO cuadran
+  // con la suma real de los subconceptos pero que pasa evaluateTotalsConsistency (subtotal dentro de la
+  // tolerancia de $1; `total` que esa validación no limita) -> el header mostraba un número y el motor de
+  // pagos calculaba otro. Fix: el recálculo corre SIEMPRE, con o sin servicios protegidos.
+  it('cotización SIN servicios protegidos: subtotal/total se recalculan desde el contenido real, ignorando los del payload', async () => {
+    const quote = new Parse.Object('Quote');
+    quote.set('exists', true);
+    quote.set('active', true);
+    quote.set('status', 'draft'); // draft + sin adminLocked => NINGÚN servicio protegido
+    quote.set('folio', `QTE-LOCK0-${Date.now()}`);
+    quote.set('numberOfPeople', 2);
+    quote.set('serviceItems', {
+      days: [{
+        dayNumber: 1,
+        dayTitle: 'Día 1',
+        subconcepts: [{
+          id: 'svcX',
+          concept: 'Servicio',
+          type: 'concepto',
+          pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 },
+          total: 1000,
+          includeInTotal: true,
+        }],
+      }],
+      subtotal: 1000,
+      iva: 0,
+      total: 1000,
+      currency: 'MXN',
+      paymentType: 'efectivo',
+    });
+    await quote.save(null, { useMasterKey: true });
+    created.quotes.push(quote.id);
+
+    // Contenido real: un único servicio de $1000 (dayTotal cuadra con él). Pero subtotal (1000.75, dentro
+    // de la tolerancia de $1 de evaluateTotalsConsistency) y total (5000, que esa validación NO limita)
+    // vienen fabricados y no cuadran con la suma real.
+    const res = await request(app)
+      .put(`/api/quotes/${quote.id}/service-items`)
+      .set('Authorization', `Bearer ${agencyToken}`)
+      .send({
+        days: [{
+          dayNumber: 1,
+          dayTitle: 'Día 1',
+          dayTotal: 1000,
+          subconcepts: [{
+            id: 'svcX',
+            concept: 'Servicio',
+            type: 'concepto',
+            pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 },
+            total: 1000,
+            includeInTotal: true,
+          }],
+        }],
+        subtotal: 1000.75,
+        iva: 0,
+        total: 5000,
+        currency: 'MXN',
+        paymentType: 'efectivo',
+      });
+
+    // El payload es autoconsistente contra sus days (dentro de tolerancia) -> no se rechaza.
+    expect(res.status).toBe(200);
+
+    const after = await new Parse.Query('Quote').get(quote.id, { useMasterKey: true });
+    const si = after.get('serviceItems');
+    // subtotal/total recomputados desde el contenido real ($1000), NUNCA el 1000.75 / 5000 fabricados.
+    expect(si.subtotal).toBe(1000);
+    expect(si.total).toBe(1000);
+  });
 });

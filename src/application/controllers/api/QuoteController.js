@@ -2414,11 +2414,12 @@ class QuoteController {
       // Timeline (Fase A): snapshot del serviceItems previo para diffear agregados/editados/quitados.
       const beforeServiceItems = quote.get('serviceItems') || { days: [] };
 
-      // Deduplicación (keep-first) + ordenamiento ADELANTADOS aquí, ANTES del guard RBAC de propina, para
-      // que el guard evalúe EXACTAMENTE los datos que se van a persistir (antes se deduplicaba después del
-      // guard). Sin esto, un no-admin podía mandar en el mismo día DOS subconceptos con el MISMO id (el
-      // primero con tip bajo/cero, el segundo con el tip real): tipFieldsChanged sumaba AMBAS ocurrencias
-      // sobre el payload crudo -> la suma cuadraba con lo guardado -> no bloqueaba (200); pero al persistir,
+      // Deduplicación (keep-first) + ordenamiento ADELANTADOS aquí, ANTES del enforcement por-servicio y del
+      // guard RBAC de propina (ambos más abajo), para que el guard evalúe EXACTAMENTE los datos que se van a
+      // persistir (antes se deduplicaba después del guard). Sin esto, un no-admin podía mandar en el mismo
+      // día DOS subconceptos con el MISMO id (el primero con tip bajo/cero, el segundo con el tip real):
+      // tipFieldsChanged sumaba AMBAS ocurrencias sobre el payload crudo -> la suma cuadraba con lo guardado
+      // -> no bloqueaba (200); pero al persistir,
       // sortAndCleanServiceDays deja solo la PRIMERA ocurrencia (tip bajo/cero), bajando/anulando la propina
       // fijada por un admin sin disparar 403. Al deduplicar antes, ambas ocurrencias colapsan en una sola y
       // el guard ve el tip real que quedaría guardado -> el intento se bloquea con 403.
@@ -2428,29 +2429,6 @@ class QuoteController {
       // rechazaría con 400 quotes legítimos con servicios idénticos sin id (que el dedup colapsa por
       // contenido), un cambio de comportamiento fuera del alcance de este fix de propina.
       const sortedAndCleanedDays = this.sortAndCleanServiceDays(days);
-
-      // FIX 1: RBAC server-side de la propina. El wizard oculta los controles de propina a los no-admin,
-      // pero el server persistía globalTip/suggestedTipPct + tipType/tipValue/tipMandatory/tipAmount por
-      // subconcepto sin validar rol -> un agente/agencia podía FIJAR cualquier propina por API directa.
-      // Solo admin/superadmin puede fijar o cambiar la propina; un no-admin únicamente puede REENVIAR la
-      // misma propina ya guardada (el wizard la reenvía para no perderla). El guard va DENTRO del
-      // controller y condicional a si la propina realmente cambia: en la ruta bloquearía TODA edición de
-      // servicios (horario/precio) de agentes/agencias, que sí está permitida.
-      // Se prioriza req.roleObject (fila fresca de Role en DB, ya cargada por el middleware) sobre
-      // req.userRole (claim del JWT, puede quedar stale hasta 8h tras un cambio de rol — council
-      // L3F1): un admin recién degradado no debe conservar el privilegio de tocar propina solo porque
-      // su token viejo todavía diga 'admin'. Fallback a userRole SOLO si no hay roleObject fresco.
-      const isAdminForTip = req.roleObject
-        ? (typeof req.roleObject.getLevel === 'function' && req.roleObject.getLevel() >= 6)
-        : ['admin', 'superadmin'].includes(req.userRole);
-      // El guard evalúa los días YA deduplicados (sortedAndCleanedDays), no el payload crudo (ver arriba).
-      const incomingTipData = { globalTip, suggestedTipPct, days: sortedAndCleanedDays };
-      if (!isAdminForTip && this.tipFieldsChanged(beforeServiceItems, incomingTipData)) {
-        logger.warn('updateServiceItems: non-admin attempted to set/change tip fields', {
-          quoteId: quote.id, userRole: req.userRole,
-        });
-        return this.sendError(res, 'Solo un administrador puede modificar la propina', 403);
-      }
 
       // Debug: Log transport services with suggested departure time fields
       days.forEach((day, dayIndex) => {
@@ -2530,48 +2508,56 @@ class QuoteController {
         });
       });
 
-      if (storedLockedById.size > 0) {
-        const seenLockedIds = new Set();
-        const enforcedDays = serviceItems.days.map((d) => ({
-          ...d,
-          subconcepts: (d.subconcepts || []).map((sc) => {
-            if (!sc || !sc.id) return sc;
-            const locked = storedLockedById.get(sc.id);
-            if (locked) {
-              seenLockedIds.add(sc.id);
-              // Sticky: para no-admin se restaura el contenido guardado (no puede editar un
-              // servicio protegido); admin conserva sus cambios. Se PRESERVA el adminLocked
-              // original: un servicio de proveedor del owner (adminLocked=false) sigue sin
-              // marcarse como admin-locked; solo queda protegido por la regla de reservación.
-              return isAdminUser
-                ? { ...sc, adminLocked: true }
-                : { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
-            }
-            // Un no-admin no puede marcar como bloqueado un servicio nuevo.
-            if (!isAdminUser && sc.adminLocked) {
-              return { ...sc, adminLocked: false };
-            }
-            return sc;
-          }),
-        }));
+      // El enforcement por-servicio corre SIEMPRE, no solo cuando hay servicios protegidos: cuando
+      // storedLockedById está vacío el .map() es un no-op sobre el CONTENIDO (no hay ids que restaurar) y
+      // enforcedDays queda equivalente en contenido a sortedAndCleanedDays, pero subtotal/total se
+      // recomputan igual desde el contenido real (abajo). Antes esto vivía dentro de un
+      // `if (storedLockedById.size > 0)`, así que una cotización SIN ningún servicio bloqueado persistía
+      // el subtotal/total fabricado del payload -> reintroducía el "cuarto total" (el header muestra un
+      // número y el motor de pagos calcula otro) para roles nivel 4. Correrlo siempre también asegura que
+      // un no-admin nunca deje adminLocked=true en un servicio nuevo aunque no hubiera bloqueados previos.
+      const seenLockedIds = new Set();
+      const enforcedDays = serviceItems.days.map((d) => ({
+        ...d,
+        subconcepts: (d.subconcepts || []).map((sc) => {
+          if (!sc || !sc.id) return sc;
+          const locked = storedLockedById.get(sc.id);
+          if (locked) {
+            seenLockedIds.add(sc.id);
+            // Sticky: para no-admin se restaura el contenido guardado (no puede editar un
+            // servicio protegido); admin conserva sus cambios. Se PRESERVA el adminLocked
+            // original: un servicio de proveedor del owner (adminLocked=false) sigue sin
+            // marcarse como admin-locked; solo queda protegido por la regla de reservación.
+            return isAdminUser
+              ? { ...sc, adminLocked: true }
+              : { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
+          }
+          // Un no-admin no puede marcar como bloqueado un servicio nuevo.
+          if (!isAdminUser && sc.adminLocked) {
+            return { ...sc, adminLocked: false };
+          }
+          return sc;
+        }),
+      }));
 
-        // No-admin: re-insertar los servicios bloqueados que se hayan quitado del payload
-        // (intento de borrado no permitido).
-        if (!isAdminUser) {
-          storedLockedById.forEach((locked, id) => {
-            if (seenLockedIds.has(id)) return;
-            const restored = { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
-            let idx = enforcedDays.findIndex((d) => d.dayNumber === locked.dayNumber);
-            if (idx < 0) idx = enforcedDays.length > 0 ? 0 : -1;
-            if (idx >= 0) {
-              enforcedDays[idx] = {
-                ...enforcedDays[idx],
-                subconcepts: [...(enforcedDays[idx].subconcepts || []), restored],
-              };
-            } else {
-              enforcedDays.push({ dayNumber: locked.dayNumber || 1, dayTitle: '', subconcepts: [restored] });
-            }
-          });
+      // No-admin: re-insertar los servicios bloqueados que se hayan quitado del payload (intento de
+      // borrado no permitido). No-op cuando no hay servicios protegidos.
+      if (!isAdminUser) {
+        storedLockedById.forEach((locked, id) => {
+          if (seenLockedIds.has(id)) return;
+          const restored = { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
+          let idx = enforcedDays.findIndex((d) => d.dayNumber === locked.dayNumber);
+          if (idx < 0) idx = enforcedDays.length > 0 ? 0 : -1;
+          if (idx >= 0) {
+            enforcedDays[idx] = {
+              ...enforcedDays[idx],
+              subconcepts: [...(enforcedDays[idx].subconcepts || []), restored],
+            };
+          } else {
+            enforcedDays.push({ dayNumber: locked.dayNumber || 1, dayTitle: '', subconcepts: [restored] });
+          }
+        });
+        if (storedLockedById.size > 0) {
           logger.info('updateServiceItems: enforced protected services for non-admin', {
             quoteId: quote.id,
             userRole: req.userRole,
@@ -2579,27 +2565,66 @@ class QuoteController {
             reinserted: storedLockedById.size - seenLockedIds.size,
           });
         }
+      }
 
-        serviceItems.days = enforcedDays;
+      serviceItems.days = enforcedDays;
 
-        // Re-deriva subtotal/total desde el contenido YA restaurado (protegido), nunca desde lo que
-        // mandó el front. evaluateTotalsConsistency (arriba) solo valida que el payload sea
-        // AUTOCONSISTENTE contra SUS PROPIOS days -- un payload manipulado por un no-admin puede pasar
-        // esa validación trayendo un subtotal/total fabricados a juego con un precio de servicio
-        // protegido alterado. El bloqueo de arriba ya restauró el contenido real en `enforcedDays`;
-        // sin este recálculo, ese subtotal/total fabricados se persistían igual (council L2F0/L5F1),
-        // reintroduciendo el "tercer total" en el header de las 4 vistas para un rol nivel 4 (agencia/
-        // agente), no solo admin. El motor de pagos real (PaymentService) no depende de este campo.
-        const pricingEngine = require('../../../domain/pricing/pricingEngine');
-        const r2 = pricingEngine.round2;
-        let enforcedSubtotal = 0;
-        enforcedDays.forEach((day) => {
-          (day.subconcepts || []).forEach((sc) => {
-            if (sc && sc.includeInTotal !== false) enforcedSubtotal += (parseFloat(sc.total) || 0);
-          });
+      // Re-deriva subtotal/total desde el contenido FINAL (protegido ya restaurado), nunca desde lo que
+      // mandó el front. evaluateTotalsConsistency (arriba) solo valida que el payload sea AUTOCONSISTENTE
+      // contra SUS PROPIOS days: un no-admin puede pasarla trayendo un subtotal/total fabricados a juego
+      // con un precio de servicio protegido alterado (council L2F0/L5F1) o, aun SIN ningún protegido, con
+      // un subtotal dentro de la tolerancia de $1 y un `total` cualquiera (esa validación no limita
+      // `total`). Sin este recálculo esos números se persistían igual, reintroduciendo el total espurio en
+      // el header de las 4 vistas para roles nivel 4, no solo admin.
+      const pricingEngine = require('../../../domain/pricing/pricingEngine');
+      const r2 = pricingEngine.round2;
+      let enforcedSubtotal = 0;
+      enforcedDays.forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          if (sc && sc.includeInTotal !== false) enforcedSubtotal += (parseFloat(sc.total) || 0);
         });
-        serviceItems.subtotal = r2(enforcedSubtotal);
-        serviceItems.total = r2(serviceItems.subtotal + (r2(parseFloat(serviceItems.iva) || 0)));
+      });
+      serviceItems.subtotal = r2(enforcedSubtotal);
+      // El total del HEADER INCLUYE las propinas (general + por servicio), igual que el motor de pagos
+      // (QuoteService.create/sync fija totalAmount = cleanSubtotal + computeGeneralTip + sumServiceTipsFromDays).
+      // Recomputarlo como subtotal+iva a secas dejaba fuera las propinas y hacía DIVERGIR el header del motor
+      // -- el mismo "tercer total" que este arco elimina. Los subconceptos guardan SOLO precio (una propina
+      // horneada en sc.total se rechaza con 400 arriba), así que sumar las propinas UNA vez sobre el contenido
+      // restaurado no las duplica. Se usan las MISMAS funciones canónicas del motor para no reintroducir la
+      // divergencia; se computan sobre serviceItems ya con los days restaurados y el globalTip del payload.
+      const enforcedGeneralTip = this.quoteService.computeGeneralTip(serviceItems);
+      const enforcedServiceTips = this.quoteService.sumServiceTipsFromDays(serviceItems);
+      serviceItems.total = r2(
+        serviceItems.subtotal + (r2(parseFloat(serviceItems.iva) || 0)) + enforcedGeneralTip + enforcedServiceTips
+      );
+
+      // FIX 1: RBAC server-side de la propina. El wizard oculta los controles de propina a los no-admin,
+      // pero el server persistía globalTip/suggestedTipPct + tipType/tipValue/tipMandatory/tipAmount por
+      // subconcepto sin validar rol -> un agente/agencia podía FIJAR cualquier propina por API directa.
+      // Solo admin/superadmin puede fijar o cambiar la propina; un no-admin únicamente puede REENVIAR la
+      // misma propina ya guardada (el wizard la reenvía para no perderla). El guard va DENTRO del
+      // controller y condicional a si la propina realmente cambia: en la ruta bloquearía TODA edición de
+      // servicios (horario/precio) de agentes/agencias, que sí está permitida.
+      // Se prioriza req.roleObject (fila fresca de Role en DB, ya cargada por el middleware) sobre
+      // req.userRole (claim del JWT, puede quedar stale hasta 8h tras un cambio de rol — council
+      // L3F1): un admin recién degradado no debe conservar el privilegio de tocar propina solo porque
+      // su token viejo todavía diga 'admin'. Fallback a userRole SOLO si no hay roleObject fresco.
+      // El guard corre DESPUÉS del enforcement, sobre serviceItems.days FINAL (contenido ya restaurado),
+      // NO sobre sortedAndCleanedDays: evaluarlo antes de restaurar permitía un bypass -- un no-admin ponía
+      // en $0 la propina de un servicio PROTEGIDO y "la movía" a un servicio NUEVO (decoy) con el mismo
+      // monto; la suma agregada pre-restauración cuadraba con lo guardado (no bloqueaba), pero la
+      // restauración revertía el protegido a su tip real y el decoy sobrevivía, DUPLICANDO la propina
+      // persistida sin 403. Sobre el contenido restaurado la suma refleja lo que realmente quedaría
+      // guardado. El 403 sale ANTES de cualquier quote.set/quote.save: un bloqueo no deja escritura parcial.
+      const isAdminForTip = req.roleObject
+        ? (typeof req.roleObject.getLevel === 'function' && req.roleObject.getLevel() >= 6)
+        : ['admin', 'superadmin'].includes(req.userRole);
+      const incomingTipData = { globalTip, suggestedTipPct, days: serviceItems.days };
+      if (!isAdminForTip && this.tipFieldsChanged(beforeServiceItems, incomingTipData)) {
+        logger.warn('updateServiceItems: non-admin attempted to set/change tip fields', {
+          quoteId: quote.id, userRole: req.userRole,
+        });
+        return this.sendError(res, 'Solo un administrador puede modificar la propina', 403);
       }
 
       quote.set('serviceItems', serviceItems);
