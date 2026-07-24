@@ -384,6 +384,10 @@ ItineraryBuilder.prototype.updateRoundTripFieldVisibility = function () {
       papPickupColVuelta?.classList.add('col-md-6');
     }
 
+    // Punto a Punto: si el destino de la Ida o de la Vuelta es un aeropuerto, ocultar el drop-off
+    // de esa pierna (el destino es el aeropuerto, no hace falta dirección de entrega).
+    this._applyPuntoAPuntoAirportDropoff();
+
     // Update section headers based on transport type
     const idaHeader = document.getElementById('roundTripIdaHeader');
     const vueltaHeader = document.getElementById('roundTripVueltaHeader');

@@ -701,6 +701,12 @@ class ItineraryBuilder {
       }
     });
 
+    // Punto a Punto: al cambiar cualquier destino (one-way o piernas de round-trip), re-evaluar si
+    // se oculta su "Dirección de drop-off" porque el destino sea un aeropuerto.
+    ['transportDestinationSelect', 'roundTripDestinationIdaSelect', 'roundTripDestinationVueltaSelect'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('change', () => this._applyPuntoAPuntoAirportDropoff());
+    });
+
     // Trip Type Toggle
     document.querySelectorAll('input[name="tripType"]').forEach((radio) => {
       radio.addEventListener('change', () => {
@@ -3063,6 +3069,9 @@ class ItineraryBuilder {
       papDropoffCol?.classList.add('col-md-6');
     }
 
+    // Punto a Punto: si el destino es un aeropuerto, ocultar su "Dirección de drop-off".
+    this._applyPuntoAPuntoAirportDropoff();
+
     // Re-populate dropdowns considering direction
     if (transportType) {
       populateDropdownsForTransportType(transportType, directionType);
@@ -4830,6 +4839,10 @@ class ItineraryBuilder {
 
         // Shared transport fields (both one-way and round-trip)
         data.category = document.getElementById('transportCategory')?.value;
+        // Tipo de ruta detectado por el backend (local / punto-a-punto / aeropuerto). Se persiste
+        // para que la reserva y el resumen reflejen que se cobró como local aunque el tipo elegido
+        // haya sido "Punto a Punto" (regla de negocio, Michelle).
+        data.detectedType = this.transportDetectedType || null;
         // Store category/segment name + color for summary / public display
         data.categoryName = data.category ? this.getSegmentNameById(data.category) : '';
         data.categoryColor = data.category ? this.getSegmentColorById(data.category) : '';
@@ -12669,6 +12682,8 @@ class ItineraryBuilder {
             pickupAddressVuelta: subconcept.pickupAddressVuelta || '',
             dropoffAddressVuelta: subconcept.dropoffAddressVuelta || '',
             category: subconcept.category || null,
+            // Tipo de ruta detectado (local / punto-a-punto / aeropuerto) persistido al guardar.
+            detectedType: subconcept.detectedType || null,
             // Segment name/color snapshots so the chip survives edit→re-save sin depender del caché
             categoryName: subconcept.categoryName || '',
             categoryColor: subconcept.categoryColor || '',
@@ -17130,6 +17145,9 @@ class ItineraryBuilder {
     // de la ruta previa). Se repuebla abajo con la routeDuration de ESTA ruta, o queda null si
     // la ruta no tiene duración configurada.
     this.cachedRouteDuration = null;
+    // Reset del aviso "detectado local": cualquier early-return lo deja oculto; el path exitoso
+    // lo re-muestra si aplica.
+    this._setTransportDetectedLocalNotice(false);
     if (!rateId) {
       this.clearVehicleDropdown();
       this.transportPriceData = null;
@@ -17290,6 +17308,14 @@ class ItineraryBuilder {
       // y routeFound:false. Marcamos "precio pendiente" y mostramos el aviso; el admin definirá
       // el precio después. Si la ruta sí tiene precio, se limpia el pendiente.
       this._setTransportRoutePending(result.data.routeFound === false);
+      // Regla local/punto-a-punto (Michelle): si el backend detectó que la ruta es LOCAL (ambos
+      // extremos locales) pero el usuario está en "Punto a Punto", se cobra la tarifa local
+      // automáticamente (el backend ya devolvió esos precios) y se avisa. Guardamos el tipo
+      // detectado para persistirlo en la reserva.
+      this.transportDetectedType = result.data.detectedType || null;
+      this._setTransportDetectedLocalNotice(
+        result.data.detectedType === 'local' && transportType === 'punto-a-punto'
+      );
       // Cache routeDuration separately so it persists even if transportPriceData is cleared
       this.cachedRouteDuration = result.data.routeDuration || null;
       // Autollenar el campo editable "Duración de ruta" con la duración de ESTA ruta (vacío si
@@ -17347,6 +17373,19 @@ class ItineraryBuilder {
 
     const priceGroup = document.getElementById('servicePrice')?.closest('.input-group');
     if (priceGroup) priceGroup.classList.toggle('field-price-pending', isPending);
+  }
+
+  /**
+   * Muestra/oculta el aviso "esta ruta se cobra como Local". Se activa cuando el backend detecta
+   * que la ruta es local (ambos POIs locales) pero el usuario está en "Punto a Punto": el precio
+   * ya llega con tarifa local y solo advertimos al usuario (regla de negocio, Michelle).
+   * @param {boolean} show - true para mostrar el aviso.
+   * @example
+   * this._setTransportDetectedLocalNotice(true);
+   */
+  _setTransportDetectedLocalNotice(show) {
+    const notice = document.getElementById('transportDetectedLocalNotice');
+    if (notice) notice.classList.toggle('d-none', !show);
   }
 
   /**
@@ -20842,6 +20881,7 @@ class ItineraryBuilder {
             includeInTotal: service.includeInTotal !== false,
             // Transport-specific fields
             transportType: service.transportType || null,
+            detectedType: service.detectedType || null,
             tripType: service.tripType || null,
             directionType: service.directionType || null,
             origin: service.origin || null,

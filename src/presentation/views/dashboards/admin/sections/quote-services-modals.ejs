@@ -1100,6 +1100,13 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                     <span class="d-block small" id="transportPricePendingNoticeText">Esta ruta no está en el catálogo de precios. Los vehículos y el precio mostrados ($0) son solo de referencia; el administrador confirmará la tarifa. El servicio se guarda igual.</span>
                                 </div>
                             </div>
+                            <div class="alert alert-info d-flex align-items-start gap-2 py-2 px-3 mb-3 d-none" id="transportDetectedLocalNotice" role="alert">
+                                <i class="ti ti-map-pin mt-1"></i>
+                                <div>
+                                    <strong>Ruta local</strong>
+                                    <span class="d-block small">Ambos puntos son locales: esta ruta se cotiza con <strong>tarifa local</strong> aunque el tipo sea "Punto a Punto".</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
