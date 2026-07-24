@@ -3,9 +3,10 @@
  *
  * End-to-end sobre Parse + mongodb-memory-server: el RBAC no regresiona (agencia/agente siguen sin
  * poder POST/DELETE /adjustments pero sí POST /payments; nivel 3 sigue con 403 en GET /:id; superadmin
- * sigue en el allowlist de /adjustments), el fallback de summarize() fallido expone
- * total = balance + paidAmount, y — tras quitar la propina general — dos pagos parciales del mismo
- * método saldan el balance exacto, un pago de monto 0 se rechaza (400) y el DTO ya no expone `tip`.
+ * sigue en el allowlist de /adjustments), el fallback de summarize() fallido recalcula
+ * total = servicesSubtotal + cargos - descuentos + propina (clampado a 0) en vez de leer los campos
+ * persistidos balance/paidAmount que quedan stale tras un ajuste, y dos pagos parciales del mismo
+ * método saldan el balance exacto, un pago de monto 0 se rechaza (400) y el DTO expone la propina.
  */
 
 const request = require('supertest');
@@ -38,6 +39,10 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
     reservation.set('quotePtr', clientQuote); // acceso agente (quote ownership)
     if (opts.paidAmount !== undefined) reservation.set('paidAmount', opts.paidAmount);
     if (opts.balance !== undefined) reservation.set('balance', opts.balance);
+    if (opts.servicesSubtotal !== undefined) reservation.set('servicesSubtotal', opts.servicesSubtotal);
+    if (opts.totalAmount !== undefined) reservation.set('totalAmount', opts.totalAmount);
+    if (opts.adjustments !== undefined) reservation.set('adjustments', opts.adjustments);
+    if (opts.tip !== undefined) reservation.set('tip', opts.tip);
     await reservation.save(null, { useMasterKey: true });
 
     const serviceIds = await Promise.all(services.map(async (svc, i) => {
@@ -154,16 +159,76 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
   });
 
   describe('fallback — summarize() falla', () => {
-    it('deriva total = balance + paidAmount (no crashea)', async () => {
+    it('recalcula el total desde servicesSubtotal + ajustes, NO desde balance/paidAmount stale', async () => {
+      // Bug de dinero cerrado: balance/paidAmount persistidos quedaron stale (de ANTES del cargo):
+      // 1000 + 0. El cargo de +200 se agregó después → el total real es 1200. El viejo fallback
+      // (balance + paidAmount = 1000) IGNORABA el ajuste; el nuevo lo refleja.
       const { id } = await createReservation([{ total: 1000 }], 'efectivo', {
-        paidAmount: 300, balance: 700,
+        servicesSubtotal: 1000,
+        adjustments: [{ type: 'charge', amount: 200, description: 'Cargo tardío' }],
+        paidAmount: 0,
+        balance: 1000, // stale: no incluye el +200
       });
 
       const spy = jest.spyOn(PaymentService, 'summarize').mockRejectedValueOnce(new Error('boom'));
       try {
         const res = await getReservation(id, adminToken);
         expect(res.status).toBe(200);
-        expect(res.body.data.payment.total).toBe(1000); // 700 + 300 derivado
+        expect(res.body.data.payment.total).toBe(1200); // 1000 + 200 cargo (no 1000 stale)
+        expect(res.body.data.payment.paidAmount).toBe(0);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('el descuento reduce el total del fallback y se clampa a Math.max(0, ...)', async () => {
+      const { id } = await createReservation([{ total: 500 }], 'efectivo', {
+        servicesSubtotal: 500,
+        adjustments: [{ type: 'discount', amount: 999, description: 'Descuento mayor al subtotal' }],
+        paidAmount: 0,
+        balance: 500,
+      });
+
+      const spy = jest.spyOn(PaymentService, 'summarize').mockRejectedValueOnce(new Error('boom'));
+      try {
+        const res = await getReservation(id, adminToken);
+        expect(res.status).toBe(200);
+        expect(res.body.data.payment.total).toBe(0); // 500 - 999 = -499 → clamp 0
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('incluye la propina general (reservation.tip) en el total del fallback', async () => {
+      const { id } = await createReservation([{ total: 800 }], 'efectivo', {
+        servicesSubtotal: 800,
+        tip: 120,
+        paidAmount: 0,
+        balance: 800,
+      });
+
+      const spy = jest.spyOn(PaymentService, 'summarize').mockRejectedValueOnce(new Error('boom'));
+      try {
+        const res = await getReservation(id, adminToken);
+        expect(res.status).toBe(200);
+        expect(res.body.data.payment.total).toBe(920); // 800 + 120 propina general
+        expect(res.body.data.payment.generalTip).toBe(120);
+        expect(res.body.data.payment.tip).toBe(120);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('sin ajustes ni propina no crashea y expone paidAmount (total = servicesSubtotal)', async () => {
+      const { id } = await createReservation([{ total: 1000 }], 'efectivo', {
+        servicesSubtotal: 1000, paidAmount: 300, balance: 700,
+      });
+
+      const spy = jest.spyOn(PaymentService, 'summarize').mockRejectedValueOnce(new Error('boom'));
+      try {
+        const res = await getReservation(id, adminToken);
+        expect(res.status).toBe(200);
+        expect(res.body.data.payment.total).toBe(1000); // servicesSubtotal, no balance+paidAmount
         expect(res.body.data.payment.paidAmount).toBe(300);
       } finally {
         spy.mockRestore();

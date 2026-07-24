@@ -929,6 +929,45 @@ class ReservationController {
         }
       }
 
+      // Fallback financiero para cuando PaymentService.summarize() lanzó (paymentSummary === null).
+      // NO derivamos el total de campos persistidos (balance + paidAmount): esos quedan stale si se
+      // agregó un ajuste (cargo/descuento) o propina después del último recalculate() exitoso, y
+      // devolverían un Total que IGNORA los ajustes del cliente. Lo recalculamos igual que
+      // ReservationController.recalculateTotal (servicesSubtotal + cargos - descuentos + propina),
+      // usando datos ya cargados (reservation + services), sin queries nuevas.
+      let fallbackPayment = null;
+      if (!paymentSummary) {
+        const fbSubtotal = Number(reservation.get('servicesSubtotal'))
+          || Number(reservation.get('totalAmount')) || 0;
+        const fbAdjustments = reservation.get('adjustments') || [];
+        const fbCharges = fbAdjustments
+          .filter((a) => a.type === 'charge')
+          .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+        const fbDiscounts = fbAdjustments
+          .filter((a) => a.type === 'discount')
+          .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+        const fbGeneralTip = Number(reservation.get('tip')) || 0;
+        const fbServiceTips = services.reduce((s, svc) => {
+          const sub = svc.get('subconcept') || {};
+          if (sub.includeInTotal === false) return s;
+          const t = Number(sub.tipAmount);
+          return s + (Number.isFinite(t) && t > 0 ? t : 0);
+        }, 0);
+        const fbTip = Math.round((fbGeneralTip + fbServiceTips + Number.EPSILON) * 100) / 100;
+        const fbTotal = Math.round(
+          Math.max(0, fbSubtotal + fbCharges - fbDiscounts + fbTip) * 100
+        ) / 100;
+        fallbackPayment = {
+          paymentStatus: reservation.get('paymentStatus') || 'pending',
+          paidAmount: reservation.get('paidAmount') || 0,
+          balance: reservation.get('balance'),
+          tip: fbTip,
+          generalTip: fbGeneralTip,
+          serviceTipsTotal: fbServiceTips,
+          total: fbTotal,
+        };
+      }
+
       return res.json({
         success: true,
         data: {
@@ -961,19 +1000,7 @@ class ReservationController {
             generalTip: paymentSummary.generalTip,
             serviceTipsTotal: paymentSummary.serviceTipsTotal,
             total: paymentSummary.total,
-          } : {
-            // Fallback (summarize() lanzó): deriva total = balance + paidAmount para que la UI de
-            // agencia no lo pinte $0 junto a un Pagado real.
-            paymentStatus: reservation.get('paymentStatus') || 'pending',
-            paidAmount: reservation.get('paidAmount') || 0,
-            balance: reservation.get('balance'),
-            tip: 0,
-            generalTip: 0,
-            serviceTipsTotal: 0,
-            total: Math.round(
-              ((Number(reservation.get('balance')) || 0) + (Number(reservation.get('paidAmount')) || 0)) * 100
-            ) / 100,
-          },
+          } : fallbackPayment,
           numberOfPeople: reservation.get('numberOfPeople'),
           eventType: reservation.get('eventType'),
           contactPerson: reservation.get('contactPerson'),
