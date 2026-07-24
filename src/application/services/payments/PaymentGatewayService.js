@@ -97,37 +97,51 @@ class PaymentGatewayService {
     }
   }
 
-  /** Identify the gateway (e.g. "stripe", "mexican"). Adapters must override. */
+  /**
+   * Identify the gateway (e.g. "stripe", "mexican"). Adapters must override.
+   */
   getId() {
     throw PaymentGatewayService.notImplemented(this, 'getId');
   }
 
-  /** Declare the ISO currency codes this gateway supports. Adapters must override. */
+  /**
+   * Declare the ISO currency codes this gateway supports. Adapters must override.
+   */
   getSupportedCurrencies() {
     throw PaymentGatewayService.notImplemented(this, 'getSupportedCurrencies');
   }
 
-  /** Report whether the gateway has valid credentials. Adapters must override. */
+  /**
+   * Report whether the gateway has valid credentials. Adapters must override.
+   */
   isConfigured() {
     throw PaymentGatewayService.notImplemented(this, 'isConfigured');
   }
 
-  /** Create a charge / build a hosted checkout (ChargeRequest -> ChargeResult). */
+  /**
+   * Create a charge / build a hosted checkout (ChargeRequest -> ChargeResult).
+   */
   createCharge() {
     throw PaymentGatewayService.notImplemented(this, 'createCharge');
   }
 
-  /** Look up an existing charge by its provider id (reconciliation / polling). */
+  /**
+   * Look up an existing charge by its provider id (reconciliation / polling).
+   */
   getCharge() {
     throw PaymentGatewayService.notImplemented(this, 'getCharge');
   }
 
-  /** Refund a charge (RefundRequest -> RefundResult). */
+  /**
+   * Refund a charge (RefundRequest -> RefundResult).
+   */
   refund() {
     throw PaymentGatewayService.notImplemented(this, 'refund');
   }
 
-  /** Verify a webhook signature and normalize it to a GatewayEvent. */
+  /**
+   * Verify a webhook signature and normalize it to a GatewayEvent.
+   */
   verifyWebhook() {
     throw PaymentGatewayService.notImplemented(this, 'verifyWebhook');
   }

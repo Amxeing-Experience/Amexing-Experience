@@ -45,37 +45,51 @@ function notConfigured(capability) {
  * @augments PaymentGatewayService
  */
 class StripeAdapter extends PaymentGatewayService {
-  /** @returns {string} The gateway id, exactly "stripe". */
+  /**
+   * @returns {string} The gateway id, exactly "stripe".
+   */
   getId() {
     return GATEWAY_ID;
   }
 
-  /** @returns {string[]} A fresh copy of the supported currency codes. */
+  /**
+   * @returns {string[]} A fresh copy of the supported currency codes.
+   */
   getSupportedCurrencies() {
     return [...SUPPORTED_CURRENCIES];
   }
 
-  /** @returns {boolean} Always false in PR1: no real credentials exist yet. */
+  /**
+   * @returns {boolean} Always false in PR1: no real credentials exist yet.
+   */
   isConfigured() {
     return false;
   }
 
-  /** @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7). */
+  /**
+   * @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7).
+   */
   createCharge() {
     throw notConfigured('createCharge');
   }
 
-  /** @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7). */
+  /**
+   * @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7).
+   */
   getCharge() {
     throw notConfigured('getCharge');
   }
 
-  /** @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7). */
+  /**
+   * @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7).
+   */
   refund() {
     throw notConfigured('refund');
   }
 
-  /** @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7). */
+  /**
+   * @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7).
+   */
   verifyWebhook() {
     throw notConfigured('verifyWebhook');
   }

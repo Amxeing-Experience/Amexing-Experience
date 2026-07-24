@@ -48,37 +48,51 @@ function notConfigured(capability) {
  * @augments PaymentGatewayService
  */
 class OpenpayAdapter extends PaymentGatewayService {
-  /** @returns {string} The gateway id, exactly "mexican" (never "openpay"). */
+  /**
+   * @returns {string} The gateway id, exactly "mexican" (never "openpay").
+   */
   getId() {
     return GATEWAY_ID;
   }
 
-  /** @returns {string[]} A fresh copy of the supported currency codes (MXN only). */
+  /**
+   * @returns {string[]} A fresh copy of the supported currency codes (MXN only).
+   */
   getSupportedCurrencies() {
     return [...SUPPORTED_CURRENCIES];
   }
 
-  /** @returns {boolean} Always false in PR1: Openpay onboarding is not complete. */
+  /**
+   * @returns {boolean} Always false in PR1: Openpay onboarding is not complete.
+   */
   isConfigured() {
     return false;
   }
 
-  /** @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7). */
+  /**
+   * @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7).
+   */
   createCharge() {
     throw notConfigured('createCharge');
   }
 
-  /** @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7). */
+  /**
+   * @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7).
+   */
   getCharge() {
     throw notConfigured('getCharge');
   }
 
-  /** @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7). */
+  /**
+   * @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7).
+   */
   refund() {
     throw notConfigured('refund');
   }
 
-  /** @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7). */
+  /**
+   * @throws {PaymentGatewayError} Always NOT_CONFIGURED (Decision #7).
+   */
   verifyWebhook() {
     throw notConfigured('verifyWebhook');
   }
