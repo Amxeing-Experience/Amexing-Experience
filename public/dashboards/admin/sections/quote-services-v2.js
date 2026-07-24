@@ -21785,6 +21785,9 @@ class ItineraryBuilder {
 
   deleteService(serviceId) {
     this.currentServiceId = serviceId;
+    // Limpiar currentDayId por simetría: evita que un borrado de día previo deje estado colgado
+    // que confunda a confirmDelete.
+    this.currentDayId = null;
     const service = this.services.get(serviceId);
 
     if (!service) return;
@@ -21803,7 +21806,17 @@ class ItineraryBuilder {
     modal.show();
   }
 
-  confirmDelete() {
+  async confirmDelete() {
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    const cancelBtn = document.querySelector('#deleteConfirmModal .btn-light[data-bs-dismiss="modal"]');
+    const closeBtn = document.querySelector('#deleteConfirmModal .btn-close');
+    // Snapshot del estado para poder revertir si el guardado falla. Antes el borrado se aplicaba
+    // solo en la UI y saveToBackend se llamaba SIN await ni catch: si fallaba (red/carrera/token/
+    // validación) el usuario veía "eliminado" pero al recargar el elemento seguía ahí. Ahora se
+    // espera el guardado y, si falla, se restaura el estado local y se avisa.
+    const snapshotDays = this.days.map((d) => ({ ...d, services: [...d.services] }));
+    const snapshotServices = new Map(this.services);
+
     if (this.currentDayId && !this.currentServiceId) {
       // Delete day - Add debugging
       qsDevLog('🗑️ DELETE DAY - Before deletion:', {
@@ -21854,10 +21867,38 @@ class ItineraryBuilder {
       }
     }
 
-    this.saveToBackend();
-    this.renderItinerary();
-    this.closeModal('deleteConfirmModal');
-    this.showAlert('Elemento eliminado exitosamente', 'success');
+    // Loader: bloquea los botones del modal mientras se guarda para evitar dobles clics y para
+    // dar feedback de que la operación está en curso.
+    const originalBtnHtml = confirmBtn ? confirmBtn.innerHTML : '';
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Eliminando...';
+    }
+    if (cancelBtn) cancelBtn.disabled = true;
+    if (closeBtn) closeBtn.disabled = true;
+
+    try {
+      // Esperar el guardado ANTES de dar por hecho el borrado: solo así sabemos si persistió.
+      await this.saveToBackend();
+      this.renderItinerary();
+      this.closeModal('deleteConfirmModal');
+      this.showAlert('Elemento eliminado exitosamente', 'success');
+    } catch (err) {
+      // El backend no cambió: restaurar el estado local para que la UI no muestre un borrado que
+      // no se guardó (antes quedaba "fantasma" hasta recargar).
+      this.days = snapshotDays;
+      this.services = snapshotServices;
+      this.renderItinerary();
+      console.error('Error al eliminar (guardado falló):', err);
+      this.showAlert('No se pudo eliminar. Revisa tu conexión e intenta de nuevo.', 'danger');
+    } finally {
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = originalBtnHtml;
+      }
+      if (cancelBtn) cancelBtn.disabled = false;
+      if (closeBtn) closeBtn.disabled = false;
+    }
   }
 
   showPreview() {
