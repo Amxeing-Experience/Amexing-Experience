@@ -253,6 +253,59 @@ ItineraryBuilder.prototype.handleTransportTypeChange = function () {
     }
 };
 
+/**
+ * Punto a Punto: si el DESTINO de una pierna es un aeropuerto, oculta su "Dirección de drop-off"
+ * (se deja al pasajero EN el aeropuerto, no hace falta dirección) y el pick-up toma todo el ancho.
+ * Aplica a one-way y a cada pierna del round-trip (Ida/Vuelta). Solo drop-off (no pick-up) y solo
+ * para 'punto-a-punto': el tipo Aeropuerto ya maneja sus columnas y Local nunca tiene destino
+ * aeropuerto. Se llama al cambiar tipo/dirección y al cambiar cualquier select de destino.
+ */
+ItineraryBuilder.prototype._applyPuntoAPuntoAirportDropoff = function () {
+  const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
+  if (transportType !== 'punto-a-punto') return;
+
+  const pois = window.allActivePois || [];
+  const isAirportName = (name) => {
+    const target = String(name || '').trim().toLowerCase();
+    if (!target) return false;
+    return pois.some((p) => String(p.label || '').trim().toLowerCase() === target
+      && String((p.serviceType && p.serviceType.name) || '').trim().toLowerCase() === 'aeropuerto');
+  };
+  // Nombre visible (label del POI) del destino seleccionado en un <select>.
+  const destNameOf = (selectId) => {
+    const el = document.getElementById(selectId);
+    if (!el || el.selectedIndex < 0) return '';
+    const text = (el.options[el.selectedIndex]?.textContent || '').trim();
+    return text.startsWith('--') ? '' : text;
+  };
+  // Oculta/restaura la columna de drop-off de una pierna según si su destino es aeropuerto.
+  const applyLeg = (destName, dropoffColId, pickupColId) => {
+    const dropoffCol = document.getElementById(dropoffColId);
+    const pickupCol = document.getElementById(pickupColId);
+    if (!dropoffCol || !pickupCol) return;
+    if (isAirportName(destName)) {
+      dropoffCol.classList.add('d-none');
+      pickupCol.classList.remove('d-none');
+      pickupCol.classList.remove('col-md-6');
+      pickupCol.classList.add('col-md-12');
+    } else {
+      dropoffCol.classList.remove('d-none');
+      dropoffCol.classList.remove('col-md-12');
+      dropoffCol.classList.add('col-md-6');
+      pickupCol.classList.remove('col-md-12');
+      pickupCol.classList.add('col-md-6');
+    }
+  };
+
+  const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+  if (tripType === 'round-trip' || tripType === 'roundtrip') {
+    applyLeg(destNameOf('roundTripDestinationIdaSelect'), 'papDropoffColIda', 'papPickupColIda');
+    applyLeg(destNameOf('roundTripDestinationVueltaSelect'), 'papDropoffColVuelta', 'papPickupColVuelta');
+  } else {
+    applyLeg(destNameOf('transportDestinationSelect'), 'papDropoffCol', 'papPickupCol');
+  }
+};
+
 ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
     const transportTypes = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
     const transportLabel = transportTypes[service.transportType] || 'Transporte';

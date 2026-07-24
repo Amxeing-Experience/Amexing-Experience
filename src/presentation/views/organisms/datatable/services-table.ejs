@@ -223,8 +223,11 @@ table.dataTable thead th:nth-child(2) select {
     --exp-border: #d6d1c4; --exp-olive: #6E7A50; --exp-olive-light: #7C8A5A;
     --exp-muted: #8a8f78; --exp-dark: #2b2b2b;
 }
-.traslados-new-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--exp-olive); background: var(--exp-olive); color: #fff; border-radius: 8px; font-size: 0.82rem; font-weight: 600; padding: 9px 16px; cursor: pointer; transition: all 0.15s; }
-.traslados-new-btn:hover { background: var(--exp-olive-light); border-color: var(--exp-olive-light); color: #fff; }
+/* Fallbacks en el var(): este botón vive en el header de services.ejs, FUERA de .exp-catalog
+   (donde se definen las --exp-olive), así que sin fallback el fondo quedaba transparente y el
+   texto blanco → botón invisible sobre el header. */
+.traslados-new-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--exp-olive, #6E7A50); background: var(--exp-olive, #6E7A50); color: #fff; border-radius: 8px; font-size: 0.82rem; font-weight: 600; padding: 9px 16px; cursor: pointer; transition: all 0.15s; }
+.traslados-new-btn:hover { background: var(--exp-olive-light, #7C8A5A); border-color: var(--exp-olive-light, #7C8A5A); color: #fff; }
 .exp-catalog .segbar { display: flex; justify-content: space-between; align-items: center; gap: 18px 28px; flex-wrap: wrap; margin-bottom: 18px; }
 .exp-catalog .segbar__left { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
 .exp-catalog .segbar__right { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }

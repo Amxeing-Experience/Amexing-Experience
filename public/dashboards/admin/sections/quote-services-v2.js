@@ -635,10 +635,11 @@ class ItineraryBuilder {
     const isLocalTransport = () => document.querySelector('input[name="transportType"]:checked')?.value === 'local';
     // El campo "Dirección (Hotel, Airbnb...)" solo aplica para aeropuerto; local y punto-a-punto
     // usan POIs directamente, así que no se muestra.
-    const usesSpecificLocation = () => {
-      const t = document.querySelector('input[name="transportType"]:checked')?.value;
-      return t !== 'local' && t !== 'punto-a-punto';
-    };
+    // El campo "Dirección (Hotel, Airbnb, Particular…)" (specificLocation) quedó REDUNDANTE: para
+    // aeropuerto (único tipo donde salía) la dirección de la ciudad ya se captura en "Dirección de
+    // pick-up" (departure) o "Dirección de drop-off" (arrival). Se deja de mostrar; el valor
+    // guardado sigue restaurándose/persistiéndose para no perder datos viejos.
+    const usesSpecificLocation = () => false;
 
     // Show specific location when destination is selected (arrival only — destination is city/hotel)
     document.getElementById('transportDestinationSelect')?.addEventListener('change', (e) => {
@@ -698,6 +699,12 @@ class ItineraryBuilder {
           row.classList.add('d-none');
         }
       }
+    });
+
+    // Punto a Punto: al cambiar cualquier destino (one-way o piernas de round-trip), re-evaluar si
+    // se oculta su "Dirección de drop-off" porque el destino sea un aeropuerto.
+    ['transportDestinationSelect', 'roundTripDestinationIdaSelect', 'roundTripDestinationVueltaSelect'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('change', () => this._applyPuntoAPuntoAirportDropoff());
     });
 
     // Trip Type Toggle
@@ -1110,6 +1117,15 @@ class ItineraryBuilder {
         field.addEventListener('input', update);
         field.addEventListener('change', update);
       });
+
+    // Precio por persona del tour (editable) → recalcular el desglose al cambiar.
+    ['tourAdultPrice', 'tourChildPrice'].forEach((id) => {
+      const field = document.getElementById(id);
+      if (!field) return;
+      const update = () => this.updateServicePriceBreakdown();
+      field.addEventListener('input', update);
+      field.addEventListener('change', update);
+    });
 
     // Concepto client price and surcharge listeners
     const conceptoClientPriceField = document.getElementById('conceptoClientPrice');
@@ -3053,6 +3069,9 @@ class ItineraryBuilder {
       papDropoffCol?.classList.add('col-md-6');
     }
 
+    // Punto a Punto: si el destino es un aeropuerto, ocultar su "Dirección de drop-off".
+    this._applyPuntoAPuntoAirportDropoff();
+
     // Re-populate dropdowns considering direction
     if (transportType) {
       populateDropdownsForTransportType(transportType, directionType);
@@ -4461,6 +4480,11 @@ class ItineraryBuilder {
           data.adultsNoAlcoholQuantity = parseInt(document.getElementById('tourAdultsNoAlcoholQuantity')?.value || 0);
           data.infantsQuantity = parseInt(document.getElementById('tourInfantsQuantity')?.value || 0);
 
+          // Precio por persona del tour (editable). Se persiste para restaurarlo al editar (el
+          // total ya lo incluye vía pricesByType). adultPrice/childPrice ya están en las whitelists.
+          data.adultPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0);
+          data.childPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0);
+
           // Additional vehicle fields (hasAdditionalVehicle / additionalVehicleSegment /
           // additionalVehicleId / additionalVehicleTypeName / additionalVehicleSegmentName)
           // are already collected and cleaned by the shared block above.
@@ -4815,6 +4839,10 @@ class ItineraryBuilder {
 
         // Shared transport fields (both one-way and round-trip)
         data.category = document.getElementById('transportCategory')?.value;
+        // Tipo de ruta detectado por el backend (local / punto-a-punto / aeropuerto). Se persiste
+        // para que la reserva y el resumen reflejen que se cobró como local aunque el tipo elegido
+        // haya sido "Punto a Punto" (regla de negocio, Michelle).
+        data.detectedType = this.transportDetectedType || null;
         // Store category/segment name + color for summary / public display
         data.categoryName = data.category ? this.getSegmentNameById(data.category) : '';
         data.categoryColor = data.category ? this.getSegmentColorById(data.category) : '';
@@ -5232,6 +5260,19 @@ class ItineraryBuilder {
       this._mainPriceManuallyEdited = true;
       this.handleServiceTypeChange(service.type);
       this._populatingForm = false;
+
+      // Restaurar los precios por persona del tour DESPUÉS del auto-fill del catálogo (deferred),
+      // para que los valores editados por el admin manden. Solo vehicle tour y solo si se guardó un
+      // precio (>0) — en tours viejos sin este dato se deja el auto-fill del catálogo.
+      if (service.type === 'tour' && !service.isWalkingTour) {
+        setTimeout(() => {
+          const ap = document.getElementById('tourAdultPrice');
+          const cp = document.getElementById('tourChildPrice');
+          if (ap && Number(service.adultPrice) > 0) ap.value = service.adultPrice;
+          if (cp && Number(service.childPrice) > 0) cp.value = service.childPrice;
+          this.updateServicePriceBreakdown();
+        }, 150);
+      }
 
       // Debug: Log service object AFTER handleServiceTypeChange for walking tours
       if (service.isWalkingTour) {
@@ -6004,6 +6045,16 @@ class ItineraryBuilder {
               return;
             }
           }
+          // Tolerancia a datos viejos: el valor guardado no está entre las opciones (p. ej. un
+          // origen/destino que ya no cumple la regla de aeropuerto por dirección). Se agrega la
+          // opción para no perder el valor guardado al editar; el usuario puede cambiarlo.
+          const slug = val.trim().toLowerCase().replace(/\s+/g, '-');
+          const opt = document.createElement('option');
+          opt.value = slug;
+          opt.textContent = val.trim();
+          selectEl.appendChild(opt);
+          selectEl.value = slug;
+          if (window.slugToOriginalMapping) window.slugToOriginalMapping.set(slug, val.trim());
         };
 
         // Helper: split "San Miguel de Allende, Hotel Rosewood" → { baseName, specificLocation }
@@ -6142,8 +6193,8 @@ class ItineraryBuilder {
           if (specificToRestore && service.transportType !== 'punto-a-punto') {
             const specificLocationField = document.getElementById('transportSpecificLocation');
             if (specificLocationField) specificLocationField.value = specificToRestore;
-            const specificLocationRow = document.getElementById('specificLocationRow');
-            if (specificLocationRow) specificLocationRow.classList.remove('d-none');
+            // Campo redundante: ya NO se muestra el row (la dirección va en pick-up/drop-off). El
+            // valor se conserva en el campo oculto para no perderlo al re-guardar datos viejos.
           }
 
           // Restore pickup / drop-off addresses (Punto a Punto + Local)
@@ -7434,11 +7485,20 @@ class ItineraryBuilder {
     const extrasEfectivoBase = extraVehicleItemsForTour.reduce(
       (sum, item) => sum + ((parseFloat(item.efectivoPrice) || 0) * tourDuration), 0,
     );
+    // Costo POR PERSONA del tour (editable, autollenado del catálogo). Se SUMA al total; NO se
+    // multiplica por duración (decisión de negocio). Infantes gratis (sin precio). Es ortogonal a
+    // los vehículos (principal/adicionales) → no los altera.
+    const tourAdultsQty = parseInt(document.getElementById('tourAdultsQuantity')?.value || 0, 10) || 0;
+    const tourChildrenQty = parseInt(document.getElementById('tourChildrenQuantity')?.value || 0, 10) || 0;
+    const tourAdultUnitPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0) || 0;
+    const tourChildUnitPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0) || 0;
+    const peopleEfectivoBase = (tourAdultsQty * tourAdultUnitPrice) + (tourChildrenQty * tourChildUnitPrice);
     const tourNodes = [
       { key: 'vehicle', efectivo: vehicleEfectivoBase, surcharge: true },
       { key: 'guide', efectivo: guideEfectivoBase, surcharge: true },
       { key: 'additionalVehicle', efectivo: additionalEfectivoBase, surcharge: true },
       { key: 'extraVehicles', efectivo: extrasEfectivoBase, surcharge: true },
+      { key: 'people', efectivo: peopleEfectivoBase, surcharge: true },
     ];
     const tourPricing = window.PricingEngine
       ? window.PricingEngine.composeServiceNodes({ transferRate: this.transferRate, agencyRate: this.agencyRate, nodes: tourNodes })
@@ -7467,6 +7527,7 @@ class ItineraryBuilder {
       const guideCost = tourPricing.nodes.guide[paymentType]; // Guide doesn't get surcharge
       const additionalCost = tourPricing.nodes.additionalVehicle[paymentType];
       const extraVehiclesTotal = tourPricing.nodes.extraVehicles[paymentType];
+      const peopleCost = tourPricing.nodes.people[paymentType]; // costo por persona (no × duración)
 
       // Debug guide cost calculation
       qsDevLog(`👨‍🦯 ${paymentType} - Guide cost calculation:`, {
@@ -7477,7 +7538,7 @@ class ItineraryBuilder {
         guideGetsNoSurcharge: 'Guide cost is NOT multiplied by payment surcharge',
       });
 
-      const total = vehicleCost + guideCost + additionalCost + extraVehiclesTotal;
+      const total = vehicleCost + guideCost + additionalCost + extraVehiclesTotal + peopleCost;
 
       qsDevLog(`🚗 ${paymentType} calculation:`, {
         mainVehicleCost,
@@ -7553,8 +7614,16 @@ class ItineraryBuilder {
         breakdownText += `Vehículo adicional (${item.vehicleType}${segmentSuffix}): $${surcharged.toFixed(2)} × ${tourDuration}h = $${lineCost.toFixed(2)}\n`;
       });
 
+      // Línea de personas (costo por persona; NO se multiplica por duración). Infantes gratis.
+      if (peopleCost > 0) {
+        const pParts = [];
+        if (tourAdultsQty > 0 && tourAdultUnitPrice > 0) pParts.push(`${tourAdultsQty} adulto(s) × $${(tourAdultUnitPrice * multiplier).toFixed(2)}`);
+        if (tourChildrenQty > 0 && tourChildUnitPrice > 0) pParts.push(`${tourChildrenQty} niño(s) × $${(tourChildUnitPrice * multiplier).toFixed(2)}`);
+        breakdownText += `Personas: ${pParts.join(' + ')} = $${peopleCost.toFixed(2)}\n`;
+      }
+
       // Add subtotal and total
-      const subtotal = vehicleCost + guideCost + additionalCost + extraVehiclesTotal;
+      const subtotal = vehicleCost + guideCost + additionalCost + extraVehiclesTotal + peopleCost;
       breakdownText += `Subtotal: $${subtotal.toFixed(2)}\n`;
       breakdownText += `Total: $${total.toFixed(2)}`;
 
@@ -11799,7 +11868,8 @@ class ItineraryBuilder {
   serviceIncludesMentionGuide(service) {
     const info = this.getServiceIncludesInfo(service);
     const lower = String(info.includes || '').toLowerCase();
-    return lower.includes('guia') || lower.includes('guía');
+    // Palabra completa "guía/guías": NO cuenta "guiado/guiada" (recorrido guiado ≠ incluye guía).
+    return /\bgu[ií]as?\b/.test(lower);
   }
 
   getServiceIncludesInfo(service) {
@@ -12612,6 +12682,8 @@ class ItineraryBuilder {
             pickupAddressVuelta: subconcept.pickupAddressVuelta || '',
             dropoffAddressVuelta: subconcept.dropoffAddressVuelta || '',
             category: subconcept.category || null,
+            // Tipo de ruta detectado (local / punto-a-punto / aeropuerto) persistido al guardar.
+            detectedType: subconcept.detectedType || null,
             // Segment name/color snapshots so the chip survives edit→re-save sin depender del caché
             categoryName: subconcept.categoryName || '',
             categoryColor: subconcept.categoryColor || '',
@@ -17073,6 +17145,9 @@ class ItineraryBuilder {
     // de la ruta previa). Se repuebla abajo con la routeDuration de ESTA ruta, o queda null si
     // la ruta no tiene duración configurada.
     this.cachedRouteDuration = null;
+    // Reset del aviso "detectado local": cualquier early-return lo deja oculto; el path exitoso
+    // lo re-muestra si aplica.
+    this._setTransportDetectedLocalNotice(false);
     if (!rateId) {
       this.clearVehicleDropdown();
       this.transportPriceData = null;
@@ -17233,6 +17308,14 @@ class ItineraryBuilder {
       // y routeFound:false. Marcamos "precio pendiente" y mostramos el aviso; el admin definirá
       // el precio después. Si la ruta sí tiene precio, se limpia el pendiente.
       this._setTransportRoutePending(result.data.routeFound === false);
+      // Regla local/punto-a-punto (Michelle): si el backend detectó que la ruta es LOCAL (ambos
+      // extremos locales) pero el usuario está en "Punto a Punto", se cobra la tarifa local
+      // automáticamente (el backend ya devolvió esos precios) y se avisa. Guardamos el tipo
+      // detectado para persistirlo en la reserva.
+      this.transportDetectedType = result.data.detectedType || null;
+      this._setTransportDetectedLocalNotice(
+        result.data.detectedType === 'local' && transportType === 'punto-a-punto'
+      );
       // Cache routeDuration separately so it persists even if transportPriceData is cleared
       this.cachedRouteDuration = result.data.routeDuration || null;
       // Autollenar el campo editable "Duración de ruta" con la duración de ESTA ruta (vacío si
@@ -17290,6 +17373,19 @@ class ItineraryBuilder {
 
     const priceGroup = document.getElementById('servicePrice')?.closest('.input-group');
     if (priceGroup) priceGroup.classList.toggle('field-price-pending', isPending);
+  }
+
+  /**
+   * Muestra/oculta el aviso "esta ruta se cobra como Local". Se activa cuando el backend detecta
+   * que la ruta es local (ambos POIs locales) pero el usuario está en "Punto a Punto": el precio
+   * ya llega con tarifa local y solo advertimos al usuario (regla de negocio, Michelle).
+   * @param {boolean} show - true para mostrar el aviso.
+   * @example
+   * this._setTransportDetectedLocalNotice(true);
+   */
+  _setTransportDetectedLocalNotice(show) {
+    const notice = document.getElementById('transportDetectedLocalNotice');
+    if (notice) notice.classList.toggle('d-none', !show);
   }
 
   /**
@@ -20785,6 +20881,7 @@ class ItineraryBuilder {
             includeInTotal: service.includeInTotal !== false,
             // Transport-specific fields
             transportType: service.transportType || null,
+            detectedType: service.detectedType || null,
             tripType: service.tripType || null,
             directionType: service.directionType || null,
             origin: service.origin || null,
