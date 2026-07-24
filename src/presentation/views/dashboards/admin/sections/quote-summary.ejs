@@ -1780,7 +1780,10 @@ const e = __isRes ? 'reservación' : 'cotización';
             alert('No se pudo determinar el folio para exportar.');
             return;
         }
-        const isQuote = /^QTE-/i.test(folio);
+        // El tipo de documento lo define el flag autoritativo del servidor, NO el prefijo del
+        // folio. Una cotización SIN folio cae al fallback quote.id (sin prefijo "QTE-"), y con la
+        // heurística /^QTE-/ se exportaba por error como reservación.
+        const isQuote = !window.__isReservation;
         // Pass the exact quote id (?q=) so the PDF resolves the same record even
         // when folios are duplicated. Reservations are unaffected.
         const qParam = (isQuote && window.__quoteId) ? `?q=${encodeURIComponent(window.__quoteId)}` : '';
