@@ -20,6 +20,7 @@ class ExperienceServicesBuilder {
       experience: {},
       tour: {},
       concepto: {},
+      entradas: {},
       transport: {},
     };
     this.currentServiceType = null;
@@ -136,29 +137,21 @@ class ExperienceServicesBuilder {
     }
   }
 
-  // Habilita/deshabilita los botones de "Agregar servicio" mostrando un estado de carga.
+  // Habilita/deshabilita el selector de "Agregar servicio" (alta progresiva) con estado de carga.
   setAddServiceButtonsEnabled(enabled) {
-    ['addServiceBtn', 'emptyStateAddServiceBtn'].forEach((id) => {
-      const btn = document.getElementById(id);
-      if (!btn) return;
-      btn.disabled = !enabled;
-      if (!enabled) {
-        if (!btn.dataset.idleHtml) btn.dataset.idleHtml = btn.innerHTML;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Cargando servicios…';
-      } else if (btn.dataset.idleHtml) {
-        btn.innerHTML = btn.dataset.idleHtml;
-        delete btn.dataset.idleHtml;
-      }
-    });
+    const sel = document.getElementById('addServiceTypeSelect');
+    if (!sel) return;
+    sel.disabled = !enabled;
+    const first = sel.querySelector('option[value=""]');
+    if (first) first.textContent = enabled ? 'Elegir tipo…' : 'Cargando servicios…';
   }
 
   setAddServiceButtonsError() {
-    ['addServiceBtn', 'emptyStateAddServiceBtn'].forEach((id) => {
-      const btn = document.getElementById(id);
-      if (!btn) return;
-      btn.disabled = true;
-      btn.innerHTML = '<i class="ti ti-alert-triangle me-1"></i>Error al cargar';
-    });
+    const sel = document.getElementById('addServiceTypeSelect');
+    if (!sel) return;
+    sel.disabled = true;
+    const first = sel.querySelector('option[value=""]');
+    if (first) first.textContent = 'Error al cargar servicios';
   }
 
   setupEventListeners() {
@@ -235,8 +228,23 @@ class ExperienceServicesBuilder {
     };
 
     // Add Service buttons
-    document.getElementById('addServiceBtn')?.addEventListener('click', async () => await this.openServiceModal());
-    document.getElementById('emptyStateAddServiceBtn')?.addEventListener('click', async () => await this.openServiceModal());
+    // Botones por tipo: abren el panel inline ya con el tipo seleccionado.
+    // Alta progresiva: al elegir el Tipo se abre el panel inline de ese tipo y el selector vuelve a reposo.
+    document.getElementById('addServiceTypeSelect')?.addEventListener('change', async (e) => {
+      const type = e.target.value;
+      if (!type) return;
+      await this.openServiceModal(null, type);
+      e.target.value = '';
+    });
+    const entradaSelectEl = document.getElementById('entradaSelect');
+    if (entradaSelectEl) {
+      entradaSelectEl.addEventListener('change', () => {
+        const opt = entradaSelectEl.selectedOptions[0];
+        const priceEl = document.getElementById('servicePrice');
+        if (opt && opt.value && priceEl) priceEl.value = Number(opt.dataset.price || 0);
+        this.updateServiceTotal();
+      });
+    }
 
     // Save Service button
     document.getElementById('saveServiceBtn')?.addEventListener('click', () => this.saveService());
@@ -277,6 +285,7 @@ class ExperienceServicesBuilder {
     // Vehicle selection
     document.getElementById('vehicleSelect')?.addEventListener('change', (e) => {
       this.handleVehicleSelection(e.target.value);
+      this.updateVehicleCapacityHint();
     });
 
     // El input de Precio es el BASE; el Total (base × horas/cantidad) se recalcula
@@ -284,7 +293,8 @@ class ExperienceServicesBuilder {
     document.getElementById('hoursQuantity')?.addEventListener('input', () => this.updateServiceTotal());
     document.getElementById('servicePrice')?.addEventListener('input', () => this.updateServiceTotal());
     document.getElementById('serviceQuantity')?.addEventListener('input', () => this.updateServiceTotal());
-    document.getElementById('additionalVehicle')?.addEventListener('change', () => this.updateServiceTotal());
+    document.getElementById('vehicleCount')?.addEventListener('input', () => { this.updateServiceTotal(); this.updateVehicleCapacityHint(); });
+    document.getElementById('experienceMaxPeople')?.addEventListener('input', () => this.updateVehicleCapacityHint());
 
     // Duración editable del header: al cambiarla, recalcular en vivo las guías de los
     // tours a pie cobrados "por toda la experiencia" y repintar tarjetas/total/sugerida.
@@ -529,6 +539,7 @@ class ExperienceServicesBuilder {
         notes: sub.notes || '',
         experienceId: sub.experienceId,
         tourId: sub.tourId,
+        entradaId: sub.entradaId,
         rateId: sub.rateId,
         hotelName: sub.hotelName,
         adultsQuantity: sub.adultsQuantity || 0,
@@ -550,6 +561,9 @@ class ExperienceServicesBuilder {
         destinationName: sub.destinationName || null,
         rateName: sub.rateName || null,
         roundTrip: sub.roundTrip || false,
+        vehicleCount: sub.vehicleCount || (sub.additionalVehicle ? 2 : 1) || 1,
+        // Base real del transporte (para editar sin re-multiplicar el total ya calculado).
+        unitPrice: sub.transportBase != null ? sub.transportBase : undefined,
         transportDurationHours: sub.transportDurationHours ?? null,
         transportDurationMinutes: sub.transportDurationMinutes ?? null,
         isWalkingTour: sub.isWalkingTour || false,
@@ -915,7 +929,7 @@ class ExperienceServicesBuilder {
   // SERVICE MODAL
   // =====================
 
-  async openServiceModal(serviceId = null) {
+  async openServiceModal(serviceId = null, presetType = null) {
     this.currentServiceId = serviceId;
     const modal = document.getElementById('serviceModal');
     if (!modal) return;
@@ -933,6 +947,7 @@ class ExperienceServicesBuilder {
     this.populateRateSelector();
     this.populateExperienceSelect();
     this.populateTourSelect();
+    await this.populateEntradaSelect();
 
     if (serviceId) {
       // Edit mode
@@ -955,11 +970,23 @@ class ExperienceServicesBuilder {
       // Create mode
       if (modalTitle) modalTitle.innerHTML = '<i class="ti ti-plus-circle me-2"></i>Agregar Servicio';
       if (saveBtn) saveBtn.innerHTML = '<i class="ti ti-device-floppy me-1"></i>Guardar Servicio';
-      this.handleServiceTypeChange('experience');
+      // Preselecciona el tipo pedido (botón por tipo) o Experiencia por defecto.
+      const initialType = presetType || 'experience';
+      const typeRadio = document.querySelector(`input[name="serviceType"][value="${initialType}"]`);
+      if (typeRadio) typeRadio.checked = true;
+      this.handleServiceTypeChange(initialType);
     }
 
-    const bsModal = new bootstrap.Modal(modal);
-    bsModal.show();
+    // Cierra el catálogo (drawer izquierdo) al abrir el panel.
+    const catalogEl = document.getElementById('dragSourceOffcanvas');
+    if (catalogEl) bootstrap.Offcanvas.getInstance(catalogEl)?.hide();
+
+    // Panel inline: se muestra dentro de la sección y hace scroll hasta él.
+    // display:block explícito (inline gana sobre la regla CSS .service-panel{display:none}).
+    modal.style.display = 'block';
+    modal.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const firstField = modal.querySelector('input:not([type=hidden]):not([disabled]), select, textarea');
+    if (firstField) setTimeout(function () { try { firstField.focus(); } catch (e) { /* noop */ } }, 200);
   }
 
   resetServiceTypeContent() {
@@ -999,6 +1026,7 @@ class ExperienceServicesBuilder {
       tour: 'tourContent',
       transport: 'transportContent',
       concepto: 'conceptoContent',
+      entradas: 'entradasContent',
     };
 
     const contentEl = document.getElementById(contentMap[type]);
@@ -1049,13 +1077,15 @@ class ExperienceServicesBuilder {
     }
 
     // Cantidad: oculta para transporte y para TOUR (el tour se cobra por horas, no
-    // por cantidad). El check de vehículo adicional va oculto siempre.
+    // por cantidad). "Cantidad de vehículos" se muestra SOLO en transporte (combinación
+    // por capacidad: N vehículos del tipo elegido → costo = base × N).
     const quantityFieldContainer = document.getElementById('quantityFieldContainer');
-    const additionalVehicleContainer = document.getElementById('additionalVehicleContainer');
+    const vehicleCountContainer = document.getElementById('vehicleCountContainer');
     if (quantityFieldContainer) {
       quantityFieldContainer.classList.toggle('d-none', type === 'transport' || type === 'tour');
     }
-    if (additionalVehicleContainer) additionalVehicleContainer.classList.add('d-none');
+    if (vehicleCountContainer) vehicleCountContainer.classList.toggle('d-none', type !== 'transport');
+    this.updateVehicleCapacityHint();
 
     // Guía/Greeter por tipo: Tour -> "Guía + Chofer" (sin greeter);
     // Transporte -> "Guía" + "Greeter".
@@ -2577,8 +2607,11 @@ class ExperienceServicesBuilder {
     const serviceType = document.querySelector('input[name="serviceType"]:checked')?.value;
 
     if (serviceType === 'transport') {
-      this.handleTransportRateSelection(rateId);
+      // await: si no, handleRateSelection resuelve antes de que carguen los
+      // vehículos y el .then() que restaura el vehículo (al editar) corre en vacío.
+      await this.handleTransportRateSelection(rateId);
       this.updateWaitingTimeRateDisplay();
+      this.updateVehicleCapacityHint();
       return;
     }
 
@@ -2820,7 +2853,7 @@ class ExperienceServicesBuilder {
     if (!totalRow || !totalEl) return;
 
     const type = this.currentServiceType;
-    if (type !== 'tour' && type !== 'concepto' && type !== 'transport') {
+    if (type !== 'tour' && type !== 'concepto' && type !== 'entradas' && type !== 'transport') {
       totalRow.classList.add('d-none');
       return;
     }
@@ -2844,13 +2877,13 @@ class ExperienceServicesBuilder {
       const hours = parseFloat(document.getElementById('hoursQuantity')?.value) || 1;
       total = base * hours;
       detail = ` ($${base.toFixed(2)} × ${hours} h)`;
-    } else if (type === 'concepto') {
+    } else if (type === 'concepto' || type === 'entradas') {
       const qty = parseInt(document.getElementById('serviceQuantity')?.value, 10) || 1;
       total = base * qty;
       if (qty > 1) detail = ` ($${base.toFixed(2)} × ${qty})`;
     } else if (type === 'transport') {
       const round = document.getElementById('transportRoundTrip')?.checked || false;
-      const qty = document.getElementById('additionalVehicle')?.checked ? 2 : 1;
+      const qty = Math.max(1, parseInt(document.getElementById('vehicleCount')?.value, 10) || 1);
       const roundMult = round ? 2 : 1;
       total = base * qty * roundMult;
       const parts = [];
@@ -2899,6 +2932,45 @@ class ExperienceServicesBuilder {
     if (greeterInVehicle) {
       greeterInVehicle.checked = checked;
     }
+  }
+
+  // Capacidad (pax) de un tipo de vehículo. Busca en vehiclesCache, en los datos de
+  // ruta (transportPriceData.vehicles) y en vehicleTypesMap, porque según el flujo el
+  // vehículo puede venir de distintas fuentes.
+  getVehicleCapacity(vehicleId) {
+    if (!vehicleId) return 0;
+    const v = (this.vehiclesCache || []).find((x) => x.id === vehicleId);
+    if (v) return Number(v.defaultCapacity ?? v.capacity ?? 0) || 0;
+    const rv = this.transportPriceData?.vehicles?.find((x) => x.vehicleTypeId === vehicleId);
+    if (rv && rv.capacity != null) return Number(rv.capacity) || 0;
+    const vt = this.vehicleTypesMap?.get(vehicleId);
+    if (vt) return Number(vt.defaultCapacity ?? vt.capacity ?? 0) || 0;
+    return 0;
+  }
+
+  // Muestra la capacidad combinada (capacidad del vehículo × cantidad) vs el Máx de pax
+  // de la experiencia, y sugiere cuántos vehículos hacen falta si no alcanza.
+  updateVehicleCapacityHint() {
+    const hintEl = document.getElementById('vehicleCapacityHint');
+    if (!hintEl) return;
+    const vehicleId = document.getElementById('vehicleSelect')?.value;
+    const count = Math.max(1, parseInt(document.getElementById('vehicleCount')?.value, 10) || 1);
+    const maxPax = parseInt(document.getElementById('experienceMaxPeople')?.value, 10) || 0;
+    if (!vehicleId) { hintEl.textContent = ''; hintEl.style.color = ''; return; }
+    const cap = this.getVehicleCapacity(vehicleId);
+    if (!cap) { hintEl.textContent = ''; hintEl.style.color = ''; return; }
+    const totalCap = cap * count;
+    let msg = `Capacidad: ${cap}${count > 1 ? ` × ${count} = ${totalCap}` : ''} pax`;
+    if (maxPax > 0 && totalCap >= maxPax) {
+      msg += ` · cubre ${maxPax} pax ✓`;
+      hintEl.style.color = '#4b7a3f';
+    } else if (maxPax > 0) {
+      msg += ` · no cubre ${maxPax} pax (sugerido: ${Math.ceil(maxPax / cap)}) ✗`;
+      hintEl.style.color = '#c0563f';
+    } else {
+      hintEl.style.color = '';
+    }
+    hintEl.textContent = msg;
   }
 
   getWaitingTimePrice() {
@@ -3230,6 +3302,9 @@ class ExperienceServicesBuilder {
       case 'concepto':
         this.populateConceptoFields(service);
         break;
+      case 'entradas':
+        this.populateEntradasFields(service);
+        break;
     }
   }
 
@@ -3390,36 +3465,34 @@ class ExperienceServicesBuilder {
       }
     }
 
-    // 4. Restore origin/destination after dropdowns are populated
-    setTimeout(() => {
+    // 4-7. Restaurar origen/destino + segmento + vehículo. El combo de destino se
+    // restaura con setTimeout(50ms) y aún no está listo cuando cargamos vehículos por
+    // ruta, así que pasamos origen/destino como fallback DIRECTO a la carga (evita el
+    // dropdown de vehículo vacío al editar).
+    setTimeout(async () => {
       if (service.originName || service.destinationName) {
         this.restoreOneWayValues(service.originName || '', service.destinationName || '', service.transportType);
       }
 
-      // 5. Set rate (segment) and trigger vehicle lookup
       if (service.rateId) {
         const rateSelect = document.getElementById('transportCategory');
-        if (rateSelect) {
-          rateSelect.value = service.rateId;
-          // Trigger rate selection to load vehicles, then set vehicle + price
-          this._populatingTransportForm = true;
-          this.handleRateSelection(service.rateId).then(() => {
-            // 6. Set vehicle after vehicles are loaded
-            if (service.vehicleId) {
-              const vehicleSelect = document.getElementById('vehicleSelect');
-              if (vehicleSelect) vehicleSelect.value = service.vehicleId;
-            }
-            // 7. Restaurar el precio BASE (unitPrice); el Total se recompone aparte.
-            const addVehEl = document.getElementById('additionalVehicle');
-            if (addVehEl) addVehEl.checked = service.additionalVehicle || false;
-            const priceEl = document.getElementById('servicePrice');
-            if (priceEl) priceEl.value = service.unitPrice != null ? service.unitPrice : (service.price || 0);
-
-            this.updateWaitingTimeRateDisplay();
-            this.updateServiceTotal();
-            this._populatingTransportForm = false;
-          });
+        if (rateSelect) rateSelect.value = service.rateId;
+        this._populatingTransportForm = true;
+        // Carga vehículos por ruta con origen/destino explícitos (no depende del combo).
+        await this.handleTransportRateSelection(service.rateId, service.originName || '', service.destinationName || '');
+        // 6. Vehículo + cantidad + precio BASE (el Total se recompone aparte).
+        if (service.vehicleId) {
+          const vehicleSelect = document.getElementById('vehicleSelect');
+          if (vehicleSelect) vehicleSelect.value = service.vehicleId;
         }
+        const vcEl = document.getElementById('vehicleCount');
+        if (vcEl) vcEl.value = service.vehicleCount || (service.additionalVehicle ? 2 : 1);
+        const priceEl = document.getElementById('servicePrice');
+        if (priceEl) priceEl.value = service.unitPrice != null ? service.unitPrice : (service.price || 0);
+        this.updateWaitingTimeRateDisplay();
+        this.updateVehicleCapacityHint();
+        this.updateServiceTotal();
+        this._populatingTransportForm = false;
       } else {
         const priceEl = document.getElementById('servicePrice');
         if (priceEl) priceEl.value = service.price || 0;
@@ -3429,9 +3502,9 @@ class ExperienceServicesBuilder {
       this.checkRoundTripSpecificLocationFields();
     }, 100);
 
-    // 8. Additional vehicle checkbox
-    const additionalVehicle = document.getElementById('additionalVehicle');
-    if (additionalVehicle) additionalVehicle.checked = (service.quantity || 1) > 1;
+    // 8. Cantidad de vehículos (compat: additionalVehicle guardado antes → 2)
+    const vehicleCountEl = document.getElementById('vehicleCount');
+    if (vehicleCountEl) vehicleCountEl.value = service.vehicleCount || (service.additionalVehicle ? 2 : 1);
     const quantityEl = document.getElementById('serviceQuantity');
     if (quantityEl) quantityEl.value = service.quantity || 1;
 
@@ -3477,6 +3550,85 @@ class ExperienceServicesBuilder {
     this.updateServiceTotal();
   }
 
+  // --- Entradas (tipo de servicio): selector de boletos con precio auto ---
+  async fetchAllEntradas() {
+    if (this.entradasCache) return this.entradasCache;
+    try {
+      const token = (typeof getAccessToken === 'function') ? getAccessToken() : (window.experienceAccessToken || null);
+      const res = await fetch('/api/destinos/all-entradas', { credentials: 'same-origin', headers: token ? { Authorization: 'Bearer ' + token } : {} });
+      if (!res.ok) { this.entradasCache = []; return this.entradasCache; }
+      const json = await res.json();
+      this.entradasCache = (json && json.data) || [];
+    } catch (e) {
+      console.warn('No se pudieron cargar las entradas:', e);
+      this.entradasCache = [];
+    }
+    return this.entradasCache;
+  }
+
+  async populateEntradaSelect() {
+    const select = document.getElementById('entradaSelect');
+    if (!select) return;
+    const all = await this.fetchAllEntradas();
+    const current = select.value;
+    select.innerHTML = '<option value="">-- Selecciona un boleto --</option>';
+    const groups = {};
+    all.forEach((e) => {
+      const g = e.destinoName || 'Sin destino';
+      (groups[g] = groups[g] || []).push(e);
+    });
+    Object.keys(groups).sort().forEach((g) => {
+      const og = document.createElement('optgroup');
+      og.label = g;
+      groups[g].forEach((e) => {
+        const o = document.createElement('option');
+        o.value = e.id;
+        o.textContent = `${e.name} \u00b7 $${Number(e.price || 0).toLocaleString('es-MX')}`;
+        o.dataset.name = e.name || '';
+        o.dataset.price = Number(e.price || 0);
+        og.appendChild(o);
+      });
+      select.appendChild(og);
+    });
+    if (current) select.value = current;
+  }
+
+  buildEntradasService() {
+    const sel = document.getElementById('entradaSelect');
+    const entradaId = sel?.value || '';
+    if (!entradaId) {
+      this.showModalAlert('Selecciona un boleto');
+      return null;
+    }
+    const opt = sel.selectedOptions[0];
+    const concept = (opt && opt.dataset.name) || (opt && opt.textContent) || 'Entrada';
+    const price = parseFloat(document.getElementById('servicePrice')?.value) || 0;
+    const quantity = parseInt(document.getElementById('serviceQuantity')?.value) || 1;
+    return { entradaId, concept, price, quantity };
+  }
+
+  populateEntradasFields(service) {
+    const sel = document.getElementById('entradaSelect');
+    if (sel) {
+      if (service.entradaId && !Array.from(sel.options).some((o) => o.value === service.entradaId)) {
+        const o = document.createElement('option');
+        o.value = service.entradaId;
+        o.textContent = service.concept || service.entradaId;
+        o.dataset.name = service.concept || '';
+        o.dataset.price = service.price || 0;
+        sel.appendChild(o);
+      }
+      sel.value = service.entradaId || '';
+    }
+    const priceEl = document.getElementById('servicePrice');
+    const quantityEl = document.getElementById('serviceQuantity');
+    if (priceEl) priceEl.value = service.price || 0;
+    if (quantityEl) quantityEl.value = service.quantity || 1;
+    const notesEl = document.getElementById('serviceNotes');
+    if (notesEl) notesEl.value = service.notes || '';
+    this.updateServiceTotal();
+  }
+
   // =====================
   // SERVICE CRUD
   // =====================
@@ -3497,6 +3649,9 @@ class ExperienceServicesBuilder {
         break;
       case 'concepto':
         service = this.buildConceptoService();
+        break;
+      case 'entradas':
+        service = this.buildEntradasService();
         break;
     }
 
@@ -3530,9 +3685,9 @@ class ExperienceServicesBuilder {
       this.services.set(service.id, service);
     }
 
-    // Close modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('serviceModal'));
-    if (modal) modal.hide();
+    // Cierra el panel inline
+    const modalEl = document.getElementById('serviceModal');
+    if (modalEl) modalEl.style.display = 'none';
 
     this.sortAndDetectOverlaps();
     this.renderServices();
@@ -3714,8 +3869,8 @@ class ExperienceServicesBuilder {
     // Precio = base por ruta × vehículos + guía (fórmula) + greeter. quantity = 1
     // porque el total ya viene completo (el detalle por vehículo queda en unitPrice).
     const base = parseFloat(document.getElementById('servicePrice')?.value) || 0;
-    const additionalVehicle = document.getElementById('additionalVehicle')?.checked || false;
-    const vehicleQty = additionalVehicle ? 2 : 1;
+    // Combinación por capacidad: N vehículos del tipo elegido (costo = base × N).
+    const vehicleQty = Math.max(1, parseInt(document.getElementById('vehicleCount')?.value, 10) || 1);
     const { guide: guideCost, greeter: greeterCost } = this.getGuideGreeterCost();
     // Viaje redondo multiplica ×2 TODO el traslado: base (por vehículo) + guía + greeter.
     const roundTrip = document.getElementById('transportRoundTrip')?.checked || false;
@@ -3761,7 +3916,7 @@ class ExperienceServicesBuilder {
       price,
       unitPrice: base,
       quantity,
-      additionalVehicle,
+      vehicleCount: vehicleQty,
       guideCost,
       greeterCost,
       rateId,
@@ -3919,6 +4074,7 @@ class ExperienceServicesBuilder {
       tour: 'Tour',
       transport: 'Transporte',
       concepto: 'Concepto',
+      entradas: 'Entradas',
     };
 
     const servicePrice = this.calculateServicePrice(service);
@@ -4607,6 +4763,7 @@ class ExperienceServicesBuilder {
         total: servicePrice * (service.quantity || 1),
         experienceId: service.experienceId || null,
         tourId: service.tourId || null,
+        entradaId: service.entradaId || null,
         rateId: service.rateId || null,
         hotelName: service.hotelName || null,
         adultsQuantity: service.adultsQuantity || null,
@@ -4628,6 +4785,8 @@ class ExperienceServicesBuilder {
         destinationName: service.destinationName || null,
         rateName: service.rateName || null,
         roundTrip: service.roundTrip || false,
+        vehicleCount: service.vehicleCount || 1,
+        transportBase: service.type === 'transport' ? (service.unitPrice || 0) : null,
         transportDurationHours: service.transportDurationHours ?? null,
         transportDurationMinutes: service.transportDurationMinutes ?? null,
         isWalkingTour: service.isWalkingTour || false,
@@ -4727,6 +4886,7 @@ class ExperienceServicesBuilder {
         total: (service.calculatedPrice || 0) * (service.quantity || 1),
         experienceId: service.experienceId || null,
         tourId: service.tourId || null,
+        entradaId: service.entradaId || null,
         rateId: service.rateId || null,
         hotelName: service.hotelName || null,
         adultsQuantity: service.adultsQuantity || null,
@@ -4748,6 +4908,8 @@ class ExperienceServicesBuilder {
         destinationName: service.destinationName || null,
         rateName: service.rateName || null,
         roundTrip: service.roundTrip || false,
+        vehicleCount: service.vehicleCount || 1,
+        transportBase: service.type === 'transport' ? (service.unitPrice || 0) : null,
         transportDurationHours: service.transportDurationHours ?? null,
         transportDurationMinutes: service.transportDurationMinutes ?? null,
         isWalkingTour: service.isWalkingTour || false,

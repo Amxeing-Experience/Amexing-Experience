@@ -6,23 +6,82 @@
  */
 %>
 
-<div class="experience-services-builder p-4" data-experience-id="<%= experienceId %>">
-    <!-- Header -->
-    <div class="services-header mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <p class="text-muted mb-0">Agrega los servicios incluidos en esta experiencia</p>
-            <button type="button" class="btn btn-primary" id="addServiceBtn" disabled>
-                <i class="ti ti-plus me-1"></i>Agregar Servicio
+<div class="experience-services-builder services-panel mb-4" data-experience-id="<%= experienceId %>">
+    <!-- Header del panel: mismo estilo que las tarjetas de configuración -->
+    <div class="services-header d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom pb-2 mb-3">
+        <h6 class="fw-bold text-primary mb-0">
+            <i class="ti ti-list-check me-1"></i>Servicios
+        </h6>
+        <div class="d-flex gap-2 flex-wrap">
+            <!-- Abre el catálogo (experiencias/tours/traslados) como drawer lateral -->
+            <button type="button" class="btn btn-outline-primary" id="openCatalogBtn" data-bs-toggle="offcanvas" data-bs-target="#dragSourceOffcanvas" aria-controls="dragSourceOffcanvas">
+                <i class="ti ti-list-search me-1"></i>Catálogo
             </button>
         </div>
     </div>
 
-    <!-- Two-Column Layout: Drag Panel + Services -->
-    <div class="row g-4">
-        <!-- Left: Drag Source Panel -->
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm sticky-top" style="top: 20px;" id="dragSourcePanel">
-                <div class="card-body p-0">
+    <!-- Barra GENERAL: guía/chofer que aplican a TODA la experiencia.
+         Costo fijo = tarifa/h × duración de la experiencia (del encabezado). -->
+    <div class="general-bar d-flex align-items-center flex-wrap gap-2 mb-3">
+        <span class="general-bar__label">General</span>
+        <!-- Guía + su tarifa/h -->
+        <div class="d-flex align-items-center gap-1">
+            <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" id="generalGuideToggle" role="switch">
+                <label class="form-check-label small" for="generalGuideToggle"><i class="ti ti-headphones me-1"></i>Guía</label>
+            </div>
+            <div class="input-group input-group-sm" style="width:auto;">
+                <span class="input-group-text">$</span>
+                <input type="number" class="form-control" id="generalGuideRate" min="0" step="0.01" placeholder="0.00" style="max-width:88px;" title="Tarifa por hora de la guía">
+                <span class="input-group-text">/h</span>
+            </div>
+        </div>
+        <!-- Chofer + su tarifa/h (puede ser distinta a la de la guía) -->
+        <div class="d-flex align-items-center gap-1">
+            <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" id="generalChoferToggle" role="switch">
+                <label class="form-check-label small" for="generalChoferToggle"><i class="ti ti-steering-wheel me-1"></i>Chofer</label>
+            </div>
+            <div class="input-group input-group-sm" style="width:auto;">
+                <span class="input-group-text">$</span>
+                <input type="number" class="form-control" id="generalChoferRate" min="0" step="0.01" placeholder="0.00" style="max-width:88px;" title="Tarifa por hora del chofer">
+                <span class="input-group-text">/h</span>
+            </div>
+        </div>
+        <!-- Duración de la experiencia (movida desde el encabezado): junto a la tarifa. -->
+        <div class="general-bar__dur d-flex align-items-center gap-2">
+            <span class="input-group-text bg-transparent border-0 px-1">Duración</span>
+            <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceDuration', hiddenName: 'duration', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
+        </div>
+        <span class="form-text m-0" id="expSuggestedDuration"></span>
+    </div>
+
+    <!-- Capacidad (FUENTE ÚNICA): rango de personas de la experiencia.
+         Movida desde "Capacidad y tarifas"; alimentará el desglose por persona. -->
+    <div class="capacity-bar d-flex align-items-center flex-wrap gap-2 mb-3">
+        <span class="general-bar__label">Capacidad</span>
+        <div class="input-group input-group-sm" style="width:auto;">
+            <span class="input-group-text">Mín</span>
+            <input type="number" class="form-control" id="experienceMinPeople" name="min_people" min="1" step="1" placeholder="1" style="max-width:78px;">
+        </div>
+        <span class="text-muted">–</span>
+        <div class="input-group input-group-sm" style="width:auto;">
+            <span class="input-group-text">Máx</span>
+            <input type="number" class="form-control" id="experienceMaxPeople" name="max_people" min="1" step="1" placeholder="10" style="max-width:78px;">
+            <span class="input-group-text">pax</span>
+        </div>
+        <span class="text-muted small">Define el rango de personas; alimentará el desglose por persona.</span>
+    </div>
+
+    <!-- Catálogo como drawer lateral (offcanvas). Sin backdrop + con scroll para poder
+         arrastrar del catálogo a la lista de servicios manteniendo la página interactiva
+         (mismo patrón que el catálogo de cotización). -->
+    <div class="offcanvas offcanvas-start" data-bs-backdrop="false" data-bs-scroll="true" tabindex="-1" id="dragSourceOffcanvas" aria-labelledby="dragSourceOffcanvasLabel">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title" id="dragSourceOffcanvasLabel"><i class="ti ti-list-search me-1"></i>Catálogo de servicios</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+        </div>
+        <div class="offcanvas-body p-0" id="dragSourcePanel">
                     <ul class="nav nav-tabs px-3 pt-2" id="dragSourceTabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="tab-experiences" data-bs-toggle="tab" data-bs-target="#pane-experiences" type="button" role="tab">
@@ -78,34 +137,45 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right: Services Drop Zone & List -->
-        <div class="col-md-8">
-            <div id="servicesDropZone" class="services-drop-zone">
-                <!-- Empty State -->
-                <div id="emptyStateContainer">
-                    <div class="text-center py-5 border border-2 border-dashed rounded">
-                        <div class="empty-state-icon mb-3">
-                            <i class="ti ti-drag-drop" style="font-size: 4rem; color: #dee2e6;"></i>
-                        </div>
-                        <h5 class="text-muted mb-2">Sin servicios aun</h5>
-                        <p class="text-muted mb-4">Arrastra experiencias, tours o traslados aqui, o usa el boton para agregar</p>
-                        <button type="button" class="btn btn-primary" id="emptyStateAddServiceBtn">
-                            <i class="ti ti-plus me-1"></i>Agregar Primer Servicio
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Services List -->
-                <div id="servicesContainer" class="services-list d-none">
-                    <!-- Services will be dynamically loaded here -->
-                </div>
-            </div>
         </div>
     </div>
+
+    <!-- Lista de servicios a ancho completo (el catálogo ahora vive en el drawer) -->
+    <div id="servicesDropZone" class="services-drop-zone">
+        <!-- Empty State -->
+        <div id="emptyStateContainer">
+            <div class="text-center py-5 border border-2 border-dashed rounded">
+                <div class="empty-state-icon mb-3">
+                    <i class="ti ti-drag-drop" style="font-size: 4rem; color: #dee2e6;"></i>
+                </div>
+                <h5 class="text-muted mb-2">Sin servicios aun</h5>
+                <p class="text-muted mb-0">Abre el <strong>Catálogo</strong> y arrastra experiencias, tours o traslados aqui, o usa <strong>Agregar servicio</strong> abajo</p>
+            </div>
+        </div>
+
+        <!-- Services List -->
+        <div id="servicesContainer" class="services-list d-none">
+            <!-- Services will be dynamically loaded here -->
+        </div>
+    </div>
+
+    <!-- Alta PROGRESIVA (siempre visible al final): eliges el Tipo y se abre el panel de ese tipo abajo. -->
+    <div class="add-service-row d-flex align-items-center flex-wrap gap-2 mt-3">
+        <span class="add-service-row__label"><i class="ti ti-plus me-1"></i>Agregar servicio</span>
+        <select class="form-select form-select-sm" id="addServiceTypeSelect" style="max-width: 220px;" disabled>
+            <option value="">Cargando servicios…</option>
+            <option value="experience">🏖 Experiencia</option>
+            <option value="tour">🗺 Tour</option>
+            <option value="transport">🚐 Traslado</option>
+            <option value="concepto">📝 Concepto</option>
+            <option value="entradas">🎟 Entradas</option>
+        </select>
+        <span class="text-muted small">Elige un tipo → se abre el formulario de ese servicio.</span>
+    </div>
+
+    <!-- Panel de servicio (inline) + modal de confirmación de borrado.
+         Va aquí (al final, junto a la fila de alta) para que el formulario aparezca cerca. -->
+    <%- include('./experience-services-modals') %>
 
 
     <!-- Save Status Indicator -->
@@ -116,7 +186,7 @@
                     <i class="ti ti-check me-1"></i>Guardado
                 </span>
             </div>
-            <small class="text-muted">Los cambios se guardan automaticamente</small>
+            <small class="text-muted">Los servicios se guardan automáticamente. El resto de la experiencia se guarda con el botón <strong>Guardar</strong>.</small>
         </div>
     </div>
 </div>
@@ -165,6 +235,62 @@
 <style>
     .experience-services-builder {
         min-height: 400px;
+    }
+
+    /* Panel de Servicios: mismo look que las tarjetas de configuración (.exp-config .mb-4) */
+    .services-panel {
+        background: #fff;
+        border: 1px solid #e2ded1;
+        border-radius: 14px;
+        padding: 16px 20px;
+    }
+
+    /* Barra general (guía/chofer generales + duración) y barra de capacidad: mismo look */
+    .general-bar,
+    .capacity-bar {
+        background: #f3f4ee;
+        border: 1px solid #e2ded1;
+        border-radius: 11px;
+        padding: 10px 12px;
+    }
+    .general-bar__label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #55603c;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+    /* La duración (advance-time-picker) no debe estirarse dentro de la barra */
+    .general-bar .advance-time-picker {
+        margin: 0;
+    }
+    .general-bar .form-check-input:checked {
+        background-color: var(--brand-primary, #969b81);
+        border-color: var(--brand-primary, #969b81);
+    }
+
+    /* Alta progresiva (fila siempre visible al final de la lista) */
+    .add-service-row {
+        background: #fbfaf6;
+        border: 1.5px dashed #cfd3bf;
+        border-radius: 11px;
+        padding: 10px 12px;
+    }
+    .add-service-row__label {
+        font-size: 12.5px;
+        font-weight: 700;
+        color: var(--brand-primary, #969b81);
+    }
+
+    /* Drawer del catálogo (offcanvas lateral) */
+    #dragSourceOffcanvas {
+        width: min(420px, 92vw);
+    }
+    #dragSourceOffcanvas .offcanvas-header {
+        background: #fbfaf6;
+    }
+    #dragSourceOffcanvas .drag-items-list {
+        max-height: calc(100vh - 220px) !important;
     }
 
     .service-item {
@@ -336,3 +462,26 @@
 <script src="/shared/pricing/pricingEngine.js"></script>
 <script src="/js/guide-formula-evaluator.js"></script>
 <script src="/dashboards/admin/sections/experience-services.js?v=<%= Date.now() %>"></script>
+
+<!-- Barra general: la tarifa/h se habilita solo si hay guía o chofer activos.
+     (El costo general = tarifa × duración se usará en el desglose por persona, fase posterior.) -->
+<script>
+(function () {
+    function updateGeneralBar() {
+        var guide = !!(document.getElementById('generalGuideToggle') || {}).checked;
+        var chofer = !!(document.getElementById('generalChoferToggle') || {}).checked;
+        var guideRate = document.getElementById('generalGuideRate');
+        var choferRate = document.getElementById('generalChoferRate');
+        if (guideRate) guideRate.disabled = !guide;
+        if (choferRate) choferRate.disabled = !chofer;
+    }
+    window.updateGeneralBar = updateGeneralBar;
+    document.addEventListener('DOMContentLoaded', function () {
+        ['generalGuideToggle', 'generalChoferToggle'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('change', updateGeneralBar);
+        });
+        updateGeneralBar();
+    });
+})();
+</script>

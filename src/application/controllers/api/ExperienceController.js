@@ -233,6 +233,11 @@ class ExperienceController {
       cancellation_policy: experience.get('cancellation_policy') || null,
       buyout: (experience.get('buyout') !== undefined ? experience.get('buyout') : null),
       experience_category: experience.get('experience_category') || null,
+      tipo: experience.get('tipo') || null,
+      general_guide: experience.get('general_guide') || false,
+      general_chofer: experience.get('general_chofer') || false,
+      general_guide_rate: experience.get('general_guide_rate') || null,
+      general_chofer_rate: experience.get('general_chofer_rate') || null,
       private_min_type: experience.get('private_min_type') || null,
       private_min_value: (experience.get('private_min_value') !== undefined ? experience.get('private_min_value') : null),
       time_journey: experience.get('time_journey'),
@@ -785,6 +790,23 @@ class ExperienceController {
     if (experienceCategory !== undefined && experienceCategory !== null && experienceCategory !== '') {
       experienceObj.set('experience_category', experienceCategory);
     }
+    // Tipo de experiencia (Exclusivo / Compartido / Privado), como en experiencias de proveedor.
+    if (data.tipo !== undefined && data.tipo !== null && data.tipo !== '') {
+      experienceObj.set('tipo', String(data.tipo));
+    }
+    // Guía/chofer GENERALES: aplican a toda la experiencia (costo fijo = tarifa/h × duración).
+    if (data.general_guide !== undefined && data.general_guide !== null) {
+      experienceObj.set('general_guide', !!data.general_guide);
+    }
+    if (data.general_chofer !== undefined && data.general_chofer !== null) {
+      experienceObj.set('general_chofer', !!data.general_chofer);
+    }
+    if (data.general_guide_rate !== undefined && data.general_guide_rate !== null && data.general_guide_rate !== '') {
+      experienceObj.set('general_guide_rate', parseFloat(data.general_guide_rate));
+    }
+    if (data.general_chofer_rate !== undefined && data.general_chofer_rate !== null && data.general_chofer_rate !== '') {
+      experienceObj.set('general_chofer_rate', parseFloat(data.general_chofer_rate));
+    }
     if (privateMinType !== undefined && privateMinType !== null && privateMinType !== '') {
       experienceObj.set('private_min_type', privateMinType);
     }
@@ -1180,6 +1202,23 @@ class ExperienceController {
 
     if (experienceCategory !== undefined) {
       experienceObj.set('experience_category', (experienceCategory === null || experienceCategory === '') ? null : experienceCategory);
+    }
+    // Tipo de experiencia (Exclusivo / Compartido / Privado).
+    if (data.tipo !== undefined) {
+      experienceObj.set('tipo', (data.tipo === null || data.tipo === '') ? null : String(data.tipo));
+    }
+    // Guía/chofer GENERALES (toda la experiencia).
+    if (data.general_guide !== undefined) {
+      experienceObj.set('general_guide', !!data.general_guide);
+    }
+    if (data.general_chofer !== undefined) {
+      experienceObj.set('general_chofer', !!data.general_chofer);
+    }
+    if (data.general_guide_rate !== undefined) {
+      experienceObj.set('general_guide_rate', (data.general_guide_rate === null || data.general_guide_rate === '') ? null : parseFloat(data.general_guide_rate));
+    }
+    if (data.general_chofer_rate !== undefined) {
+      experienceObj.set('general_chofer_rate', (data.general_chofer_rate === null || data.general_chofer_rate === '') ? null : parseFloat(data.general_chofer_rate));
     }
 
     if (privateMinType !== undefined) {
@@ -2100,6 +2139,11 @@ class ExperienceController {
       cancellation_policy: experience.get('cancellation_policy') || null,
       buyout: (experience.get('buyout') !== undefined ? experience.get('buyout') : null),
       experience_category: experience.get('experience_category') || null,
+      tipo: experience.get('tipo') || null,
+      general_guide: experience.get('general_guide') || false,
+      general_chofer: experience.get('general_chofer') || false,
+      general_guide_rate: experience.get('general_guide_rate') || null,
+      general_chofer_rate: experience.get('general_chofer_rate') || null,
       private_min_type: experience.get('private_min_type') || null,
       private_min_value: (experience.get('private_min_value') !== undefined ? experience.get('private_min_value') : null),
       experienciasCount,

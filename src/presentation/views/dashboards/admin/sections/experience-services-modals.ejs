@@ -5,23 +5,23 @@
  */
 %>
 
-<!-- Service Modal -->
-<div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="serviceModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header border-bottom">
-                <h5 class="modal-title" id="serviceModalLabel">
-                    <i class="ti ti-plus-circle me-2"></i>Agregar Servicio
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
+<!-- Panel de servicio: inline (se expande dentro de la sección, no como overlay). -->
+<style>
+    #serviceModal.service-panel{display:none;margin:0 0 1.25rem;border:1px solid #e6e3da;border-radius:.75rem;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.06);overflow:hidden;}
+    #serviceModal .service-panel__head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#fbfaf6;border-bottom:1px solid #eee;}
+    #serviceModal .service-panel__body{padding:18px;}
+    #serviceModal .service-panel__foot{display:flex;justify-content:flex-end;gap:.5rem;padding:14px 18px;background:#fbfaf6;border-top:1px solid #eee;}
+</style>
+<div class="service-panel" id="serviceModal">
+            <div class="service-panel__body">
                 <!-- Alert Container for Modal -->
                 <div id="serviceModalAlert" class="modal-alert-container"></div>
-                
+
                 <form id="serviceForm">
-                    <!-- Service Type Selection -->
-                    <div class="service-type-selector mb-3">
+                    <!-- Selector de tipo OCULTO: el tipo se elige con los botones de arriba
+                         (Experiencia/Tour/Traslado/Concepto). Los radios se conservan porque
+                         el guardado lee input[name="serviceType"]:checked. -->
+                    <div class="service-type-selector mb-3 d-none">
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <label class="form-label mb-0">Servicio <span class="text-danger">*</span></label>
                             <div class="btn-group btn-group-sm" role="group">
@@ -47,6 +47,12 @@
                                 <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeConcepto">
                                     <i class="ti ti-file-text me-1" style="font-size: 1.1rem;"></i>
                                     <span style="font-size: 0.9rem;">Concepto</span>
+                                </label>
+
+                                <input type="radio" class="btn-check" name="serviceType" id="typeEntradas" value="entradas">
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeEntradas">
+                                    <i class="ti ti-ticket me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Entradas</span>
                                 </label>
                             </div>
                         </div>
@@ -132,7 +138,18 @@
                                 <label for="conceptoConcept" class="form-label">Concepto <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="conceptoConcept" placeholder="Describe el servicio...">
                             </div>
-                            
+
+                        </div>
+
+                        <!-- Entradas Fields: selector de boletos (auto-rellena el precio) -->
+                        <div id="entradasContent" class="service-content d-none">
+                            <div class="mb-3">
+                                <label for="entradaSelect" class="form-label">Boleto <span class="text-danger">*</span></label>
+                                <select class="form-select" id="entradaSelect" required>
+                                    <option value="">-- Selecciona un boleto --</option>
+                                </select>
+                                <div class="form-text">Boletos de acceso de cualquier destino. El precio se autocompleta y es editable.</div>
+                            </div>
                         </div>
                     </div>
 
@@ -242,12 +259,13 @@
                             <label for="serviceQuantity" class="form-label">Cantidad</label>
                             <input type="number" class="form-control" id="serviceQuantity" value="1" min="1" required>
                         </div>
-                        <div class="col-md-6 mb-3 d-none" id="additionalVehicleContainer">
-                            <label class="form-label d-block">&nbsp;</label>
-                            <div class="form-check" style="padding-top: 6px;">
-                                <input class="form-check-input" type="checkbox" id="additionalVehicle">
-                                <label class="form-check-label" for="additionalVehicle">Vehículo adicional</label>
+                        <div class="col-md-6 mb-3 d-none" id="vehicleCountContainer">
+                            <label for="vehicleCount" class="form-label">Cantidad de vehículos</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="ti ti-car"></i></span>
+                                <input type="number" class="form-control" id="vehicleCount" value="1" min="1" step="1">
                             </div>
+                            <div class="form-text" id="vehicleCapacityHint"></div>
                         </div>
                     </div>
                     
@@ -355,11 +373,6 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="serviceNotes" class="form-label">Notas Adicionales</label>
-                        <textarea class="form-control" id="serviceNotes" rows="2" placeholder="Información adicional del servicio..."></textarea>
-                    </div>
-
                     <!-- Preview -->
                     <div class="service-preview bg-light rounded p-3 d-none">
                         <h6 class="mb-2">Vista Previa</h6>
@@ -369,15 +382,22 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer border-top">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+            <div class="service-panel__foot">
+                <button type="button" class="btn btn-light" id="serviceModalCancelBtn">Cancelar</button>
                 <button type="button" class="btn btn-primary" id="saveServiceBtn">
                     <i class="ti ti-device-floppy me-1"></i>Guardar Servicio
                 </button>
             </div>
-        </div>
-    </div>
 </div>
+
+<script>
+(function () {
+    function hideServicePanel() { var p = document.getElementById('serviceModal'); if (p) p.style.display = 'none'; }
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('#serviceModalCloseBtn, #serviceModalCancelBtn')) hideServicePanel();
+    });
+})();
+</script>
 
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">

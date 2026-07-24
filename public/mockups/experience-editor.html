@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Editor de Experiencia (detalle-como-form)</title>
+<style>
+  :root{
+    --olive:#6E7A50; --olive-2:#969b81; --ink:#2b2b2b; --muted:#8a8f78;
+    --line:#e2ded1; --paper:#f5f3ec; --card:#ffffff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#efece3;color:var(--ink);
+    font-family:'Myriad Pro','Segoe UI',Tahoma,Geneva,Verdana,sans-serif;}
+  .page{max-width:1160px;margin:0 auto;padding:20px 22px 90px;}
+
+  /* Top bar */
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+  .crumbs{font-size:.82rem;color:var(--muted);letter-spacing:.02em;}
+  .crumbs b{color:var(--ink);}
+  .btn-save{background:var(--olive);color:#fff;border:0;border-radius:10px;
+    font-weight:700;letter-spacing:.04em;padding:11px 22px;cursor:pointer;font-size:.9rem;}
+  .btn-save:hover{background:#7c8a5a;}
+
+  /* ===== HERO (detalle-como-form, estilo exp-lux) ===== */
+  .hero{display:grid;grid-template-columns:1.05fr 1fr;gap:0;background:var(--card);
+    border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.06);}
+  .hero-media{position:relative;min-height:460px;background:
+    linear-gradient(135deg,#5c6a48,#8a9470 60%,#b6bd9e);}
+  .hero-media .grain{position:absolute;inset:0;opacity:.16;
+    background-image:radial-gradient(circle at 20% 30%,#000 0,transparent 40%),radial-gradient(circle at 80% 70%,#000 0,transparent 40%);}
+  .hero-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.62) 0%,rgba(0,0,0,.15) 45%,transparent 70%);}
+  .hero-upload{position:absolute;top:14px;left:14px;background:rgba(255,255,255,.9);
+    border:0;border-radius:9px;padding:8px 12px;font-size:.8rem;font-weight:600;cursor:pointer;color:var(--ink);}
+  .hero-upload:before{content:"📷  ";}
+  .hero-caption{position:absolute;left:26px;right:26px;bottom:24px;z-index:2;}
+  .hero-category{display:inline-block;background:rgba(110,122,80,.9);color:#fff;
+    border:0;border-radius:999px;padding:7px 16px;font-size:.72rem;font-weight:700;
+    letter-spacing:.14em;text-transform:uppercase;cursor:pointer;}
+  .hero-title{display:block;width:100%;margin-top:14px;background:transparent;border:0;
+    color:#fff;font-size:2.4rem;font-weight:700;letter-spacing:-.01em;outline:none;}
+  .hero-title::placeholder{color:rgba(255,255,255,.65);}
+  .hero-underline{display:block;width:64px;height:4px;background:#e6b34a;margin-top:10px;border-radius:2px;}
+  .hero-hint{position:absolute;bottom:6px;left:26px;color:rgba(255,255,255,.7);font-size:.68rem;z-index:2;}
+
+  .hero-panel{padding:30px 30px 26px;display:flex;flex-direction:column;}
+  .hero-panel label{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700;margin-bottom:8px;display:block;}
+  .hero-desc{flex:1;min-height:220px;border:1px solid var(--line);border-radius:12px;
+    padding:16px;font-size:1rem;line-height:1.6;color:#3a3a3a;resize:vertical;outline:none;background:#fcfbf7;}
+  .hero-desc:focus{border-color:var(--olive);box-shadow:0 0 0 .18rem rgba(110,122,80,.14);}
+  .hero-chips{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  .chip{display:flex;align-items:center;gap:8px;background:#f3f2ec;border:1px solid var(--line);
+    border-radius:10px;padding:8px 12px;font-size:.85rem;}
+  .chip .k{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;}
+  .chip input, .chip select{border:0;background:transparent;font-size:.9rem;font-weight:600;outline:none;width:72px;color:var(--ink);}
+
+  /* ===== CONFIG SECTIONS ===== */
+  .cfg{margin-top:22px;display:flex;flex-direction:column;gap:14px;}
+  .cfg-card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  .cfg-head{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;user-select:none;}
+  .cfg-head .chev{transition:transform .15s;color:var(--muted);font-size:1rem;}
+  .cfg-card.open .cfg-head .chev{transform:rotate(90deg);}
+  .cfg-head h3{margin:0;font-size:1rem;font-weight:700;}
+  .cfg-head .sub{color:var(--muted);font-size:.8rem;font-weight:400;}
+  .cfg-head .count{background:#eef0e8;color:var(--olive);font-weight:700;border-radius:999px;
+    padding:2px 10px;font-size:.75rem;margin-left:2px;}
+  .cfg-head .spacer{flex:1;}
+  .cfg-head .add{background:var(--olive);color:#fff;border:0;border-radius:9px;
+    padding:8px 14px;font-size:.82rem;font-weight:600;cursor:pointer;}
+  .cfg-body{padding:0 20px 20px;display:none;}
+  .cfg-card.open .cfg-body{display:block;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .field label{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;margin-bottom:5px;display:block;}
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:9px;
+    padding:9px 11px;font-size:.9rem;outline:none;background:#fff;}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--olive);box-shadow:0 0 0 .16rem rgba(110,122,80,.13);}
+  .money{position:relative;}
+  .money:before{content:"$";position:absolute;left:11px;top:33px;color:var(--muted);}
+  .money input{padding-left:22px;}
+
+  /* Servicios inline (tarjetas acordeón, sin modal) */
+  .svc{border:1px solid var(--line);border-radius:11px;margin-bottom:10px;overflow:hidden;}
+  .svc-head{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;background:#fbfaf6;}
+  .svc-type{font-size:.66rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#fff;
+    background:var(--olive-2);border-radius:6px;padding:3px 9px;}
+  .svc-type.tras{background:#5b8fb0;} .svc-type.exp{background:#b07b5b;} .svc-type.tour{background:#7b9a5b;}
+  .svc-name{font-weight:600;}
+  .svc-desc{color:var(--muted);font-size:.85rem;}
+  .svc-price{margin-left:auto;font-weight:700;color:var(--olive);}
+  .svc-del{border:0;background:transparent;color:#c0392b;cursor:pointer;font-size:1rem;}
+  .svc-body{display:none;padding:14px;border-top:1px solid var(--line);}
+  .svc.open .svc-body{display:block;}
+  .note{font-size:.8rem;color:var(--muted);margin-top:8px;}
+  .adv{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:2px 0 10px;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <div class="crumbs">Dashboard · Experiencias · <b>Nueva experiencia</b></div>
+    <button class="btn-save">Guardar experiencia</button>
+  </div>
+
+  <!-- ===== HERO: se edita viéndose como el detalle del catálogo ===== -->
+  <div class="hero">
+    <div class="hero-media">
+      <div class="grain"></div>
+      <div class="hero-overlay"></div>
+      <button class="hero-upload">Cambiar portada</button>
+      <div class="hero-caption">
+        <select class="hero-category">
+          <option>HISTORIA Y ARQUITECTURA</option>
+          <option>GASTRONOMÍA</option>
+          <option>NATURALEZA</option>
+          <option>BIENESTAR</option>
+        </select>
+        <input class="hero-title" placeholder="Nombre de la experiencia" value="Cañada de la Virgen">
+        <span class="hero-underline"></span>
+      </div>
+      <div class="hero-hint">La portada, categoría y nombre se ven igual que en el catálogo del cliente.</div>
+    </div>
+    <div class="hero-panel">
+      <label>Descripción</label>
+      <textarea class="hero-desc" placeholder="Describe la experiencia como se mostrará al cliente…">Zona arqueológica otomí a las afueras de San Miguel de Allende. Recorrido guiado por la pirámide de Los Trece Cielos con interpretación astronómica y vistas al valle.</textarea>
+      <div class="hero-chips">
+        <div class="chip"><span class="k">Precio desde</span><input value="450"></div>
+        <div class="chip"><span class="k">Tipo</span>
+          <select><option>Compartido</option><option>Privado</option><option>Exclusivo</option></select>
+        </div>
+        <div class="chip"><span class="k">Pax mín/máx</span><input value="1 – 12" style="width:64px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONFIG en secciones (una página, sin modales/tabs) ===== -->
+  <div class="cfg">
+
+    <!-- Servicios: inline, visible (no escondido) -->
+    <div class="cfg-card open">
+      <div class="cfg-head" onclick="toggle(this)">
+        <span class="chev">▶</span>
+        <h3>Servicios de la experiencia</h3>
+        <span class="count">2</span>
+        <span class="spacer"></span>
+        <button class="add" onclick="event.stopPropagation()">＋ Agregar servicio</button>
+      </div>
+      <div class="cfg-body">
+        <div class="adv">Cada servicio se edita aquí mismo, sin ventanas emergentes.</div>
+
+        <div class="svc open">
+          <div class="svc-head" onclick="toggle(this)">
+            <span class="svc-type tras">Traslado</span>
+            <span class="svc-name">One-way QRO – SMA</span>
+            <span class="svc-price">$1,850</span>
+            <button class="svc-del" onclick="event.stopPropagation()">🗑</button>
+          </div>
+          <div class="svc-body">
+            <div class="grid4">
+              <div class="field"><label>Origen</label><input value="Querétaro (QRO)"></div>
+              <div class="field"><label>Destino</label><input value="San Miguel (SMA)"></div>
+              <div class="field"><label>Viaje</label><select><option>One-way</option><option>Round-trip</option></select></div>
+              <div class="field"><label>Segmento</label><select><option>Premium</option><option>Estándar</option></select></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="svc">
+          <div class="svc-head" onclick="toggle(this)">
+            <span class="svc-type exp">Experiencia</span>
+            <span class="svc-name">Cata a ciegas</span>
+            <span class="svc-desc">— 2 pax</span>
+            <span class="svc-price">$900</span>
+            <button class="svc-del" onclick="event.stopPropagation()">🗑</button>
+          </div>
+          <div class="svc-body">
+            <div class="grid4">
+              <div class="field money"><label>Precio adulto</label><input value="450"></div>
+              <div class="field"><label>Pax</label><input value="2"></div>
+              <div class="field"><label>Duración</label><input value="90 min"></div>
+              <div class="field"><label>Categoría</label><select><option>Gastronomía</option></select></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Precios & capacidad -->
+    <div class="cfg-card open">
+      <div class="cfg-head" onclick="toggle(this)"><span class="chev">▶</span><h3>Precios & capacidad</h3></div>
+      <div class="cfg-body">
+        <div class="grid4">
+          <div class="field money"><label>Adulto</label><input value="450"></div>
+          <div class="field money"><label>Niño</label><input value="250"></div>
+          <div class="field money"><label>Adulto sin alcohol</label><input value="400"></div>
+          <div class="field money"><label>Infante</label><input value="0"></div>
+        </div>
+        <div class="grid4" style="margin-top:14px">
+          <div class="field"><label>Mín. personas</label><input value="1"></div>
+          <div class="field"><label>Máx. personas</label><input value="12"></div>
+          <div class="field money"><label>Buyout (privado)</label><input value="5400"></div>
+          <div class="field"><label>Mín. privado</label><select><option>Por personas</option><option>Por monto</option></select></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tiempos & horario -->
+    <div class="cfg-card">
+      <div class="cfg-head" onclick="toggle(this)"><span class="chev">▶</span><h3>Tiempos & horario</h3><span class="sub">— duración, anticipación, disponibilidad</span></div>
+      <div class="cfg-body">
+        <div class="grid4">
+          <div class="field"><label>Duración</label><input value="3 h"></div>
+          <div class="field"><label>Traslado</label><input value="45 min"></div>
+          <div class="field"><label>Anticipación</label><input value="24 h"></div>
+          <div class="field"><label>Horario fijo</label><select><option>No</option><option>Sí</option></select></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Destino & entradas -->
+    <div class="cfg-card">
+      <div class="cfg-head" onclick="toggle(this)"><span class="chev">▶</span><h3>Destino & entradas</h3></div>
+      <div class="cfg-body">
+        <div class="grid2">
+          <div class="field"><label>Destino (POI)</label><select><option>Cañada de la Virgen</option></select></div>
+          <div class="field"><label>Entradas asociadas</label><select><option>Entrada General ($90) · Cañada de la Virgen</option></select></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Includes / Excludes / Idiomas -->
+    <div class="cfg-card">
+      <div class="cfg-head" onclick="toggle(this)"><span class="chev">▶</span><h3>Incluye / No incluye / Idiomas</h3></div>
+      <div class="cfg-body">
+        <div class="grid2">
+          <div class="field"><label>Incluye (uno por línea)</label><textarea rows="4">Guía certificado&#10;Transporte redondo&#10;Entrada</textarea></div>
+          <div class="field"><label>No incluye</label><textarea rows="4">Alimentos&#10;Propinas</textarea></div>
+        </div>
+        <div class="field" style="margin-top:12px"><label>Idiomas</label><input value="Español, Inglés"></div>
+      </div>
+    </div>
+
+    <!-- Notas -->
+    <div class="cfg-card">
+      <div class="cfg-head" onclick="toggle(this)"><span class="chev">▶</span><h3>Notas</h3><span class="sub">— internas, cliente, proveedor, equipo</span></div>
+      <div class="cfg-body">
+        <div class="grid2">
+          <div class="field"><label>Notas internas</label><textarea rows="3"></textarea></div>
+          <div class="field"><label>Notas al cliente</label><textarea rows="3"></textarea></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function toggle(el){ el.closest('.cfg-card, .svc').classList.toggle('open'); }
+</script>
+</body>
+</html>
