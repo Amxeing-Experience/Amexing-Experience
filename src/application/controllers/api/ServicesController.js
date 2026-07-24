@@ -3753,6 +3753,7 @@ class ServicesController {
       const destPOIQuery = new Parse.Query('POI');
       destPOIQuery.matches('name', `^${destinationPOIName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
       destPOIQuery.equalTo('exists', true);
+      destPOIQuery.include('serviceType'); // para el fallback de ciudad base (saber si es aeropuerto)
       const destinationPOIs = await destPOIQuery.find({ useMasterKey: true });
 
       let originPOIs = [];
@@ -3760,6 +3761,7 @@ class ServicesController {
         const originPOIQuery = new Parse.Query('POI');
         originPOIQuery.matches('name', `^${originPOIName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
         originPOIQuery.equalTo('exists', true);
+        originPOIQuery.include('serviceType');
         originPOIs = await originPOIQuery.find({ useMasterKey: true });
       }
 
@@ -3770,13 +3772,44 @@ class ServicesController {
         destinationPOIIds: destinationPOIs.map((p) => p.id),
       });
 
+      // Clasificación de la ruta por el serviceType de los POIs (regla de negocio, Michelle):
+      //   - algún extremo Aeropuerto           → 'aeropuerto'
+      //   - ambos Local (o destino Local con   → 'local'  (se cobra tarifa local aunque el
+      //     origen libre/sin POI)                          usuario haya elegido un origen específico)
+      //   - un Local + un no-Local             → 'punto-a-punto' (no debe tomar la tarifa local)
+      //   - resto                              → 'punto-a-punto'
+      /**
+       * Nombres de serviceType (minúsculas, sin vacíos) de un conjunto de POIs.
+       * @param {Parse.Object[]} pois - POIs con su `serviceType` incluido.
+       * @returns {string[]} Nombres de tipo en minúsculas.
+       * @example
+       * const types = typeNamesOf(originPOIs); // ['local']
+       */
+      const typeNamesOf = (pois) => pois
+        .map((p) => String((p.get('serviceType') && p.get('serviceType').get('name')) || '').trim().toLowerCase())
+        .filter(Boolean);
+      const originTypeNames = typeNamesOf(originPOIs);
+      const destTypeNames = typeNamesOf(destinationPOIs);
+      const hasAirport = originTypeNames.includes('aeropuerto') || destTypeNames.includes('aeropuerto');
+      const originAllLocal = originTypeNames.length > 0 && originTypeNames.every((t) => t === 'local');
+      const destAllLocal = destTypeNames.length > 0 && destTypeNames.every((t) => t === 'local');
+      let detectedType;
+      if (hasAirport) {
+        detectedType = 'aeropuerto';
+      } else if (destAllLocal && (originAllLocal || originTypeNames.length === 0)) {
+        // Ambos locales, o destino local con origen libre (servicio local = solo destino).
+        detectedType = 'local';
+      } else {
+        detectedType = 'punto-a-punto';
+      }
+
       if (destinationPOIs.length === 0) {
         // Destino no encontrado en el catálogo de POIs: tratar como ruta sin precio (pendiente).
         const pendingVehicles = await this.buildZeroPriceVehicles();
         return res.json({
           success: true,
           data: {
-            serviceId: null, vehicles: pendingVehicles, routeFound: false, routeDuration: null,
+            serviceId: null, vehicles: pendingVehicles, routeFound: false, routeDuration: null, detectedType,
           },
         });
       }
@@ -3803,10 +3836,14 @@ class ServicesController {
 
       const allRatePrices = await ratePricesQuery.find({ useMasterKey: true });
 
-      // Helper function to filter RatePrices by direction
+      // Helper function to filter RatePrices by direction.
+      // strictOrigin: cuando es true y se especifica origen, EXIGE que el origen del servicio
+      // coincida (no toma servicios sin origen como fallback). Se usa para 'punto a punto', para
+      // que una ruta mixta (local + no-local) NO tome por error la tarifa local (origen libre).
       const filterRatePricesByDirection = (
         requestedOriginPOIs,
-        requestedDestinationPOIs
+        requestedDestinationPOIs,
+        strictOrigin = false
       ) => allRatePrices.filter((ratePrice) => {
         const service = ratePrice.get('service');
         if (!service) return false;
@@ -3826,26 +3863,77 @@ class ServicesController {
           // No origin specified - match services without originPOI or any service
           return true;
         }
-        // Origin specified - match services with matching originPOI
-        // Also include services without originPOI as fallback
-        return (
-          requestedOriginPOIs.some((poi) => serviceOriginPOI && serviceOriginPOI.id === poi.id)
-          || !serviceOriginPOI
+        const originMatch = requestedOriginPOIs.some(
+          (poi) => serviceOriginPOI && serviceOriginPOI.id === poi.id
         );
+        // Origin specified - match services with matching originPOI.
+        // Non-strict: también incluye servicios sin originPOI como fallback (tarifa origen-libre).
+        return strictOrigin ? originMatch : (originMatch || !serviceOriginPOI);
       });
 
-      // Try exact direction first (origin → destination)
-      let ratePrices = filterRatePricesByDirection(originPOIs, destinationPOIs);
+      let ratePrices;
       let searchDirection = 'exact';
+      let usedBaseCityFallback = false;
 
-      // If no results and both origin and destination specified, try reverse direction
-      if (ratePrices.length === 0 && originPOIs.length > 0 && destinationPOIs.length > 0) {
-        console.log('No routes found in exact direction, trying reverse direction...');
-        ratePrices = filterRatePricesByDirection(destinationPOIs, originPOIs);
-        searchDirection = 'reverse';
+      if (detectedType === 'local') {
+        // Tarifa LOCAL: el servicio local se define solo por el destino (origen libre), así que
+        // lo buscamos por destino ignorando el origen; si no, por el otro extremo. Garantiza que
+        // dos POIs locales elegidos en 'punto a punto' se coticen a tarifa local.
+        ratePrices = filterRatePricesByDirection([], destinationPOIs);
+        if (ratePrices.length === 0 && originPOIs.length > 0) {
+          ratePrices = filterRatePricesByDirection([], originPOIs);
+        }
+        searchDirection = 'local-by-endpoint';
+      } else {
+        // Punto a punto / aeropuerto. Para 'punto a punto' con origen específico exigimos match
+        // real de origen (strict) para no tomar la tarifa local origen-libre en rutas mixtas.
+        const strict = detectedType === 'punto-a-punto' && originPOIs.length > 0;
 
-        if (ratePrices.length > 0) {
-          console.log(`Found ${ratePrices.length} routes in reverse direction`);
+        // Try exact direction first (origin → destination)
+        ratePrices = filterRatePricesByDirection(originPOIs, destinationPOIs, strict);
+
+        // If no results and both origin and destination specified, try reverse direction
+        if (ratePrices.length === 0 && originPOIs.length > 0 && destinationPOIs.length > 0) {
+          console.log('No routes found in exact direction, trying reverse direction...');
+          ratePrices = filterRatePricesByDirection(destinationPOIs, originPOIs, strict);
+          searchDirection = 'reverse';
+
+          if (ratePrices.length > 0) {
+            console.log(`Found ${ratePrices.length} routes in reverse direction`);
+          }
+        }
+      }
+
+      // Fallback de CIUDAD BASE (solo aeropuerto): si la ruta no tiene tarifa para el POI
+      // específico pero un extremo es un aeropuerto, se cotiza como si el extremo NO-aeropuerto
+      // fuera la ciudad base (el POI marcado isBaseCity). Cubre el caso de orígenes/destinos
+      // "sub-locales" (haciendas, hoteles) que no tienen tarifa propia pero están en la ciudad base.
+      if (ratePrices.length === 0) {
+        const destIsAirport = destinationPOIs.some((poi) => String((poi.get('serviceType') && poi.get('serviceType').get('name')) || '').trim().toLowerCase() === 'aeropuerto');
+        const originIsAirport = originPOIs.some((poi) => String((poi.get('serviceType') && poi.get('serviceType').get('name')) || '').trim().toLowerCase() === 'aeropuerto');
+        // Solo si EXACTAMENTE un extremo es aeropuerto (traslado de aeropuerto real).
+        if (destIsAirport !== originIsAirport) {
+          const baseQuery = new Parse.Query('POI');
+          baseQuery.equalTo('isBaseCity', true);
+          baseQuery.equalTo('exists', true);
+          const baseCity = await baseQuery.first({ useMasterKey: true });
+          if (baseCity) {
+            const baseArr = [baseCity];
+            if (destIsAirport) {
+              // Origen no-aeropuerto → usar la ciudad base como origen.
+              ratePrices = filterRatePricesByDirection(baseArr, destinationPOIs);
+              if (ratePrices.length === 0) ratePrices = filterRatePricesByDirection(destinationPOIs, baseArr);
+            } else {
+              // Destino no-aeropuerto → usar la ciudad base como destino.
+              ratePrices = filterRatePricesByDirection(originPOIs, baseArr);
+              if (ratePrices.length === 0) ratePrices = filterRatePricesByDirection(baseArr, originPOIs);
+            }
+            if (ratePrices.length > 0) {
+              usedBaseCityFallback = true;
+              searchDirection = 'base-city-fallback';
+              console.log(`Base-city fallback (${baseCity.get('name')}): found ${ratePrices.length} routes`);
+            }
+          }
         }
       }
 
@@ -3859,7 +3947,7 @@ class ServicesController {
         return res.json({
           success: true,
           data: {
-            serviceId: null, vehicles: pendingVehicles, routeFound: false, routeDuration: null,
+            serviceId: null, vehicles: pendingVehicles, routeFound: false, routeDuration: null, detectedType,
           },
         });
       }
@@ -3975,6 +4063,10 @@ class ServicesController {
           vehicles,
           routeDuration,
           routeFound: true,
+          // Fase: precio tomado de la ciudad base (el POI específico no tenía tarifa de aeropuerto).
+          fallbackToBaseCity: usedBaseCityFallback,
+          // Tipo de ruta detectado por serviceType de los POIs (local / punto-a-punto / aeropuerto).
+          detectedType,
         },
       });
     } catch (error) {

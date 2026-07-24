@@ -106,6 +106,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             <div class="form-text">Clasifica el destino según el tipo de servicio</div>
                         </div>
 
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="isBaseCity" name="isBaseCity">
+                            <label class="form-check-label" for="isBaseCity">Ciudad base</label>
+                            <div class="form-text">Si un traslado de aeropuerto no tiene tarifa para el origen/destino específico, se cotiza como si fuera esta ciudad. Solo un destino puede ser la ciudad base.</div>
+                        </div>
+
                         <!-- Imagen del destino: opcional, 1 sola, se optimiza automáticamente -->
                         <div class="mb-3">
                             <label for="poiImageInput" class="form-label">Imagen <span class="text-muted">(opcional)</span></label>
@@ -460,6 +466,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         // Populate the form with the data
                         $('#poiId').val(poi.id);
                         $('#name').val(poi.name);
+                        $('#isBaseCity').prop('checked', !!poi.isBaseCity);
                         if (poi.serviceType && poi.serviceType.id) {
                             $('#serviceType').val(poi.serviceType.id);
                         }
@@ -501,6 +508,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const poiData = {
                 name: $('#name').val().trim(),
                 serviceTypeId: $('#serviceType').val(),
+                isBaseCity: $('#isBaseCity').is(':checked'),
                 // Imagen: nueva → solo {dataUrl, fileName}; existente → objeto tal cual
                 // (el backend la conserva por su s3Key); sin imagen/quitada → null.
                 image: poiImageState
