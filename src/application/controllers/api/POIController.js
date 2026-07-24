@@ -427,7 +427,9 @@ class POIController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      const { name, serviceTypeId, image } = req.body;
+      const {
+        name, serviceTypeId, image, isBaseCity,
+      } = req.body;
 
       // Validate required fields
       if (!name || name.trim().length === 0) {
@@ -473,6 +475,19 @@ class POIController {
       poi.set('active', true);
       poi.set('exists', true);
       poi.set('serviceType', serviceType);
+
+      // Ciudad base (fallback de precio de aeropuerto): solo UN POI puede serlo. Al activarlo se
+      // desmarca cualquier otro. Igual que updatePOI, pero al crear no hay self que excluir.
+      if (typeof isBaseCity === 'boolean') {
+        if (isBaseCity) {
+          const otherQuery = new Parse.Query('POI');
+          otherQuery.equalTo('isBaseCity', true);
+          otherQuery.equalTo('exists', true);
+          const others = await otherQuery.find({ useMasterKey: true });
+          await Promise.all(others.map((o) => o.set('isBaseCity', false).save(null, { useMasterKey: true })));
+        }
+        poi.set('isBaseCity', isBaseCity);
+      }
 
       // Save with master key and user context for audit trail
       await poi.save(null, {
@@ -520,6 +535,7 @@ class POIController {
           id: serviceType.id,
           name: serviceType.get('name'),
         },
+        isBaseCity: poi.get('isBaseCity') || false,
         image: await this.formatImageForResponse(poi.get('image'), req.get('accept') || ''),
       };
 
