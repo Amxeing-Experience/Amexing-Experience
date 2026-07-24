@@ -1804,13 +1804,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Comparativo por método de pago (staff-facing): subtotal de servicios en los 3 métodos,
         // con marcador sobre el método actual. Reutiliza computeServicesSubtotalByType (sin fetch).
         const comparisonMethods = [
-            { key: 'efectivo', label: 'Efectivo' },
-            { key: 'transferencia', label: 'Transferencia' },
-            { key: 'tarjeta', label: 'Tarjeta' },
+            { method: 'efectivo', label: 'Efectivo' },
+            { method: 'transferencia', label: 'Transferencia' },
+            { method: 'tarjeta', label: 'Tarjeta' },
         ];
         const comparisonRows = comparisonMethods.map(m => {
-            const amount = computeServicesSubtotalByType(d.services, m.key);
-            const isActive = m.key === d.paymentType;
+            const amount = computeServicesSubtotalByType(d.services, m.method);
+            const isActive = m.method === d.paymentType;
             const marker = isActive
                 ? `<i class="ti ti-point-filled text-primary me-1"></i>${m.label} <span class="small text-primary">(Método actual: ${m.label})</span>`
                 : `<i class="ti ti-point text-muted me-1"></i>${m.label}`;
