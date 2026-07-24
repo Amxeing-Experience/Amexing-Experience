@@ -4,8 +4,8 @@
  * End-to-end sobre Parse + mongodb-memory-server: el RBAC no regresiona (agencia/agente siguen sin
  * poder POST/DELETE /adjustments pero sí POST /payments; nivel 3 sigue con 403 en GET /:id; superadmin
  * sigue en el allowlist de /adjustments), el fallback de summarize() fallido recalcula
- * total = servicesSubtotal + cargos - descuentos + propina (clampado a 0) en vez de leer los campos
- * persistidos balance/paidAmount que quedan stale tras un ajuste, y dos pagos parciales del mismo
+ * total = servicesSubtotal + cargos - descuentos + propina (clampado a 0) y balance = total - pagado,
+ * en vez de leer los campos persistidos balance/paidAmount que quedan stale tras un ajuste, y dos pagos parciales del mismo
  * método saldan el balance exacto, un pago de monto 0 se rechaza (400) y el DTO expone la propina.
  */
 
@@ -176,6 +176,7 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
         expect(res.status).toBe(200);
         expect(res.body.data.payment.total).toBe(1200); // 1000 + 200 cargo (no 1000 stale)
         expect(res.body.data.payment.paidAmount).toBe(0);
+        expect(res.body.data.payment.balance).toBe(1200); // total - pagado, no el balance stale (1000)
       } finally {
         spy.mockRestore();
       }
@@ -230,6 +231,7 @@ describe('GET /api/reservations/:id — payment breakdown (integration)', () => 
         expect(res.status).toBe(200);
         expect(res.body.data.payment.total).toBe(1000); // servicesSubtotal, no balance+paidAmount
         expect(res.body.data.payment.paidAmount).toBe(300);
+        expect(res.body.data.payment.balance).toBe(700); // 1000 - 300 recalculado (paidAmount>0)
       } finally {
         spy.mockRestore();
       }

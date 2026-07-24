@@ -957,10 +957,14 @@ class ReservationController {
         const fbTotal = Math.round(
           Math.max(0, fbSubtotal + fbCharges - fbDiscounts + fbTip) * 100
         ) / 100;
+        const fbPaidAmount = Number(reservation.get('paidAmount')) || 0;
         fallbackPayment = {
           paymentStatus: reservation.get('paymentStatus') || 'pending',
-          paidAmount: reservation.get('paidAmount') || 0,
-          balance: reservation.get('balance'),
+          paidAmount: fbPaidAmount,
+          // Igual que PaymentService.buildSummary (balance = total - pagado): se deriva del fbTotal
+          // fresco, NO del balance persistido (que queda stale tras un ajuste), para que el "Saldo"
+          // (resolveDisplayedBalance) quede consistente con el "Total a pagar" recalculado.
+          balance: Math.round((fbTotal - fbPaidAmount) * 100) / 100,
           tip: fbTip,
           generalTip: fbGeneralTip,
           serviceTipsTotal: fbServiceTips,
