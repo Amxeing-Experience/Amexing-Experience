@@ -31,6 +31,12 @@ const VERSION = '1.0.0';
 const CLASS_NAME = 'GatewayEvent';
 const UNIQUE_INDEX_NAME = 'gateway_eventId_unique';
 
+// PCI-sensitive Payment gateway fields that formatPayment already OMITS from the HTTP DTO. They are
+// also hidden at the schema level via protectedFields so a direct GET /parse/classes/Payment without
+// masterKey can never leak them (PR 4/5 fill gatewayRaw with the raw provider payload). The publicly
+// exposed fields (channel/gateway/gatewayStatus/gatewayChargeId) are intentionally NOT protected.
+const PCI_PROTECTED_FIELDS = ['gatewayRaw', 'gatewayIntentId', 'gatewaySessionId'];
+
 // New gateway fields for the existing Payment class (plan seccion 6.2). Type-tagged so the
 // addFieldIfNotExists loop knows which Parse.Schema adder to call.
 const PAYMENT_GATEWAY_FIELDS = [
@@ -65,6 +71,34 @@ async function ensureGatewayEventUniqueIndex(db, collectionName = CLASS_NAME) {
     { unique: true, name: UNIQUE_INDEX_NAME }
   );
   return name;
+}
+
+/**
+ * Post-creation verification: confirm the unique compound index actually exists on the collection.
+ * createIndex can resolve without giving us uniqueness in edge cases (a same-named non-unique index
+ * already present raises IndexOptionsConflict, but we double-check regardless), so we read the live
+ * index list and require a { unique:true } index whose key is exactly { gateway:1, eventId:1 }. Throws
+ * a fatal error if it is missing — the seed must never report success without real DB-level idempotency.
+ * @param {import('mongodb').Db} db - Connected Mongo Db handle.
+ * @param {string} [collectionName] - Collection to inspect (defaults to the GatewayEvent class name).
+ * @returns {Promise<string>} The verified index name.
+ * @example
+ * await assertGatewayEventUniqueIndex(client.db());
+ */
+async function assertGatewayEventUniqueIndex(db, collectionName = CLASS_NAME) {
+  const indexes = await db.collection(collectionName).indexes();
+  const found = indexes.find((i) => i.unique === true
+    && i.key
+    && i.key.gateway === 1
+    && i.key.eventId === 1
+    && Object.keys(i.key).length === 2);
+  if (!found) {
+    throw new Error(
+      `[${SEED_NAME}] FATAL: unique index on {gateway:1,eventId:1} is NOT present on ${collectionName} `
+      + 'after creation — webhook idempotency would be disabled at the DB level. Aborting seed.'
+    );
+  }
+  return found.name;
 }
 
 /**
@@ -167,6 +201,48 @@ async function addPaymentGatewayFields() {
 }
 
 /**
+ * Harden the PCI-sensitive Payment gateway fields with schema-level protectedFields so they can never
+ * be read via a direct Parse REST query without masterKey (formatPayment already hides them on the HTTP
+ * path, but the class keeps parse-server's public find/get CLP). Preserves the existing CLP operations
+ * (find/get/count/create/update/delete/addField) EXACTLY as they are today and any pre-existing
+ * protectedFields, only ADDING the PCI fields to the public ('*') protected bucket. Idempotent (re-adds
+ * the same fields to a Set). Does NOT protect channel/gateway/gatewayStatus/gatewayChargeId — those are
+ * exposed by formatPayment on purpose.
+ * @returns {Promise<void>}
+ */
+async function protectPaymentPciFields() {
+  const current = await new Parse.Schema('Payment').get({ useMasterKey: true });
+  const base = (current && current.classLevelPermissions) || {};
+
+  // Preserve current operation permissions verbatim; fall back to the public default only for a key
+  // that is genuinely absent (never for an explicit {} which means masterKey-only).
+  const publicDefault = { '*': true };
+  const op = (key) => (base[key] !== undefined ? base[key] : publicDefault);
+
+  const existingProtected = base.protectedFields || {};
+  const publicProtected = new Set(existingProtected['*'] || []);
+  PCI_PROTECTED_FIELDS.forEach((f) => publicProtected.add(f));
+
+  const clp = {
+    find: op('find'),
+    get: op('get'),
+    count: op('count'),
+    create: op('create'),
+    update: op('update'),
+    delete: op('delete'),
+    addField: op('addField'),
+    protectedFields: { ...existingProtected, '*': Array.from(publicProtected) },
+  };
+
+  const schema = new Parse.Schema('Payment');
+  schema.setCLP(clp);
+  await schema.update({ useMasterKey: true });
+  logger.info(`[${SEED_NAME}] Payment PCI fields protected (protectedFields '*')`, {
+    fields: PCI_PROTECTED_FIELDS,
+  });
+}
+
+/**
  * Ensure the unique index on GatewayEvent via a direct Mongo connection (from DATABASE_URI).
  * @returns {Promise<void>}
  */
@@ -180,7 +256,9 @@ async function ensureUniqueIndexFromEnv() {
     await client.connect();
     const db = process.env.DATABASE_NAME ? client.db(process.env.DATABASE_NAME) : client.db();
     const name = await ensureGatewayEventUniqueIndex(db);
-    logger.info(`[${SEED_NAME}] Unique index ensured on ${CLASS_NAME}: ${name}`);
+    // Fail loud if the index did not end up unique — this is the whole point of the seed.
+    await assertGatewayEventUniqueIndex(db);
+    logger.info(`[${SEED_NAME}] Unique index ensured + verified on ${CLASS_NAME}: ${name}`);
   } finally {
     await client.close();
   }
@@ -209,11 +287,17 @@ async function run() {
       statistics.created++;
     }
 
-    // The unique index is always ensured (idempotent) — it is the whole point of this class.
+    // The unique index is always ensured + verified (idempotent) — it is the whole point of this
+    // class. A failure here is CRITICAL and must be fatal (see the re-throw below): the shared
+    // seed-runner hardcodes status:'completed' and only records 'failed' when run() THROWS, so
+    // swallowing the error would mark the seed done forever with idempotency disabled at the DB level.
     await ensureUniqueIndexFromEnv();
 
     // Additive Payment fields (idempotent: only missing ones are added).
     await addPaymentGatewayFields();
+
+    // Harden the PCI-sensitive fields at the schema level (protectedFields).
+    await protectPaymentPciFields();
 
     const duration = Date.now() - startTime;
     logger.info(`[${SEED_NAME}] Seed completed successfully`, { duration: `${duration}ms`, statistics });
@@ -225,19 +309,23 @@ async function run() {
     statistics.errors++;
     const duration = Date.now() - startTime;
     logger.error(`[${SEED_NAME}] Seed execution failed`, { error: error.message, statistics, duration: `${duration}ms` });
-    return {
-      success: false, seedName: SEED_NAME, version: VERSION, error: error.message, statistics, duration,
-    };
+    // RE-THROW: never return {success:false} silently — the seed-runner ignores result.success and
+    // would otherwise mark this 'completed'. Throwing forces it to record 'failed' and re-run later.
+    throw error;
   }
 }
 
-// Export for seed runner + tests (ensureGatewayEventUniqueIndex is reused by the integration test).
+// Export for seed runner + tests. ensureGatewayEventUniqueIndex (index test) and protectPaymentPciFields
+// (PCI protectedFields test) are reused directly against the jest memory Parse/Mongo.
 module.exports = {
   run,
   seedName: SEED_NAME,
   version: VERSION,
   description: 'Create GatewayEvent class with unique (gateway,eventId) index and add gateway fields to Payment',
   ensureGatewayEventUniqueIndex,
+  assertGatewayEventUniqueIndex,
+  protectPaymentPciFields,
+  PCI_PROTECTED_FIELDS,
 };
 
 // Allow direct execution for testing.
