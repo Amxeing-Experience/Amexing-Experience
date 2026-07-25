@@ -1241,6 +1241,10 @@ class ItineraryBuilder {
       // Marcar cambios y agendar el autosave: sin esto, la propina global vivía solo en memoria y
       // no se persistía (al navegar al resumen o recargar se perdía).
       this.hasUnsavedChanges = true;
+      // Feedback inmediato: los controles de propina viven FUERA de day/serviceForm, así que el
+      // 'input' de setupAutoSave no los cubre y el estado solo cambiaba al arrancar el autosave (2s).
+      // Mostramos "Guardando…" al instante para que el usuario sepa que su cambio se va a guardar.
+      if (this.updateSaveStatus) this.updateSaveStatus('saving');
       if (this.scheduleAutoSave) this.scheduleAutoSave();
     };
     ['applyGlobalTip', 'globalTipType', 'globalTipValue', 'globalTipMandatory'].forEach((id) => {
@@ -1263,6 +1267,7 @@ class ItineraryBuilder {
       const v = parseFloat(document.getElementById('suggestedTipPct')?.value || 0);
       this.suggestedTipPct = (Number.isFinite(v) && v >= 0) ? v : 10;
       this.hasUnsavedChanges = true;
+      if (this.updateSaveStatus) this.updateSaveStatus('saving'); // feedback inmediato (control fuera del form)
       if (this.scheduleAutoSave) this.scheduleAutoSave();
       this.updateTotals();
     };
@@ -12277,17 +12282,25 @@ class ItineraryBuilder {
     let displaySubtotal; let
       iva;
 
+    // Descomposición del subtotal SOBRE totalMXN (servicios + propinas por servicio, SIN la propina
+    // general), NO sobre finalTotal. Antes se derivaba de finalTotal/1.16 (con la propina general
+    // adentro), por lo que Subtotal + IVA ya igualaba al Total y el renglón de propina parecía que
+    // no sumaba. Ahora Subtotal + IVA = totalMXN y el Total = Subtotal + IVA + Propina general.
     if (paymentType === 'efectivo') {
-      // Efectivo: no IVA breakdown
-      displaySubtotal = finalTotal;
+      // Efectivo: sin IVA. Subtotal = servicios + propinas por servicio.
+      displaySubtotal = totalMXN;
       iva = 0;
       if (ivaRow) {
         ivaRow.classList.add('d-none');
       }
     } else {
-      // Transferencia/Tarjeta: calculate backwards from total (which already includes IVA)
-      displaySubtotal = finalTotal / 1.16;
-      iva = finalTotal - displaySubtotal;
+      // Transferencia/Tarjeta: el precio de servicio ya incluye el 16%; se desglosa. El IVA se calcula
+      // SOLO sobre la base de servicios (netSubtotalMXN) — nunca sobre las propinas (regla CFDI). El
+      // Subtotal es esa base sin IVA MÁS las propinas por servicio (sin IVA); la propina general va
+      // aparte. Así Subtotal + IVA + Propina general = Total (antes se dividía todo /1.16, gravando las
+      // propinas por servicio y dejando el Subtotal inflado con la propina general adentro).
+      iva = netSubtotalMXN - netSubtotalMXN / 1.16;
+      displaySubtotal = netSubtotalMXN / 1.16 + serviceTipsTotalMXN;
       if (ivaRow) {
         ivaRow.classList.remove('d-none');
       }
@@ -19975,8 +19988,10 @@ class ItineraryBuilder {
             if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
           } else {
             tourAdultPriceField.value = '';
-            if (adultPriceContainer) adultPriceContainer.style.display = 'none';
-            if (adultQuantityContainer) adultQuantityContainer.style.display = 'none';
+            // Vehicle tour (#311): la cantidad de adultos SIEMPRE se muestra (editable), aunque el
+            // catálogo no traiga precio por persona — el usuario puede capturarlo a mano. Antes se
+            // ocultaba con precio 0, quedando inconsistente con el precio (que sí se ve, en col-md-6).
+            if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
             // Don't clear quantity field for vehicle tours - preserve prefilled values
           }
         }
@@ -19996,8 +20011,8 @@ class ItineraryBuilder {
             if (childQuantityContainer) childQuantityContainer.style.display = 'block';
           } else {
             tourChildPriceField.value = '';
-            if (childPriceContainer) childPriceContainer.style.display = 'none';
-            if (childQuantityContainer) childQuantityContainer.style.display = 'none';
+            // Vehicle tour (#311): la cantidad de niños SIEMPRE se muestra (editable), igual que adultos.
+            if (childQuantityContainer) childQuantityContainer.style.display = 'block';
             // Don't clear quantity field for vehicle tours - preserve prefilled values
           }
         }
@@ -20045,8 +20060,8 @@ class ItineraryBuilder {
                 if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
               } else {
                 tourAdultPriceField.value = '';
-                if (adultPriceContainer) adultPriceContainer.style.display = 'none';
-                if (adultQuantityContainer) adultQuantityContainer.style.display = 'none';
+                // Vehicle tour (#311): la cantidad de adultos siempre visible (editable).
+                if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
               }
             }
 
@@ -20062,8 +20077,8 @@ class ItineraryBuilder {
                 if (childQuantityContainer) childQuantityContainer.style.display = 'block';
               } else {
                 tourChildPriceField.value = '';
-                if (childPriceContainer) childPriceContainer.style.display = 'none';
-                if (childQuantityContainer) childQuantityContainer.style.display = 'none';
+                // Vehicle tour (#311): la cantidad de niños siempre visible (editable).
+                if (childQuantityContainer) childQuantityContainer.style.display = 'block';
               }
             }
 
