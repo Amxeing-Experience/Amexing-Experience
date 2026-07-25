@@ -15,6 +15,7 @@ const logger = require('../../../infrastructure/logger');
 const Payment = require('../../../domain/models/Payment');
 const ExchangeRate = require('../../../domain/models/ExchangeRate');
 const PaymentService = require('../../services/PaymentService');
+const ReservationController = require('./ReservationController');
 const ClientProfileController = require('./ClientProfileController');
 const FileStorageService = require('../../services/FileStorageService');
 const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
@@ -24,7 +25,9 @@ const { validateDate } = require('../../utils/dateValidation');
 const CURRENCIES = ['MXN', 'USD'];
 const REFERENCE_MAX = 100;
 const NOTES_MAX = 300;
-// Upper bound for a single payment amount / tip — blocks absurd values (e.g. 1e19).
+// Nombre de quien recibió el efectivo — mismo cap que reference (texto libre acotado).
+const RECEIVED_BY_MAX = 100;
+// Upper bound for a single payment amount — blocks absurd values (e.g. 1e19).
 const AMOUNT_MAX = 100000000; // 100,000,000
 
 // Payment receipt (proof of payment) — base64-in-JSON upload, same caps/MIME as client documents.
@@ -41,16 +44,21 @@ const serverOptimizationService = new ServerImageOptimizationService();
  */
 class PaymentController {
   /**
-   * Load an active reservation by id (null if not found).
+   * Load an active reservation by id, scoped to what the acting actor may access (null otherwise).
+   * Reuses ReservationController.applyOwnershipScope so an out-of-scope reservation (another agency's)
+   * returns null exactly like a truly-missing one — the 5 call sites answer 404 either way, never
+   * leaking a foreign reservation nor a 403 that confirms it exists.
    * @param {string} id - Reservation objectId.
-   * @returns {Promise<object|null>} Reservation or null.
+   * @param {object} req - Express request with user info from JWT middleware.
+   * @returns {Promise<object|null>} Reservation the actor may access, or null.
    * @example
-   * const r = await PaymentController.loadReservation(id);
+   * const r = await PaymentController.loadReservation(id, req);
    */
-  static async loadReservation(id) {
+  static async loadReservation(id, req) {
     const query = new Parse.Query('Reservation');
     query.equalTo('active', true);
     query.equalTo('exists', true);
+    await ReservationController.applyOwnershipScope(query, req);
     try {
       return await query.get(id, { useMasterKey: true });
     } catch (err) {
@@ -88,7 +96,7 @@ class PaymentController {
   static async getPayments(req, res) {
     try {
       const { id } = req.params;
-      const reservation = await PaymentController.loadReservation(id);
+      const reservation = await PaymentController.loadReservation(id, req);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -112,7 +120,8 @@ class PaymentController {
 
   /**
    * POST /api/reservations/:id/payments — Register a payment, then recalculate.
-   * @param {object} req - Express request; body { amount, currency, method, reference, notes, tip, paidAt, reservationServiceId, paymentInfoId }.
+   * paidAt is required; receivedBy is required only when method === 'efectivo'.
+   * @param {object} req - Express request; body { amount, currency, method, reference, notes, paidAt, receivedBy, reservationServiceId, paymentInfoId }.
    * @param {object} res - Express response.
    * @returns {Promise<object>} JSON { success, data: { payment, summary } }.
    * @example
@@ -122,20 +131,32 @@ class PaymentController {
     try {
       const { id } = req.params;
       const {
-        amount, currency, method, reference, notes, tip, paidAt,
+        amount, currency, method, reference, notes, paidAt, receivedBy,
         reservationServiceId, paymentInfoId, fileBase64, fileName, mimeType,
       } = req.body || {};
 
       const validation = PaymentController.validatePaymentInput({
-        amount, currency, method, tip,
+        amount, currency, method,
       });
       if (validation.error) {
         return res.status(400).json({ success: false, error: validation.error });
       }
 
-      const reservation = await PaymentController.loadReservation(id);
+      const reservation = await PaymentController.loadReservation(id, req);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      }
+
+      // Guard de CONTENIDO (Fase C): el método debe estar realmente disponible según los datos de la
+      // cotización (pricesByType por servicio + ancla), no solo ser un token con FORMA válida (eso ya lo
+      // filtró Payment.isValidMethod en validatePaymentInput). El método ancla siempre pasa (invariante
+      // de deriveAvailableMethods). Se mide contra la RESERVACIÓN completa, no el servicio individual.
+      const availableMethods = await PaymentService.loadAvailableMethods(reservation);
+      if (!availableMethods.includes(method)) {
+        return res.status(400).json({
+          success: false,
+          error: `Método no disponible para esta reservación. Métodos disponibles: ${availableMethods.join(', ')}`,
+        });
       }
 
       let servicePtr = null;
@@ -146,9 +167,21 @@ class PaymentController {
         }
       }
 
-      // Payment date — shared standard: future allowed (reservations later), 1900 .. today + 20y.
+      // Payment date — now REQUIRED: hay que SABER qué día se hizo el pago, nunca inferirlo en silencio.
+      if (paidAt === undefined || paidAt === null || String(paidAt).trim() === '') {
+        return res.status(400).json({ success: false, error: 'La fecha de pago es obligatoria.' });
+      }
+      // Shared standard: future allowed (reservations later), 1900 .. today + 20y.
       const paidAtError = validateDate(paidAt, { fieldName: 'Fecha de pago', allowFuture: true });
       if (paidAtError) return res.status(400).json({ success: false, error: paidAtError });
+
+      // Efectivo exige saber quién recibió físicamente el dinero. Para transferencia/tarjeta es
+      // irrelevante: no se exige, pero si llega se guarda (no se descarta).
+      const receivedByClean = receivedBy !== undefined && receivedBy !== null
+        ? String(receivedBy).trim().slice(0, RECEIVED_BY_MAX) : '';
+      if (validation.method === 'efectivo' && !receivedByClean) {
+        return res.status(400).json({ success: false, error: 'Indica quién recibió el efectivo.' });
+      }
 
       const { amountMXN, rate } = await PaymentController.toMXN(validation.amount, validation.currency);
 
@@ -162,8 +195,8 @@ class PaymentController {
       payment.setMethod(method);
       if (reference) payment.setReference(String(reference).slice(0, REFERENCE_MAX));
       if (notes) payment.setNotes(String(notes).slice(0, NOTES_MAX));
-      payment.setTip(validation.tip);
-      payment.setPaidAt(paidAt ? new Date(paidAt) : new Date());
+      if (receivedByClean) payment.setReceivedBy(receivedByClean);
+      payment.setPaidAt(new Date(paidAt));
       payment.setRegisteredBy(req.user);
       if (paymentInfoId) {
         const pi = new Parse.Object('PaymentInfo');
@@ -195,7 +228,13 @@ class PaymentController {
         }
       }
 
+      // Modelo de saldo mixto: reservation.paymentType es inmutable (heredado de la cotización) y ya no
+      // hay re-anclaje ni ajuste automático que reconciliar. recalculate() recalcula el rollup desde
+      // cero sobre todo el historial con el motor nuevo (paymentStatus por cobertura equivalente-ancla).
       const summary = await PaymentService.recalculate(id);
+      // `warning` se conserva en la respuesta (contrato estable del frontend); ya no lo alimenta ningún
+      // aviso de método — solo el fallo no fatal de subida de comprobante. null en el caso normal.
+      const warning = receiptWarning || null;
 
       logger.info('Payment registered', {
         reservationId: id,
@@ -208,7 +247,7 @@ class PaymentController {
       return res.json({
         success: true,
         message: receiptWarning || 'Pago registrado',
-        warning: receiptWarning,
+        warning,
         data: { payment: await PaymentController.formatPaymentWithReceipt(payment), summary },
       });
     } catch (error) {
@@ -229,11 +268,11 @@ class PaymentController {
     try {
       const { id, paymentId } = req.params;
       const {
-        amount, currency, method, reference, notes, tip, paidAt, reservationServiceId,
+        amount, currency, method, reference, notes, paidAt, receivedBy, reservationServiceId,
         fileBase64, fileName, mimeType,
       } = req.body || {};
 
-      const reservation = await PaymentController.loadReservation(id);
+      const reservation = await PaymentController.loadReservation(id, req);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -247,18 +286,45 @@ class PaymentController {
       const nextCurrency = currency !== undefined ? currency : payment.getOrigCurrency();
       const nextAmount = amount !== undefined ? amount : payment.getOrigAmount();
       const nextMethod = method !== undefined ? method : payment.getMethod();
-      const nextTip = tip !== undefined ? tip : payment.getTip();
       const validation = PaymentController.validatePaymentInput({
-        amount: nextAmount, currency: nextCurrency, method: nextMethod, tip: nextTip,
+        amount: nextAmount, currency: nextCurrency, method: nextMethod,
       });
       if (validation.error) {
         return res.status(400).json({ success: false, error: validation.error });
       }
 
-      // Payment date — shared standard (future allowed). Only validated when a new value is sent.
+      // Guard de CONTENIDO (Fase C): SOLO cuando el actor cambia el método explícitamente. Editar otros
+      // campos NO re-valida el método histórico contra los availableMethods actuales — el respaldo de
+      // precio pudo cambiar después y no debe bloquear una edición legítima (monto, nota, comprobante).
+      if (method !== undefined) {
+        const availableMethods = await PaymentService.loadAvailableMethods(reservation);
+        if (!availableMethods.includes(method)) {
+          return res.status(400).json({
+            success: false,
+            error: `Método no disponible para esta reservación. Métodos disponibles: ${availableMethods.join(', ')}`,
+          });
+        }
+      }
+
+      // Payment date — una edición parcial que NO toca la fecha (paidAt omitido) conserva la existente.
+      // Pero un paidAt presente y vacío/null = el usuario la borró a propósito: se rechaza, un pago nunca
+      // debe quedar sin fecha. Shared standard (future allowed) cuando sí llega un valor.
       if (paidAt !== undefined) {
+        if (paidAt === null || String(paidAt).trim() === '') {
+          return res.status(400).json({ success: false, error: 'La fecha de pago es obligatoria.' });
+        }
         const paidAtError = validateDate(paidAt, { fieldName: 'Fecha de pago', allowFuture: true });
         if (paidAtError) return res.status(400).json({ success: false, error: paidAtError });
+      }
+
+      // Efectivo sigue exigiendo quién recibió el dinero. Valor efectivo = el nuevo si llega, si no el
+      // almacenado; método efectivo = el nuevo si llega, si no el almacenado (nextMethod). Un pago que
+      // ya es/pasa a ser efectivo no puede quedarse sin este dato.
+      const nextReceivedBy = receivedBy !== undefined
+        ? String(receivedBy || '').trim().slice(0, RECEIVED_BY_MAX)
+        : (payment.getReceivedBy() || '');
+      if (nextMethod === 'efectivo' && !nextReceivedBy) {
+        return res.status(400).json({ success: false, error: 'Indica quién recibió el efectivo.' });
       }
 
       if (amount !== undefined || currency !== undefined) {
@@ -271,8 +337,8 @@ class PaymentController {
       if (method !== undefined) payment.setMethod(validation.method);
       if (reference !== undefined) payment.setReference(String(reference || '').slice(0, REFERENCE_MAX));
       if (notes !== undefined) payment.setNotes(String(notes || '').slice(0, NOTES_MAX));
-      if (tip !== undefined) payment.setTip(validation.tip);
-      if (paidAt !== undefined) payment.setPaidAt(paidAt ? new Date(paidAt) : new Date());
+      if (receivedBy !== undefined) payment.setReceivedBy(String(receivedBy || '').trim().slice(0, RECEIVED_BY_MAX));
+      if (paidAt !== undefined) payment.setPaidAt(new Date(paidAt));
       if (reservationServiceId !== undefined) {
         await PaymentController.applyServicePointer(payment, reservationServiceId, reservation, res);
         if (res.headersSent) return undefined;
@@ -311,14 +377,20 @@ class PaymentController {
       payment.set('modifiedBy', req.user);
       await payment.save(null, { useMasterKey: true });
 
+      // Modelo de saldo mixto: editar monto/método recalcula el rollup desde CERO sobre todo el
+      // historial (nunca un delta incremental) — paymentType queda inmutable, sin re-anclaje ni ajuste
+      // automático que reconciliar.
       const summary = await PaymentService.recalculate(id);
+      // `warning` se conserva en la respuesta (contrato estable); solo lo alimenta el fallo no fatal de
+      // subida de comprobante. null en el caso normal.
+      const warning = receiptWarning || null;
 
       logger.info('Payment updated', { reservationId: id, paymentId, performedBy: req.userId });
 
       return res.json({
         success: true,
         message: receiptWarning || 'Pago actualizado',
-        warning: receiptWarning,
+        warning,
         data: { payment: await PaymentController.formatPaymentWithReceipt(payment), summary },
       });
     } catch (error) {
@@ -339,7 +411,7 @@ class PaymentController {
     try {
       const { id, paymentId } = req.params;
 
-      const reservation = await PaymentController.loadReservation(id);
+      const reservation = await PaymentController.loadReservation(id, req);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -361,6 +433,8 @@ class PaymentController {
         }
       }
 
+      // Modelo de saldo mixto: recalculate() recalcula el rollup desde CERO sobre el historial
+      // restante — eliminar un pago cross-tier no deja residuo, sin paso de reconciliación aparte.
       const summary = await PaymentService.recalculate(id);
 
       logger.info('Payment deleted', { reservationId: id, paymentId, performedBy: req.userId });
@@ -387,7 +461,7 @@ class PaymentController {
       const { id, paymentId } = req.params;
       const { fileBase64, fileName, mimeType } = req.body || {};
 
-      const reservation = await PaymentController.loadReservation(id);
+      const reservation = await PaymentController.loadReservation(id, req);
       if (!reservation) {
         return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
       }
@@ -558,17 +632,16 @@ class PaymentController {
 
   /**
    * Validate and normalize payment input shared by create/update.
-   * @param {object} input - { amount, currency, method, tip }.
+   * @param {object} input - { amount, currency, method }.
    * @param input.amount
    * @param input.currency
    * @param input.method
-   * @param input.tip
-   * @returns {object} { error } or { amount, currency, method, tip }.
+   * @returns {object} { error } or { amount, currency, method }.
    * @example
    * PaymentController.validatePaymentInput({ amount: 100, currency: 'MXN', method: 'efectivo' });
    */
   static validatePaymentInput({
-    amount, currency, method, tip,
+    amount, currency, method,
   }) {
     const amountNum = Number(amount);
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
@@ -584,15 +657,8 @@ class PaymentController {
     if (!CURRENCIES.includes(cur)) {
       return { error: `Moneda inválida. Use: ${CURRENCIES.join(', ')}` };
     }
-    const tipNum = tip === undefined || tip === null || tip === '' ? 0 : Number(tip);
-    if (!Number.isFinite(tipNum) || tipNum < 0) {
-      return { error: 'La propina debe ser un número mayor o igual a 0' };
-    }
-    if (tipNum > AMOUNT_MAX) {
-      return { error: `La propina no puede exceder ${AMOUNT_MAX.toLocaleString('es-MX')}` };
-    }
     return {
-      amount: amountNum, currency: cur, method, tip: tipNum,
+      amount: amountNum, currency: cur, method,
     };
   }
 

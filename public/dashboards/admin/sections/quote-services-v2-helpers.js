@@ -813,24 +813,25 @@ ItineraryBuilder.prototype.getServiceDisplayPrice = function (service) {
     return Math.max(0, base - disc);
 };
 
-// Propina por servicio (Fase 2) en la forma de pago dada. Es ADITIVA (se suma al total) y se
-// muestra como línea aparte; NO se hornea en pricesByType. Porcentaje: sobre el precio neto del
-// servicio (ya con descuento) en la forma de pago → escala solo. Monto fijo (capturado en
-// efectivo): TAMBIÉN escala con los mismos recargos que los precios (getDisplayPriceForType).
-ItineraryBuilder.prototype.getServiceTipInPaymentType = function (service, paymentType) {
-    const pt = paymentType || (document.getElementById('priceTypeSelect')?.value || 'efectivo');
+// Propina por servicio (Fase 2). Es ADITIVA (se suma al total) y se muestra como línea aparte; NO se
+// hornea en pricesByType. La propina es PLANA: se persiste (subconcept.tipAmount) y se factura
+// (PaymentService.sumServiceTips la lee literal) siempre sobre la base EFECTIVA, sin escalar por método
+// de pago. El display debe reflejar exactamente ese monto facturado, así que el cálculo ignora el
+// método (parámetro paymentType) y usa siempre la base efectivo: porcentaje sobre el precio neto en
+// efectivo (ya con descuento), monto fijo literal. Antes se escalaba con getDisplayPriceForType y el
+// preview/lista mostraba un monto (ej. $363 en tarjeta) distinto al facturado ($300).
+ItineraryBuilder.prototype.getServiceTipInPaymentType = function (service, _paymentType) {
     const type = service && service.tipType;
     const val = Number(service && service.tipValue) || 0;
     if (!type || val <= 0) return 0;
     if (type === 'percent') {
       const pbt = service.pricesByType;
-      const base = (pbt && pbt[pt] !== undefined) ? (Number(pbt[pt]) || 0) : (Number(service.price) || 0);
-      const net = Math.max(0, base - this.getServiceDiscountInPaymentType(service, pt));
+      const base = (pbt && pbt.efectivo !== undefined) ? (Number(pbt.efectivo) || 0) : (Number(service.price) || 0);
+      const net = Math.max(0, base - this.getServiceDiscountInPaymentType(service, 'efectivo'));
       return Math.round(net * (val / 100) * 100) / 100;
     }
-    // Monto fijo (efectivo) escalado a la forma de pago.
-    const scaled = this.getDisplayPriceForType ? this.getDisplayPriceForType(val, pt) : val;
-    return Math.round(scaled * 100) / 100;
+    // Monto fijo: literal en pesos (efectivo), sin escalar por método.
+    return Math.round(val * 100) / 100;
 };
 
 // Propina por servicio en EFECTIVO (para persistir como metadata, análogo a discountAmount).

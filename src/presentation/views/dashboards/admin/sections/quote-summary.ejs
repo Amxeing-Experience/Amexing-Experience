@@ -1067,7 +1067,7 @@ const e = __isRes ? 'reservación' : 'cotización';
     function getAccessToken() {
         return document.cookie
             .split('; ')
-            .find(row => row.startsWith('accessToken='))
+            .find(row => row.startsWith('accessToken=') || row.startsWith('clientAccessToken='))
             ?.split('=')[1];
     }
 
@@ -1554,47 +1554,89 @@ const e = __isRes ? 'reservación' : 'cotización';
                 });
             });
 
-            // Fase 2b: propina global de la cotización. Se usa el monto guardado (calculado en la
-            // forma de pago guardada) y se muestra en su línea + se suma al total.
+            // Fase 2b: propina general de la cotización. NUNCA se lee globalTip.amount persistido: el
+            // wizard lo escala por el recargo de tarjeta para type 'amount' (queda inflado), por eso el
+            // servidor lo IGNORA y lo recalcula limpio (computeGeneralTip) dentro de serviceItems.total.
+            // Aquí se muestra el monto SIN escalar en su línea y el Total sale de serviceItems.total.
             const gtMeta = serviceItems.globalTip;
-            const globalTipAmount = (gtMeta && gtMeta.type && Number(gtMeta.value) > 0) ? (Number(gtMeta.amount) || 0) : 0;
+            let globalTipAmount = 0;
+            if (gtMeta && Number(gtMeta.value) > 0) {
+                if (gtMeta.type === 'amount') {
+                    // Monto fijo: literal en pesos, sin escalar por método (igual que computeGeneralTip).
+                    globalTipAmount = Math.round((Number(gtMeta.value) || 0) * 100) / 100;
+                } else if (gtMeta.type === 'percent') {
+                    // Porcentaje: sobre la base NETA en efectivo (precio efectivo menos descuento) de los
+                    // servicios activos — misma base y tope de 100% que computeGeneralTip en el servidor,
+                    // para que la línea cuadre con la propina ya horneada en serviceItems.total.
+                    let netBaseEfectivo = 0;
+                    normalizedData.days.forEach(day => {
+                        (day.services || []).forEach(svc => {
+                            if (svc.includeInTotal === false) return;
+                            const ef = Number(svc.pricesByType && svc.pricesByType.efectivo) || 0;
+                            const disc = Number(svc.discountAmount) || 0;
+                            netBaseEfectivo += Math.max(0, ef - disc);
+                        });
+                    });
+                    const pct = Math.min(Number(gtMeta.value), 100);
+                    globalTipAmount = Math.round(netBaseEfectivo * (pct / 100) * 100) / 100;
+                }
+            }
             const gtRow = document.getElementById('summaryGlobalTipRow');
             const gtEl = document.getElementById('summaryGlobalTip');
             if (gtRow && gtEl) {
                 if (globalTipAmount > 0) {
-                    gtEl.textContent = `+${currencyFormatter.format(globalTipAmount)}`;
+                    // "(obligatoria)" cuando la propina general es obligatoria, igual que la propina por servicio.
+                    const gtMandatory = (gtMeta && gtMeta.mandatory === true) ? ' (obligatoria)' : '';
+                    gtEl.textContent = `+${currencyFormatter.format(globalTipAmount)}${gtMandatory}`;
                     gtRow.classList.remove('d-none');
                 } else {
                     gtRow.classList.add('d-none');
                 }
             }
-            serviceTotal += globalTipAmount;
 
-            // Calculate IVA breakdown based on payment type (matching main services logic)
+            // Total: fuente de verdad = serviceItems.total recalculado por el servidor (subtotal limpio +
+            // computeGeneralTip + sumServiceTipsFromDays). Así el Total mostrado NUNCA diverge del grabado.
+            // Fallback al cómputo client-side (netSubtotal + propinas por servicio + propina general) sólo
+            // si el servidor no mandó un total válido.
             let subtotal;
             let iva;
-            const total = serviceTotal;
+            const serverTotal = Number(serviceItems.total);
+            const total = (Number.isFinite(serverTotal) && serverTotal > 0)
+                ? Math.round(serverTotal * 100) / 100
+                : Math.round((serviceTotal + globalTipAmount) * 100) / 100;
 
+            // IVA: se calcula SOLO sobre la base de SERVICIOS (netSubtotal, sin ninguna propina). Regla
+            // CFDI/SAT: el IVA jamás grava la propina, ni la general ni la por servicio. netSubtotal ya
+            // excluye ambas (sólo suma getServicePrice de cada servicio activo, nunca las propinas).
             if (savedPayment === 'efectivo') {
-                // Efectivo: no IVA breakdown
-                subtotal = total;
+                // Efectivo: sin desglose de IVA.
                 iva = 0;
-                // Hide IVA row
                 const ivaRow = document.getElementById('summaryIVARow');
                 if (ivaRow) {
                     ivaRow.classList.add('d-none');
                 }
             } else {
-                // Transferencia/Tarjeta: calculate backwards from total (which already includes IVA)
-                subtotal = total / 1.16;
-                iva = total - subtotal;
-                // Show IVA row
+                // Transferencia/Tarjeta: los precios de servicio ya incluyen IVA; se desglosa el 16% SOLO
+                // sobre la base neta de servicios (excluye ambas propinas — antes se dividía el total con
+                // propinas entre 1.16 y el IVA gravaba la propina).
+                iva = Math.round((netSubtotal - netSubtotal / 1.16) * 100) / 100;
                 const ivaRow = document.getElementById('summaryIVARow');
                 if (ivaRow) {
                     ivaRow.classList.remove('d-none');
                 }
             }
-            
+            // Subtotal = neto de servicios (SIN ninguna propina), igual a netSubtotal (arriba) y a
+            // serviceItems.subtotal ya persistido por el servidor (QuoteController.updateServiceItems).
+            // NUNCA "total - iva": total INCLUYE ambas propinas y en efectivo iva=0 siempre, así que esa
+            // resta colapsaba Subtotal=Total (la propina general quedaba "horneada" en el Subtotal
+            // mostrado — bug DISC-100). Se prioriza el subtotal del servidor (misma fuente de verdad que
+            // Total) sobre netSubtotal por si difieren tras un descuento/propina por servicio a medio
+            // guardar; netSubtotal queda de fallback si el servidor no mandó un valor válido.
+            const serverSubtotal = Number(serviceItems.subtotal);
+            subtotal = (Number.isFinite(serverSubtotal) && serverSubtotal >= 0)
+                ? Math.round(serverSubtotal * 100) / 100
+                : Math.round(netSubtotal * 100) / 100;
+
             const perPerson = numberOfPeople > 0 ? total / numberOfPeople : 0;
 
             document.getElementById('summarySubtotal').textContent = currencyFormatter.format(subtotal);

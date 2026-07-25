@@ -223,6 +223,42 @@ const requireRole = (allowedRoles) => {
 };
 
 /**
+ * Middleware to explicitly EXCLUDE one or more roles from a route, on top of requireRoleLevel.
+ * Necesario porque el mapa de fallback de requireRoleLevel (usado cuando req.roleObject es null,
+ * el caso de end_client -- ver comentario ahi) le da a `end_client` el MISMO nivel (4) que
+ * department_manager/client, para que pueda LEER su propia reservacion/cotizacion (scoping real
+ * lo hacen los controllers). requireRoleLevel(4) por si solo no distingue "puede leer lo suyo" de
+ * "puede escribir/cobrar" -- un endpoint de ESCRITURA que solo pida nivel 4 coincide sin querer con
+ * end_client tambien. Usar DESPUES de requireRoleLevel/requireRole en la cadena para cerrar ese hueco
+ * sin tocar el mapa de fallback (que otros endpoints de lectura SI necesitan sin cambios).
+ * @param {string|string[]} deniedRoles - Rol o roles que deben quedar excluidos pese a alcanzar el nivel.
+ * @returns {Function} - Express middleware function.
+ * @example
+ * // Nivel 4+ para agencia/agente, pero NUNCA para el cliente final aunque su fallback tambien sea 4.
+ * router.post('/:id/payments', requireRoleLevel(4), denyRoles('end_client'), addPayment);
+ */
+const denyRoles = (deniedRoles) => {
+  const roles = Array.isArray(deniedRoles) ? deniedRoles : [deniedRoles];
+
+  return (req, res, next) => {
+    if (req.userRole && roles.includes(req.userRole)) {
+      logger.warn('Insufficient permissions (denied role):', {
+        userId: req.userId,
+        userRole: req.userRole,
+        deniedRoles: roles,
+      });
+
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions',
+      });
+    }
+
+    next();
+  };
+};
+
+/**
  * Middleware to check if user has specific permission with context.
  * @param {string} permission - Permission to check (e.g., 'bookings.approve').
  * @param {object} contextExtractor - Function to extract context from request.
@@ -584,6 +620,7 @@ module.exports = {
   authenticateToken,
   authenticateOptional,
   requireRole,
+  denyRoles,
   requirePermission,
   requireRoleLevel,
   requireOrganizationScope,

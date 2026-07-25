@@ -104,6 +104,16 @@ class Reservation extends BaseModel {
     this.set('paymentType', paymentType);
   }
 
+  // Tasa USD/MXN congelada al pasar de cotización a reservación (solo reservaciones USD). El motor de
+  // pagos la prefiere sobre la tasa vigente para que el saldo no cambie cuando el tipo de cambio cambie.
+  getExchangeRateSnapshot() {
+    return this.get('exchangeRateSnapshot');
+  }
+
+  setExchangeRateSnapshot(rate) {
+    this.set('exchangeRateSnapshot', rate);
+  }
+
   getNumberOfPeople() {
     return this.get('numberOfPeople') || 1;
   }

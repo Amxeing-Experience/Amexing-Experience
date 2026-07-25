@@ -25,7 +25,20 @@ const PDFReceiptService = require('./PDFReceiptService');
 const Invoice = require('../../domain/models/Invoice');
 const Reservation = require('../../domain/models/Reservation');
 const ReservationService = require('../../domain/models/ReservationService');
+const Payment = require('../../domain/models/Payment');
 const { getEndClientCapabilities } = require('../config/endClientCapabilities');
+
+/**
+ * Redondeo a 2 decimales (moneda), con la misma corrección de punto flotante (Number.EPSILON) que
+ * PaymentService.round2, para que la propina general recalculada no divierja del motor de pagos por un centavo.
+ * @param {number} n - Valor a redondear.
+ * @returns {number} Valor con 2 decimales (0 para entradas no numéricas).
+ * @example
+ * round2(1.005) // 1.01
+ */
+function round2(n) {
+  return Math.round((Number(n) + Number.EPSILON || 0) * 100) / 100;
+}
 
 /**
  * QuoteService class implementing Quote business logic.
@@ -150,8 +163,17 @@ class QuoteService {
         resQuery.equalTo('exists', true);
         const existingReservation = await resQuery.first({ useMasterKey: true });
 
-        if (!existingReservation) {
-          logger.info('Creating reservation for transition to scheduled/hold status', {
+        // Una reservación CANCELADA no cuenta como "ya existe": reactivar (volver a scheduled/hold) debe
+        // llamar createReservationFromQuote, que toma su rama de reactivación (revive la reservación y
+        // reconcilia sus servicios contra el snapshot vigente). Sin esto, la reservación quedaba
+        // 'cancelled' para siempre aunque la cotización dijera "Agendada".
+        const reservationNeedsReactivation = !!existingReservation
+          && existingReservation.get('status') === 'cancelled';
+
+        if (!existingReservation || reservationNeedsReactivation) {
+          logger.info(reservationNeedsReactivation
+            ? 'Reactivating cancelled reservation for transition to scheduled/hold status'
+            : 'Creating reservation for transition to scheduled/hold status', {
             quoteId: quote.id,
             quoteFolio: quote.get('folio'),
             previousStatus,
@@ -594,8 +616,15 @@ class QuoteService {
         resQuery.equalTo('exists', true);
         const existingReservation = await resQuery.first({ useMasterKey: true });
 
-        if (!existingReservation) {
-          logger.info('Creating reservation for quote with scheduled status via updateQuote', {
+        // Una reservación CANCELADA no cuenta como "ya existe": reactivar debe llamar
+        // createReservationFromQuote (rama de reactivación), no solo voltear la cotización a scheduled.
+        const reservationNeedsReactivation = !!existingReservation
+          && existingReservation.get('status') === 'cancelled';
+
+        if (!existingReservation || reservationNeedsReactivation) {
+          logger.info(reservationNeedsReactivation
+            ? 'Reactivating cancelled reservation for quote with scheduled status via updateQuote'
+            : 'Creating reservation for quote with scheduled status via updateQuote', {
             quoteId: quote.id,
             quoteFolio: quote.get('folio'),
             previousStatus: currentStatus,
@@ -860,7 +889,9 @@ class QuoteService {
       resQuery.equalTo('exists', true);
       const existingReservation = await resQuery.first({ useMasterKey: true });
 
-      if (existingReservation) {
+      // Una reservación CANCELADA no cuenta como "ya la tiene": debe reactivarse (crear/reconciliar vía
+      // createReservationFromQuote), no devolverse tal cual con status 'cancelled'.
+      if (existingReservation && existingReservation.get('status') !== 'cancelled') {
         logger.info('Scheduled quote already has reservation', {
           quoteId: quote.id,
           quoteFolio,
@@ -1063,9 +1094,14 @@ class QuoteService {
       resQuery.equalTo('exists', true);
       let reservation = await resQuery.first({ useMasterKey: true });
 
-      if (!reservation) {
-        // Try to create reservation if missing
-        logger.warn('Receipt generation attempted but no reservation found, attempting to create', {
+      // Una reservación CANCELADA no sirve para el recibo: se reactiva (crear/reconciliar vía
+      // createReservationFromQuote) igual que si faltara.
+      const reservationCancelled = !!reservation && reservation.get('status') === 'cancelled';
+      if (!reservation || reservationCancelled) {
+        // Try to create/reactivate reservation if missing or cancelled
+        logger.warn(reservationCancelled
+          ? 'Receipt generation: reservation is cancelled, reactivating before generating'
+          : 'Receipt generation attempted but no reservation found, attempting to create', {
           quoteId: quote.id,
           quoteFolio: quote.get('folio'),
           currentStatus,
@@ -1073,14 +1109,14 @@ class QuoteService {
 
         try {
           const reservationData = await this.createReservationFromQuote(quote, currentUser);
-          if (reservationData && reservationData.reservation) {
-            const { reservation: createdReservation } = reservationData;
-            reservation = createdReservation;
-            // Update reservation status to confirmed since quote is scheduled
-            reservation.set('status', 'confirmed');
-            await reservation.save(null, { useMasterKey: true });
+          if (reservationData && reservationData.id) {
+            // createReservationFromQuote devuelve { id, folio, servicesCount } (no el objeto): se recarga
+            // la reservación creada/reactivada para el resto de la generación del recibo.
+            const refetchQuery = new Parse.Query('Reservation');
+            refetchQuery.equalTo('exists', true);
+            reservation = await refetchQuery.get(reservationData.id, { useMasterKey: true });
 
-            logger.info('Successfully created missing reservation for receipt generation', {
+            logger.info('Successfully created/reactivated reservation for receipt generation', {
               reservationId: reservation.id,
               quoteId: quote.id,
               quoteFolio: quote.get('folio'),
@@ -1899,6 +1935,163 @@ class QuoteService {
   }
 
   /**
+   * Reconcilia los ReservationService de una reservación contra los días del snapshot VIGENTE de la
+   * cotización: los emparejados se refrescan en su lugar (campos descriptivos + subconcept), los nuevos
+   * se crean y los que ya no están se soft-eliminan. Emparejamiento por clave de id con fallback a clave
+   * por contenido (registros legacy sin id). NO toca pagos/rollup: eso lo recalcula el llamador. Extraído
+   * de syncReservationFromQuote para reutilizarlo también al reactivar una reservación cancelada, donde el
+   * subconcepto pudo editarse mientras estuvo cancelada. Con reactivateCancelled, un servicio emparejado
+   * que siga en 'cancelled' (lo dejó cancelReservation) vuelve a 'pending' para que el motor de pagos (que
+   * suma los servicios existentes) y el header cuadren.
+   * @param {object} reservation - Parse Reservation object (ya guardado).
+   * @param {Array<object>} days - serviceItems.days del snapshot vigente.
+   * @param {object} [options] - Opciones de reconciliación.
+   * @param {boolean} [options.reactivateCancelled] - Devuelve a 'pending' los servicios emparejados cancelados.
+   * @returns {Promise<{updatedOrCreated: number, removed: number}>} Conteos de la reconciliación.
+   * @private
+   * @example
+   * await this.reconcileReservationServices(reservation, days, { reactivateCancelled: true });
+   */
+  async reconcileReservationServices(reservation, days, options = {}) {
+    const { reactivateCancelled = false } = options;
+    const dayList = Array.isArray(days) ? days : [];
+
+    const existingQuery = new Parse.Query('ReservationService');
+    existingQuery.equalTo('reservationPtr', reservation);
+    existingQuery.equalTo('exists', true);
+    existingQuery.limit(1000);
+    const existing = await existingQuery.find({ useMasterKey: true });
+
+    const existingByKey = new Map();
+    existing.forEach((rs) => {
+      const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
+      if (!existingByKey.has(key)) existingByKey.set(key, rs);
+    });
+
+    // Reconcile: update matched, create new. Se matchea por id y, si no hay match, se cae a la clave por
+    // contenido. Protege reservaciones legacy: sus ReservationService se crearon cuando el subconcepto no
+    // tenía id (clave por contenido); al asignarle un id después, el match por id fallaría y se recrearían
+    // los RS perdiendo asignaciones de chofer/vehículo. Con el fallback se ACTUALIZAN en su lugar.
+    const seen = new Set();
+    const toSave = [];
+    for (const day of dayList) {
+      const subconcepts = Array.isArray(day.subconcepts) ? day.subconcepts : [];
+      for (const sub of subconcepts) {
+        const idKey = this.reservationServiceMatchKey(sub, day.dayNumber);
+        const contentKey = this.reservationServiceMatchKey({ ...sub, id: undefined }, day.dayNumber);
+        let matchedKey = null;
+        if (existingByKey.has(idKey) && !seen.has(idKey)) matchedKey = idKey;
+        else if (existingByKey.has(contentKey) && !seen.has(contentKey)) matchedKey = contentKey;
+        if (matchedKey) {
+          seen.add(matchedKey);
+          const match = existingByKey.get(matchedKey);
+          this.applyReservationServiceDescriptiveFields(match, day, sub);
+          // Reactivación: un servicio emparejado que cancelReservation dejó en 'cancelled' vuelve a
+          // 'pending' para que cuente otra vez en el motor de pagos y en el header.
+          if (reactivateCancelled && match.get('status') === 'cancelled') {
+            match.set('status', 'pending');
+          }
+          toSave.push(match);
+        } else {
+          toSave.push(this.buildReservationServiceRecord(reservation, day, sub));
+          seen.add(idKey);
+        }
+      }
+    }
+
+    // Soft-delete records whose service is no longer present
+    const toRemove = existing.filter((rs) => {
+      const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
+      return !seen.has(key);
+    });
+    toRemove.forEach((rs) => {
+      rs.set('active', false);
+      rs.set('exists', false);
+    });
+
+    const all = toSave.concat(toRemove);
+    if (all.length > 0) {
+      await Parse.Object.saveAll(all, { useMasterKey: true });
+    }
+    return { updatedOrCreated: toSave.length, removed: toRemove.length };
+  }
+
+  /**
+   * Recalcula la propina GENERAL de la cotización desde serviceItems.globalTip. NO se confía en
+   * globalTip.amount persistido por el wizard: se recomputa aquí para ser la fuente de verdad del
+   * cobro y de la reservación. type 'percent': % sobre la base NETA DEL MÉTODO de pago de los
+   * servicios ACTIVOS (includeInTotal !== false) — precio pricesByType[método] menos su descuento
+   * escalado — de modo que la propina ESCALE por método igual que el widget de la cotización
+   * (getGlobalTipAmount). type 'amount': value literal en pesos (nunca escala por método). Sin
+   * globalTip válido, valor <= 0 o no finito -> 0.
+   * @param {object} serviceItems - Snapshot de servicios de la cotización { globalTip, days, paymentType }.
+   * @returns {number} Propina general en pesos (en el método de pago), a 2 decimales.
+   * @example
+   * this.computeGeneralTip({ globalTip: { type: 'percent', value: 10 }, paymentType: 'tarjeta', days: [...] }); // 10% de la base neta en tarjeta
+   */
+  computeGeneralTip(serviceItems) {
+    const gt = serviceItems && serviceItems.globalTip;
+    if (!gt || (gt.type !== 'percent' && gt.type !== 'amount')) return 0;
+    const value = Number(gt.value);
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    // Monto fijo: literal en pesos, sin escalar por método (anti-regresión del bug del wizard).
+    if (gt.type === 'amount') return round2(value);
+    // Porcentaje: sobre la base NETA DEL MÉTODO de pago (precio del método menos su descuento
+    // escalado) de servicios activos, para que la propina general ESCALE por método igual que el
+    // widget de la cotización (getGlobalTipAmount usa el subtotal ya expresado en el método). El
+    // descuento en efectivo se escala por pricesByType[método]/efectivo, idéntico a
+    // getServiceDiscountByType. Si falta el precio del método, cae a la base en efectivo.
+    const days = Array.isArray(serviceItems.days) ? serviceItems.days : [];
+    const method = serviceItems.paymentType || 'efectivo';
+    let netBaseMethod = 0;
+    for (const day of days) {
+      const subs = Array.isArray(day.subconcepts) ? day.subconcepts : [];
+      for (const sub of subs) {
+        if (sub && sub.includeInTotal !== false) {
+          const pbt = (sub && sub.pricesByType) || {};
+          const ef = Number(pbt.efectivo) || 0;
+          const mp = Number(pbt[method]);
+          const hasMethod = Number.isFinite(mp) && pbt[method] != null;
+          const base = hasMethod ? mp : ef;
+          const discEf = Number(sub.discountAmount) || 0;
+          const disc = (ef > 0 && hasMethod) ? discEf * (mp / ef) : discEf;
+          netBaseMethod += Math.max(0, base - disc);
+        }
+      }
+    }
+    // Tope de 100%: un porcentaje mayor se RECORTA aquí (no se rechaza) en la función pura, paralelo al
+    // Math.min del descuento por servicio. El endpoint (updateServiceItems) sí rechaza >100 con 400.
+    const pct = Math.min(value, 100);
+    return round2(netBaseMethod * (pct / 100));
+  }
+
+  /**
+   * Suma la propina POR SERVICIO (subconcept.tipAmount, ya en pesos fijos por el wizard) de los servicios
+   * ACTIVOS del snapshot de la cotización. Un servicio excluido del total aporta $0 (igual que su precio).
+   * Solo se LEE tipAmount, nunca se recalcula. Mismo criterio que PaymentService.sumServiceTips (que suma
+   * desde los ReservationService); aquí se suma desde serviceItems.days porque en la sincronización los RS
+   * todavía no se han reconciliado.
+   * @param {object} serviceItems - Snapshot de servicios de la cotización { days }.
+   * @returns {number} Suma de propinas por servicio, a 2 decimales.
+   * @example
+   * this.sumServiceTipsFromDays({ days: [{ subconcepts: [{ tipAmount: 100 }] }] }); // 100
+   */
+  sumServiceTipsFromDays(serviceItems) {
+    const days = (serviceItems && Array.isArray(serviceItems.days)) ? serviceItems.days : [];
+    let total = 0;
+    for (const day of days) {
+      const subs = Array.isArray(day.subconcepts) ? day.subconcepts : [];
+      for (const sub of subs) {
+        if (sub && sub.includeInTotal !== false) {
+          const tip = Number(sub.tipAmount);
+          if (Number.isFinite(tip) && tip > 0) total += tip;
+        }
+      }
+    }
+    return round2(total);
+  }
+
+  /**
    * Keeps an existing reservation in sync when its source quote's serviceItems
    * change. No-op when the quote has no active reservation (reservations are only
    * created on a status change). Always syncs the denormalized general info
@@ -1940,11 +2133,42 @@ class QuoteService {
     // are provided (i.e. called from the service-items save).
     if (serviceItems) {
       reservation.set('serviceItemsSnapshot', serviceItems);
-      const total = serviceItems.total || 0;
-      reservation.set('totalAmount', total);
-      reservation.set('servicesSubtotal', serviceItems.subtotal ?? total);
+      // servicesSubtotal = SUBTOTAL de servicios SIN NINGUNA propina horneada — ni la general ni la por
+      // servicio (serviceItems.subtotal, no .total). Invariante garantizado por saveToBackend (el front
+      // guarda el subconcepto con SOLO precio y acumula ambas propinas aparte); antes era un supuesto no
+      // verificado que se rompía con la propina por servicio y causaba doble conteo. serviceItems.total
+      // incluye el globalTip (potencialmente escalado por el método de pago) y era la raíz del "tercer
+      // total": el header quedaba por encima del motor de pagos. El subtotal limpio es la BASE a la que
+      // recalculateTotal netea los ajustes YA EXISTENTES (cargos − descuentos) y suma la propina cobrada
+      // (general + por servicio, cada una UNA sola vez) para producir totalAmount. Así una
+      // re-sincronización de una cotización editada NUNCA borra un ajuste aplicado después de crear la
+      // reservación (council L0F1). El motor de pagos (loadAndCompute) ignora este campo (recomputa desde
+      // los ReservationService), así que el saldo cobrado nunca dependió del bug. require diferido: el
+      // ciclo con ReservationController se rompe al ejecutar (no en la carga del módulo).
+      const ReservationController = require('../controllers/api/ReservationController');
+      // Propina GENERAL recalculada (pesos fijos en efectivo) — se SOBREESCRIBE en cada sync (no es "solo
+      // si está vacío" como exchangeRateSnapshot): si el vendedor editó el %/monto o cambió servicios que
+      // afectan la base, el monto cobrado se actualiza. Un pago ya hecho no se toca; sólo cambia el saldo.
+      reservation.set('tip', this.computeGeneralTip(serviceItems));
+      reservation.set('servicesSubtotal', serviceItems.subtotal || 0);
+      // Propina POR SERVICIO recomputada desde el snapshot nuevo (los RS aún no se reconcilian en este
+      // punto): se pasa a recalculateTotal para que el header (totalAmount) cuadre con el motor de pagos.
+      await ReservationController.recalculateTotal(reservation, this.sumServiceTipsFromDays(serviceItems));
       if (serviceItems.currency) reservation.set('currency', serviceItems.currency);
-      if (serviceItems.paymentType) reservation.set('paymentType', serviceItems.paymentType);
+      // Tipo de cambio congelado: SOLO se fija si la reservación todavía no tiene snapshot. Una reservación
+      // ya creada (posiblemente con pagos registrados) NUNCA cambia su tasa aunque la cotización de origen
+      // se re-edite/sincronice después. Cubre el caso legacy (reservación previa a este cambio que adquiere
+      // su primer snapshot en una sincronización), pero jamás pisa uno ya existente.
+      if (serviceItems.exchangeRateSnapshot && !reservation.get('exchangeRateSnapshot')) {
+        reservation.set('exchangeRateSnapshot', serviceItems.exchangeRateSnapshot);
+      }
+      // Defensa en profundidad: el ancla persistida siempre es un método válido. Un token corrupto
+      // (dato legacy u otro path) cae al default en vez de propagarse a la reservación, donde habilitaría
+      // stored XSS en el desglose y bloquearía el registro de pagos (council L3F0/L0F1).
+      if (serviceItems.paymentType) {
+        reservation.set('paymentType', Payment.isValidMethod(serviceItems.paymentType)
+          ? serviceItems.paymentType : 'efectivo');
+      }
 
       let startDate = null;
       let endDate = null;
@@ -1968,61 +2192,19 @@ class QuoteService {
     let updatedOrCreated = 0;
     let removed = 0;
     if (serviceItems) {
-      const existingQuery = new Parse.Query('ReservationService');
-      existingQuery.equalTo('reservationPtr', reservation);
-      existingQuery.equalTo('exists', true);
-      existingQuery.limit(1000);
-      const existing = await existingQuery.find({ useMasterKey: true });
+      ({ updatedOrCreated, removed } = await this.reconcileReservationServices(reservation, days));
 
-      const existingByKey = new Map();
-      existing.forEach((rs) => {
-        const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
-        if (!existingByKey.has(key)) existingByKey.set(key, rs);
-      });
-
-      // Reconcile: update matched, create new. Se matchea por id y, si no hay match, se cae a
-      // la clave por contenido. Esto protege reservaciones legacy: sus ReservationService se
-      // crearon cuando el subconcepto no tenía id (clave por contenido); al asignarle un id
-      // después (backfill o updateServiceItems), el match por id fallaría y se recrearían los
-      // RS perdiendo asignaciones de chofer/vehículo. Con el fallback se ACTUALIZAN en su lugar.
-      const seen = new Set();
-      const toSave = [];
-      for (const day of days) {
-        const subconcepts = Array.isArray(day.subconcepts) ? day.subconcepts : [];
-        for (const sub of subconcepts) {
-          const idKey = this.reservationServiceMatchKey(sub, day.dayNumber);
-          const contentKey = this.reservationServiceMatchKey({ ...sub, id: undefined }, day.dayNumber);
-          let matchedKey = null;
-          if (existingByKey.has(idKey) && !seen.has(idKey)) matchedKey = idKey;
-          else if (existingByKey.has(contentKey) && !seen.has(contentKey)) matchedKey = contentKey;
-          if (matchedKey) {
-            seen.add(matchedKey);
-            const match = existingByKey.get(matchedKey);
-            this.applyReservationServiceDescriptiveFields(match, day, sub);
-            toSave.push(match);
-          } else {
-            toSave.push(this.buildReservationServiceRecord(reservation, day, sub));
-            seen.add(idKey);
-          }
-        }
+      // Mantiene el rollup de pago (paidAmount/balance/paymentStatus) en sync con el nuevo total: sin
+      // esto, esos campos STORED quedaban obsoletos tras editar la cotización (council L4F0) — algunos
+      // dashboards filtran "Pendientes de pago" por el campo guardado ANTES de recomputar, escondiendo
+      // saldo real adeudado. No-fatal (mismo patrón que addAdjustment/removeAdjustment): la sincronización
+      // ya se guardó, un fallo aquí solo deja el rollup temporalmente desactualizado.
+      try {
+        const PaymentService = require('./PaymentService');
+        await PaymentService.recalculate(reservation.id);
+      } catch (e) {
+        logger.warn('Reservation synced but payment recalculate failed', { reservationId: reservation.id, error: e.message });
       }
-
-      // Soft-delete records whose service is no longer present
-      const toRemove = existing.filter((rs) => {
-        const key = this.reservationServiceMatchKey(rs.get('subconcept') || {}, rs.get('dayNumber'));
-        return !seen.has(key);
-      });
-      toRemove.forEach((rs) => {
-        rs.set('active', false);
-        rs.set('exists', false);
-      });
-
-      const all = toSave.concat(toRemove);
-      if (all.length > 0) {
-        await Parse.Object.saveAll(all, { useMasterKey: true });
-      }
-      updatedOrCreated = toSave.length;
-      removed = toRemove.length;
     }
 
     logger.info('Synced reservation from quote', {
@@ -2150,27 +2332,48 @@ class QuoteService {
         // If cancelled, reactivate it and its services
         if (existing.get('status') === 'cancelled') {
           existing.set('status', 'pending');
+          // Propina + subtotal recalculados desde la cotización ACTUAL (no lo que quedó congelado al
+          // cancelar): si el vendedor editó la cotización mientras la reservación estaba cancelada (nadie
+          // la sincroniza en ese estado), reactivar debe reflejar la versión más reciente, igual que
+          // cualquier otra re-sincronización. Los ajustes manuales existentes se preservan (no se tocan).
+          // servicesSubtotal viene limpio de ambas propinas (invariante de saveToBackend); recalculateTotal
+          // vuelve a sumar la propina por servicio una sola vez, sin doble conteo.
+          existing.set('tip', this.computeGeneralTip(serviceItems));
+          existing.set('servicesSubtotal', serviceItems.subtotal || 0);
+          // eslint-disable-next-line global-require
+          const ReservationController = require('../controllers/api/ReservationController');
+          await ReservationController.recalculateTotal(existing, this.sumServiceTipsFromDays(serviceItems));
           await existing.save(null, { useMasterKey: true });
 
-          const svcQuery = new Parse.Query('ReservationService');
-          svcQuery.equalTo('reservationPtr', existing);
-          svcQuery.equalTo('exists', true);
-          svcQuery.equalTo('status', 'cancelled');
-          svcQuery.limit(1000);
-          const services = await svcQuery.find({ useMasterKey: true });
-          for (const svc of services) {
-            svc.set('status', 'pending');
-          }
-          if (services.length > 0) {
-            await Parse.Object.saveAll(services, { useMasterKey: true });
-          }
+          // Reconcilia los ReservationService reales contra el snapshot VIGENTE (no solo voltea el status):
+          // actualiza el subconcept (precio/descuento/propina) si el vendedor editó el servicio mientras la
+          // reservación estuvo cancelada, crea los agregados y soft-elimina los quitados. Sin esto, el motor
+          // de pagos leía los subconceptos viejos y summarize().total divergía de reservation.totalAmount (el
+          // mismo "tercer total" que otros fixes cerraron, en esta rama). Mismo mecanismo que
+          // syncReservationFromQuote; reactivateCancelled devuelve los servicios emparejados a 'pending'.
+          const { updatedOrCreated } = await this.reconcileReservationServices(
+            existing,
+            days,
+            { reactivateCancelled: true }
+          );
 
           logger.info('♻️ Reactivated cancelled reservation for quote', {
             quoteId: quote.id,
             reservationId: existing.id,
-            servicesReactivated: services.length,
+            servicesReactivated: updatedOrCreated,
           });
-          return { id: existing.id, folio: existing.get('folio'), servicesCount: services.length };
+
+          // Mantiene el rollup de pago (paidAmount/balance/paymentStatus) en sync con el total recien
+          // recalculado (council L4F0) -- sin esto, una reservacion reactivada con pagos existentes podia
+          // quedar con el saldo/estado STORED desactualizado hasta el proximo pago o edicion.
+          try {
+            const PaymentService = require('./PaymentService');
+            await PaymentService.recalculate(existing.id);
+          } catch (e) {
+            logger.warn('Reservation reactivated but payment recalculate failed', { reservationId: existing.id, error: e.message });
+          }
+
+          return { id: existing.id, folio: existing.get('folio'), servicesCount: updatedOrCreated };
         }
 
         logger.info('🔄 Reservation already exists for quote, skipping creation', {
@@ -2198,15 +2401,34 @@ class QuoteService {
       }
 
       // Create Reservation
+      // Propina cobrada (Fase 2): general recalculada (escalada por método de pago) + Σ propina
+      // por servicio del snapshot. servicesSubtotal = SUBTOTAL limpio (serviceItems.subtotal, sin NINGUNA
+      // propina horneada — ni la general ni la por servicio; invariante garantizado por saveToBackend, ver
+      // syncReservationFromQuote). serviceItems.total sí incluye las propinas y era la raíz del "tercer
+      // total". totalAmount (header) se fija ya con ambas propinas (cada una una sola vez) para no divergir
+      // del motor de pagos desde el primer render (sin ajustes aún).
+      const generalTip = this.computeGeneralTip(serviceItems);
+      const serviceTipsTotal = this.sumServiceTipsFromDays(serviceItems);
+      const cleanSubtotal = serviceItems.subtotal || 0;
+
       const reservation = new Reservation();
       reservation.set('quotePtr', quote);
       reservation.set('folio', folio);
       reservation.set('status', 'pending');
-      reservation.set('totalAmount', serviceItems.total || 0);
-      reservation.set('servicesSubtotal', serviceItems.total || 0);
+      reservation.set('tip', generalTip);
+      reservation.set('servicesSubtotal', cleanSubtotal);
+      reservation.set('totalAmount', round2(cleanSubtotal + generalTip + serviceTipsTotal));
       reservation.set('adjustments', []);
       reservation.set('currency', serviceItems.currency || 'MXN');
-      reservation.set('paymentType', serviceItems.paymentType || 'efectivo');
+      // Tipo de cambio congelado: la reservación es nueva, así que hereda el snapshot que la cotización
+      // capturó en USD. A partir de aquí queda fijo (el motor de pagos lo prefiere sobre la tasa vigente).
+      if (serviceItems.exchangeRateSnapshot) {
+        reservation.set('exchangeRateSnapshot', serviceItems.exchangeRateSnapshot);
+      }
+      // Defensa en profundidad (igual que syncReservationFromQuote): el ancla persistida siempre es un
+      // método válido; un token corrupto de una cotización legacy cae al default en vez de propagarse.
+      reservation.set('paymentType', Payment.isValidMethod(serviceItems.paymentType)
+        ? serviceItems.paymentType : 'efectivo');
       reservation.set('numberOfPeople', quote.get('numberOfPeople') || 1);
       reservation.set('eventType', quote.get('eventType') || '');
       reservation.set('contactPerson', quote.get('contactPerson') || '');

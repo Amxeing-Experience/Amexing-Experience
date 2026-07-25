@@ -7,6 +7,8 @@ const Parse = require('parse/node');
 const Quote = require('../../../domain/models/Quote');
 const QuoteOwnership = require('../../../domain/models/QuoteOwnership');
 const ReservationService = require('../../../domain/models/ReservationService');
+const Payment = require('../../../domain/models/Payment');
+const ExchangeRate = require('../../../domain/models/ExchangeRate');
 const ServiceChangeRequest = require('../../../domain/models/ServiceChangeRequest');
 const QuoteActivityService = require('../../services/QuoteActivityService');
 const QuoteService = require('../../services/QuoteService');
@@ -23,6 +25,11 @@ const fileStorageService = new FileStorageService({
   isPublic: false,
   presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
 });
+
+// Tolerancia (MXN) de divergencia entre lo que el front envía y lo que el motor de precios recalcula
+// al guardar service-items (costura #1). Hasta $1.00 se acepta como redondeo normal (solo se loggea);
+// una divergencia mayor rechaza el guardado, porque esos centavos se acumulan en pérdidas reales.
+const PRICE_MISMATCH_TOLERANCE = 1.00;
 
 /**
  * Batch fetch primary images for a list of item IDs.
@@ -2201,6 +2208,22 @@ class QuoteController {
         suggestedTipPct = null, // Fase 2c: % de propina sugerida (default 10 en el front).
       } = req.body;
 
+      // Enum guard: paymentType alimenta reservation.paymentType (ancla del carrito de pagos) y se
+      // renderiza en el desglose de las 3 vistas de reservación. Un valor fuera de los métodos válidos
+      // habilitaba stored XSS (council L3F0) y corrompía el ancla (bloqueaba el registro de pagos). Se
+      // rechaza aquí, el único punto de escritura de paymentType desde el request.
+      if (!Payment.isValidMethod(paymentType)) {
+        return this.sendError(res, `Forma de pago inválida. Use: ${Payment.METHODS.join(', ')}`, 400);
+      }
+
+      // FIX 3: tope de 100% en la propina general de tipo porcentaje. El monto fijo (type 'amount') no
+      // lleva límite. Se rechaza (400) antes de tocar la BD; computeGeneralTip además recorta a 100 en
+      // la función pura (defensa en profundidad). Se valida ANTES de la comparación RBAC para que un
+      // porcentaje imposible se rechace con 400 sin importar el rol.
+      if (globalTip && globalTip.type === 'percent' && Number(globalTip.value) > 100) {
+        return this.sendError(res, 'El porcentaje de propina no puede ser mayor a 100%', 400);
+      }
+
       // Validate serviceItems structure
       if (!Array.isArray(days)) {
         return this.sendError(res, 'El campo days debe ser un array', 400);
@@ -2306,6 +2329,52 @@ class QuoteController {
               );
             }
           }
+
+          // FIX 3: tope de 100% en la propina POR SERVICIO de tipo porcentaje (el monto fijo no se
+          // limita). Rechaza aquí, antes de persistir, identificando el subconcepto/día.
+          if (sub.tipType === 'percent' && Number(sub.tipValue) > 100) {
+            return this.sendError(
+              res,
+              `El porcentaje de propina no puede ser mayor a 100% (subconcepto ${j + 1} del día ${day.dayNumber})`,
+              400
+            );
+          }
+
+          // FIX (council LOW): el descuento por servicio nunca se validaba server-side. Un discountAmount
+          // negativo infla la base neta de la propina general porcentual en computeGeneralTip
+          // (netBaseEfectivo += Math.max(0, ef - disc): con disc<0 => ef + |disc|), cobrando MÁS propina
+          // en vez de menos. Se rechaza aquí, antes de persistir, con el mismo patrón que los demás campos.
+          if (sub.discountAmount !== null && sub.discountAmount !== undefined) {
+            if (typeof sub.discountAmount !== 'number' || sub.discountAmount < 0) {
+              return this.sendError(
+                res,
+                `Descuento inválido en subconcepto ${j + 1} del día ${day.dayNumber}`,
+                400
+              );
+            }
+          }
+
+          // Descuento porcentual: tope de 100% (un descuento no puede exceder el precio), análogo al tope
+          // de tipValue de FIX 3. El monto fijo ('amount') no lleva tope superior, igual que el tip fijo.
+          if (sub.discountType === 'percent' && sub.discountValue !== null && sub.discountValue !== undefined) {
+            if (typeof sub.discountValue !== 'number' || sub.discountValue < 0 || sub.discountValue > 100) {
+              return this.sendError(
+                res,
+                `El porcentaje de descuento no puede ser mayor a 100% (subconcepto ${j + 1} del día ${day.dayNumber})`,
+                400
+              );
+            }
+          }
+
+          if (sub.discountType === 'amount' && sub.discountValue !== null && sub.discountValue !== undefined) {
+            if (typeof sub.discountValue !== 'number' || sub.discountValue < 0) {
+              return this.sendError(
+                res,
+                `Monto de descuento inválido en subconcepto ${j + 1} del día ${day.dayNumber}`,
+                400
+              );
+            }
+          }
         }
 
         // Validate dayTotal (new field - must equal sum of subconcepts totals)
@@ -2313,7 +2382,13 @@ class QuoteController {
           return this.sendError(res, `El total del día ${day.dayNumber} debe ser un número positivo`, 400);
         }
 
-        const calculatedDayTotal = day.subconcepts.reduce((sum, sub) => sum + (parseFloat(sub.total) || 0), 0);
+        // Excluye los subconceptos "Pago externo" (includeInTotal === false) igual que
+        // evaluateTotalsConsistency: el wizard manda un dayTotal que ya los excluye, así que sumarlos
+        // aquí divergiría siempre por el monto completo del servicio externo y rechazaría el guardado.
+        const calculatedDayTotal = day.subconcepts.reduce(
+          (sum, sub) => (sub.includeInTotal === false ? sum : sum + (parseFloat(sub.total) || 0)),
+          0
+        );
 
         const dayTotalRounded = Math.round(day.dayTotal * 100) / 100;
         const expectedRounded = Math.round(calculatedDayTotal * 100) / 100;
@@ -2327,59 +2402,43 @@ class QuoteController {
         }
       }
 
-      // Consistencia de totales (costura #1 — backend, motor único). SOLO OBSERVA: re-verifica
-      // con el motor que los números del front sean consistentes y loggea divergencias; NO
-      // cambia valores ni bloquea el guardado (prioridad: que funcione). Usa solo los datos del
-      // payload (sin fetches extra a la BD) para no afectar el rendimiento.
+      // Consistencia de totales (costura #1 — backend, motor único). Re-verifica con el motor que los
+      // números del front cuadren, usando solo los datos del payload (sin fetches extra a la BD).
+      // Divergencias de centavos (redondeo normal) solo se loggean y siguen guardando; una divergencia
+      // mayor a PRICE_MISMATCH_TOLERANCE ($1.00) RECHAZA el guardado — ocurre ANTES del query/save de
+      // la cotización, así que nada se persiste si se rechaza.
       try {
-        const pricingEngine = require('../../../domain/pricing/pricingEngine');
-        const r2 = pricingEngine.round2;
-
-        // 1) Subtotal vs suma de los totales de los subconcepts (lo que realmente se cobra),
-        //    y por-subconcept que su total coincida con pricesByType[forma de pago].
-        let sumOfSubconceptTotals = 0;
-        let subconceptMismatches = 0;
-        days.forEach((day) => {
-          (day.subconcepts || []).forEach((sc) => {
-            if (sc.includeInTotal === false) return;
-            const scTotal = parseFloat(sc.total) || 0;
-            sumOfSubconceptTotals += scTotal;
-            if (sc.pricesByType && typeof sc.pricesByType === 'object') {
-              const expected = parseFloat(sc.pricesByType[paymentType]);
-              if (!Number.isNaN(expected) && Math.abs(r2(expected) - r2(scTotal)) > 0.01) {
-                subconceptMismatches += 1;
-              }
-            }
-          });
+        const consistency = this.evaluateTotalsConsistency({
+          days, subtotal, iva, total, paymentType,
         });
-        sumOfSubconceptTotals = r2(sumOfSubconceptTotals);
-        const subtotalRounded = r2(subtotal);
-        if (Math.abs(sumOfSubconceptTotals - subtotalRounded) > 0.01) {
+
+        if (consistency.subtotalDiff > 0.01) {
           logger.warn('⚠️ Inconsistencia de subtotal (front vs suma de subconcepts)', {
             quoteId,
-            subtotalRecibido: subtotalRounded,
-            sumaSubconcepts: sumOfSubconceptTotals,
-            diferencia: r2(subtotalRounded - sumOfSubconceptTotals),
+            subtotalRecibido: consistency.subtotalRounded,
+            sumaSubconcepts: consistency.sumOfSubconceptTotals,
+            diferencia: consistency.subtotalSignedDiff,
             paymentType,
             currency,
           });
         }
-        if (subconceptMismatches > 0) {
+        if (consistency.subconceptMismatches > 0) {
           logger.warn('⚠️ Subconcepts cuyo total no coincide con pricesByType[formaPago]', {
-            quoteId, count: subconceptMismatches, paymentType,
+            quoteId, count: consistency.subconceptMismatches, paymentType,
+          });
+        }
+        if (consistency.totalDiff > 0.01) {
+          logger.warn('⚠️ Inconsistencia de total (subtotal + IVA vs total recibido)', {
+            quoteId,
+            subtotal: consistency.subtotalRounded,
+            iva: consistency.ivaRounded,
+            totalEsperado: consistency.totalEsperado,
+            totalRecibido: consistency.totalRecibido,
           });
         }
 
-        // 2) total = subtotal + IVA (coherencia del agregado).
-        const totalEsperado = r2(subtotalRounded + (parseFloat(iva) || 0));
-        if (Math.abs(totalEsperado - r2(total)) > 0.01) {
-          logger.warn('⚠️ Inconsistencia de total (subtotal + IVA vs total recibido)', {
-            quoteId,
-            subtotal: subtotalRounded,
-            iva: r2(parseFloat(iva) || 0),
-            totalEsperado,
-            totalRecibido: r2(total),
-          });
+        if (consistency.rejectMessage) {
+          return this.sendError(res, consistency.rejectMessage, 400);
         }
       } catch (calcErr) {
         logger.warn('No se pudo verificar la consistencia de totales con el motor', { error: calcErr.message });
@@ -2394,8 +2453,37 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
+      // Aislamiento entre agencias: sin esto, cualquier department_manager/client autenticado podía
+      // sobrescribir servicios/precios de una cotización de OTRA agencia mandando el PUT directo con su
+      // quoteId (bypass de tenant). Mismo control de acceso que la LECTURA en getQuoteById: hasAccess
+      // (colaboración) con fallback legacy a checkQuoteAccess (admin/superadmin pasan siempre; la agencia
+      // por su client pointer/departamento; el agente solo por ownership).
+      const hasAccess = await this.collaborationService.hasAccess(quoteId, currentUser.id);
+      if (!hasAccess) {
+        const hasLegacyAccess = await this.checkQuoteAccess(currentUser, quote, req.userRole);
+        if (!hasLegacyAccess) {
+          return this.sendError(res, 'No tienes permisos para modificar esta cotización', 403);
+        }
+      }
+
       // Timeline (Fase A): snapshot del serviceItems previo para diffear agregados/editados/quitados.
       const beforeServiceItems = quote.get('serviceItems') || { days: [] };
+
+      // Deduplicación (keep-first) + ordenamiento ADELANTADOS aquí, ANTES del enforcement por-servicio y del
+      // guard RBAC de propina (ambos más abajo), para que el guard evalúe EXACTAMENTE los datos que se van a
+      // persistir (antes se deduplicaba después del guard). Sin esto, un no-admin podía mandar en el mismo
+      // día DOS subconceptos con el MISMO id (el primero con tip bajo/cero, el segundo con el tip real):
+      // tipFieldsChanged sumaba AMBAS ocurrencias sobre el payload crudo -> la suma cuadraba con lo guardado
+      // -> no bloqueaba (200); pero al persistir,
+      // sortAndCleanServiceDays deja solo la PRIMERA ocurrencia (tip bajo/cero), bajando/anulando la propina
+      // fijada por un admin sin disparar 403. Al deduplicar antes, ambas ocurrencias colapsan en una sola y
+      // el guard ve el tip real que quedaría guardado -> el intento se bloquea con 403.
+      // evaluateTotalsConsistency (arriba) se deja intencionalmente sobre `days` crudos: valida el
+      // subtotal/total COSMÉTICO del header (PaymentService no depende de él, y los servicios bloqueados se
+      // recomputan más abajo desde el contenido restaurado); correrlo sobre los días deduplicados
+      // rechazaría con 400 quotes legítimos con servicios idénticos sin id (que el dedup colapsa por
+      // contenido), un cambio de comportamiento fuera del alcance de este fix de propina.
+      const sortedAndCleanedDays = this.sortAndCleanServiceDays(days);
 
       // Debug: Log transport services with suggested departure time fields
       days.forEach((day, dayIndex) => {
@@ -2421,10 +2509,7 @@ class QuoteController {
         }
       });
 
-      // Apply sorting and deduplication to days before saving
-      const sortedAndCleanedDays = this.sortAndCleanServiceDays(days);
-
-      // Update serviceItems
+      // Update serviceItems (days ya deduplicados/ordenados arriba, antes del guard de propina)
       const serviceItems = {
         days: sortedAndCleanedDays,
         subtotal,
@@ -2449,6 +2534,14 @@ class QuoteController {
         )),
       }));
 
+      // Congelamiento del tipo de cambio: en cotizaciones USD se captura la tasa vigente que produjo
+      // los pricesByType actuales, y viaja dentro del mismo blob serviceItems. Se re-captura en cada
+      // guardado (los precios también se recalculan con la tasa vigente en cada edición del wizard); el
+      // congelamiento real ocurre al pasar de cotización a reservación (QuoteService no pisa uno existente).
+      if (String(currency).toUpperCase() === 'USD') {
+        serviceItems.exchangeRateSnapshot = await ExchangeRate.getCurrentValue();
+      }
+
       // Bloqueo por-servicio: los subconceptos PROTEGIDOS no pueden ser editados ni eliminados
       // por no-admins (el servidor los restaura), reforzando lo que la UI ya impide.
       // Un subconcepto está protegido si:
@@ -2470,48 +2563,56 @@ class QuoteController {
         });
       });
 
-      if (storedLockedById.size > 0) {
-        const seenLockedIds = new Set();
-        const enforcedDays = serviceItems.days.map((d) => ({
-          ...d,
-          subconcepts: (d.subconcepts || []).map((sc) => {
-            if (!sc || !sc.id) return sc;
-            const locked = storedLockedById.get(sc.id);
-            if (locked) {
-              seenLockedIds.add(sc.id);
-              // Sticky: para no-admin se restaura el contenido guardado (no puede editar un
-              // servicio protegido); admin conserva sus cambios. Se PRESERVA el adminLocked
-              // original: un servicio de proveedor del owner (adminLocked=false) sigue sin
-              // marcarse como admin-locked; solo queda protegido por la regla de reservación.
-              return isAdminUser
-                ? { ...sc, adminLocked: true }
-                : { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
-            }
-            // Un no-admin no puede marcar como bloqueado un servicio nuevo.
-            if (!isAdminUser && sc.adminLocked) {
-              return { ...sc, adminLocked: false };
-            }
-            return sc;
-          }),
-        }));
+      // El enforcement por-servicio corre SIEMPRE, no solo cuando hay servicios protegidos: cuando
+      // storedLockedById está vacío el .map() es un no-op sobre el CONTENIDO (no hay ids que restaurar) y
+      // enforcedDays queda equivalente en contenido a sortedAndCleanedDays, pero subtotal/total se
+      // recomputan igual desde el contenido real (abajo). Antes esto vivía dentro de un
+      // `if (storedLockedById.size > 0)`, así que una cotización SIN ningún servicio bloqueado persistía
+      // el subtotal/total fabricado del payload -> reintroducía el "cuarto total" (el header muestra un
+      // número y el motor de pagos calcula otro) para roles nivel 4. Correrlo siempre también asegura que
+      // un no-admin nunca deje adminLocked=true en un servicio nuevo aunque no hubiera bloqueados previos.
+      const seenLockedIds = new Set();
+      const enforcedDays = serviceItems.days.map((d) => ({
+        ...d,
+        subconcepts: (d.subconcepts || []).map((sc) => {
+          if (!sc || !sc.id) return sc;
+          const locked = storedLockedById.get(sc.id);
+          if (locked) {
+            seenLockedIds.add(sc.id);
+            // Sticky: para no-admin se restaura el contenido guardado (no puede editar un
+            // servicio protegido); admin conserva sus cambios. Se PRESERVA el adminLocked
+            // original: un servicio de proveedor del owner (adminLocked=false) sigue sin
+            // marcarse como admin-locked; solo queda protegido por la regla de reservación.
+            return isAdminUser
+              ? { ...sc, adminLocked: true }
+              : { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
+          }
+          // Un no-admin no puede marcar como bloqueado un servicio nuevo.
+          if (!isAdminUser && sc.adminLocked) {
+            return { ...sc, adminLocked: false };
+          }
+          return sc;
+        }),
+      }));
 
-        // No-admin: re-insertar los servicios bloqueados que se hayan quitado del payload
-        // (intento de borrado no permitido).
-        if (!isAdminUser) {
-          storedLockedById.forEach((locked, id) => {
-            if (seenLockedIds.has(id)) return;
-            const restored = { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
-            let idx = enforcedDays.findIndex((d) => d.dayNumber === locked.dayNumber);
-            if (idx < 0) idx = enforcedDays.length > 0 ? 0 : -1;
-            if (idx >= 0) {
-              enforcedDays[idx] = {
-                ...enforcedDays[idx],
-                subconcepts: [...(enforcedDays[idx].subconcepts || []), restored],
-              };
-            } else {
-              enforcedDays.push({ dayNumber: locked.dayNumber || 1, dayTitle: '', subconcepts: [restored] });
-            }
-          });
+      // No-admin: re-insertar los servicios bloqueados que se hayan quitado del payload (intento de
+      // borrado no permitido). No-op cuando no hay servicios protegidos.
+      if (!isAdminUser) {
+        storedLockedById.forEach((locked, id) => {
+          if (seenLockedIds.has(id)) return;
+          const restored = { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
+          let idx = enforcedDays.findIndex((d) => d.dayNumber === locked.dayNumber);
+          if (idx < 0) idx = enforcedDays.length > 0 ? 0 : -1;
+          if (idx >= 0) {
+            enforcedDays[idx] = {
+              ...enforcedDays[idx],
+              subconcepts: [...(enforcedDays[idx].subconcepts || []), restored],
+            };
+          } else {
+            enforcedDays.push({ dayNumber: locked.dayNumber || 1, dayTitle: '', subconcepts: [restored] });
+          }
+        });
+        if (storedLockedById.size > 0) {
           logger.info('updateServiceItems: enforced protected services for non-admin', {
             quoteId: quote.id,
             userRole: req.userRole,
@@ -2519,8 +2620,66 @@ class QuoteController {
             reinserted: storedLockedById.size - seenLockedIds.size,
           });
         }
+      }
 
-        serviceItems.days = enforcedDays;
+      serviceItems.days = enforcedDays;
+
+      // Re-deriva subtotal/total desde el contenido FINAL (protegido ya restaurado), nunca desde lo que
+      // mandó el front. evaluateTotalsConsistency (arriba) solo valida que el payload sea AUTOCONSISTENTE
+      // contra SUS PROPIOS days: un no-admin puede pasarla trayendo un subtotal/total fabricados a juego
+      // con un precio de servicio protegido alterado (council L2F0/L5F1) o, aun SIN ningún protegido, con
+      // un subtotal dentro de la tolerancia de $1 y un `total` cualquiera (esa validación no limita
+      // `total`). Sin este recálculo esos números se persistían igual, reintroduciendo el total espurio en
+      // el header de las 4 vistas para roles nivel 4, no solo admin.
+      const pricingEngine = require('../../../domain/pricing/pricingEngine');
+      const r2 = pricingEngine.round2;
+      let enforcedSubtotal = 0;
+      enforcedDays.forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          if (sc && sc.includeInTotal !== false) enforcedSubtotal += (parseFloat(sc.total) || 0);
+        });
+      });
+      serviceItems.subtotal = r2(enforcedSubtotal);
+      // El total del HEADER INCLUYE las propinas (general + por servicio), igual que el motor de pagos
+      // (QuoteService.create/sync fija totalAmount = cleanSubtotal + computeGeneralTip + sumServiceTipsFromDays).
+      // Recomputarlo como subtotal+iva a secas dejaba fuera las propinas y hacía DIVERGIR el header del motor
+      // -- el mismo "tercer total" que este arco elimina. Los subconceptos guardan SOLO precio (una propina
+      // horneada en sc.total se rechaza con 400 arriba), así que sumar las propinas UNA vez sobre el contenido
+      // restaurado no las duplica. Se usan las MISMAS funciones canónicas del motor para no reintroducir la
+      // divergencia; se computan sobre serviceItems ya con los days restaurados y el globalTip del payload.
+      const enforcedGeneralTip = this.quoteService.computeGeneralTip(serviceItems);
+      const enforcedServiceTips = this.quoteService.sumServiceTipsFromDays(serviceItems);
+      serviceItems.total = r2(
+        serviceItems.subtotal + (r2(parseFloat(serviceItems.iva) || 0)) + enforcedGeneralTip + enforcedServiceTips
+      );
+
+      // FIX 1: RBAC server-side de la propina. El wizard oculta los controles de propina a los no-admin,
+      // pero el server persistía globalTip/suggestedTipPct + tipType/tipValue/tipMandatory/tipAmount por
+      // subconcepto sin validar rol -> un agente/agencia podía FIJAR cualquier propina por API directa.
+      // Solo admin/superadmin puede fijar o cambiar la propina; un no-admin únicamente puede REENVIAR la
+      // misma propina ya guardada (el wizard la reenvía para no perderla). El guard va DENTRO del
+      // controller y condicional a si la propina realmente cambia: en la ruta bloquearía TODA edición de
+      // servicios (horario/precio) de agentes/agencias, que sí está permitida.
+      // Se prioriza req.roleObject (fila fresca de Role en DB, ya cargada por el middleware) sobre
+      // req.userRole (claim del JWT, puede quedar stale hasta 8h tras un cambio de rol — council
+      // L3F1): un admin recién degradado no debe conservar el privilegio de tocar propina solo porque
+      // su token viejo todavía diga 'admin'. Fallback a userRole SOLO si no hay roleObject fresco.
+      // El guard corre DESPUÉS del enforcement, sobre serviceItems.days FINAL (contenido ya restaurado),
+      // NO sobre sortedAndCleanedDays: evaluarlo antes de restaurar permitía un bypass -- un no-admin ponía
+      // en $0 la propina de un servicio PROTEGIDO y "la movía" a un servicio NUEVO (decoy) con el mismo
+      // monto; la suma agregada pre-restauración cuadraba con lo guardado (no bloqueaba), pero la
+      // restauración revertía el protegido a su tip real y el decoy sobrevivía, DUPLICANDO la propina
+      // persistida sin 403. Sobre el contenido restaurado la suma refleja lo que realmente quedaría
+      // guardado. El 403 sale ANTES de cualquier quote.set/quote.save: un bloqueo no deja escritura parcial.
+      const isAdminForTip = req.roleObject
+        ? (typeof req.roleObject.getLevel === 'function' && req.roleObject.getLevel() >= 6)
+        : ['admin', 'superadmin'].includes(req.userRole);
+      const incomingTipData = { globalTip, suggestedTipPct, days: serviceItems.days };
+      if (!isAdminForTip && this.tipFieldsChanged(beforeServiceItems, incomingTipData)) {
+        logger.warn('updateServiceItems: non-admin attempted to set/change tip fields', {
+          quoteId: quote.id, userRole: req.userRole,
+        });
+        return this.sendError(res, 'Solo un administrador puede modificar la propina', 403);
       }
 
       quote.set('serviceItems', serviceItems);
@@ -2596,6 +2755,94 @@ class QuoteController {
         500
       );
     }
+  }
+
+  /**
+   * FIX 1: detecta si un payload de service-items INTENTA fijar/cambiar/quitar la propina respecto a lo
+   * ya guardado. Se usa para bloquear (403) a los no-admin, que solo pueden reenviar la misma propina
+   * existente. Compara: globalTip (type/value/mandatory; ignora `amount`, que es derivado y lo recomputa
+   * el server), suggestedTipPct (solo se protege MODIFICAR/QUITAR una sugerencia ya guardada — el wizard
+   * SIEMPRE manda un default 10, bloquearlo sobre cotizaciones legacy sin sugerencia rompería ediciones
+   * legítimas; además es una nota, no se cobra) y la SUMA AGREGADA de la propina por servicio (Σ tipAmount
+   * de los subconceptos activos, sin emparejar por id) — si esa suma cambia, es un cambio de propina. La
+   * suma agregada permite splits/fusiones que preservan el total (ej. round-trip que parte la propina de
+   * un servicio en dos piernas) y bloquea cualquier subida/bajada real. Números con tolerancia de centavo.
+   * @param {object} storedSI - serviceItems actualmente guardado en la cotización.
+   * @param {object} incoming - Datos del request { globalTip, suggestedTipPct, days }.
+   * @returns {boolean} true si la propina cambia (debe bloquearse para no-admin).
+   * @example
+   * this.tipFieldsChanged(quote.get('serviceItems'), { globalTip, suggestedTipPct, days });
+   */
+  tipFieldsChanged(storedSI, incoming) {
+    const CENT = 0.01;
+    const numEq = (a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      return Math.abs((Number.isFinite(na) ? na : 0) - (Number.isFinite(nb) ? nb : 0)) <= CENT;
+    };
+    const stored = storedSI || {};
+    const inc = incoming || {};
+
+    const normType = (t) => {
+      if (t === 'amount') return 'amount';
+      if (t === 'percent') return 'percent';
+      return null;
+    };
+    // globalTip normalizado: propina efectiva o null. `amount` se ignora (lo recomputa computeGeneralTip).
+    const normGT = (gt) => {
+      if (!gt || typeof gt !== 'object') return null;
+      const type = normType(gt.type);
+      const value = Number(gt.value);
+      if (!type || !Number.isFinite(value) || value <= 0) return null;
+      return { type, value, mandatory: gt.mandatory === true };
+    };
+    const storedGT = normGT(stored.globalTip);
+    const incomingGT = normGT(inc.globalTip);
+    if (!storedGT !== !incomingGT) return true; // se agrega o se quita la propina general
+    if (storedGT && incomingGT && (
+      storedGT.type !== incomingGT.type
+      || !numEq(storedGT.value, incomingGT.value)
+      || storedGT.mandatory !== incomingGT.mandatory
+    )) return true;
+
+    // suggestedTipPct: solo se protege MODIFICAR/QUITAR una sugerencia ya guardada (>0).
+    const storedPct = Number(stored.suggestedTipPct);
+    if (Number.isFinite(storedPct) && storedPct > 0) {
+      const inPct = Number(inc.suggestedTipPct);
+      const normInPct = Number.isFinite(inPct) && inPct > 0 ? inPct : 0;
+      if (!numEq(storedPct, normInPct)) return true;
+    }
+
+    // Propina por subconcepto: se compara la SUMA AGREGADA de tipAmount (lo que realmente se cobra) de
+    // TODOS los subconceptos activos, sea cual sea su id, en lo guardado vs lo entrante. NO se empareja
+    // por id ni se comparan campos uno a uno: un split ida-vuelta reparte la propina de un servicio en
+    // dos piernas (id reutilizado para Ida + id nuevo para Vuelta) conservando la suma total; empatar por
+    // id daba un falso positivo (el id existente pasa de 200 a 100 y el id nuevo aporta 100 "sin previo")
+    // y bloqueaba con 403 a un no-admin aunque la SUMA no cambiara (100+100=200). Con la suma agregada,
+    // cualquier reparto/fusión que preserve el total se permite, y toda subida/bajada real (o la
+    // desaparición de un servicio con propina sin compensación) mueve la suma y se bloquea.
+    //
+    // Esto subsume de raíz el chequeo previo "tipSilentlyRemoved" (council L0F0: borrar el servicio o
+    // reenviarlo con id vacío para quitar la propina): al desaparecer su tipAmount la suma baja y se
+    // detecta sin necesitar rastrear ids que se pierden. Se usa el MISMO criterio que el motor de dinero
+    // (QuoteService.sumServiceTipsFromDays / PaymentService.sumServiceTips): tipAmount finito y > 0 de los
+    // subconceptos con includeInTotal !== false.
+    const sumServiceTips = (si) => {
+      const days = Array.isArray(si.days) ? si.days : [];
+      let sum = 0;
+      days.forEach((d) => {
+        ((d && Array.isArray(d.subconcepts)) ? d.subconcepts : []).forEach((sc) => {
+          if (sc && sc.includeInTotal !== false) {
+            const tip = Number(sc.tipAmount);
+            if (Number.isFinite(tip) && tip > 0) sum += tip;
+          }
+        });
+      });
+      return sum;
+    };
+    if (!numEq(sumServiceTips(stored), sumServiceTips(inc))) return true;
+
+    return false;
   }
 
   /**
@@ -5137,6 +5384,103 @@ class QuoteController {
       success: false,
       error,
     });
+  }
+
+  /**
+   * Evalúa la consistencia de totales del payload de service-items contra el motor de precios
+   * (costura #1). Compara el subtotal recibido contra la suma de los totales de subconceptos, y cada
+   * subconcepto contra pricesByType[paymentType]. Es pura: no toca Parse ni loggea. Divergencias de
+   * hasta 0.01 se ignoran; entre 0.01 y PRICE_MISMATCH_TOLERANCE ($1.00) se reportan como warning
+   * (subtotalDiff / subconceptMismatches / totalDiff, para que el controller loggee igual que antes);
+   * una divergencia MAYOR a la tolerancia produce `rejectMessage`, que el controller convierte en 400
+   * sin guardar nada. El límite es inclusivo del lado "está bien": exactamente $1.00 no rechaza.
+   * @param {object} params - Payload numérico ya validado.
+   * @param {Array<object>} params.days - Días con `subconcepts`.
+   * @param {number} params.subtotal - Subtotal recibido del front.
+   * @param {number} params.iva - IVA recibido del front.
+   * @param {number} params.total - Total recibido del front.
+   * @param {string} params.paymentType - Método de pago ancla (llave de pricesByType).
+   * @returns {object} Métricas de divergencia + `rejectMessage` (string|null).
+   * @example
+   * this.evaluateTotalsConsistency({ days, subtotal, iva, total, paymentType });
+   */
+  evaluateTotalsConsistency({
+    days, subtotal, iva, total, paymentType,
+  }) {
+    const pricingEngine = require('../../../domain/pricing/pricingEngine');
+    const r2 = pricingEngine.round2;
+
+    let sumOfSubconceptTotals = 0;
+    let subconceptMismatches = 0;
+    let subconceptHardMismatch = null; // primer subconcepto que supera la tolerancia
+    (Array.isArray(days) ? days : []).forEach((day) => {
+      ((day && day.subconcepts) || []).forEach((sc) => {
+        if (!sc || sc.includeInTotal === false) return;
+        const scTotal = parseFloat(sc.total) || 0;
+        sumOfSubconceptTotals += scTotal;
+        if (sc.pricesByType && typeof sc.pricesByType === 'object') {
+          const base = parseFloat(sc.pricesByType[paymentType]);
+          if (!Number.isNaN(base)) {
+            // El descuento por servicio (Fase 1) se captura en efectivo y ya viene restado del precio
+            // neto guardado (sc.total). Se escala por el mismo factor multiplicativo que el front
+            // (getServiceDiscountInPaymentType) para que ambos lados comparen la misma fórmula; sin
+            // restarlo aquí, cualquier servicio con descuento divergiría del pricesByType bruto y se
+            // rechazaría por error.
+            const discEf = parseFloat(sc.discountAmount) || 0;
+            let discountInType = 0;
+            if (discEf > 0) {
+              const efBase = Number(sc.pricesByType.efectivo);
+              discountInType = (efBase > 0 && sc.pricesByType[paymentType] != null)
+                ? r2(discEf * (base / efBase))
+                : discEf;
+            }
+            const expected = Math.max(0, r2(base - discountInType));
+            const diff = Math.abs(expected - r2(scTotal));
+            if (diff > 0.01) {
+              subconceptMismatches += 1;
+              if (diff > PRICE_MISMATCH_TOLERANCE && !subconceptHardMismatch) {
+                subconceptHardMismatch = { concept: sc.concept, diff: r2(diff) };
+              }
+            }
+          }
+        }
+      });
+    });
+
+    sumOfSubconceptTotals = r2(sumOfSubconceptTotals);
+    const subtotalRounded = r2(subtotal);
+    const subtotalSignedDiff = r2(subtotalRounded - sumOfSubconceptTotals);
+    const subtotalDiff = Math.abs(subtotalSignedDiff);
+
+    const ivaRounded = r2(parseFloat(iva) || 0);
+    const totalEsperado = r2(subtotalRounded + ivaRounded);
+    const totalRecibido = r2(total);
+    const totalDiff = Math.abs(totalEsperado - totalRecibido);
+
+    // Se prefiere el mensaje específico del subconcepto (más accionable); si no, el del subtotal.
+    let rejectMessage = null;
+    if (subconceptHardMismatch) {
+      const label = subconceptHardMismatch.concept ? `"${subconceptHardMismatch.concept}"` : 'un servicio';
+      rejectMessage = `El precio de ${label} no coincide con lo calculado `
+        + `(diferencia de $${subconceptHardMismatch.diff.toFixed(2)}). Verifica el precio antes de guardar.`;
+    } else if (subtotalDiff > PRICE_MISMATCH_TOLERANCE) {
+      rejectMessage = `El subtotal ($${subtotalRounded.toFixed(2)}) no coincide con la suma de los servicios `
+        + `($${sumOfSubconceptTotals.toFixed(2)}), diferencia de $${subtotalDiff.toFixed(2)}. `
+        + 'Verifica los precios antes de guardar.';
+    }
+
+    return {
+      subtotalRounded,
+      sumOfSubconceptTotals,
+      subtotalSignedDiff,
+      subtotalDiff,
+      subconceptMismatches,
+      ivaRounded,
+      totalEsperado,
+      totalRecibido,
+      totalDiff,
+      rejectMessage,
+    };
   }
 }
 

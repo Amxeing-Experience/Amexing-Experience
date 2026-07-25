@@ -93,6 +93,10 @@
                     <small class="text-muted d-block">Tipo de Pago</small>
                     <span id="infoPaymentType">&mdash;</span>
                 </div>
+                <div class="col-md-3">
+                    <small class="text-muted d-block">Total</small>
+                    <strong id="infoTotal" class="text-success fs-5">&mdash;</strong>
+                </div>
             </div>
             <hr>
             <div class="row g-3">
@@ -140,43 +144,19 @@
                 <h5 class="card-title mb-0 text-white">
                     <i class="ti ti-calculator me-2"></i>Resumen Financiero
                 </h5>
-                <button class="btn btn-sm btn-light d-none" id="addAdjustmentBtn">
-                    <i class="ti ti-plus me-1"></i>Ajuste
-                </button>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm btn-light d-none" id="addPaymentBtn">
+                        <i class="ti ti-cash me-1"></i>Agregar pago
+                    </button>
+                    <button class="btn btn-sm btn-light d-none" id="addAdjustmentBtn">
+                        <i class="ti ti-plus me-1"></i>Ajuste
+                    </button>
+                </div>
             </div>
         </div>
         <div class="card-body">
             <div id="financialSummaryBody">
                 <!-- Resumen (totales + saldo) — rendered by JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Pagos — sección propia, separada de Cargos Adicionales (antes vivían en la misma tarjeta).
-         Colapsable: se auto-colapsa una vez cargados los pagos si ya hay al menos uno registrado
-         (ver loadPayments), para no obligar a hacer scroll por una tabla que el usuario ya conoce. -->
-    <div class="card border-0 shadow-sm mb-4" id="paymentsCard" style="display:none;">
-        <div class="card-header" style="background: linear-gradient(135deg, #0d6efd 0%, #6ea8fe 100%); border: none;">
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center flex-grow-1" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#paymentsCollapse" aria-expanded="true" aria-controls="paymentsCollapse">
-                    <h5 class="card-title mb-0 text-white">
-                        <i class="ti ti-cash me-2"></i>Pagos
-                        <span class="badge bg-light text-primary ms-2 d-none" id="paymentsCountBadge"></span>
-                    </h5>
-                    <i class="ti ti-chevron-up text-white ms-2" id="paymentsChevron"></i>
-                </div>
-                <button class="btn btn-sm btn-light d-none" id="addPaymentBtn">
-                    <i class="ti ti-plus me-1"></i>Agregar pago
-                </button>
-            </div>
-        </div>
-        <div class="collapse show" id="paymentsCollapse">
-            <div class="card-body">
-                <!-- Inline payment form (replaces the old modal) -->
-                <div id="paymentFormWrap" class="border rounded p-3 mb-3 bg-light" style="display:none;"></div>
-                <div id="paymentsBody">
-                    <!-- Payments table — rendered by JS -->
-                </div>
             </div>
         </div>
     </div>
@@ -246,7 +226,83 @@
     </div>
 </div>
 
+<!-- Pagos — Offcanvas (Bootstrap 5 nativo). Reemplaza la antigua #paymentsCard: chips por método,
+     cobertura, saldo restante por método, énfasis de descuento, historial y (admin) el formulario de
+     registro. Se abre con "Agregar pago" del Resumen Financiero. Ancho 680px; full-width bajo el
+     breakpoint sm (576px) nativo de Bootstrap. -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="paymentsOffcanvas" aria-labelledby="paymentsOffcanvasLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title mb-0" id="paymentsOffcanvasLabel"><i class="ti ti-cash me-2"></i>Pagos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+    <div class="offcanvas-body">
+        <!-- Card de cobertura (total + estado + barra + Pagado/Saldo), primero para verse sin scroll,
+             con acento de marca propio (payment-coverage-highlight) para distinguirla del resto del carrito -->
+        <div class="rounded p-3 mb-3 payment-coverage-highlight" id="paymentCoverageCard"></div>
+        <!-- Énfasis de descuento (Fase E), justo debajo de la card de cobertura -->
+        <div class="mb-3" id="paymentDiscountEmphasis" style="display:none;"></div>
+        <!-- Chips por método de pago (Requisito 3) -->
+        <div class="text-muted fw-semibold small mb-2"><i class="ti ti-credit-card me-1"></i>Progreso por método de pago</div>
+        <div class="mb-3" id="paymentChips"></div>
+        <!-- Desglose de saldo restante por método (Requisito 8) -->
+        <div class="p-3 mb-3" id="paymentRemainingByMethod" style="display:none;"></div>
+        <!-- Historial de pagos (colapsado por defecto, menos amontonado) + registro (admin) -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <button class="btn btn-sm btn-link text-decoration-none ps-0 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#paymentsHistoryCollapse" id="paymentsHistoryToggle">
+                <i class="ti ti-history me-1"></i>Historial de pagos <i class="ti ti-chevron-down ms-1" style="font-size:0.75rem;"></i>
+            </button>
+            <button class="btn btn-sm btn-primary d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
+        </div>
+        <!-- Inline payment form (relocated from the old card; only admin renders/uses it) -->
+        <div id="paymentFormWrap" class="p-3 mb-3" style="display:none;"></div>
+        <div class="collapse" id="paymentsHistoryCollapse">
+            <div class="p-2" id="paymentsBody">
+                <!-- Payments table — rendered by JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
+#paymentsOffcanvas { --bs-offcanvas-width: 760px; }
+@media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
+/* Backdrop mas oscuro que el default de Bootstrap (0.5) para que las tarjetas blancas del carrito
+   resalten mas contra el resto de la pagina (unico offcanvas de esta vista). */
+.offcanvas-backdrop.show { background-color: rgba(15,23,32,0.72) !important; opacity: 1 !important; }
+/* Fondo gris claro (el mismo tono de fondo de pagina del resto del dashboard, #f8f9fa) para que las
+   tarjetas blancas "floten" con contraste, en vez de perderse contra un panel blanco parejo. */
+#paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 0.86rem; }
+/* Letra mas chica en todo el carrito (chips, cobertura, historial) para que quepa mas sin sentirse
+   amontonado; el historial ya trae ademas la clase Bootstrap "small" encima de esta base. Radio de
+   borde explicito (0.5rem, el mismo que usan las demas cards de esta pagina) porque el `.rounded`
+   por defecto de Bootstrap se veia casi recto a este tamano. */
+#paymentCoverageCard.payment-coverage-highlight,
+#paymentChips .payment-chip-card,
+#paymentRemainingByMethod,
+#paymentFormWrap,
+#paymentsBody {
+    background: #fff;
+    border: 1px solid #e0e6ed;
+    border-radius: 0.5rem;
+}
+/* El wrapper flex que envuelve los chips (buildMethodChips) no debe tener su propio borde/fondo —
+   cada chip individual ya trae el suyo via .payment-chip-card. */
+#paymentChips > div { background: transparent; border: none; }
+/* Filete de acento del verde sage de marca (--brand-primary): solido en la card de cobertura
+   (la principal), y un tono mas claro en las demas tarjetas para diferenciarlas entre si. */
+#paymentCoverageCard.payment-coverage-highlight { border-left: 4px solid #969b81; }
+#paymentChips .payment-chip-card,
+#paymentRemainingByMethod,
+#paymentFormWrap,
+#paymentsBody {
+    border-left: 4px solid #c0c3b3;
+}
+#paymentsBody { overflow: hidden; }
+/* Historial: letra explicitamente chica en la tabla (mas chica que el resto del panel). */
+#paymentsOffcanvas #paymentsBody table { font-size: 0.72rem; }
+#paymentsOffcanvas #paymentsBody .badge { font-size: 0.68rem; }
+/* Mismo radio de borde explicito para el bloque de descuento/ahorro (fondo verde claro propio). */
+#paymentDiscountEmphasis > div, #paymentCoverageCard .rounded { border-radius: 0.5rem; }
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
@@ -308,6 +364,8 @@
 
 <!-- Shared cancel utilities -->
 <script src="/js/reservation-cancel-utils.js"></script>
+<!-- Shared payment breakdown helpers (isomorphic; also require'd by Jest) -->
+<script src="/shared/payments/paymentBreakdownHelpers.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
@@ -328,38 +386,35 @@ document.addEventListener('DOMContentLoaded', async function() {
         return name.split(' ').map(w => w[0]).filter(Boolean).join('').substring(0, 2).toUpperCase();
     }
 
-    // Returns the per-service price respecting the reservation's payment type. The
-    // quote stored pricesByType per service ({ efectivo, transferencia, tarjeta }) — at
-    // conversion only the snapshot for the quote's payment type made it into
-    // svc.total. Using pricesByType when available makes the booking totals match the
-    // quote regardless of which payment type the reservation is currently on.
-    function getServicePriceByType(svc, paymentType) {
-        const sub = (svc && svc.subconcept) || {};
-        const pbt = sub.pricesByType;
-        if (pbt && typeof pbt === 'object' && pbt[paymentType] != null) {
-            const base = Number(pbt[paymentType]);
-            if (!Number.isNaN(base)) {
-                // Fase 2d: pricesByType es la base pura → restar descuento y sumar propina por
-                // servicio, escalados a la forma de pago (mismo cálculo que la cotización).
-                const ef = Number(pbt.efectivo) || 0;
-                const factor = ef > 0 ? base / ef : 1;
-                const disc = (Number(sub.discountAmount) || 0) * factor;
-                const net = Math.max(0, base - disc);
-                let tip = 0;
-                if (sub.tipType && Number(sub.tipValue) > 0) {
-                    tip = sub.tipType === 'percent'
-                        ? net * (Number(sub.tipValue) / 100)
-                        : (Number(sub.tipValue) || 0) * factor;
-                }
-                return Math.round((net + tip) * 100) / 100;
-            }
+    // Precio base en efectivo de un servicio (0 si está excluido del total). Es el precio de
+    // referencia para el desglose Subtotal/recargo -- no se usa para calcular el cobro de
+    // otros métodos.
+    function getServiceBase(svc) {
+        if (svc?.subconcept?.includeInTotal === false) return 0;
+        const pbt = svc?.subconcept?.pricesByType;
+        if (pbt && typeof pbt === 'object' && pbt.efectivo != null) {
+            const v = Number(pbt.efectivo);
+            if (!Number.isNaN(v)) return v;
         }
         return Number(svc?.total) || 0;
     }
 
-    // Sum of per-service prices using the reservation's payment type.
+    // Lógica de cálculo/desglose compartida (pura, probada por Jest) — ver
+    // /shared/payments/paymentBreakdownHelpers.js. Wrappers finos para no tocar los call sites.
+    function getServicePriceByType(svc, paymentType) {
+        return PaymentBreakdownHelpers.getServicePriceByType(svc, paymentType);
+    }
+    // Precio REAL para la LÍNEA del servicio: no pone $0 en "Pago externo" (includeInTotal:false); la
+    // exclusión del Total/Saldo la sigue haciendo getServicePriceByType en el agregado financiero.
+    function getServicePriceByTypeGross(svc, paymentType) {
+        return PaymentBreakdownHelpers.getServicePriceByTypeGross(svc, paymentType);
+    }
+    function getServiceDiscountByType(svc, paymentType) {
+        return PaymentBreakdownHelpers.getServiceDiscountByType(svc, paymentType);
+    }
     function computeServicesSubtotalByType(services, paymentType) {
-        return (services || []).reduce((sum, svc) => sum + getServicePriceByType(svc, paymentType), 0);
+        const currency = (reservationData && reservationData.currency) || 'MXN';
+        return PaymentBreakdownHelpers.computeServicesSubtotalByType(services, paymentType, currency);
     }
 
     function buildPersonCard(person, roleLabel, roleIcon, colorClass) {
@@ -554,18 +609,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `<span class="badge ${s.cls}" title="Estado de la reservación">${s.label}</span>`;
     }
 
-    // Estado de pago — solid badge + text-white salvo bg-warning (text-dark).
-    const PAYMENT_STATUS_MAP = {
-        pending: { label: 'Pendiente de pago', cls: 'bg-secondary text-white' },
-        partial: { label: 'Pago parcial', cls: 'bg-warning text-dark' },
-        paid: { label: 'Pagado', cls: 'bg-success text-white' },
-        refunded: { label: 'Reembolsado', cls: 'bg-info text-white' },
-    };
-
+    // Estado de pago — delegado al módulo compartido (mismo PAYMENT_STATUS_MAP en las 3 plantillas).
     function getPaymentStatusBadge(status) {
-        if (!status) return '';
-        const s = PAYMENT_STATUS_MAP[status] || { label: status, cls: 'bg-secondary text-white' };
-        return `<span class="badge ${s.cls}" title="Estado de pago">${s.label}</span>`;
+        return PaymentBreakdownHelpers.getPaymentStatusBadge(status);
     }
 
     function formatDate(dateStr) {
@@ -660,22 +706,36 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `<span class="badge ${s.cls}" style="font-size:0.65rem;">${s.label}</span>`;
     }
 
+    // Failure modes are kept DISTINCT so the message points at the real cause instead of a
+    // single opaque "Error al cargar": (1) network/HTTP or API success:false vs (2) an
+    // exception thrown while rendering valid data. Both are logged with detail to the console.
     async function loadReservation() {
+        let result;
         try {
             const response = await fetch(`/api/reservations/${reservationId}`, {
                 headers: { 'Authorization': `Bearer ${authToken()}` }
             });
-            const result = await response.json();
-            if (!result.success) {
-                document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservacion</p>';
+            result = await response.json().catch(() => null);
+            if (!response.ok || !result || !result.success) {
+                const reason = (result && result.error) ? result.error : `HTTP ${response.status}`;
+                console.error('Error loading reservation:', reason, result);
+                document.getElementById('loadingState').innerHTML = `<p class="text-danger">Error al cargar la reservacion (${reason})</p>`;
                 return;
             }
+        } catch (error) {
+            console.error('Error loading reservation (red):', error);
+            document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservacion (sin conexion)</p>';
+            return;
+        }
 
+        // Render separately: a render-time exception (unexpected/malformed data) is reported
+        // distinctly from a fetch/API failure, and no longer masquerades as "no se pudo cargar".
+        try {
             reservationData = result.data;
             renderReservation();
         } catch (error) {
-            console.error('Error loading reservation:', error);
-            document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservacion</p>';
+            console.error('Error rendering reservation:', error);
+            document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al mostrar la reservacion. Revisa la consola para el detalle.</p>';
         }
     }
 
@@ -733,8 +793,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('infoStartDate').textContent = formatDate(d.startDate);
         document.getElementById('infoEndDate').textContent = formatDate(d.endDate);
         document.getElementById('infoPaymentType').textContent = d.paymentType || '—';
-        // El total del header se quitó por redundante: el "Total Final" del resumen financiero
-        // (abajo) es la fuente única e incluye ajustes + propina global.
+        // Total del encabezado = d.totalAmount persistido (misma fuente que usan agencia/cliente
+        // en su #infoTotal). Ese campo YA incluye los ajustes de reservación —recalculateTotal lo
+        // mantiene en sync con adjustments y el motor de pagos lo actualiza—, así que los 3 roles
+        // muestran el MISMO número. El desglose por método de pago (pricesByType) vive en la card
+        // "Resumen Financiero", no en este encabezado informativo (council L0F0).
+        document.getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency);
 
         // Assignment counter
         const totalSvc = (d.services || []).length;
@@ -975,10 +1039,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (svc.type === 'a-disposicion' && sub.discountPercent) {
             otrosItems.push(detailLine('discount-2', `${sub.discountPercent}% descuento`));
         }
-        // Fase 2d: descuento y propina por servicio (ya reflejados en el total del servicio).
+        // Fase 2d: descuento y propina por servicio (ya reflejados en el total del servicio). El
+        // descuento se escala por la forma de pago (getServiceDiscountByType) para coincidir con el
+        // precio por método mostrado arriba (getServicePriceByType), en vez del monto bruto en efectivo.
         if (Number(sub.discountAmount) > 0) {
             const dPct = (sub.discountType === 'percent' && sub.discountValue) ? ` ${sub.discountValue}%` : '';
-            otrosItems.push(detailLine('discount-2', `Descuento${dPct} −${formatCurrency(sub.discountAmount, reservationData.currency)}`));
+            const dScaled = getServiceDiscountByType(svc, reservationData.paymentType);
+            otrosItems.push(detailLine('discount-2', `Descuento${dPct} −${formatCurrency(dScaled, reservationData.currency)}`));
         }
         if (Number(sub.tipAmount) > 0) {
             const tPct = (sub.tipType === 'percent' && sub.tipValue) ? ` ${sub.tipValue}%` : '';
@@ -1130,6 +1197,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                     ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' &rarr; ' : ''}${svc.destinationName || ''}</small>`
                     : '';
 
+                // "Pago externo" (includeInTotal:false): el cliente lo paga directo a un tercero. Se
+                // marca junto al título y se muestra su precio REAL (nunca $0), igual que la vista
+                // pública, para no aparentar un servicio gratis ni un cargo que la agencia debe cobrar.
+                // Estilo tomado de .service-badge.external (services-renderer.js), que estas vistas no cargan.
+                const externalBadge = svc.subconcept?.includeInTotal === false
+                    ? '<span class="badge me-1" style="background:rgba(150,155,129,0.15);color:#969b81;border:1px solid rgba(150,155,129,0.3);font-weight:600;">Pago externo</span>'
+                    : '';
+
                 const includeGuide = svc.subconcept?.includeGuide;
                 const includeGreeter = svc.subconcept?.includeGreeter;
                 // Decide whether this service actually needs vehicle assignment slots.
@@ -1158,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 <div class="service-row d-flex align-items-center justify-content-between">
                     <div class="d-flex align-items-center flex-grow-1">
                         <div>
-                            <div class="fw-semibold">${getDisplayConcept(svc)}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
+                            <div class="fw-semibold">${externalBadge}${getDisplayConcept(svc)}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
                             ${route}
                             ${(svc.vehicleTypeName && needsVehicle && vehicleQty === 1) ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
                             ${getSubconceptDetails(svc)}
@@ -1172,7 +1247,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         ${svc.type === 'concepto' && svc.status !== 'cancelled' ? '<span class="badge bg-success text-white">Lista</span>' : getReservationStatusBadge(svc.status)}
-                        <span class="text-end" style="min-width: 80px;">${formatCurrency(getServicePriceByType(svc, reservationData.paymentType), reservationData.currency)}</span>
+                        <span class="text-end" style="min-width: 80px;">${formatCurrency(getServicePriceByTypeGross(svc, reservationData.paymentType), reservationData.currency)}</span>
                         ${canAssign && svc.status !== 'cancelled' && svc.type !== 'concepto' ? `<button class="btn btn-sm ${svc.status === 'completed' ? 'btn-success' : (svc.status === 'assigned' ? 'btn-outline-success' : 'btn-outline-secondary')} status-toggle-btn" data-service-id="${svc.id}" data-current-status="${svc.status}" title="${svc.status === 'completed' ? 'Revertir a asignada' : (svc.status === 'assigned' ? 'Marcar completada' : 'Marcar asignada')}"><i class="ti ${svc.status === 'completed' ? 'ti-circle-check-filled' : (svc.status === 'assigned' ? 'ti-circle-check' : 'ti-circle')}"></i></button>` : ''}
                         ${canAssign ? (() => {
             // Build the extras payload merging the REQUESTED list (from subconcept blob — never
@@ -1595,6 +1670,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const card = document.getElementById('financialSummaryCard');
         const body = document.getElementById('financialSummaryBody');
         const addBtn = document.getElementById('addAdjustmentBtn');
+        const addPaymentBtn = document.getElementById('addPaymentBtn');
         const adjustments = d.adjustments || [];
         // Subtotal recomputed from per-service pricesByType[paymentType] so the booking
         // matches the quote's totals when both use the same payment type, and updates
@@ -1609,17 +1685,22 @@ document.addEventListener('DOMContentLoaded', async function() {
         card.style.display = '';
         if (canEdit) addBtn.classList.remove('d-none');
         else addBtn.classList.add('d-none');
+        // "Agregar pago" solo depende de d.status (ya disponible aquí, tras loadReservation), no de
+        // paymentsCache — se habilita en el mismo punto que "+ Ajuste" para no esperar el fetch aparte
+        // de loadPayments (evita el retraso visible del botón tras un hard reload).
+        if (addPaymentBtn) {
+            if (canEdit) addPaymentBtn.classList.remove('d-none');
+            else addPaymentBtn.classList.add('d-none');
+        }
 
         const charges = adjustments.filter(a => a.type === 'charge');
         const discounts = adjustments.filter(a => a.type === 'discount');
-        const chargesTotal = charges.reduce((s, a) => s + (a.amount || 0), 0);
-        const discountsTotal = discounts.reduce((s, a) => s + (a.amount || 0), 0);
-        // Fase 2d: propina global de la cotización (del snapshot).
-        const globalTip = d.globalTip;
-        const globalTipAmount = (globalTip && Number(globalTip.amount) > 0) ? Number(globalTip.amount) : 0;
-        // Final total = subtotal + charges - discounts + propina global (computed instead of using
-        // the stored d.totalAmount so payment-type changes recompute correctly).
-        const finalTotal = servicesSubtotal + chargesTotal - discountsTotal + globalTipAmount;
+        const pay = d.payment;
+        // Propina cobrada (Fase 2): SIEMPRE del summary del servidor (d.payment), NUNCA de d.globalTip del
+        // snapshot bruto de la cotización (fuente no confiable) ni recalculada localmente. general +
+        // por servicio suman pay.tip; el motor de pagos ya la incluye en pay.total.
+        const generalTip = pay ? PaymentBreakdownHelpers.round2(pay.generalTip) : 0;
+        const serviceTipsTotal = pay ? PaymentBreakdownHelpers.round2(pay.serviceTipsTotal) : 0;
         const curr = d.currency || 'MXN';
 
         let html = '';
@@ -1634,7 +1715,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
                 <div>
                     <i class="ti ti-plus text-danger me-1"></i>
-                    <span class="small">${adj.description}</span>
+                    <span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
@@ -1649,7 +1730,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
                 <div>
                     <i class="ti ti-discount-2 text-success me-1"></i>
-                    <span class="small">${adj.description}${pctLabel}</span>
+                    <span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}${pctLabel}</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
@@ -1658,33 +1739,42 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
         });
 
-        // Fase 2d: propina general de la cotización (ya incluida en el Total Final).
-        if (globalTipAmount > 0) {
-            const gtPct = (globalTip.type === 'percent' && globalTip.value) ? ` (${globalTip.value}%)` : '';
-            const gtMand = globalTip.mandatory ? ' · obligatoria' : '';
+        // Propina cobrada (Fase 2): líneas leídas del summary del servidor para que el Subtotal + ajustes +
+        // propina reconcilie con el Total a pagar. La general va en su línea; la de por-servicio se agrega
+        // (los tips por servicio también aparecen por servicio en el itinerario, aquí es el agregado).
+        if (generalTip > 0) {
             html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propina general${gtPct}${gtMand}</span></div>
-                <span class="text-info fw-semibold">+${formatCurrency(globalTipAmount, curr)}</span>
+                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propina general</span></div>
+                <span class="text-info fw-semibold">+${formatCurrency(generalTip, curr)}</span>
+            </div>`;
+        }
+        if (serviceTipsTotal > 0) {
+            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
+                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propinas por servicio</span></div>
+                <span class="text-info fw-semibold">+${formatCurrency(serviceTipsTotal, curr)}</span>
             </div>`;
         }
 
-        // Final total
-        html += `<div class="d-flex justify-content-between align-items-center py-2 mt-1">
-            <span class="fw-bold"><i class="ti ti-receipt me-2"></i>Total Final</span>
-            <span class="fw-bold fs-5 text-success">${formatCurrency(finalTotal, curr)}</span>
-        </div>`;
-
-        // Payment block — estado de pago + pagado / saldo / total con IVA.
-        const pay = d.payment;
+        // Payment block — estado + total + pagado + saldo. El "Saldo" se resuelve con
+        // resolveDisplayedBalance: cuando está pagado el saldo mostrado es 0 y, si el pago se hizo en un
+        // método más barato que el ancla de la cotización, el residuo físico aparece como línea de AHORRO
+        // aparte (nunca restado del saldo). El detalle completo (chips, cobertura, desglose por método,
+        // historial y registro) vive en #paymentsOffcanvas.
         if (pay) {
-            const balanceCls = (pay.balance || 0) > 0 ? 'text-danger' : 'text-success';
+            const resolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
+            const balanceCls = resolved.displayedBalance > 0 ? 'text-danger' : 'text-success';
+            const savingsRow = resolved.savings
+                ? `<div class="py-2 border-top" style="color:#146c43;">
+                    <div class="fw-semibold"><i class="ti ti-discount-2 me-2"></i>${PaymentBreakdownHelpers.escapeHtml(resolved.savings.label)}</div>
+                    <div class="small">${PaymentBreakdownHelpers.escapeHtml(resolved.savings.sublabel)}</div>
+                </div>` : '';
             html += `<div class="border-top mt-2 pt-2">
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
                     ${getPaymentStatusBadge(pay.paymentStatus)}
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total con IVA</span>
+                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total a pagar</span>
                     <span class="fw-semibold">${formatCurrency(pay.total, curr)}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
@@ -1693,10 +1783,36 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2">
                     <span class="text-muted"><i class="ti ti-wallet me-2"></i>Saldo</span>
-                    <span class="fw-semibold ${balanceCls}">${formatCurrency(pay.balance, curr)}</span>
+                    <span class="fw-semibold ${balanceCls}">${formatCurrency(resolved.displayedBalance, curr)}</span>
                 </div>
+                ${savingsRow}
             </div>`;
         }
+
+        // Comparativo por método de pago (staff-facing): subtotal de servicios en los 3 métodos,
+        // con marcador sobre el método actual. Reutiliza computeServicesSubtotalByType (sin fetch).
+        const comparisonMethods = [
+            { method: 'efectivo', label: 'Efectivo' },
+            { method: 'transferencia', label: 'Transferencia' },
+            { method: 'tarjeta', label: 'Tarjeta' },
+        ];
+        const comparisonRows = comparisonMethods.map(m => {
+            const amount = computeServicesSubtotalByType(d.services, m.method);
+            const isActive = m.method === d.paymentType;
+            const marker = isActive
+                ? `<i class="ti ti-point-filled text-primary me-1"></i>${m.label} <span class="small text-primary">(Método actual: ${m.label})</span>`
+                : `<i class="ti ti-point text-muted me-1"></i>${m.label}`;
+            return `<div class="d-flex justify-content-between align-items-center py-1">
+                <span class="${isActive ? 'fw-semibold' : 'text-muted'}">${marker}</span>
+                <span class="${isActive ? 'fw-semibold' : ''}">${formatCurrency(amount, curr)}</span>
+            </div>`;
+        }).join('');
+        html += `<div class="border-top mt-2 pt-2">
+            <button class="btn btn-sm btn-link text-decoration-none p-0" type="button" data-bs-toggle="collapse" data-bs-target="#paymentMethodComparison" aria-expanded="false" aria-controls="paymentMethodComparison" id="paymentMethodComparisonToggle">
+                <i class="ti ti-arrows-left-right me-1"></i>Ver comparativo por método de pago
+            </button>
+            <div class="collapse mt-2" id="paymentMethodComparison">${comparisonRows}</div>
+        </div>`;
 
         body.innerHTML = html;
 
@@ -1731,12 +1847,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     // ===== PAYMENTS =====
 
     let paymentsCache = [];
-    // Auto-collapse only once (first load) — re-collapsing after every add/edit save would fight the user.
-    let paymentsAutoCollapseDone = false;
+    // Último summary AMPLIO de GET .../payments (coveragePercent/availableMethods/anchoredMethod/
+    // montoParaSaldar). El summary ANGOSTO de getReservationById NO trae estos campos, así que el carrito
+    // se puebla solo desde aquí.
+    let latestSummary = null;
 
-    function paymentsCollapseInstance() {
-        const el = document.getElementById('paymentsCollapse');
-        return el ? bootstrap.Collapse.getOrCreateInstance(el, { toggle: false }) : null;
+    function paymentsOffcanvasInstance() {
+        const el = document.getElementById('paymentsOffcanvas');
+        return el ? bootstrap.Offcanvas.getOrCreateInstance(el) : null;
     }
 
     const PAYMENT_METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
@@ -1748,7 +1866,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
             const result = await response.json();
             paymentsCache = result?.data?.payments || [];
-            // GET returns the fresh summary too — keep the saldo (Total/Pagado/Saldo) in sync on every reload.
+            // GET returns the fresh summary too — keep the saldo y el carrito en sync en cada recarga.
             if (result?.data?.summary) applyPaymentSummary(result.data.summary);
         } catch (err) {
             // Keep the existing cache on a transient network error instead of blanking the list.
@@ -1757,38 +1875,43 @@ document.addEventListener('DOMContentLoaded', async function() {
         renderPayments();
     }
 
+    // Rellena las secciones del offcanvas (chips / cobertura / saldo restante / descuento) desde el
+    // summary AMPLIO. Los % de cada chip y la barra usan coveragePercent/remainingPercent del backend TAL
+    // CUAL (no re-derivar en cliente: rompería con ajustes manuales).
+    function renderPaymentsOffcanvas() {
+        if (!latestSummary) return;
+        const services = reservationData?.services || [];
+        const curr = reservationData?.currency || 'MXN';
+        const chips = document.getElementById('paymentChips');
+        const coverage = document.getElementById('paymentCoverageCard');
+        const remaining = document.getElementById('paymentRemainingByMethod');
+        const discount = document.getElementById('paymentDiscountEmphasis');
+        if (chips) chips.innerHTML = PaymentBreakdownHelpers.buildMethodChips(latestSummary, services, curr);
+        if (coverage) coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr);
+        if (remaining) {
+            const html = PaymentBreakdownHelpers.buildRemainingByMethod(latestSummary, curr);
+            remaining.innerHTML = html;
+            remaining.style.display = html ? '' : 'none';
+        }
+        if (discount) {
+            const html = PaymentBreakdownHelpers.buildDiscountEmphasis(latestSummary, services, curr);
+            discount.innerHTML = html;
+            discount.style.display = html ? '' : 'none';
+        }
+    }
+
     function renderPayments() {
         const body = document.getElementById('paymentsBody');
-        const addBtn = document.getElementById('addPaymentBtn');
+        const showFormBtn = document.getElementById('showPaymentFormBtn');
         if (!body) return;
-
-        // Pagos now lives in its own card (split out of Resumen Financiero) — show it here
-        // since it's no longer unhidden as a side effect of renderFinancialSummary().
-        const card = document.getElementById('paymentsCard');
-        if (card) card.style.display = '';
 
         const d = reservationData;
         const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
         const curr = d.currency || 'MXN';
 
-        if (addBtn) { if (canEdit) addBtn.classList.remove('d-none'); else addBtn.classList.add('d-none'); }
-
-        const countBadge = document.getElementById('paymentsCountBadge');
-        if (countBadge) {
-            if (paymentsCache.length) {
-                countBadge.textContent = paymentsCache.length;
-                countBadge.classList.remove('d-none');
-            } else {
-                countBadge.classList.add('d-none');
-            }
-        }
-
-        // First load only: collapse the section when there's already data (nothing new to review),
-        // keep it open when empty (invites registering the first payment).
-        if (!paymentsAutoCollapseDone) {
-            paymentsAutoCollapseDone = true;
-            if (paymentsCache.length) paymentsCollapseInstance()?.hide();
-        }
+        // "Agregar pago" (header) ya se habilita en renderFinancialSummary, justo tras loadReservation.
+        // "Registrar pago" (dentro del carrito) solo es relevante una vez abierto el offcanvas.
+        if (showFormBtn) { if (canEdit) showFormBtn.classList.remove('d-none'); else showFormBtn.classList.add('d-none'); }
 
         if (!paymentsCache.length) {
             body.innerHTML = '<div class="text-center py-3 text-muted">Sin pagos registrados</div>';
@@ -1796,16 +1919,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         const rows = paymentsCache.map((p) => {
-            const ref = p.reference ? p.reference : '<span class="text-muted">—</span>';
-            const tipHtml = p.tip ? `<small class="text-muted d-block">+ propina ${formatCurrency(p.tip, curr)}</small>` : '';
+            const ref = p.reference ? PaymentBreakdownHelpers.escapeHtml(p.reference) : '<span class="text-muted">—</span>';
+            // "Recibió" solo aplica al efectivo; en otros métodos es irrelevante y se muestra un guion.
+            const received = (p.method === 'efectivo' && p.receivedBy)
+                ? PaymentBreakdownHelpers.escapeHtml(p.receivedBy) : '<span class="text-muted">—</span>';
             const receipt = p.receiptUrl
-                ? `<a href="${p.receiptUrl}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
+                ? `<a href="${PaymentBreakdownHelpers.escapeHtml(p.receiptUrl)}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
                 : '<span class="text-muted">—</span>';
             return `<tr>
                 <td>${formatDate(p.paidAt || p.createdAt)}</td>
                 <td><span class="badge bg-secondary-subtle text-secondary">${PAYMENT_METHOD_LABELS[p.method] || p.method || '—'}</span></td>
                 <td>${ref}</td>
-                <td class="text-end">${formatCurrency(p.amount, curr)}${tipHtml}</td>
+                <td>${received}</td>
+                <td class="text-end">${formatCurrency(p.amount, curr)}</td>
                 <td>${p.origCurrency || curr}</td>
                 <td class="text-center">${receipt}</td>
                 <td class="text-end">
@@ -1816,12 +1942,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         }).join('');
 
         body.innerHTML = `<div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0">
+            <table class="table table-sm table-hover align-middle mb-0 small">
                 <thead class="table-light">
                     <tr>
                         <th>Fecha</th>
                         <th>Método</th>
                         <th>Referencia</th>
+                        <th>Recibió</th>
                         <th class="text-end">Monto</th>
                         <th>Moneda</th>
                         <th class="text-center">Comprobante</th>
@@ -1874,21 +2001,33 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    // Inline payment form (replaces the old modal). null = nuevo, id = editar el pago.
+    // Inline payment form (relocated into #paymentsOffcanvas). null = nuevo, id = editar el pago.
     function renderPaymentForm(paymentId) {
         const wrap = document.getElementById('paymentFormWrap');
         if (!wrap) return;
-        // The form lives inside the collapsible Pagos section — expand it so the form is actually visible.
-        paymentsCollapseInstance()?.show();
         const existing = paymentId ? paymentsCache.find((p) => p.id === paymentId) : null;
         const curr = existing?.origCurrency || 'MXN';
         const paidAt = existing?.paidAt ? new Date(existing.paidAt).toISOString().slice(0, 10) : '';
         // Payment date allows the future (reservations later); shared standard 1900 .. today + 20y.
         const paidAtMax = (() => { const dt = new Date(); dt.setFullYear(dt.getFullYear() + 20); return dt.toISOString().slice(0, 10); })();
         const opt = (v, label, sel) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${label}</option>`;
-        const method = existing?.method || 'efectivo';
         const receiptLink = existing?.receiptUrl
             ? `<a href="${existing.receiptUrl}" target="_blank" class="small d-block mt-1"><i class="ti ti-file-invoice me-1"></i>Ver comprobante actual</a>` : '';
+
+        // Método: poblado dinámicamente desde availableMethods (Fase C), NUNCA hardcodeado a 3 opciones.
+        // Al editar, se conserva el método guardado aunque ya no esté disponible (no cambiarlo en silencio).
+        // Sin métodos disponibles (H3): select deshabilitado con mensaje y guardado bloqueado.
+        const available = (latestSummary && Array.isArray(latestSummary.availableMethods)) ? latestSummary.availableMethods.slice() : [];
+        const method = existing?.method || available[0] || '';
+        const methodOrder = available.slice();
+        if (existing?.method && !methodOrder.includes(existing.method)) methodOrder.push(existing.method);
+        const methodDisabled = methodOrder.length === 0;
+        const methodSelectHtml = methodDisabled
+            ? `<select class="form-select form-select-sm" id="paymentMethod" disabled><option value="">Sin métodos disponibles</option></select>
+               <div class="form-text text-danger">No hay métodos de pago disponibles para esta reservación.</div>`
+            : `<select class="form-select form-select-sm" id="paymentMethod">${methodOrder.map((m) => opt(m, PAYMENT_METHOD_LABELS[m] || m, method)).join('')}</select>`;
+
+        const amountInit = existing ? (existing.origAmount ?? existing.amount ?? '') : '';
 
         wrap.innerHTML = `
             <h6 class="fw-bold mb-2">${existing ? '<i class="ti ti-edit me-1"></i>Editar pago' : '<i class="ti ti-cash me-1"></i>Registrar pago'}</h6>
@@ -1896,7 +2035,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentAmount">Monto</label>
-                    <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentAmount" placeholder="0.00" value="${existing ? (existing.origAmount ?? existing.amount ?? '') : ''}">
+                    <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentAmount" placeholder="0.00" value="${amountInit}">
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentCurrency">Moneda</label>
@@ -1904,19 +2043,19 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentMethod">Método</label>
-                    <select class="form-select form-select-sm" id="paymentMethod">${opt('efectivo', 'Efectivo', method)}${opt('transferencia', 'Transferencia', method)}${opt('tarjeta', 'Tarjeta', method)}</select>
+                    ${methodSelectHtml}
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
-                    <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}">
+                    <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}" required>
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentTip">Propina</label>
-                    <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentTip" placeholder="0.00" value="${existing?.tip || ''}">
-                </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
-                    <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${(existing?.reference || '').replace(/"/g, '&quot;')}">
+                    <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${PaymentBreakdownHelpers.escapeHtml(existing?.reference || '')}">
+                </div>
+                <div class="col-md-6" id="paymentReceivedByWrap" style="display:${method === 'efectivo' ? '' : 'none'};">
+                    <label class="form-label fw-semibold small" for="paymentReceivedBy">¿Quién recibió el efectivo?</label>
+                    <input type="text" class="form-control form-control-sm" id="paymentReceivedBy" maxlength="100" placeholder="Nombre de quien recibió" value="${PaymentBreakdownHelpers.escapeHtml(existing?.receivedBy || '')}" ${method === 'efectivo' ? 'required' : ''}>
                 </div>
                 <div class="col-12">
                     <label class="form-label fw-semibold small" for="paymentReceipt">Comprobante (imagen o PDF)</label>
@@ -1925,59 +2064,83 @@ document.addEventListener('DOMContentLoaded', async function() {
                 </div>
                 <div class="col-12">
                     <label class="form-label fw-semibold small" for="paymentNotes">Notas</label>
-                    <textarea class="form-control form-control-sm" id="paymentNotes" rows="2" maxlength="300" placeholder="Notas del pago">${existing?.notes || ''}</textarea>
+                    <textarea class="form-control form-control-sm" id="paymentNotes" rows="2" maxlength="300" placeholder="Notas del pago">${PaymentBreakdownHelpers.escapeHtml(existing?.notes || '')}</textarea>
                 </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-3">
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelPaymentBtn">Cancelar</button>
                 <button type="button" class="btn btn-sm btn-primary px-4" id="savePaymentBtn"><i class="ti ti-check me-1"></i>Guardar</button>
             </div>`;
-        // Make the inline form obvious (it lives above the payments table): a clearly bordered panel
-        // centered in the viewport, so opening "Editar/Registrar pago" no longer desconcierta.
-        wrap.style.cssText = 'border:2px solid #0d6efd;border-radius:.5rem;padding:1rem 1.25rem;background:#f5f9ff';
-        wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // El formulario vive dentro del offcanvas (posición fija con scroll propio): se muestra en su
+        // sitio y se desplaza a la vista dentro del panel, sin scrollIntoView de página ni borde inline.
+        wrap.style.display = '';
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const saveBtn = document.getElementById('savePaymentBtn');
+        // Sin métodos disponibles (H3): no se puede registrar/editar el pago — bloquea el guardado.
+        if (methodDisabled && saveBtn) saveBtn.disabled = true;
         document.getElementById('cancelPaymentBtn').addEventListener('click', () => { wrap.style.display = 'none'; wrap.innerHTML = ''; });
-        document.getElementById('savePaymentBtn').addEventListener('click', () => savePayment(existing ? existing.id : ''));
+        saveBtn.addEventListener('click', () => savePayment(existing ? existing.id : ''));
         attachThousands(document.getElementById('paymentAmount'));
-        attachThousands(document.getElementById('paymentTip'));
+
+        // "¿Quién recibió el efectivo?" es visible + required SOLO cuando el método es efectivo, y
+        // reacciona en vivo si el usuario cambia el método DESPUÉS de abrir el formulario.
+        const methodSel = document.getElementById('paymentMethod');
+        function syncReceivedByVisibility() {
+            const isCash = methodSel && methodSel.value === 'efectivo';
+            const wrapEl = document.getElementById('paymentReceivedByWrap');
+            const inputEl = document.getElementById('paymentReceivedBy');
+            if (wrapEl) wrapEl.style.display = isCash ? '' : 'none';
+            if (inputEl) inputEl.required = !!isCash;
+        }
+        if (methodSel) methodSel.addEventListener('change', syncReceivedByVisibility);
+        syncReceivedByVisibility();
     }
 
-    // Refresh the Financial Summary numbers from a POST/PUT/DELETE response summary
-    // (paymentStatus, paidAmount, balance, total) without a full reload.
+    // Refresh the Financial Summary numbers + el carrito desde un summary de respuesta (POST/PUT/DELETE)
+    // o de GET, sin recargar la página. Guarda el summary AMPLIO para poblar el offcanvas.
     function applyPaymentSummary(summary) {
-        if (!summary || !reservationData.payment) return;
-        Object.assign(reservationData.payment, summary);
+        if (!summary) return;
+        latestSummary = summary;
+        if (reservationData.payment) Object.assign(reservationData.payment, summary);
+        else reservationData.payment = { ...summary };
         renderFinancialSummary();
+        renderPaymentsOffcanvas();
     }
 
-    document.getElementById('addPaymentBtn')?.addEventListener('click', () => renderPaymentForm(null));
-
-    // Flip the chevron with the actual collapse state (works whether it was toggled by the header
-    // click or programmatically via paymentsCollapseInstance()).
-    document.getElementById('paymentsCollapse')?.addEventListener('show.bs.collapse', () => {
-        document.getElementById('paymentsChevron')?.classList.replace('ti-chevron-down', 'ti-chevron-up');
+    // "Agregar pago" (header): abre el carrito. El formulario queda colapsado detrás de
+    // "Registrar pago" dentro del panel (menos amontonado al abrir).
+    document.getElementById('addPaymentBtn')?.addEventListener('click', () => {
+        paymentsOffcanvasInstance()?.show();
     });
-    document.getElementById('paymentsCollapse')?.addEventListener('hide.bs.collapse', () => {
-        document.getElementById('paymentsChevron')?.classList.replace('ti-chevron-up', 'ti-chevron-down');
+    // "Registrar pago" (dentro del carrito): muestra el formulario de nuevo pago sin reabrir el panel.
+    document.getElementById('showPaymentFormBtn')?.addEventListener('click', () => renderPaymentForm(null));
+    // Cerrar el carrito (backdrop-click / Escape / botón) descarta el formulario en silencio (H5).
+    document.getElementById('paymentsOffcanvas')?.addEventListener('hidden.bs.offcanvas', () => {
+        const wrap = document.getElementById('paymentFormWrap');
+        if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
     });
 
     async function savePayment(paymentId) {
         const amount = parseAmount(document.getElementById('paymentAmount').value);
-        const tipRaw = parseAmount(document.getElementById('paymentTip').value);
         const paidAt = document.getElementById('paymentPaidAt').value;
+        const method = document.getElementById('paymentMethod').value;
+        const receivedByEl = document.getElementById('paymentReceivedBy');
+        const receivedBy = receivedByEl ? receivedByEl.value.trim() : '';
 
         if (!amount || amount <= 0) { pmToast('El monto debe ser mayor a 0', 'warning'); return; }
         if (amount > 100000000) { pmToast('El monto no puede exceder 100,000,000', 'warning'); return; }
+        if (!paidAt) { pmToast('La fecha de pago es obligatoria', 'warning'); return; }
+        if (method === 'efectivo' && !receivedBy) { pmToast('Indica quién recibió el efectivo', 'warning'); return; }
 
         const payload = {
             amount,
             currency: document.getElementById('paymentCurrency').value,
-            method: document.getElementById('paymentMethod').value,
+            method,
             reference: document.getElementById('paymentReference').value.trim(),
             notes: document.getElementById('paymentNotes').value.trim(),
         };
-        if (!Number.isNaN(tipRaw) && tipRaw > 0) payload.tip = tipRaw;
         if (paidAt) payload.paidAt = paidAt;
+        if (receivedBy) payload.receivedBy = receivedBy;
 
         // Receipt (optional) — validated here but uploaded in a SEPARATE request AFTER the payment is
         // saved (see uploadReceipt). The receipt no longer travels inside the payment save, so a slow
