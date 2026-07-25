@@ -2017,17 +2017,17 @@ class QuoteService {
   }
 
   /**
-   * Recalcula la propina GENERAL de la cotización a pesos FIJOS en efectivo, desde serviceItems.globalTip.
-   * NO se confía en globalTip.amount persistido por el wizard: se calculó contra el método de pago que
-   * estuviera seleccionado y puede venir inflado con recargo de tarjeta (incluso para type 'amount'). Se
-   * recomputa contra la base en efectivo NETA de los servicios ACTIVOS (includeInTotal !== false), restando
-   * el discountAmount de cada servicio ANTES del %, con el mismo patrón que el tip por-servicio del wizard
-   * (ya correcto). type 'percent': base × value/100; type 'amount': value literal (nunca escala por método).
-   * Sin globalTip válido, valor <= 0 o no finito -> 0.
-   * @param {object} serviceItems - Snapshot de servicios de la cotización { globalTip, days }.
-   * @returns {number} Propina general en pesos (efectivo), a 2 decimales.
+   * Recalcula la propina GENERAL de la cotización desde serviceItems.globalTip. NO se confía en
+   * globalTip.amount persistido por el wizard: se recomputa aquí para ser la fuente de verdad del
+   * cobro y de la reservación. type 'percent': % sobre la base NETA DEL MÉTODO de pago de los
+   * servicios ACTIVOS (includeInTotal !== false) — precio pricesByType[método] menos su descuento
+   * escalado — de modo que la propina ESCALE por método igual que el widget de la cotización
+   * (getGlobalTipAmount). type 'amount': value literal en pesos (nunca escala por método). Sin
+   * globalTip válido, valor <= 0 o no finito -> 0.
+   * @param {object} serviceItems - Snapshot de servicios de la cotización { globalTip, days, paymentType }.
+   * @returns {number} Propina general en pesos (en el método de pago), a 2 decimales.
    * @example
-   * this.computeGeneralTip({ globalTip: { type: 'percent', value: 10 }, days: [...] }); // 10% de la base neta
+   * this.computeGeneralTip({ globalTip: { type: 'percent', value: 10 }, paymentType: 'tarjeta', days: [...] }); // 10% de la base neta en tarjeta
    */
   computeGeneralTip(serviceItems) {
     const gt = serviceItems && serviceItems.globalTip;
@@ -2036,23 +2036,33 @@ class QuoteService {
     if (!Number.isFinite(value) || value <= 0) return 0;
     // Monto fijo: literal en pesos, sin escalar por método (anti-regresión del bug del wizard).
     if (gt.type === 'amount') return round2(value);
-    // Porcentaje: sobre la base en efectivo NETA (precio efectivo menos su descuento) de servicios activos.
+    // Porcentaje: sobre la base NETA DEL MÉTODO de pago (precio del método menos su descuento
+    // escalado) de servicios activos, para que la propina general ESCALE por método igual que el
+    // widget de la cotización (getGlobalTipAmount usa el subtotal ya expresado en el método). El
+    // descuento en efectivo se escala por pricesByType[método]/efectivo, idéntico a
+    // getServiceDiscountByType. Si falta el precio del método, cae a la base en efectivo.
     const days = Array.isArray(serviceItems.days) ? serviceItems.days : [];
-    let netBaseEfectivo = 0;
+    const method = serviceItems.paymentType || 'efectivo';
+    let netBaseMethod = 0;
     for (const day of days) {
       const subs = Array.isArray(day.subconcepts) ? day.subconcepts : [];
       for (const sub of subs) {
         if (sub && sub.includeInTotal !== false) {
-          const ef = Number(sub.pricesByType && sub.pricesByType.efectivo) || 0;
-          const disc = Number(sub.discountAmount) || 0;
-          netBaseEfectivo += Math.max(0, ef - disc);
+          const pbt = (sub && sub.pricesByType) || {};
+          const ef = Number(pbt.efectivo) || 0;
+          const mp = Number(pbt[method]);
+          const hasMethod = Number.isFinite(mp) && pbt[method] != null;
+          const base = hasMethod ? mp : ef;
+          const discEf = Number(sub.discountAmount) || 0;
+          const disc = (ef > 0 && hasMethod) ? discEf * (mp / ef) : discEf;
+          netBaseMethod += Math.max(0, base - disc);
         }
       }
     }
     // Tope de 100%: un porcentaje mayor se RECORTA aquí (no se rechaza) en la función pura, paralelo al
     // Math.min del descuento por servicio. El endpoint (updateServiceItems) sí rechaza >100 con 400.
     const pct = Math.min(value, 100);
-    return round2(netBaseEfectivo * (pct / 100));
+    return round2(netBaseMethod * (pct / 100));
   }
 
   /**
@@ -2391,7 +2401,7 @@ class QuoteService {
       }
 
       // Create Reservation
-      // Propina cobrada (Fase 2): general recalculada (pesos fijos, sin escalar por método) + Σ propina
+      // Propina cobrada (Fase 2): general recalculada (escalada por método de pago) + Σ propina
       // por servicio del snapshot. servicesSubtotal = SUBTOTAL limpio (serviceItems.subtotal, sin NINGUNA
       // propina horneada — ni la general ni la por servicio; invariante garantizado por saveToBackend, ver
       // syncReservationFromQuote). serviceItems.total sí incluye las propinas y era la raíz del "tercer

@@ -2,9 +2,10 @@
  * QuoteService — recálculo de la propina GENERAL (Fase 2, unit).
  *
  * Cubre las funciones puras computeGeneralTip / sumServiceTipsFromDays, que recomputan la propina
- * general a pesos FIJOS en efectivo desde serviceItems.globalTip (NO desde globalTip.amount persistido,
- * que puede venir inflado con recargo de tarjeta) y suman la propina por servicio del snapshot. Sin Parse
- * ni DB: sólo la lógica de cálculo.
+ * general desde serviceItems.globalTip (NO desde globalTip.amount persistido). type 'percent' escala
+ * por el método de pago (base neta del método = pricesByType[método] − descuento escalado), para
+ * cuadrar con el widget de la cotización; type 'amount' es literal (nunca escala). Suman también la
+ * propina por servicio del snapshot. Sin Parse ni DB: sólo la lógica de cálculo.
  */
 
 const QuoteService = require('../../../src/application/services/QuoteService');
@@ -23,9 +24,28 @@ const daysOf = (efectivos, discounts = []) => ({
 });
 
 describe('QuoteService.computeGeneralTip (propina general, pesos fijos en efectivo)', () => {
-  it('percent: 10% sobre la base efectivo NETA, IGNORA el método de pago de la UI', () => {
+  it('percent: sin paymentType cae a la base EFECTIVO neta (default)', () => {
     const si = { globalTip: { type: 'percent', value: 10 }, ...daysOf([2000, 1000]) };
-    expect(svc.computeGeneralTip(si)).toBe(300); // 10% de 3000, no de tarjeta
+    expect(svc.computeGeneralTip(si)).toBe(300); // 10% de 3000 (efectivo), sin método
+  });
+
+  it('percent: ESCALA por método de pago — 10% sobre la base neta en tarjeta', () => {
+    // daysOf pone tarjeta = efectivo × 1.21. Base tarjeta = 2000×1.21 + 1000×1.21 = 3630; 10% = 363.
+    const si = { globalTip: { type: 'percent', value: 10 }, paymentType: 'tarjeta', ...daysOf([2000, 1000]) };
+    expect(svc.computeGeneralTip(si)).toBe(363); // 10% de 3630 (tarjeta), NO de 3000 (efectivo)
+  });
+
+  it('percent: descuento escalado al método antes del % (paridad con getServiceDiscountByType)', () => {
+    // efectivo 2000, tarjeta 2420 (×1.21), descuento efectivo 200 -> descuento tarjeta 242.
+    // base neta tarjeta = 2420 − 242 = 2178; 10% = 217.8.
+    const si = { globalTip: { type: 'percent', value: 10 }, paymentType: 'tarjeta', ...daysOf([2000], [200]) };
+    expect(svc.computeGeneralTip(si)).toBe(217.8);
+  });
+
+  it('percent: método sin precio propio cae a la base efectivo (fallback)', () => {
+    // transferencia no está en pricesByType -> usa efectivo. 10% de 2000 = 200.
+    const si = { globalTip: { type: 'percent', value: 10 }, paymentType: 'transferencia', ...daysOf([2000]) };
+    expect(svc.computeGeneralTip(si)).toBe(200);
   });
 
   it('amount: monto fijo LITERAL, no escala con método (anti-regresión directa del bug del wizard)', () => {
