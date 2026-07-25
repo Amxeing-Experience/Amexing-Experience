@@ -171,6 +171,83 @@ class Payment extends BaseModel {
     this.set('receiptS3Key', key);
   }
 
+  // ---- Online gateway fields (Fase pasarela) ----
+  // channel/gateway are the orthogonal dimension to `method` (efectivo|transferencia|tarjeta);
+  // manual payments leave these unset. `gatewayStatus` governs whether the payment counts in the
+  // rollup (see PaymentService.countsInRollup). intentId/raw are never serialized to the client.
+
+  getChannel() {
+    return this.get('channel');
+  }
+
+  setChannel(channel) {
+    this.set('channel', channel);
+  }
+
+  getGateway() {
+    return this.get('gateway');
+  }
+
+  setGateway(gateway) {
+    this.set('gateway', gateway);
+  }
+
+  getGatewayStatus() {
+    return this.get('gatewayStatus');
+  }
+
+  setGatewayStatus(gatewayStatus) {
+    this.set('gatewayStatus', gatewayStatus);
+  }
+
+  getGatewayIntentId() {
+    return this.get('gatewayIntentId');
+  }
+
+  setGatewayIntentId(gatewayIntentId) {
+    this.set('gatewayIntentId', gatewayIntentId);
+  }
+
+  getGatewaySessionId() {
+    return this.get('gatewaySessionId');
+  }
+
+  setGatewaySessionId(gatewaySessionId) {
+    this.set('gatewaySessionId', gatewaySessionId);
+  }
+
+  getGatewayChargeId() {
+    return this.get('gatewayChargeId');
+  }
+
+  setGatewayChargeId(gatewayChargeId) {
+    this.set('gatewayChargeId', gatewayChargeId);
+  }
+
+  getGatewayRaw() {
+    return this.get('gatewayRaw');
+  }
+
+  setGatewayRaw(gatewayRaw) {
+    this.set('gatewayRaw', gatewayRaw);
+  }
+
+  getExpiresAt() {
+    return this.get('expiresAt');
+  }
+
+  setExpiresAt(expiresAt) {
+    this.set('expiresAt', expiresAt);
+  }
+
+  getConfirmedAt() {
+    return this.get('confirmedAt');
+  }
+
+  setConfirmedAt(confirmedAt) {
+    this.set('confirmedAt', confirmedAt);
+  }
+
   // =================
   // STATIC HELPERS
   // =================
@@ -254,6 +331,13 @@ class Payment extends BaseModel {
         : '',
       validatedAt: payment.get('validatedAt') || null,
       receiptS3Key: payment.get('receiptS3Key') || null,
+      // Canal/pasarela expuestos al cliente. Los pagos manuales legacy no tienen `channel` -> 'manual'.
+      // gatewayIntentId/gatewayRaw NUNCA se serializan (seguridad/ruido, plan seccion 6.2); tampoco
+      // gatewaySessionId/expiresAt/confirmedAt en este PR (el DTO solo expone estos 4).
+      channel: payment.get('channel') || 'manual',
+      gateway: payment.get('gateway') || null,
+      gatewayStatus: payment.get('gatewayStatus') || null,
+      gatewayChargeId: payment.get('gatewayChargeId') || null,
       createdAt: payment.createdAt || null,
       updatedAt: payment.updatedAt || null,
     };
