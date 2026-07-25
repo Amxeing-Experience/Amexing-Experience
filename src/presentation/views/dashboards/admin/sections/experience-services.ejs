@@ -7,71 +7,48 @@
 %>
 
 <div class="experience-services-builder services-panel mb-4" data-experience-id="<%= experienceId %>">
-    <!-- Header del panel: mismo estilo que las tarjetas de configuración -->
-    <div class="services-header d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom pb-2 mb-3">
-        <h6 class="fw-bold text-primary mb-0">
+    <!-- Header: título "Servicios" arriba; debajo, controles (Incluye izq · Duración der). -->
+    <div class="services-header border-bottom pb-2 mb-3">
+        <h6 class="fw-bold text-primary mb-2">
             <i class="ti ti-list-check me-1"></i>Servicios
         </h6>
-        <div class="d-flex gap-2 flex-wrap">
-            <!-- Abre el catálogo (experiencias/tours/traslados) como drawer lateral -->
-            <button type="button" class="btn btn-outline-primary" id="openCatalogBtn" data-bs-toggle="offcanvas" data-bs-target="#dragSourceOffcanvas" aria-controls="dragSourceOffcanvas">
-                <i class="ti ti-list-search me-1"></i>Catálogo
-            </button>
+        <div class="d-flex flex-column gap-2">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <span class="general-bar__label gen-lbl">Incluye</span>
+                <div class="gen-group">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" id="generalGuideToggle" role="switch">
+                        <label class="form-check-label small" for="generalGuideToggle"><i class="ti ti-headphones me-1"></i>Guía</label>
+                    </div>
+                    <div class="input-group input-group-sm gen-rate">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" id="generalGuideRate" min="0" step="0.01" placeholder="0.00" title="Tarifa por hora de la guía">
+                        <span class="input-group-text">/h</span>
+                    </div>
+                </div>
+                <div class="gen-group">
+                    <div class="form-check form-switch m-0">
+                        <input class="form-check-input" type="checkbox" id="generalChoferToggle" role="switch">
+                        <label class="form-check-label small" for="generalChoferToggle"><i class="ti ti-steering-wheel me-1"></i>Chofer</label>
+                    </div>
+                    <div class="input-group input-group-sm gen-rate">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" id="generalChoferRate" min="0" step="0.01" placeholder="0.00" title="Tarifa por hora del chofer">
+                        <span class="input-group-text">/h</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Duración de la experiencia (debajo de Incluye, alineada). -->
+            <div class="general-dur d-flex align-items-center flex-wrap gap-2">
+                <span class="general-bar__label gen-lbl">Duración</span>
+                <div class="general-bar__dur">
+                    <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceDuration', hiddenName: 'duration', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
+                </div>
+                <span class="form-text m-0" id="expSuggestedDuration"></span>
+            </div>
         </div>
     </div>
 
-    <!-- Barra GENERAL: guía/chofer que aplican a TODA la experiencia.
-         Costo fijo = tarifa/h × duración de la experiencia (del encabezado). -->
-    <div class="general-bar d-flex align-items-center flex-wrap gap-2 mb-3">
-        <span class="general-bar__label">General</span>
-        <!-- Guía + su tarifa/h -->
-        <div class="d-flex align-items-center gap-1">
-            <div class="form-check form-switch m-0">
-                <input class="form-check-input" type="checkbox" id="generalGuideToggle" role="switch">
-                <label class="form-check-label small" for="generalGuideToggle"><i class="ti ti-headphones me-1"></i>Guía</label>
-            </div>
-            <div class="input-group input-group-sm" style="width:auto;">
-                <span class="input-group-text">$</span>
-                <input type="number" class="form-control" id="generalGuideRate" min="0" step="0.01" placeholder="0.00" style="max-width:88px;" title="Tarifa por hora de la guía">
-                <span class="input-group-text">/h</span>
-            </div>
-        </div>
-        <!-- Chofer + su tarifa/h (puede ser distinta a la de la guía) -->
-        <div class="d-flex align-items-center gap-1">
-            <div class="form-check form-switch m-0">
-                <input class="form-check-input" type="checkbox" id="generalChoferToggle" role="switch">
-                <label class="form-check-label small" for="generalChoferToggle"><i class="ti ti-steering-wheel me-1"></i>Chofer</label>
-            </div>
-            <div class="input-group input-group-sm" style="width:auto;">
-                <span class="input-group-text">$</span>
-                <input type="number" class="form-control" id="generalChoferRate" min="0" step="0.01" placeholder="0.00" style="max-width:88px;" title="Tarifa por hora del chofer">
-                <span class="input-group-text">/h</span>
-            </div>
-        </div>
-        <!-- Duración de la experiencia (movida desde el encabezado): junto a la tarifa. -->
-        <div class="general-bar__dur d-flex align-items-center gap-2">
-            <span class="input-group-text bg-transparent border-0 px-1">Duración</span>
-            <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceDuration', hiddenName: 'duration', showDays: false, presets: [{ label: '1 h', minutes: 60 }, { label: '2 h', minutes: 120 }, { label: '3 h', minutes: 180 }, { label: '4 h', minutes: 240 }] }) %>
-        </div>
-        <span class="form-text m-0" id="expSuggestedDuration"></span>
-    </div>
-
-    <!-- Capacidad (FUENTE ÚNICA): rango de personas de la experiencia.
-         Movida desde "Capacidad y tarifas"; alimentará el desglose por persona. -->
-    <div class="capacity-bar d-flex align-items-center flex-wrap gap-2 mb-3">
-        <span class="general-bar__label">Capacidad</span>
-        <div class="input-group input-group-sm" style="width:auto;">
-            <span class="input-group-text">Mín</span>
-            <input type="number" class="form-control" id="experienceMinPeople" name="min_people" min="1" step="1" placeholder="1" style="max-width:78px;">
-        </div>
-        <span class="text-muted">–</span>
-        <div class="input-group input-group-sm" style="width:auto;">
-            <span class="input-group-text">Máx</span>
-            <input type="number" class="form-control" id="experienceMaxPeople" name="max_people" min="1" step="1" placeholder="10" style="max-width:78px;">
-            <span class="input-group-text">pax</span>
-        </div>
-        <span class="text-muted small">Define el rango de personas; alimentará el desglose por persona.</span>
-    </div>
 
     <!-- Catálogo como drawer lateral (offcanvas). Sin backdrop + con scroll para poder
          arrastrar del catálogo a la lista de servicios manteniendo la página interactiva
@@ -142,14 +119,11 @@
 
     <!-- Lista de servicios a ancho completo (el catálogo ahora vive en el drawer) -->
     <div id="servicesDropZone" class="services-drop-zone">
-        <!-- Empty State -->
+        <!-- Empty State (compacto: sin servicios no debe ocupar tanto) -->
         <div id="emptyStateContainer">
-            <div class="text-center py-5 border border-2 border-dashed rounded">
-                <div class="empty-state-icon mb-3">
-                    <i class="ti ti-drag-drop" style="font-size: 4rem; color: #dee2e6;"></i>
-                </div>
-                <h5 class="text-muted mb-2">Sin servicios aun</h5>
-                <p class="text-muted mb-0">Abre el <strong>Catálogo</strong> y arrastra experiencias, tours o traslados aqui, o usa <strong>Agregar servicio</strong> abajo</p>
+            <div class="text-center py-3 px-3 border border-2 border-dashed rounded d-flex align-items-center justify-content-center gap-2 flex-wrap">
+                <i class="ti ti-drag-drop text-muted" style="font-size: 1.4rem; color: #cfd3bf;"></i>
+                <span class="text-muted small mb-0"><strong>Sin servicios aún.</strong> Abre el <strong>Catálogo</strong> y arrastra aquí, o usa <strong>Agregar servicio</strong> abajo.</span>
             </div>
         </div>
 
@@ -162,32 +136,48 @@
     <!-- Alta PROGRESIVA (siempre visible al final): eliges el Tipo y se abre el panel de ese tipo abajo. -->
     <div class="add-service-row d-flex align-items-center flex-wrap gap-2 mt-3">
         <span class="add-service-row__label"><i class="ti ti-plus me-1"></i>Agregar servicio</span>
-        <select class="form-select form-select-sm" id="addServiceTypeSelect" style="max-width: 220px;" disabled>
-            <option value="">Cargando servicios…</option>
-            <option value="experience">🏖 Experiencia</option>
-            <option value="tour">🗺 Tour</option>
-            <option value="transport">🚐 Traslado</option>
-            <option value="concepto">📝 Concepto</option>
-            <option value="entradas">🎟 Entradas</option>
-        </select>
-        <span class="text-muted small">Elige un tipo → se abre el formulario de ese servicio.</span>
+        <!-- Catálogo: abre el drawer para arrastrar; va junto a los chips de tipo -->
+        <button type="button" class="add-service-chip" id="openCatalogBtn" data-bs-toggle="offcanvas" data-bs-target="#dragSourceOffcanvas" aria-controls="dragSourceOffcanvas">Catálogo</button>
+        <div class="add-service-chips d-flex flex-wrap gap-2" id="addServiceChips">
+            <button type="button" class="add-service-chip" data-type="experience" disabled>Experiencia</button>
+            <button type="button" class="add-service-chip" data-type="tour" disabled>Tour</button>
+            <button type="button" class="add-service-chip" data-type="transport" disabled>Traslado</button>
+            <button type="button" class="add-service-chip" data-type="concepto" disabled>Concepto</button>
+            <button type="button" class="add-service-chip" data-type="entradas" disabled>Entradas</button>
+        </div>
     </div>
 
-    <!-- Panel de servicio (inline) + modal de confirmación de borrado.
-         Va aquí (al final, junto a la fila de alta) para que el formulario aparezca cerca. -->
+    <!-- Ancla "home" del panel de servicio: al ALTA vive aquí; al EDITAR se mueve debajo
+         de la tarjeta editada (edición inline) y vuelve aquí al cerrar/re-render. -->
+    <div id="svcPanelHome"></div>
+    <!-- Panel de servicio (inline) + modal de confirmación de borrado. -->
     <%- include('./experience-services-modals') %>
 
 
-    <!-- Save Status Indicator -->
-    <div class="save-status-bar p-3 bg-light rounded d-flex justify-content-between align-items-center">
-        <div class="d-flex align-items-center">
-            <div id="saveStatusIndicator" class="me-3">
-                <span class="badge bg-success">
-                    <i class="ti ti-check me-1"></i>Guardado
-                </span>
+    <!-- (El aviso de guardado ahora es global: toast flotante del autoguardado de la
+         experiencia completa; se quitó el indicador específico de servicios.) -->
+
+    <!-- Desglose por pax: total y precio por persona en Mín/Máx de Capacidad. Lo pinta el JS. -->
+    <!-- Desglose por capacidad. La Capacidad Mín/Máx vive AQUÍ (header, markup estático
+         para que save/load/validación no se rompan); la tabla la pinta el JS abajo. -->
+    <div class="service-breakdown mt-3">
+        <div class="bd-head d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span class="bd-title"><i class="ti ti-report-money"></i>Desglose de tarifas</span>
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <span class="general-bar__label">Capacidad</span>
+                <div class="input-group input-group-sm" style="width:auto;">
+                    <span class="input-group-text">Mín</span>
+                    <input type="number" class="form-control" id="experienceMinPeople" name="min_people" min="1" step="1" placeholder="1" style="max-width:100px;">
+                </div>
+                <span class="text-muted">–</span>
+                <div class="input-group input-group-sm" style="width:auto;">
+                    <span class="input-group-text">Máx</span>
+                    <input type="number" class="form-control" id="experienceMaxPeople" name="max_people" min="1" step="1" placeholder="10" style="max-width:100px;">
+                    <span class="input-group-text">pax</span>
+                </div>
             </div>
-            <small class="text-muted">Los servicios se guardan automáticamente. El resto de la experiencia se guarda con el botón <strong>Guardar</strong>.</small>
         </div>
+        <div id="serviceBreakdown"></div>
     </div>
 </div>
 
@@ -234,7 +224,7 @@
 
 <style>
     .experience-services-builder {
-        min-height: 400px;
+        min-height: auto;
     }
 
     /* Panel de Servicios: mismo look que las tarjetas de configuración (.exp-config .mb-4) */
@@ -245,28 +235,65 @@
         padding: 16px 20px;
     }
 
-    /* Barra general (guía/chofer generales + duración) y barra de capacidad: mismo look */
-    .general-bar,
-    .capacity-bar {
-        background: #f3f4ee;
-        border: 1px solid #e2ded1;
-        border-radius: 11px;
-        padding: 10px 12px;
-    }
+    /* Etiqueta de sección (General / Duración) */
     .general-bar__label {
-        font-size: 11px;
+        font-size: 12.5px;
         font-weight: 700;
         color: #55603c;
         text-transform: uppercase;
         letter-spacing: .04em;
     }
-    /* La duración (advance-time-picker) no debe estirarse dentro de la barra */
-    .general-bar .advance-time-picker {
-        margin: 0;
+    /* Etiquetas alineadas en columna (Incluye / Duración) */
+    .gen-lbl { min-width: 74px; }
+    /* Guía/Chofer como "píldoras" (en el header) */
+    .gen-group {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: #fff; border: 1px solid #e2ded1; border-radius: 9px; padding: 4px 10px;
     }
-    .general-bar .form-check-input:checked {
+    .gen-group .form-check-input:checked {
         background-color: var(--brand-primary, #969b81);
         border-color: var(--brand-primary, #969b81);
+    }
+    .gen-rate { width: auto; }
+    .gen-rate .form-control { max-width: 84px; }
+    /* Duración: el picker no debe estirarse */
+    .general-dur .advance-time-picker { margin: 0; }
+
+    /* Rows inline (Concepto/Entradas): el row ES el formulario */
+    .inline-svc { background: #fff; }
+    .inline-svc .isvc-fld { display: flex; flex-direction: column; gap: 2px; }
+    .inline-svc .isvc-fld.grow { flex: 1 1 200px; min-width: 160px; }
+    .inline-svc .isvc-lbl { font-size: 12px; font-weight: 700; color: #8a8f78; text-transform: uppercase; letter-spacing: .03em; }
+    /* Fuente más grande en inputs/labels de los rows inline. Scope a .isvc-fld deja
+       INTACTO el picker de vehículos (.card-veh-picker), que va bien en su tamaño. */
+    .inline-svc .isvc-fld .form-control,
+    .inline-svc .isvc-fld .form-select,
+    .inline-svc .isvc-fld .input-group-text { font-size: 0.95rem; }
+    .inline-svc .isvc-fld .form-check-label { font-size: 0.9rem; }
+    /* Segmento (dentro del picker): sube la fuente del label y del select, sin tocar
+       las tarjetas de vehículo (que van bien en su tamaño). */
+    .inline-svc .card-seg > span,
+    .inline-svc .card-seg .card-seg-select { font-size: 0.95rem; }
+
+    /* Picker de vehículos por capacidad (lista de opciones seleccionables) */
+    .vehicle-picker-list { display: flex; flex-direction: column; gap: 6px; }
+    .veh-pick-opt {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 10px; border: 1px solid #e2ded1; border-radius: 9px;
+        cursor: pointer; background: #fff; margin: 0;
+    }
+    .veh-pick-opt:hover { border-color: #969b81; }
+    .veh-pick-opt.active { border-color: #6E7A50; box-shadow: inset 0 0 0 1px #6E7A50; background: #fbfcf9; }
+    .veh-pick-opt input { accent-color: #6E7A50; }
+    .veh-pick-opt__name { font-weight: 600; flex: 1; }
+    .veh-pick-opt__cap {
+        font-size: 11px; font-weight: 700; color: #3d5a80;
+        background: #e7eef6; border-radius: 5px; padding: 2px 7px; white-space: nowrap;
+    }
+    .veh-pick-opt__price { font-weight: 700; color: #6E7A50; min-width: 84px; text-align: right; }
+    .veh-pick-opt__best {
+        font-size: 10px; font-weight: 700; color: #4b7a3f;
+        background: #e6f0e0; border-radius: 5px; padding: 1px 5px; margin-left: 6px;
     }
 
     /* Alta progresiva (fila siempre visible al final de la lista) */
@@ -280,6 +307,50 @@
         font-size: 12.5px;
         font-weight: 700;
         color: var(--brand-primary, #969b81);
+    }
+    /* Desglose por pax (tabla comparativa) */
+    .service-breakdown { background: #fbfaf6; border: 1px solid #e2ded1; border-radius: 12px; padding: 14px 16px; }
+    .service-breakdown .bd-head { border-bottom: 1px solid #e2ded1; padding-bottom: 10px; margin-bottom: 10px; }
+    .service-breakdown table { width: 100%; border-collapse: collapse; font-size: 15px; }
+    .service-breakdown th, .service-breakdown td { padding: 9px 11px; border-bottom: 1px solid #e2ded1; text-align: right; }
+    .service-breakdown th:first-child, .service-breakdown td:first-child { text-align: left; }
+    .service-breakdown thead th { background: #f3f4ee; color: #55603c; font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
+    /* Inputs de capacidad (Mín/Máx) con letra más grande */
+    .service-breakdown .bd-head .input-group-text,
+    .service-breakdown .bd-head #experienceMinPeople,
+    .service-breakdown .bd-head #experienceMaxPeople { font-size: 15px; }
+    .service-breakdown tr.sum td { font-weight: 700; border-top: 2px solid #6E7A50; }
+    .service-breakdown tr.ppv td { color: #3d5a80; font-weight: 800; }
+    .service-breakdown .bd-title { font-weight: 700; color: #6E7A50; font-size: 15px; display: inline-flex; align-items: center; gap: 8px; }
+    .service-breakdown .bd-tag { font-size: 10.5px; font-weight: 700; border-radius: 5px; padding: 1px 6px; white-space: nowrap; }
+    .service-breakdown .bd-tag.fx { color: #8a6d2f; background: #faf0dd; }
+    .service-breakdown .bd-tag.pp { color: #3d5a80; background: #e7eef6; }
+
+    /* Chips de tipo (sustituyen al dropdown de "agregar servicio") */
+    .add-service-chip {
+        border: 1px solid var(--brand-primary, #969b81);
+        background: #fff;
+        color: var(--brand-primary, #6E7A50);
+        border-radius: 999px;
+        padding: 5px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background .12s, color .12s;
+    }
+    .add-service-chip:hover:not(:disabled) {
+        background: var(--brand-primary, #969b81);
+        color: #fff;
+    }
+    .add-service-chip.active {
+        background: var(--brand-gradient, #6E7A50);
+        border-color: #6E7A50;
+        color: #fff;
+        box-shadow: 0 2px 6px rgba(110, 122, 80, .3);
+    }
+    .add-service-chip:disabled {
+        opacity: .5;
+        cursor: default;
     }
 
     /* Drawer del catálogo (offcanvas lateral) */

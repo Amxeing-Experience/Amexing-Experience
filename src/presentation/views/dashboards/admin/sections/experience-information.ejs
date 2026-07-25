@@ -176,6 +176,12 @@
                                 <input type="number" class="form-control" id="experienceCost" name="cost" min="0" step="0.01" placeholder="0.00">
                             </div>
                             <div class="invalid-feedback" id="cost-error"></div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="experienceCreateVersion">
+                                <label class="form-check-label small text-muted" for="experienceCreateVersion">
+                                    Crear <b>nueva versión</b> de precio al Guardar (conserva el historial). Sin marcar, el precio se actualiza en el mismo registro.
+                                </label>
+                            </div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="experiencePriceNoAlcohol" class="form-label">Precio Sin Alcohol</label>
@@ -200,28 +206,6 @@
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="experiencePriceInfant" name="price_infant" min="0" step="0.01" placeholder="0.00">
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tiempos -->
-                <div class="mb-4">
-                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                        <i class="ti ti-clock me-1"></i>
-                        Tiempos
-                    </h6>
-                    <%# "Duración (hrs)" es ahora GLOBAL: vive en el header, junto al nombre,
-                        con la "duración sugerida" (suma de tiempos de los servicios). %>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Duración de Trayecto</label>
-                            <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceTravelDuration', hiddenName: 'travel_duration', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Tiempo de Anticipación</label>
-                            <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceAdvanceMinutes', hiddenName: 'advance_minutes' }) %>
                         </div>
                     </div>
                 </div>
@@ -259,15 +243,28 @@
                     <div class="form-text"><small><i class="ti ti-world me-1"></i>Escriba cada idioma en una linea nueva</small></div>
                 </div>
 
-                <!-- Disponibilidad -->
+                <!-- Agenda: tiempos (arriba) + disponibilidad (abajo) -->
                 <div class="mb-4">
                     <h6 class="fw-bold text-primary border-bottom pb-2 mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <span><i class="ti ti-calendar-time me-1"></i>Disponibilidad <span class="text-muted fw-normal">(Opcional)</span></span>
+                        <span><i class="ti ti-calendar-time me-1"></i>Logística</span>
                         <span class="form-check form-switch mb-0 fw-normal" title='Si se activa, en el detalle se muestra "Horarios" en lugar de "Horarios sugeridos" (ej. viñedos).'>
                             <input class="form-check-input" type="checkbox" id="experienceFixedSchedule" name="fixed_schedule">
                             <label class="form-check-label small" for="experienceFixedSchedule">Horario fijo</label>
                         </span>
                     </h6>
+                    <!-- Tiempos: trayecto + anticipación -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Duración de Trayecto</label>
+                            <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceTravelDuration', hiddenName: 'travel_duration', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Tiempo de Anticipación</label>
+                            <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceAdvanceMinutes', hiddenName: 'advance_minutes' }) %>
+                        </div>
+                    </div>
+                    <!-- Disponibilidad: días + horarios -->
+                    <label class="form-label mt-1">Disponibilidad</label>
                     <div class="mb-3">
                         <div class="d-flex gap-1 flex-wrap mb-3" id="availableDaysContainer">
                             <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="1" data-day-name="Lunes">Lu</button>
@@ -291,13 +288,20 @@
                 <div class="mb-4">
                     <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
                         <i class="ti ti-camera me-1"></i>
-                        Fotos <span class="text-muted fw-normal">(Opcional)</span>
+                        Fotos
                     </h6>
+                    <div class="alert alert-warning py-2 px-3 mb-2 d-flex align-items-center" role="alert" style="font-size: 0.85rem;">
+                        <i class="ti ti-alert-triangle me-2"></i>
+                        <span>Las imágenes (portada y fotos) <b>no</b> se autoguardan: da clic en <b>Guardar imágenes</b> para subirlas.</span>
+                    </div>
                     <div class="experience-photos-container">
                         <div class="row g-2 mb-2" id="photosPreviewContainer"></div>
-                        <div class="d-grid">
+                        <div class="d-grid gap-2">
                             <button type="button" class="btn btn-outline-primary btn-sm" id="addPhotoBtn">
                                 <i class="ti ti-camera-plus me-1"></i>Agregar Foto
+                            </button>
+                            <button type="button" class="btn btn-success btn-sm" id="savePhotosBtn">
+                                <i class="ti ti-device-floppy me-1"></i>Guardar imágenes
                             </button>
                         </div>
                         <input type="file" class="d-none" id="experiencePhotoInput" accept=".jpg,.jpeg,.png,.webp" multiple>
@@ -435,7 +439,8 @@
         </div>
 
         <!-- Save Button -->
-        <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+        <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top flex-wrap">
+            <small class="text-muted me-auto"><i class="ti ti-cloud-check me-1"></i>Los cambios se guardan solos. <b>Las imágenes solo se guardan con este botón.</b></small>
             <a href="/dashboard/admin/experiences" id="cancelExperienceBtn" class="btn btn-secondary">
                 <i class="ti ti-x me-1"></i>Cancelar
             </a>
@@ -647,6 +652,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setupEventListeners() {
         document.getElementById('saveExperienceInfoBtn').addEventListener('click', saveExperience);
+        // Botón dedicado del panel de fotos: sube solo imágenes (portada + fotos).
+        document.getElementById('savePhotosBtn')?.addEventListener('click', saveImagesOnly);
+
+        // AUTOGUARDADO: cualquier cambio en el HERO (nombre/tipo/destino/descripción, fuera
+        // del form) y en el FORM de info dispara el autosave de la experiencia completa.
+        // Las imágenes se excluyen (input file / contenedores de imagen). Los controles de
+        // la sección Servicios (guía/chofer general, mín/máx, duración) lo disparan desde
+        // el builder vía window.scheduleExperienceInfoAutoSave.
+        const isImageField = (t) => t && (t.type === 'file'
+            || t.closest('#mainImageContainer') || t.closest('.experience-photos-container'));
+        const onInfoChange = (e) => { if (!isImageField(e.target)) scheduleExperienceInfoAutoSave(); };
+        [document.querySelector('.exp-hero'), document.getElementById('experienceInformationForm')].forEach((cont) => {
+            if (!cont) return;
+            cont.addEventListener('input', onInfoChange);
+            cont.addEventListener('change', onInfoChange);
+        });
 
         // F3 (draft-first): si se creó un borrador (active:false) al agregar servicios
         // y el usuario cancela sin finalizar, borramos ese borrador para no dejar
@@ -1765,6 +1786,152 @@ document.addEventListener('DOMContentLoaded', function() {
         return null;
     }
 
+    // Construye el payload JSON de la experiencia (TODOS los campos menos imágenes).
+    // Reutilizado por el guardado manual y por el autoguardado.
+    function buildExperienceInfoBody() {
+        const nameEl = document.getElementById('experienceName');
+        const descEl = document.getElementById('experienceDescription');
+        const costEl = document.querySelector('#experienceInformationForm #experienceCost') || document.getElementById('experienceCost');
+        const bName = ((capturedFormValues.name || (nameEl && nameEl.value) || '')).trim();
+        const bDescription = ((capturedFormValues.description || (descEl && descEl.value) || '')).trim() || bName;
+        const bCost = parseFloat(capturedFormValues.cost || (costEl && costEl.value)) || 0;
+
+        const availability = [];
+        document.querySelectorAll('#daySchedulesContainer .day-schedule-row').forEach(row => {
+            const daySchedule = { day: parseInt(row.dataset.day), times: [] };
+            row.querySelectorAll('.time-slot-row').forEach(slotRow => {
+                const start = slotRow.querySelector('.start-time').value;
+                const end = slotRow.querySelector('.end-time').value;
+                if (start && end) daySchedule.times.push({ start, end });
+            });
+            daySchedule.times = sortExpTimes(daySchedule.times);
+            if (daySchedule.times.length > 0) availability.push(daySchedule);
+        });
+
+        return {
+            name: bName,
+            description: bDescription,
+            type: 'Experience',
+            cost: bCost,
+            price_no_alcohol: parseFloat(document.getElementById('experiencePriceNoAlcohol').value) || null,
+            price_child: parseFloat(document.getElementById('experiencePriceChild').value) || null,
+            price_infant: parseFloat(document.getElementById('experiencePriceInfant').value) || null,
+            duration: parseFloat(document.getElementById('experienceDuration').value) || null,
+            travel_duration: parseInt(document.getElementById('experienceTravelDuration').value) || null,
+            advance_minutes: parseInt(document.getElementById('experienceAdvanceMinutes').value) || null,
+            min_people: parseInt(document.getElementById('experienceMinPeople').value) || null,
+            max_people: parseInt(document.getElementById('experienceMaxPeople').value) || null,
+            cancellation_policy: document.getElementById('experienceCancellationPolicy').value.trim() || null,
+            buyout: parseFloat(document.getElementById('experienceBuyout').value) || null,
+            experience_category: document.getElementById('experienceCategory').value || null,
+            tipo: (document.getElementById('experienceTipo') || {}).value || null,
+            general_guide: !!(document.getElementById('generalGuideToggle') || {}).checked,
+            general_chofer: !!(document.getElementById('generalChoferToggle') || {}).checked,
+            general_guide_rate: parseFloat((document.getElementById('generalGuideRate') || {}).value) || null,
+            general_chofer_rate: parseFloat((document.getElementById('generalChoferRate') || {}).value) || null,
+            private_min_type: document.getElementById('experiencePrivateMinType').value || null,
+            private_min_value: parseFloat(document.getElementById('experiencePrivateMinValue').value) || null,
+            includes: stringToArray(capturedFormValues.includes) || textareaToArray('experienceIncludes'),
+            notincludes: stringToArray(capturedFormValues.notincludes) || textareaToArray('experienceNotIncludes'),
+            languages: stringToArray(capturedFormValues.languages) || textareaToArray('experienceLanguages'),
+            internal_notes: document.getElementById('experienceInternalNotes').value.trim() || null,
+            client_booking_notes: document.getElementById('experienceClientBookingNotes').value.trim() || null,
+            provider_notes: document.getElementById('experienceProviderNotes').value.trim() || null,
+            team_notes: document.getElementById('experienceTeamNotes').value.trim() || null,
+            availability: availability.length > 0 ? availability : null,
+            fixed_schedule: document.getElementById('experienceFixedSchedule').checked,
+            destinationPOI: document.getElementById('experienceDestino').value || null,
+        };
+    }
+
+    // Versionado por costo: cuando cambia 'cost', el backend crea una NUEVA versión con
+    // otro objectId (y marca la vieja con valid_until). Si el front sigue usando el id
+    // viejo, el siguiente GET/PUT falla (queda histórico). Aquí adoptamos el id nuevo.
+    function applyVersionedId(result) {
+        if (!result || !result.success || !result.data) return;
+        const d = result.data;
+        if (!d.costChanged || !d.id) return;
+        const newId = d.id;
+        window.__experienceDraftId = newId;                 // id de trabajo para el autosave
+        if (window.experienceServicesBuilder) window.experienceServicesBuilder.experienceId = newId; // service-items al id vigente
+        try {
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', `/dashboard/admin/experiences/${newId}`);
+            }
+        } catch (e) { /* noop */ }
+    }
+
+    // ===== AUTOGUARDADO de la EXPERIENCIA COMPLETA (sin imágenes) =====
+    // Las imágenes son pesadas: NO entran al autosave; solo se suben con el botón Guardar.
+    let _infoAutoSaveTimer = null;
+    let _infoAutoSaveInFlight = false;
+    function setAutoSaveStatus(state) {
+        // Toast FIJO (position:fixed en <body>) para que se vea aunque estés haciendo scroll.
+        let el = document.getElementById('expAutoSaveToast');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'expAutoSaveToast';
+            el.style.cssText = 'position:fixed;z-index:2000;right:18px;bottom:18px;display:inline-flex;align-items:center;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.18);opacity:0;transition:opacity .25s;pointer-events:none;';
+            document.body.appendChild(el);
+        }
+        if (state === 'saving') {
+            el.style.background = '#ffffff'; el.style.color = '#6E7A50'; el.style.border = '1px solid #d9dcc9';
+            el.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando cambios…';
+            el.style.opacity = '1';
+        } else if (state === 'saved') {
+            el.style.background = '#eaf3e4'; el.style.color = '#3f7a3f'; el.style.border = '1px solid #c3ddb6';
+            el.innerHTML = '<i class="ti ti-cloud-check me-2"></i>Cambios guardados';
+            el.style.opacity = '1';
+            setTimeout(() => { el.style.opacity = '0'; }, 2000);
+        } else {
+            el.style.opacity = '0';
+        }
+    }
+    function scheduleExperienceInfoAutoSave() {
+        clearTimeout(_infoAutoSaveTimer);
+        _infoAutoSaveTimer = setTimeout(() => { autoSaveExperienceInfo(); }, 900);
+    }
+    async function autoSaveExperienceInfo() {
+        const nameEl = document.getElementById('experienceName');
+        if (!nameEl || !nameEl.value.trim()) return;            // sin nombre no se guarda
+        if (_infoAutoSaveInFlight) { scheduleExperienceInfoAutoSave(); return; } // reintenta luego
+        if (typeof validateAllNumericFields === 'function' && !validateAllNumericFields()) return; // no guardar con errores
+        const accessToken = getAccessToken() || localStorage.getItem('authToken');
+        if (!accessToken) return;
+
+        // Necesita un id: experiencia existente o borrador. Para una nueva, crea el borrador.
+        let targetId = window.__experienceDraftId || (isNew ? null : experienceId);
+        if (!targetId && isNew && window.experienceServicesBuilder && window.experienceServicesBuilder.ensureDraftExperience) {
+            try { targetId = (await window.experienceServicesBuilder.ensureDraftExperience()) || window.__experienceDraftId; } catch (e) { return; }
+        }
+        if (!targetId) return;
+
+        const body = buildExperienceInfoBody(); // sin imágenes, sin tocar 'active' (no finaliza el borrador)
+        _infoAutoSaveInFlight = true;
+        setAutoSaveStatus('saving');
+        try {
+            const res = await fetch(`/api/experiences/${targetId}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const result = await res.json().catch(() => null);
+            if (res.ok && result && result.success) {
+                applyVersionedId(result); // si versionó por costo, adopta el nuevo id
+                setAutoSaveStatus('saved');
+            } else {
+                setAutoSaveStatus('idle');
+            }
+        } catch (e) {
+            console.warn('Autoguardado de experiencia falló:', e);
+            setAutoSaveStatus('idle');
+        } finally {
+            _infoAutoSaveInFlight = false;
+        }
+    }
+    // Exponer para que la sección de Servicios (toggles generales, mín/máx, duración) lo dispare.
+    window.scheduleExperienceInfoAutoSave = scheduleExperienceInfoAutoSave;
+
     async function saveExperience() {
         // Nombre global obligatorio: no se puede guardar sin él. Enfoca el campo.
         const globalNameEl = document.getElementById('experienceName');
@@ -1893,61 +2060,12 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             updateProgress('Guardando datos...');
 
-            // Build availability (multi-slot format matching provider)
-            const availability = [];
-            document.querySelectorAll('#daySchedulesContainer .day-schedule-row').forEach(row => {
-                const daySchedule = {
-                    day: parseInt(row.dataset.day),
-                    times: []
-                };
-                row.querySelectorAll('.time-slot-row').forEach(slotRow => {
-                    const start = slotRow.querySelector('.start-time').value;
-                    const end = slotRow.querySelector('.end-time').value;
-                    if (start && end) {
-                        daySchedule.times.push({ start, end });
-                    }
-                });
-                // Ordena por hora de inicio (pueden capturarse desordenados)
-                daySchedule.times = sortExpTimes(daySchedule.times);
-                if (daySchedule.times.length > 0) {
-                    availability.push(daySchedule);
-                }
-            });
-
-            const body = {
-                name,
-                description,
-                type: 'Experience',
-                cost,
-                price_no_alcohol: parseFloat(document.getElementById('experiencePriceNoAlcohol').value) || null,
-                price_child: parseFloat(document.getElementById('experiencePriceChild').value) || null,
-                price_infant: parseFloat(document.getElementById('experiencePriceInfant').value) || null,
-                duration: parseFloat(document.getElementById('experienceDuration').value) || null,
-                travel_duration: parseInt(document.getElementById('experienceTravelDuration').value) || null,
-                advance_minutes: parseInt(document.getElementById('experienceAdvanceMinutes').value) || null,
-                min_people: parseInt(document.getElementById('experienceMinPeople').value) || null,
-                max_people: parseInt(document.getElementById('experienceMaxPeople').value) || null,
-                cancellation_policy: document.getElementById('experienceCancellationPolicy').value.trim() || null,
-                buyout: parseFloat(document.getElementById('experienceBuyout').value) || null,
-                experience_category: document.getElementById('experienceCategory').value || null,
-                tipo: (document.getElementById('experienceTipo') || {}).value || null,
-                general_guide: !!(document.getElementById('generalGuideToggle') || {}).checked,
-                general_chofer: !!(document.getElementById('generalChoferToggle') || {}).checked,
-                general_guide_rate: parseFloat((document.getElementById('generalGuideRate') || {}).value) || null,
-                general_chofer_rate: parseFloat((document.getElementById('generalChoferRate') || {}).value) || null,
-                private_min_type: document.getElementById('experiencePrivateMinType').value || null,
-                private_min_value: parseFloat(document.getElementById('experiencePrivateMinValue').value) || null,
-                includes: stringToArray(capturedFormValues.includes) || textareaToArray('experienceIncludes'),
-                notincludes: stringToArray(capturedFormValues.notincludes) || textareaToArray('experienceNotIncludes'),
-                languages: stringToArray(capturedFormValues.languages) || textareaToArray('experienceLanguages'),
-                internal_notes: document.getElementById('experienceInternalNotes').value.trim() || null,
-                client_booking_notes: document.getElementById('experienceClientBookingNotes').value.trim() || null,
-                provider_notes: document.getElementById('experienceProviderNotes').value.trim() || null,
-                team_notes: document.getElementById('experienceTeamNotes').value.trim() || null,
-                availability: availability.length > 0 ? availability : null,
-                fixed_schedule: document.getElementById('experienceFixedSchedule').checked,
-                destinationPOI: document.getElementById('experienceDestino').value || null,
-            };
+            // Payload común (todos los campos menos imágenes). Mismo builder que el autosave.
+            const body = buildExperienceInfoBody();
+            // Versionado EXPLÍCITO: solo el guardado MANUAL puede versionar el precio, y solo
+            // si el usuario marcó el checkbox. El autoguardado nunca manda esto (actualiza en
+            // el mismo registro), por eso no crea versiones ni cambia el id.
+            body.createVersion = !!document.getElementById('experienceCreateVersion')?.checked;
 
             // 🔍 SAVE DEBUG - Log destinationPOI save details
             const destinoValue = document.getElementById('experienceDestino').value;
@@ -2033,6 +2151,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 showAlert(result.error || 'Error al guardar', 'danger');
                 return;
             }
+
+            // Si el guardado versionó por costo (nuevo objectId), adopta el id nuevo para
+            // que las imágenes y guardados siguientes no apunten al registro histórico.
+            applyVersionedId(result);
+            // Desmarca "crear versión": es una acción puntual, no debe repetirse en el
+            // siguiente guardado sin que el usuario lo vuelva a pedir.
+            const verChk = document.getElementById('experienceCreateVersion');
+            if (verChk) verChk.checked = false;
 
             // Delete old main image if removed (without replacement)
             if (window._mainImageRemoved && !window._mainImageFile && window._mainImageId) {
@@ -2166,6 +2292,65 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Error uploading photo:', error);
+        }
+    }
+
+    // Guarda SOLO imágenes (portada + fotos), sin el resto del formulario. Sirve para que
+    // el usuario no las olvide: el autoguardado no las sube (son pesadas).
+    async function saveImagesOnly() {
+        const nameEl = document.getElementById('experienceName');
+        if (!nameEl || !nameEl.value.trim()) {
+            showAlert('Escribe primero el nombre de la experiencia para poder subir imágenes.', 'warning');
+            if (nameEl) { nameEl.focus(); nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+            return;
+        }
+        const accessToken = getAccessToken() || localStorage.getItem('authToken');
+        if (!accessToken) { showAlert('Error de autenticación. Recarga la página.', 'danger'); return; }
+
+        const hasMainNew = !!window._mainImageFile;
+        const hasMainRemoved = !!(window._mainImageRemoved && !window._mainImageFile && window._mainImageId);
+        const hasPhotos = pendingPhotoFiles.length > 0;
+        if (!hasMainNew && !hasMainRemoved && !hasPhotos) {
+            showAlert('No hay imágenes nuevas por guardar.', 'info');
+            return;
+        }
+
+        // Asegura que la experiencia exista (borrador o real) antes de subir imágenes.
+        let targetId = window.__experienceDraftId || (isNew ? null : experienceId);
+        if (!targetId && isNew && window.experienceServicesBuilder && window.experienceServicesBuilder.ensureDraftExperience) {
+            try { targetId = (await window.experienceServicesBuilder.ensureDraftExperience()) || window.__experienceDraftId; } catch (e) {}
+        }
+        if (!targetId) { showAlert('No se pudo preparar la experiencia para subir imágenes.', 'danger'); return; }
+
+        const btn = document.getElementById('savePhotosBtn');
+        const btnHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando imágenes...'; }
+        try {
+            if (hasMainRemoved) {
+                try {
+                    await fetch(`/api/experiences/${targetId}/images/${window._mainImageId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } });
+                    window._mainImageId = null; window._mainImageRemoved = false;
+                } catch (delErr) { console.warn('No se pudo borrar la portada:', delErr); }
+            }
+            if (hasMainNew) {
+                await uploadMainImage(targetId, window._mainImageFile);
+                window._mainImageFile = null; window._mainImageRemoved = false;
+            }
+            if (pendingPhotoFiles.length > 0) {
+                const count = pendingPhotoFiles.length;
+                for (let i = 0; i < count; i++) {
+                    // eslint-disable-next-line no-await-in-loop
+                    await uploadPhoto(targetId, pendingPhotoFiles[i]);
+                }
+                pendingPhotoFiles.length = 0;
+            }
+            showAlert('Imágenes guardadas correctamente.', 'success');
+            setAutoSaveStatus('saved');
+        } catch (e) {
+            console.error('Error guardando imágenes:', e);
+            showAlert('Error al subir las imágenes.', 'danger');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
         }
     }
 

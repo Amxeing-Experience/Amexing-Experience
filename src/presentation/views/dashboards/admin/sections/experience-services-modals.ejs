@@ -9,8 +9,45 @@
 <style>
     #serviceModal.service-panel{display:none;margin:0 0 1.25rem;border:1px solid #e6e3da;border-radius:.75rem;background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.06);overflow:hidden;}
     #serviceModal .service-panel__head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#fbfaf6;border-bottom:1px solid #eee;}
-    #serviceModal .service-panel__body{padding:18px;}
-    #serviceModal .service-panel__foot{display:flex;justify-content:flex-end;gap:.5rem;padding:14px 18px;background:#fbfaf6;border-top:1px solid #eee;}
+    #serviceModal .service-panel__body{padding:14px 16px;}
+    #serviceModal .service-panel__foot{display:flex;justify-content:flex-end;gap:.5rem;padding:12px 16px;background:#fbfaf6;border-top:1px solid #eee;}
+
+    /* Compactación estilo mockup: labels chicos en mayúsculas + menos espacio vertical. */
+    #serviceModal .form-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;font-weight:700;color:#8a8f78;margin-bottom:3px;}
+    #serviceModal .mb-3{margin-bottom:.55rem !important;}
+    #serviceModal .mb-4{margin-bottom:.7rem !important;}
+    #serviceModal hr.my-4{margin:.6rem 0 !important;}
+    #serviceModal .form-control,#serviceModal .form-select{padding-top:.35rem;padding-bottom:.35rem;}
+    #serviceModal .service-type-selector{margin-bottom:0 !important;}
+
+    /* Loader mientras se arma el formulario (feedback al pulsar un chip). */
+    #serviceModal{position:relative;}
+    #serviceModal.is-loading::after{content:'';position:absolute;inset:0;z-index:6;background:rgba(255,255,255,.6);border-radius:.75rem;}
+    #serviceModal.is-loading::before{content:'';position:absolute;top:60px;left:50%;z-index:7;width:30px;height:30px;margin-left:-15px;border:3px solid #e6e3da;border-top-color:#6E7A50;border-radius:50%;animation:svcspin .7s linear infinite;}
+    @keyframes svcspin{to{transform:rotate(360deg);}}
+
+    /* Layout HORIZONTAL estilo mockup: fusiona el contenido por tipo + campos comunes en
+       una sola fila que envuelve. Los grupos (row/col/service-content) se hacen
+       display:contents para que sus campos fluyan como items del form. */
+    #serviceModal #serviceForm{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;}
+    #serviceModal #serviceForm #serviceTypeContent,
+    #serviceModal #serviceForm .service-content:not(.d-none),
+    #serviceModal #serviceForm .row,
+    #serviceModal #serviceForm #transportFieldsRow,
+    #serviceModal #serviceForm #oneWayForm,
+    #serviceModal #serviceForm #oneWayForm .border{display:contents;}
+    /* Cada grupo de campo se ajusta a su contenido. */
+    #serviceModal #serviceForm .service-content:not(.d-none) > .mb-3,
+    #serviceModal #serviceForm [class*="col-"]{flex:0 0 auto;width:auto;min-width:130px;max-width:230px;padding:0;margin:0 0 2px;}
+    /* El selector principal (Servicio) crece. */
+    #serviceModal #serviceForm .service-content:not(.d-none) > .mb-3:first-child,
+    #serviceModal #serviceForm .grow{flex:1 1 220px;max-width:none;}
+    /* A todo el ancho: tarjetas de detalle, picker, preview, duración de transporte. */
+    #serviceModal #serviceForm .card,
+    #serviceModal #serviceForm #vehiclePicker,
+    #serviceModal #serviceForm .service-preview,
+    #serviceModal #serviceForm #transportDurationRow{flex-basis:100% !important;max-width:100% !important;}
+    #serviceModal #serviceForm hr{display:none;}
 </style>
 <div class="service-panel" id="serviceModal">
             <div class="service-panel__body">
@@ -205,6 +242,15 @@
                         </div>
                     </div>
 
+                    <!-- Picker de vehículos por capacidad: se llena desde la ruta, ordenado por
+                         precio; marca la opción más barata que cubre el Máx de pax. Reemplaza
+                         al dropdown de vehículo cuando hay opciones de ruta. -->
+                    <div id="vehiclePicker" class="mb-3 d-none">
+                        <label class="form-label">Vehículos por capacidad</label>
+                        <div id="vehiclePickerList" class="vehicle-picker-list"></div>
+                        <div class="form-text">La más barata que cubre el Máx de pax viene marcada. Puedes elegir otra o ajustar la cantidad abajo.</div>
+                    </div>
+
                     <!-- Duración del traslado (Transport only). Se autollena de la ruta y es
                          editable. "Redondo" multiplica duración y precio ×2. Alimenta la
                          duración sugerida y la tarjeta del servicio (service.durationHours). -->
@@ -392,7 +438,13 @@
 
 <script>
 (function () {
-    function hideServicePanel() { var p = document.getElementById('serviceModal'); if (p) p.style.display = 'none'; }
+    function hideServicePanel() {
+        var p = document.getElementById('serviceModal'); if (p) p.style.display = 'none';
+        // Devuelve el panel a su "home" (fuera de la lista) tras editar inline.
+        var home = document.getElementById('svcPanelHome');
+        if (home && p && home.nextElementSibling !== p) home.insertAdjacentElement('afterend', p);
+        document.querySelectorAll('#addServiceChips .add-service-chip.active').forEach(function (c) { c.classList.remove('active'); });
+    }
     document.addEventListener('click', function (e) {
         if (e.target.closest('#serviceModalCloseBtn, #serviceModalCancelBtn')) hideServicePanel();
     });

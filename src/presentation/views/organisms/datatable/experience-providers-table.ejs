@@ -1452,7 +1452,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         
         $(document).on('click', '.delete-experiencia-btn', function() {
             const index = $(this).closest('.experiencia-editable').data('index');
-            deleteExperiencia(index);
+            deleteExperiencia(index, this);
         });
 
         // Marca visual del corazón "popular" en un botón de experiencia.
@@ -2412,13 +2412,38 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#noExperienciasMessage').toggle(!hasExperiencias);
         }
         
-        function deleteExperiencia(index) {
+        async function deleteExperiencia(index, btnEl) {
             const experiencia = providerExperiencias[index];
-            
-            if (confirm(`¿Está seguro de que desea eliminar la experiencia "${experiencia.name || 'Sin nombre'}"?`)) {
-                providerExperiencias.splice(index, 1);
-                renderAllExperienciaCards();
+            if (!experiencia) return;
+
+            if (!confirm(`¿Está seguro de que desea eliminar la experiencia "${experiencia.name || 'Sin nombre'}"?`)) return;
+
+            // Loader en el botón mientras borra (para que no parezca que no hace nada).
+            const $btn = btnEl ? $(btnEl) : null;
+            const prevBtnHtml = $btn ? $btn.html() : '';
+            if ($btn) $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+
+            // Si la experiencia YA está guardada (tiene id) en un proveedor existente, se borra
+            // de inmediato en el backend. Antes solo se quitaba de memoria y se dependía del
+            // "Guardar": si el usuario recargaba sin guardar, la experiencia reaparecía.
+            const providerId = $('#providerId').val();
+            if (experiencia.id && providerId) {
+                try {
+                    const token = getAccessToken();
+                    await $.ajax({
+                        url: `/api/providers/${providerId}/experiencias/${experiencia.id}`,
+                        type: 'DELETE',
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                    });
+                } catch (e) {
+                    if ($btn) $btn.prop('disabled', false).html(prevBtnHtml);
+                    showErrorAlert((e.responseJSON && e.responseJSON.error) || 'No se pudo eliminar la experiencia. Intenta de nuevo.');
+                    return; // no la quites de memoria si el backend falló
+                }
             }
+
+            providerExperiencias.splice(index, 1);
+            renderAllExperienciaCards(); // re-render quita la tarjeta (y su botón) — no hace falta restaurar
         }
         
         function renderAllExperienciaCards() {
@@ -3222,8 +3247,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     if (response.success) {
                         const actualProviderId = response.data?.id || response.data?.objectId || providerId;
                         
-                        // Save experiencias for the provider
-                        if (actualProviderId && experienciasToSave.length > 0) {
+                        // Save experiencias for the provider.
+                        // IMPORTANTE: NO condicionar a experienciasToSave.length > 0. Si el
+                        // usuario borra la ÚLTIMA experiencia (quedan 0), igual hay que correr
+                        // la reconciliación (GET existentes → DELETE de las removidas); si no,
+                        // la experiencia borrada nunca se elimina en el backend y reaparece.
+                        if (actualProviderId) {
                             try {
                                 // Count total images that need optimization
                                 let totalImages = 0;

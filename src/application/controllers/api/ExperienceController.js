@@ -1618,6 +1618,14 @@ class ExperienceController {
       // Extract cost change information if it exists
       const costChangeInfo = basicFieldsResult && basicFieldsResult.costChanged ? basicFieldsResult : null;
 
+      // Versionado EXPLÍCITO: solo se crea una nueva versión (nuevo registro) si el cliente
+      // pide createVersion === true. Si no, el cambio de costo se guarda EN EL MISMO registro
+      // (sin nuevo objectId), evitando ids obsoletos y versiones basura del autoguardado.
+      const shouldVersion = !!(costChangeInfo && costChangeInfo.costChanged && req.body.createVersion === true);
+      if (costChangeInfo && costChangeInfo.costChanged && !shouldVersion) {
+        experienceObj.set('cost', costChangeInfo.newCost);
+      }
+
       const relationshipsError = await this.updateExperienceRelationships(experienceObj, experienceId, req.body);
       if (relationshipsError) {
         return this.sendError(res, relationshipsError.error, relationshipsError.status);
@@ -1647,8 +1655,8 @@ class ExperienceController {
         }
       }
 
-      // Handle cost versioning if cost was changed
-      if (costChangeInfo && costChangeInfo.costChanged) {
+      // Handle cost versioning ONLY when explicitly requested (createVersion === true).
+      if (shouldVersion) {
         logger.info('Cost changed, implementing versioning', {
           experienceId: experienceObj.id,
           oldCost: costChangeInfo.oldCost,
