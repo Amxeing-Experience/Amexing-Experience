@@ -69,7 +69,8 @@ describe('rollup gateway filter (integration)', () => {
     p.set('paidAt', new Date());
     if (channel) p.set('channel', channel);
     if (gateway) p.set('gateway', gateway);
-    if (gatewayStatus) p.set('gatewayStatus', gatewayStatus);
+    // Set gatewayStatus whenever provided, including an explicit '' (legacy manual edge case).
+    if (gatewayStatus !== undefined) p.set('gatewayStatus', gatewayStatus);
     await p.save(null, { useMasterKey: true });
     created.push(p);
     return p;
@@ -119,6 +120,17 @@ describe('rollup gateway filter (integration)', () => {
       await addPayment(id, { amount: 300, method: 'tarjeta' });
       const s = await PaymentService.summarize(id);
       expect(s.paidAmount).toBe(900);
+      expect(s.balance).toBe(0);
+      expect(s.paymentStatus).toBe('paid');
+    });
+
+    it("manual con gatewayStatus '' (cadena vacia) sigue contando (no sobrecobra)", async () => {
+      // Un pago manual/legacy cuyo campo String se guarde como '' debe tratarse como manual y contar;
+      // si cayera del rollup, el saldo se inflaria y sobrecobraria al cliente.
+      const id = await createReservation([1000]);
+      await addPayment(id, { amount: 1000, method: 'efectivo', gatewayStatus: '' });
+      const s = await PaymentService.summarize(id);
+      expect(s.paidAmount).toBe(1000);
       expect(s.balance).toBe(0);
       expect(s.paymentStatus).toBe('paid');
     });

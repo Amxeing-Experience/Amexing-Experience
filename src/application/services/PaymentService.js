@@ -456,9 +456,19 @@ class PaymentService {
    * ALLOWLIST, fail-safe (plan seccion 6.5): a manual payment (no gatewayStatus) always counts;
    * an online payment counts only if its gateway status is in the "counts" allowlist. A new/unknown
    * status defaults to NOT counting, so an unmodeled state never inflates the balance (money-side
-   * fail-safe). 'disputed' DOES count (the money was already captured; an open chargeback does not
-   * release it until resolved); 'dispute_lost' does NOT — the only terminal dispute state that stops
-   * counting, same as 'refunded'.
+   * fail-safe).
+   *
+   * "Manual" here means falsy gatewayStatus — null, undefined OR '' (a String field commonly persists
+   * as an empty string). All three must count: dropping a legit manual payment from the rollup would
+   * inflate the balance and OVERCHARGE the client, the opposite of the fail-safe intent.
+   *
+   * 'disputed' DOES count — but by the plan's design decision (seccion 6.5), because the charge has not
+   * yet been reversed accounting-wise, NOT because the funds are guaranteed available. NOTE: "counts in
+   * the rollup" is NOT the same as "funds available" — on card networks the acquirer typically debits
+   * the merchant provisionally when a dispute opens, so with an open dispute the merchant usually does
+   * NOT hold the money. Modeling available vs. held funds (plan seccion 8.3) is a separate future-PR
+   * concern. 'dispute_lost' does NOT count — the only terminal dispute state that stops counting, same
+   * as 'refunded'.
    *
    * Case-sensitive by design: 'SUCCEEDED' or ' succeeded ' do NOT count (statuses are stored verbatim
    * from the provider mapping, never normalized here).
@@ -467,7 +477,7 @@ class PaymentService {
    * with gatewayStatus='refunded', but seccion 6.5 (implemented here) excludes 'refunded' — so such a
    * negative Payment would never subtract from paidGlobal. Reconciling the refund semantics (mutate the
    * original vs. a negative Payment) is deferred to the refunds PR; PR 2 implements 6.5 literally.
-   * @param {string|null|undefined} gatewayStatus - Payment.gatewayStatus (null/undefined = manual).
+   * @param {string|null|undefined} gatewayStatus - Payment.gatewayStatus (falsy = manual).
    * @returns {boolean} True if the payment counts toward paidGlobal.
    * @example
    * PaymentService.countsInRollup(undefined) // true (manual)
@@ -476,7 +486,8 @@ class PaymentService {
    */
   static countsInRollup(gatewayStatus) {
     const COUNTS = new Set(['succeeded', 'disputed']);
-    return gatewayStatus == null || COUNTS.has(gatewayStatus); // == null cubre null Y undefined
+    // !gatewayStatus cubre null, undefined y '' (todos = manual, cuentan; nunca sobrecobrar).
+    return !gatewayStatus || COUNTS.has(gatewayStatus);
   }
 
   /**
