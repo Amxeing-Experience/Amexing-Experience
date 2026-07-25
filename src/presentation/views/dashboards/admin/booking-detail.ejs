@@ -332,12 +332,35 @@ document.addEventListener('DOMContentLoaded', async function() {
         return name.split(' ').map(w => w[0]).filter(Boolean).join('').substring(0, 2).toUpperCase();
     }
 
-    // Returns the per-service price respecting the reservation's payment type. The
-    // quote stored pricesByType per service ({ efectivo, transferencia, tarjeta }) — at
-    // conversion only the snapshot for the quote's payment type made it into
-    // svc.total. Using pricesByType when available makes the booking totals match the
-    // quote regardless of which payment type the reservation is currently on.
+    // Redondeo a efectivo: múltiplo de 5 MXN (ley de redondeo del proyecto, applyCashRounding).
+    // Regla física del efectivo (no hay denominación practicable de 1-2 pesos); NO aplica a
+    // tarjeta/transferencia, que se cobran exactas al valor de la cotización.
+    function cashRoundMXN(price) {
+        const integerPart = Math.floor(price);
+        const decimalPart = price - integerPart;
+        if (decimalPart <= 0.50) return Math.floor(integerPart / 5) * 5;
+        if (integerPart === 0) return 5;
+        return Math.ceil(integerPart / 5) * 5;
+    }
+
+    // Precio base en efectivo de un servicio (0 si está excluido del total). Es el precio de
+    // referencia para el desglose Subtotal/recargo -- no se usa para calcular el cobro de
+    // otros métodos.
+    function getServiceBase(svc) {
+        if (svc?.subconcept?.includeInTotal === false) return 0;
+        const pbt = svc?.subconcept?.pricesByType;
+        if (pbt && typeof pbt === 'object' && pbt.efectivo != null) {
+            const v = Number(pbt.efectivo);
+            if (!Number.isNaN(v)) return v;
+        }
+        return Number(svc?.total) || 0;
+    }
+
+    // Lee el precio YA calculado y aprobado por la cotización para este método
+    // (pricesByType[paymentType]), igual que PaymentService.chargeAmount en el servidor --
+    // no se recalcula con ninguna tasa. Fallback a svc.total si ese método no está presente.
     function getServicePriceByType(svc, paymentType) {
+        if (svc?.subconcept?.includeInTotal === false) return 0;
         const pbt = svc?.subconcept?.pricesByType;
         if (pbt && typeof pbt === 'object' && pbt[paymentType] != null) {
             const v = Number(pbt[paymentType]);
@@ -346,9 +369,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         return Number(svc?.total) || 0;
     }
 
-    // Sum of per-service prices using the reservation's payment type.
+    // Total de servicios por método: Σ pricesByType[paymentType] (valor ya aprobado en la
+    // cotización); efectivo (MXN) redondeado a múltiplo de 5.
     function computeServicesSubtotalByType(services, paymentType) {
-        return (services || []).reduce((sum, svc) => sum + getServicePriceByType(svc, paymentType), 0);
+        let value = (services || []).reduce((sum, svc) => sum + getServicePriceByType(svc, paymentType), 0);
+        const currency = (reservationData && reservationData.currency) || 'MXN';
+        if (paymentType === 'efectivo' && String(currency).toUpperCase() === 'MXN') {
+            value = cashRoundMXN(value);
+        }
+        return Math.round(value * 100) / 100;
     }
 
     function buildPersonCard(person, roleLabel, roleIcon, colorClass) {
@@ -649,22 +678,36 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `<span class="badge ${s.cls}" style="font-size:0.65rem;">${s.label}</span>`;
     }
 
+    // Failure modes are kept DISTINCT so the message points at the real cause instead of a
+    // single opaque "Error al cargar": (1) network/HTTP or API success:false vs (2) an
+    // exception thrown while rendering valid data. Both are logged with detail to the console.
     async function loadReservation() {
+        let result;
         try {
             const response = await fetch(`/api/reservations/${reservationId}`, {
                 headers: { 'Authorization': `Bearer ${authToken()}` }
             });
-            const result = await response.json();
-            if (!result.success) {
-                document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservacion</p>';
+            result = await response.json().catch(() => null);
+            if (!response.ok || !result || !result.success) {
+                const reason = (result && result.error) ? result.error : `HTTP ${response.status}`;
+                console.error('Error loading reservation:', reason, result);
+                document.getElementById('loadingState').innerHTML = `<p class="text-danger">Error al cargar la reservacion (${reason})</p>`;
                 return;
             }
+        } catch (error) {
+            console.error('Error loading reservation (red):', error);
+            document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservacion (sin conexion)</p>';
+            return;
+        }
 
+        // Render separately: a render-time exception (unexpected/malformed data) is reported
+        // distinctly from a fetch/API failure, and no longer masquerades as "no se pudo cargar".
+        try {
             reservationData = result.data;
             renderReservation();
         } catch (error) {
-            console.error('Error loading reservation:', error);
-            document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al cargar la reservacion</p>';
+            console.error('Error rendering reservation:', error);
+            document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al mostrar la reservacion. Revisa la consola para el detalle.</p>';
         }
     }
 
@@ -1600,7 +1643,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         const discountsTotal = discounts.reduce((s, a) => s + (a.amount || 0), 0);
         // Final total = subtotal + charges - discounts (computed instead of using
         // the stored d.totalAmount so payment-type changes recompute correctly).
-        const finalTotal = servicesSubtotal + chargesTotal - discountsTotal;
+        // Nunca negativo: un descuento mayor al total lo deja en 0 (igual que el server).
+        const finalTotal = Math.max(0, servicesSubtotal + chargesTotal - discountsTotal);
         const curr = d.currency || 'MXN';
 
         let html = '';
@@ -1655,7 +1699,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     ${getPaymentStatusBadge(pay.paymentStatus)}
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total con IVA</span>
+                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total a pagar</span>
                     <span class="fw-semibold">${formatCurrency(pay.total, curr)}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">

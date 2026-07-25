@@ -552,24 +552,22 @@ class PublicReservationController {
       };
     }));
 
-    // Compute totals from per-service price by paymentType (mirrors booking-detail logic)
+    // Totales por método de pago (misma fuente de verdad que PaymentService): se cobra
+    // pricesByType[paymentType], el valor ya calculado y aprobado por la cotización.
     const paymentType = reservation.get('paymentType') || snapshot.paymentType || 'efectivo';
     const currency = reservation.get('currency') || snapshot.currency || 'MXN';
 
-    let subtotal = 0;
+    const totalItems = [];
     for (const day of days) {
       for (const sc of day.subconcepts) {
-        if (sc.includeInTotal !== false) {
-          const byType = sc.pricesByType && typeof sc.pricesByType === 'object'
-            ? Number(sc.pricesByType[paymentType])
-            : null;
-          if (Number.isFinite(byType)) subtotal += byType;
-          else if (Number.isFinite(Number(sc.total))) subtotal += Number(sc.total);
-        }
+        totalItems.push({ includeInTotal: sc.includeInTotal, pricesByType: sc.pricesByType, total: sc.total });
       }
     }
-    const iva = Math.round(subtotal * 0.16 * 100) / 100;
-    const total = Math.round((subtotal + iva) * 100) / 100;
+    // Servicios solos (sin ajustes ni propina) para el desglose Subtotal/recargo/Total de la vista.
+    const dispTotals = PaymentService.computeTotals(totalItems, paymentType, 0, 0, currency);
+    const { subtotal } = dispTotals; // base (efectivo)
+    const { iva } = dispTotals; // recargo por método (IVA, o IVA + comisión de tarjeta)
+    const total = dispTotals.servicesTotal; // base × factor
 
     // Payment rollup (fresh, non-persisting): amount paid, balance and status.
     // payment.total includes the reservation tip (the full amount due); serviceItems.total does not.

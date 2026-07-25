@@ -326,7 +326,7 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
             <div class="rc-pay-row"><span class="l">Subtotal</span><span class="v"><%= fmtMoney(sumSubtotal) %></span></div>
             <% } %>
             <% if (sumIva) { %>
-            <div class="rc-pay-row"><span class="l">IVA (16%)</span><span class="v"><%= fmtMoney(sumIva) %></span></div>
+            <div class="rc-pay-row"><span class="l">Recargo <%= paymentLabel ? ('(' + paymentLabel + ')') : '' %></span><span class="v"><%= fmtMoney(sumIva) %></span></div>
             <% } %>
             <% if (sumTotal) { %>
             <div class="rc-pay-row rc-pay-total"><span class="l">Total</span><span class="v"><%= fmtMoney(sumTotal) %></span></div>

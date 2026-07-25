@@ -116,6 +116,10 @@ backups/
 docs/backlog/README.md
 docs/backlog/_plantilla.md
 
+# Payment gateway working files - NO COMMIT (planning docs + local verification scripts)
+docs/plans/pasarela-pagos*.md
+scripts/prueba-pagos*.js
+
 # Playwright E2E output
 test-results/
 playwright-report/
