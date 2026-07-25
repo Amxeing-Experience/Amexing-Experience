@@ -145,8 +145,7 @@ const isClient = dtUserRole === 'client';
 }
 </style>
 
-<div class="card border-0 shadow-sm">
-    <div class="card-body" id="experiences-content">
+<div id="experiences-content">
         <!-- Filter Controls -->
         <div class="d-flex justify-content-end align-items-center mb-3">
             <!-- Trailing Dropdowns -->
@@ -182,8 +181,8 @@ const isClient = dtUserRole === 'client';
                 <thead class="table-light">
                     <tr>
                         <th>Nombre</th>
-                        <th>Duración</th>
-                        <th>Mín. Personas</th>
+                        <th>Categoría</th>
+                        <th>Destino</th>
                         <th>Estado</th>
                         <th class="text-center">Acciones</th>
                     </tr>
@@ -191,7 +190,6 @@ const isClient = dtUserRole === 'client';
                 <tbody></tbody>
             </table>
         </div>
-    </div>
 </div>
 
 <%- include('../modal/experience-images-modal.ejs') %>
@@ -553,6 +551,7 @@ const isClient = dtUserRole === 'client';
 
 <!-- Load centralized pricing utilities -->
 <script src="/dashboard/js/utils/pricing-utils.js"></script>
+<script src="/dashboard/js/utils/experience-categories.js"></script>
 
 <script>
 (function() {
@@ -1196,26 +1195,25 @@ const isClient = dtUserRole === 'client';
                         return `<div class="fw-semibold">${data}</div>`;
                     }
                 },
-                // 2. Duración
+                // 2. Categoría (código → etiqueta vía ExperienceCategories.labelFor)
                 {
-                    // Función en vez de 'duration' string: tolera filas sin la propiedad
-                    // (evita "Requested unknown parameter 'duration'" en DataTables).
-                    data: function(row) { return row.duration; },
+                    data: function(row) { return row.experience_category; },
                     defaultContent: '',
                     orderable: false,
                     render: function(data) {
-                        if (!data) return '<span class="text-muted">No especificado</span>';
-                        return `<span class="text-primary">${data} hrs</span>`;
+                        if (!data) return '<span class="text-muted">—</span>';
+                        const label = (window.ExperienceCategories && ExperienceCategories.labelFor(data)) || data;
+                        return `<span class="badge bg-light text-dark border">${label}</span>`;
                     }
                 },
-                // 4. Mín. Personas
+                // 3. Destino
                 {
-                    data: function(row) { return row.min_people; },
+                    data: function(row) { return row.destinationPOI ? row.destinationPOI.name : null; },
                     defaultContent: '',
                     orderable: false,
                     render: function(data) {
-                        if (!data) return '<span class="text-muted">No especificado</span>';
-                        return `<span class="text-info">${data} personas</span>`;
+                        if (!data) return '<span class="text-muted">—</span>';
+                        return `<span><i class="ti ti-map-pin me-1 text-muted"></i>${data}</span>`;
                     }
                 },
                 // 4. Estado
@@ -1359,6 +1357,13 @@ const isClient = dtUserRole === 'client';
                 }
             }
         });
+
+        // Carga las categorías (código→etiqueta) y repinta para mostrar el nombre real.
+        if (window.ExperienceCategories && typeof ExperienceCategories.fetch === 'function') {
+            ExperienceCategories.fetch().then(function() {
+                try { dataTable.draw(false); } catch (e) { /* noop */ }
+            }).catch(function() { /* noop */ });
+        }
 
         // Setup filter functionality for Moneda and Pago dropdowns
         setupExperienceFilters();

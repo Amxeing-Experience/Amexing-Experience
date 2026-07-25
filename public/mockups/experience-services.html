@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup · Servicios de experiencia (inline + desglose)</title>
+<style>
+  :root{
+    --olive:#6E7A50; --sage:#969b81; --sage-soft:#f3f4ee; --line:#e2ded1;
+    --ink:#2b2b2b; --muted:#8a8f78; --bg:#f6f7f4; --card:#fff;
+    --chip:#eef0e6; --danger:#c0563f; --ok:#4b7a3f;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.4;padding:28px 16px 80px;}
+  .wrap{max-width:1000px;margin:0 auto;}
+  h1{font-size:20px;margin:0 0 4px;}
+  .sub{color:var(--muted);margin:0 0 22px;font-size:13px;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:18px;}
+  .panel__head{display:flex;justify-content:space-between;align-items:center;gap:10px;
+    border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .panel__title{font-weight:700;color:var(--olive);display:flex;align-items:center;gap:8px;margin:0;font-size:15px;}
+  .btn{border:1px solid var(--olive);background:var(--olive);color:#fff;border-radius:9px;
+    padding:7px 14px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+  .btn.ghost{background:#fff;color:var(--olive);}
+  .btn.sm{padding:4px 10px;font-size:12px;border-radius:7px;}
+  .btn.chip{border:1px dashed var(--sage);background:#fbfcf9;color:var(--olive);}
+  .muted{color:var(--muted);}
+  .tag{display:inline-flex;align-items:center;gap:4px;background:var(--chip);color:#55603c;
+    border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600;white-space:nowrap;}
+  .tag.warn{background:#faf0dd;color:#8a6d2f;}
+  .tag.info{background:#e7eef6;color:#3d5a80;}
+
+  /* ---------- Fila de servicio (inline, compacta) ---------- */
+  .svc{border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:10px;background:#fff;}
+  .svc__main{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;}
+  .svc__ico{width:26px;height:26px;border-radius:7px;background:var(--sage-soft);
+    display:grid;place-items:center;font-size:15px;}
+  .svc__body{min-width:0;}
+  .svc__name{font-weight:600;}
+  .svc__attrs{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}
+  .svc__price{text-align:right;white-space:nowrap;}
+  .svc__unit{font-size:11.5px;color:var(--muted);}
+  .svc__total{font-weight:700;color:var(--olive);font-size:15px;}
+  .svc__acts{display:flex;gap:4px;margin-left:8px;}
+  .icobtn{width:26px;height:26px;border:1px solid var(--line);background:#fff;border-radius:7px;
+    cursor:pointer;color:var(--muted);font-size:13px;display:grid;place-items:center;}
+  .icobtn:hover{border-color:var(--sage);color:var(--olive);}
+
+  /* ---------- Editor inline (alta en una línea) ---------- */
+  .editor{border:1px solid var(--sage);border-radius:11px;padding:12px;background:#fbfcf9;margin-top:4px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
+  .fld{display:flex;flex-direction:column;gap:3px;}
+  .fld label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
+  select,input{border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:13px;background:#fff;color:var(--ink);}
+  select:focus,input:focus{outline:none;border-color:var(--sage);}
+  .w-xs{width:56px;text-align:center;} .w-sm{width:80px;} .w-md{width:150px;} .w-lg{width:220px;} .grow{flex:1;min-width:160px;}
+  /* Capacidad editable (fuente única: se define aquí y alimenta las columnas) */
+  .capedit{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--sage);
+    border-radius:10px;padding:6px 10px;font-size:12.5px;color:#55603c;}
+  .capedit .cap{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);}
+  .switch{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;background:#fff;
+    border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;user-select:none;}
+  .switch input{accent-color:var(--olive);}
+  .switch.on{border-color:var(--sage);background:#fff;box-shadow:inset 0 0 0 1px var(--sage);}
+
+  /* barra "general" (guía/chofer que aplican a toda la experiencia) */
+  .globalbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--sage-soft);
+    border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:14px;}
+  .gb-label{font-size:11px;font-weight:700;color:#55603c;text-transform:uppercase;letter-spacing:.04em;}
+  .gb-total{margin-left:auto;font-weight:800;color:var(--olive);font-size:15px;}
+  .fld.inline{flex-direction:row;align-items:center;gap:6px;}
+  .fld.inline .cap{font-size:10.5px;text-transform:uppercase;letter-spacing:.03em;font-weight:700;color:var(--muted);}
+  /* duración: referencia de solo-lectura al campo del encabezado (no se duplica) */
+  .durref{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px dashed var(--sage);
+    border-radius:8px;padding:6px 11px;font-size:12.5px;font-weight:600;color:#55603c;}
+  .durref .lk{font-size:11px;}
+
+  /* Picker de vehículos por capacidad (sugeridos + alternativas, combinables) */
+  .vehpick{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);}
+  .vehpick__head{font-size:12.5px;color:var(--muted);margin-bottom:8px;}
+  .vopt{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);
+    border-radius:9px;margin-bottom:6px;cursor:pointer;background:#fff;}
+  .vopt.on{border-color:var(--sage);box-shadow:inset 0 0 0 1px var(--sage);background:#fbfcf9;}
+  .vopt input{accent-color:var(--olive);}
+  .vopt__name{font-weight:600;flex:1;}
+  .vopt__name small{color:var(--muted);font-weight:500;}
+  .vcap{font-size:11px;font-weight:700;color:#3d5a80;background:#e7eef6;border-radius:5px;padding:2px 7px;white-space:nowrap;}
+  .vcap.tight{color:#8a6d2f;background:#faf0dd;}
+  .vprice{font-weight:700;color:var(--olive);min-width:74px;text-align:right;}
+  .vehpick__foot{display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap;}
+
+  .addhint{font-size:12px;color:var(--muted);margin:-6px 0 8px;padding-left:6px;border-left:2px solid var(--sage);}
+  /* Alta progresiva: siempre visible, colapsada al mínimo (Tipo + Servicio + ＋) */
+  .addprog{border:1.5px dashed var(--sage);background:#fbfcf9;border-radius:11px;padding:10px 12px;margin:4px 0 8px;}
+  .addprog__label{font-size:11px;font-weight:700;color:var(--olive);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;}
+  .addprog .row{align-items:flex-end;}
+  .plusbtn{width:38px;height:38px;border:1px solid var(--olive);background:var(--olive);color:#fff;border-radius:9px;font-size:18px;line-height:1;cursor:pointer;}
+  .brk__label .pill{font-size:10.5px;font-weight:700;color:#3d5a80;background:#e7eef6;border-radius:5px;padding:1px 6px;margin-left:6px;}
+  .secondary{opacity:.92;}
+
+  /* ---------- Desglose ---------- */
+  .brk{display:flex;gap:16px;flex-wrap:wrap;}
+  .brk__col{flex:1;min-width:300px;}
+  .brk__label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.04em;margin:0 0 8px;}
+  .line{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line);}
+  .line small{color:var(--muted);display:block;font-size:11.5px;}
+  .line b{white-space:nowrap;}
+  .badge-pp{font-size:10.5px;font-weight:700;color:#3d5a80;background:#e7eef6;border-radius:5px;padding:1px 5px;margin-left:6px;}
+  .badge-fx{font-size:10.5px;font-weight:700;color:#8a6d2f;background:#faf0dd;border-radius:5px;padding:1px 5px;margin-left:6px;}
+  .total{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;padding-top:10px;border-top:2px solid var(--olive);}
+  .total .big{font-size:22px;font-weight:800;color:var(--olive);}
+  .pp{display:flex;justify-content:space-between;align-items:baseline;margin-top:6px;color:#3d5a80;}
+  .pp .big{font-size:18px;font-weight:800;}
+
+  table.mtx{width:100%;border-collapse:collapse;font-size:13px;}
+  table.mtx th,table.mtx td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;}
+  table.mtx th:first-child,table.mtx td:first-child{text-align:left;}
+  table.mtx thead th{background:var(--sage-soft);color:#55603c;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;}
+  table.mtx tr.sum td{font-weight:700;border-top:2px solid var(--olive);}
+  table.mtx tr.ppv td{color:#3d5a80;font-weight:800;}
+  table.mtx td.hi{background:#f3f4ee;}
+
+  .note{background:#fff8ec;border:1px solid #f0e2c4;border-radius:10px;padding:10px 12px;font-size:12.5px;color:#7a5f24;margin-top:6px;}
+  hr.soft{border:0;border-top:1px dashed var(--line);margin:14px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Servicios de la experiencia — propuesta inline + desglose</h1>
+  <p class="sub">Mockup para ajustar antes de implementar · caso: <b>Experiencia propia “Clase de cocina”</b> · precios variables por vehículo y pax.</p>
+
+  <!-- ====== SERVICIOS (lista inline) ====== -->
+  <div class="panel">
+    <div class="panel__head">
+      <p class="panel__title">🧾 Servicios</p>
+      <button class="btn sm ghost">＋ Servicio</button>
+    </div>
+
+    <!-- Barra GENERAL: guía + chofer + vehículo que aplican a toda la experiencia.
+         (Un servicio puntual puede además traer su propio chofer/guía; ver Transporte local.) -->
+    <div class="globalbar">
+      <span class="gb-label">General · toda la experiencia</span>
+      <label class="switch on"><input type="checkbox" checked> 🎧 Guía</label>
+      <label class="switch on"><input type="checkbox" checked> 🧑‍✈️ Chofer</label>
+      <span class="fld inline"><span class="cap">Tarifa guía+chofer /h</span><input class="w-sm" value="1200"></span>
+      <span class="durref"><span class="lk">🔗</span> × 2 h · <span class="muted">duración de la experiencia</span></span>
+      <span class="gb-total">= $2,400</span>
+    </div>
+    <div class="note" style="margin:-8px 0 14px;">La <b>tarifa /h</b> es el costo por hora de <b>guía + chofer</b>; se multiplica por la <b>duración de la experiencia</b> (del encabezado 🔗): $1,200/h × 2 h = <b>$2,400</b>, fijo para cualquier pax.</div>
+
+    <!-- Servicio 1: Experiencia por persona -->
+    <div class="svc">
+      <div class="svc__main">
+        <div class="svc__ico">🍳</div>
+        <div class="svc__body">
+          <div class="svc__name">Cooking class</div>
+          <div class="svc__attrs"><span class="tag info">👤 Por persona</span><span class="tag">× 4 pax</span></div>
+        </div>
+        <div class="svc__price"><div class="svc__unit">$5,500 × 4</div><div class="svc__total">$22,000.00</div></div>
+        <div class="svc__acts"><button class="icobtn">✎</button><button class="icobtn">🗑</button></div>
+      </div>
+    </div>
+
+    <!-- Servicio 2: Transporte — precio y vehículo según capacidad de pax -->
+    <div class="svc">
+      <div class="svc__main">
+        <div class="svc__ico">🚕</div>
+        <div class="svc__body">
+          <div class="svc__name">Transporte local — regreso al hotel</div>
+          <div class="svc__attrs"><span class="tag">👥 hasta 6 pax</span><span class="tag ok">2 × Sedán económico</span><span class="tag">🧑‍✈️ Chofer propio</span></div>
+        </div>
+        <div class="svc__price"><div class="svc__unit">2 × $900</div><div class="svc__total">$1,800.00</div></div>
+        <div class="svc__acts"><button class="icobtn" title="Editar">✎</button><button class="icobtn">🗑</button></div>
+      </div>
+      <!-- Picker: vehículos que cubren la capacidad (sugeridos por pax), editable/combinables -->
+      <div class="vehpick">
+        <div class="vehpick__head">Vehículos que cubren <b>6 pax (máx)</b> — sugeridos por capacidad; puedes cambiar la combinación:</div>
+        <label class="vopt"><input type="radio" name="veh"> <span class="vopt__name">1 × Van 9 premium <small>caben todos en 1</small></span> <span class="vcap">cap. 9</span> <span class="vprice">$2,000</span></label>
+        <label class="vopt on"><input type="radio" name="veh" checked> <span class="vopt__name">2 × Sedán económico <small>más barato</small></span> <span class="vcap">3 ×2 = 6</span> <span class="vprice">$1,800</span></label>
+        <label class="vopt"><input type="radio" name="veh"> <span class="vopt__name">1 × Sprinter 14</span> <span class="vcap">cap. 14</span> <span class="vprice">$2,400</span></label>
+        <div class="vehpick__foot">
+          <button class="btn chip sm">＋ Combinar vehículo</button>
+          <span class="muted" style="font-size:12px;">Mezcla (ej. 1 Van + 1 Sedán) si un solo tipo no cuadra con los pax. Solo aparecen vehículos con capacidad suficiente.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALTA PROGRESIVA · REPOSO: siempre visible al final, colapsada al mínimo (Tipo + Servicio + ＋) -->
+    <div class="addprog">
+      <div class="addprog__label">＋ Agregar servicio</div>
+      <div class="row">
+        <div class="fld"><label>Tipo</label>
+          <select class="w-md"><option>Elegir tipo…</option><option>🚐 Tour / vehículo</option><option>🍳 Experiencia</option><option>🚕 Transporte</option><option>🎟 Entradas</option><option>📝 Concepto</option></select>
+        </div>
+        <div class="fld grow"><label>Servicio</label>
+          <select><option>Buscar servicio…</option></select>
+        </div>
+        <button class="plusbtn" title="Agregar">＋</button>
+      </div>
+    </div>
+
+    <div class="addhint">↑ <b>Reposo</b> (siempre visible): solo Tipo + Servicio. Al elegir un <b>Tipo</b> se revelan <b>solo</b> los campos de ese tipo ↓. Ejemplo con <b>Transporte / Tour</b>:</div>
+
+    <!-- Estado EXPANDIDO (ejemplo: se eligió "Transporte / Tour" → aparecen vehículo, duración, switches) -->
+    <div class="editor">
+      <div class="row">
+        <div class="fld"><label>Tipo</label>
+          <select class="w-md"><option>🚐 Tour / vehículo</option><option>🍳 Experiencia</option><option>🚕 Transporte</option><option>🎟 Entradas</option><option>📝 Concepto</option></select>
+        </div>
+        <div class="fld grow"><label>Servicio</label>
+          <select><option>Buscar servicio…</option></select>
+        </div>
+        <div class="fld"><label>Vehículo</label>
+          <select class="w-md"><option>Van (1–6)</option><option>Sedán (1–3)</option><option>Sprinter (1–14)</option></select>
+        </div>
+        <div class="fld"><label>Dur.</label>
+          <input class="w-sm" value="2 h">
+        </div>
+        <div class="fld"><label>Precio</label>
+          <input class="w-sm" value="1200"></div>
+        <label class="switch"><input type="checkbox"> 🧑‍✈️ Chofer propio</label>
+        <label class="switch"><input type="checkbox"> 🎧 Guía propia</label>
+        <button class="btn sm">✓ Agregar</button>
+        <button class="btn ghost sm">Cancelar</button>
+      </div>
+      <div class="note"><b>Progresivo</b>: en reposo solo ves Tipo + Servicio; al elegir el Tipo se revelan solo sus campos (aquí “Transporte/Tour” → vehículo, duración, switches). Otros tipos: “Experiencia” → <i>Precio por persona</i> (sin vehículo/duración); “Entradas/Concepto” → solo precio y cantidad. Por defecto usa la <b>guía/chofer generales</b> (barra de arriba); marca “propio” solo si ese servicio lleva el suyo. “Agregar” lo suma a la lista y la fila vuelve a reposo.</div>
+    </div>
+  </div>
+
+  <!-- ====== DESGLOSE (B como principal, alimentado por Mín/Máx de Capacidad) ====== -->
+  <div class="panel">
+    <div class="panel__head">
+      <p class="panel__title">📊 Desglose por capacidad</p>
+      <span class="capedit">
+        <span class="cap">👥 Capacidad</span>
+        <input class="w-xs" value="2"> <span class="muted">mín</span>
+        <span class="muted">–</span>
+        <input class="w-xs" value="6"> <span class="muted">máx pax</span>
+      </span>
+    </div>
+    <div class="note" style="margin:-4px 0 14px;">Mín/Máx se define <b>aquí una sola vez</b> (ya no en “Capacidad y tarifas”) y alimenta las columnas del comparativo. Cambiar estos valores recalcula el rango de precio por persona.</div>
+
+    <!-- PRINCIPAL: comparativo por pax usando Mín/Máx (+ punto medio) -->
+    <p class="brk__label">Comparativo por pax <span class="pill">recomendado</span></p>
+    <table class="mtx">
+      <thead><tr><th>Servicio</th><th>Mín · 2 pax</th><th>4 pax</th><th>Máx · 6 pax</th></tr></thead>
+      <tbody>
+        <tr><td>Guía + chofer <small class="muted">(general · $1,200/h × 2 h · fijo)</small></td><td>$2,400</td><td>$2,400</td><td>$2,400</td></tr>
+        <tr><td>Cooking class <small class="muted">($5,500/pax)</small></td><td>$11,000</td><td>$22,000</td><td>$33,000</td></tr>
+        <tr><td>Transporte <small class="muted">(vehículo según capacidad)</small></td>
+          <td>$900<br><small class="muted">1 Sedán</small></td>
+          <td>$1,800<br><small class="muted">2 Sedán</small></td>
+          <td>$1,800<br><small class="muted">2 Sedán ✓</small></td></tr>
+        <tr class="sum"><td>Total</td><td>$14,300</td><td>$26,200</td><td>$37,200</td></tr>
+        <tr class="ppv"><td>Por persona</td><td>$7,150</td><td>$6,550</td><td>$6,200</td></tr>
+      </tbody>
+    </table>
+    <div class="note">Columnas de <b>Mín</b> y <b>Máx</b> de Capacidad. La fila <b>Transporte</b> cambia de <b>vehículo y precio según los pax</b>: en cada escenario se ofrecen solo los vehículos con <b>capacidad suficiente</b> (1 Sedán cabe 2–3; para 4–6 se sugiere 2 Sedán, o 1 Van premium $2,000 / Sprinter $2,400). El vehículo elegido (<b>✓</b>) es el del servicio; puedes cambiarlo por escenario. <b>Guía + chofer</b> es general y fijo; lo “por pax” escala lineal.</div>
+
+    <hr class="soft">
+
+    <!-- SECUNDARIO: detalle itemizado (opcional) -->
+    <details class="secondary">
+      <summary style="cursor:pointer;color:var(--olive);font-weight:600;font-size:13px;">Ver detalle itemizado (para 4 pax)</summary>
+      <div style="max-width:470px;margin-top:12px;">
+        <div class="line"><span>Guía + chofer <small>general · $1,200/h × 2 h (duración exp.)</small></span><b>$2,400<span class="badge-fx">general fijo</span></b></div>
+        <div class="line"><span>Cooking class <small>$5,500 × 4 pax</small></span><b>$22,000<span class="badge-pp">por pax</span></b></div>
+        <div class="line"><span>Transporte local <small>regreso al hotel · 2 × Sedán económico ($900 c/u) para 4 pax</small></span><b>$1,800<span class="badge-fx">por capacidad</span></b></div>
+        <div class="total"><span class="muted">Total</span><span class="big">$26,200</span></div>
+        <div class="pp"><span>Por persona <small class="muted">(÷ 4)</small></span><span class="big">$6,550</span></div>
+      </div>
+    </details>
+  </div>
+
+  <p class="sub" style="margin-top:24px;">Ajustes que puedo hacer: ¿columnas solo Mín/Máx o también punto medio? · qué servicios pueden ser “generales” (guía, chofer, ¿vehículo?) · cómo se marca “general / compartido / por persona” · orden de columnas en la fila de alta.</p>
+</div>
+</body>
+</html>
