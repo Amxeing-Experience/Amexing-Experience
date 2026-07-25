@@ -451,6 +451,35 @@ class PaymentService {
   }
 
   /**
+   * Whether a payment counts toward the rollup (paidGlobal), based on its gateway status.
+   *
+   * ALLOWLIST, fail-safe (plan seccion 6.5): a manual payment (no gatewayStatus) always counts;
+   * an online payment counts only if its gateway status is in the "counts" allowlist. A new/unknown
+   * status defaults to NOT counting, so an unmodeled state never inflates the balance (money-side
+   * fail-safe). 'disputed' DOES count (the money was already captured; an open chargeback does not
+   * release it until resolved); 'dispute_lost' does NOT — the only terminal dispute state that stops
+   * counting, same as 'refunded'.
+   *
+   * Case-sensitive by design: 'SUCCEEDED' or ' succeeded ' do NOT count (statuses are stored verbatim
+   * from the provider mapping, never normalized here).
+   *
+   * KNOWN PLAN GAP (not resolved in this PR): plan seccion 5.7 models a refund as a NEGATIVE Payment
+   * with gatewayStatus='refunded', but seccion 6.5 (implemented here) excludes 'refunded' — so such a
+   * negative Payment would never subtract from paidGlobal. Reconciling the refund semantics (mutate the
+   * original vs. a negative Payment) is deferred to the refunds PR; PR 2 implements 6.5 literally.
+   * @param {string|null|undefined} gatewayStatus - Payment.gatewayStatus (null/undefined = manual).
+   * @returns {boolean} True if the payment counts toward paidGlobal.
+   * @example
+   * PaymentService.countsInRollup(undefined) // true (manual)
+   * PaymentService.countsInRollup('succeeded') // true
+   * PaymentService.countsInRollup('refunded') // false
+   */
+  static countsInRollup(gatewayStatus) {
+    const COUNTS = new Set(['succeeded', 'disputed']);
+    return gatewayStatus == null || COUNTS.has(gatewayStatus); // == null cubre null Y undefined
+  }
+
+  /**
    * Expresa un pago (siempre almacenado en `amount` MXN) en la MONEDA DE LA RESERVACIÓN, para que el
    * motor de cobertura (baseEquivalente/remainingBreakdown/paidAmount) compare contra pricesByType y
    * totalDue, que ya vienen en esa moneda, sin mezclar unidades. Reservación MXN: se usa `amount` tal
@@ -524,7 +553,13 @@ class PaymentService {
       usdRate = Number.isFinite(snapshot) && snapshot > 0 ? snapshot : await ExchangeRate.getCurrentValue();
     }
 
-    const paymentRows = payments.map((payment) => ({
+    // Ruta de dinero: solo los pagos que cuentan en el rollup alimentan el paidGlobal. Un pendiente
+    // online (requires_payment/processing), un fallido/expirado, un reembolsado o una disputa perdida
+    // NO deben sumar; los manuales (sin gatewayStatus) y los online succeeded/disputed sí. El predicado
+    // vive en countsInRollup() (fail-safe por allowlist) para ser unit-testeable sin DB (plan 6.5).
+    const countingPayments = payments.filter((p) => PaymentService.countsInRollup(p.get('gatewayStatus')));
+
+    const paymentRows = countingPayments.map((payment) => ({
       amount: this.paymentAmountInCurrency({
         amount: payment.get('amount'),
         origAmount: payment.get('origAmount'),
