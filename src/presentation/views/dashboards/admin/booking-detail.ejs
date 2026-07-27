@@ -271,7 +271,7 @@
 .offcanvas-backdrop.show { background-color: rgba(15,23,32,0.72) !important; opacity: 1 !important; }
 /* Fondo gris claro (el mismo tono de fondo de pagina del resto del dashboard, #f8f9fa) para que las
    tarjetas blancas "floten" con contraste, en vez de perderse contra un panel blanco parejo. */
-#paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 0.86rem; }
+#paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 0.95rem; }
 /* Letra mas chica en todo el carrito (chips, cobertura, historial) para que quepa mas sin sentirse
    amontonado; el historial ya trae ademas la clase Bootstrap "small" encima de esta base. Radio de
    borde explicito (0.5rem, el mismo que usan las demas cards de esta pagina) porque el `.rounded`
@@ -299,8 +299,8 @@
 }
 #paymentsBody { overflow: hidden; }
 /* Historial: letra explicitamente chica en la tabla (mas chica que el resto del panel). */
-#paymentsOffcanvas #paymentsBody table { font-size: 0.72rem; }
-#paymentsOffcanvas #paymentsBody .badge { font-size: 0.68rem; }
+#paymentsOffcanvas #paymentsBody table { font-size: 0.8rem; }
+#paymentsOffcanvas #paymentsBody .badge { font-size: 0.75rem; }
 /* Mismo radio de borde explicito para el bloque de descuento/ahorro (fondo verde claro propio). */
 #paymentDiscountEmphasis > div, #paymentCoverageCard .rounded { border-radius: 0.5rem; }
 .service-row {
@@ -1768,7 +1768,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <div class="fw-semibold"><i class="ti ti-discount-2 me-2"></i>${PaymentBreakdownHelpers.escapeHtml(resolved.savings.label)}</div>
                     <div class="small">${PaymentBreakdownHelpers.escapeHtml(resolved.savings.sublabel)}</div>
                 </div>` : '';
-            html += `<div class="border-top mt-2 pt-2">
+            html += `<div class="mt-2 pt-2">
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
                     <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
                     ${getPaymentStatusBadge(pay.paymentStatus)}
