@@ -459,10 +459,23 @@ Created by Denisse Maldonado
 
     <%# Header: banner con la imagen de la flota %>
     <section class="transporte-hero">
-        <video class="transporte-hero__img" autoplay muted loop playsinline preload="metadata"
-               poster="/images/video_tesla_poster.jpg" aria-label="<%= t('pages:transporte.heroAlt') %>">
+        <video class="transporte-hero__img" id="transporteHeroVideo" autoplay muted loop playsinline preload="auto"
+               poster="/images/video_tesla_poster.webp" aria-label="<%= t('pages:transporte.heroAlt') %>">
             <source src="/images/video_tesla.mp4" type="video/mp4">
         </video>
+        <script>
+        // Arranca el video en cuanto el primer frame está listo (no espera la descarga
+        // completa; el mp4 tiene faststart). Espeja el fix del hero del home.
+        (function () {
+            var v = document.getElementById('transporteHeroVideo');
+            if (!v) return;
+            function playNow() {
+                try { v.currentTime = 0; var p = v.play(); if (p && p.catch) p.catch(function () {}); } catch (e) { /* autoplay bloqueado: no pasa nada */ }
+            }
+            v.addEventListener('loadeddata', playNow, { once: true });
+            if (v.readyState >= 2) playNow(); // por si ya tenía datos
+        })();
+        </script>
     </section>
 
     <%# Opciones de vehículos %>
@@ -683,7 +696,7 @@ Created by Denisse Maldonado
 
     <%# Traslados punto a punto %>
     <section class="book-vehicles">
-        <img src="/images/book_vehicles.jpg" alt="<%= t('pages:transporte.pointToPointAlt') %>" class="book-vehicles__img">
+        <img src="/images/book_vehicles.webp" alt="<%= t('pages:transporte.pointToPointAlt') %>" class="book-vehicles__img" loading="lazy">
         <a href="/contacto#book" class="book-vehicles__cta" aria-label="<%= t('pages:transporte.bookAria') %>"></a>
     </section>
 

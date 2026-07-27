@@ -276,6 +276,97 @@ class ExperienceController {
   }
 
   /**
+   * Get ALL experiences combined from the 3 sources (standalone Experience + provider &
+   * establishment ProviderExperiencia) normalized into a single list for the admin index.
+   * Read-only: each row carries `source` and `parentId` so the UI can deep-link to the
+   * correct editor. No pagination (admin catalog is small enough).
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Returns the normalized combined list or error.
+   * @author Denisse Maldonado
+   * @since 1.0.0
+   * @example
+   * // GET /api/experiences/all-combined
+   */
+  async getAllCombinedExperiences(req, res) {
+    try {
+      if (!req.user) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      // 1) Experiencias estándar (type=Experience, vigentes).
+      const expQuery = new Parse.Query('Experience');
+      expQuery.equalTo('type', 'Experience');
+      expQuery.equalTo('exists', true);
+      expQuery.doesNotExist('valid_until');
+      expQuery.include('destinationPOI');
+      expQuery.limit(10000);
+
+      // 2) Experiencias de proveedor/establecimiento (ProviderExperiencia activas).
+      const peQuery = new Parse.Query('ProviderExperiencia');
+      peQuery.equalTo('exists', true);
+      peQuery.include('provider');
+      peQuery.include('provider.destinationPOI');
+      peQuery.limit(10000);
+
+      const [standalone, providerExps] = await Promise.all([
+        expQuery.find({ useMasterKey: true }),
+        peQuery.find({ useMasterKey: true }),
+      ]);
+
+      const rows = [];
+
+      standalone.forEach((e) => {
+        const poi = e.get('destinationPOI');
+        rows.push({
+          id: e.id,
+          source: 'standalone',
+          name: e.get('name') || '',
+          category: e.get('experience_category') || null,
+          destino: poi ? poi.get('name') : null,
+          active: e.get('active') === true,
+          popular: e.get('popular') === true,
+          parentId: null,
+          parentName: null,
+        });
+      });
+
+      providerExps.forEach((pe) => {
+        const prov = pe.get('provider');
+        // Ignora experiencias cuyo proveedor ya no existe (huérfanas).
+        if (!prov || prov.get('exists') !== true) return;
+        const provType = prov.get('type'); // 'Provider' | 'Establishment'
+        const poi = prov.get('destinationPOI');
+        rows.push({
+          id: pe.id,
+          source: provType === 'Establishment' ? 'establishment' : 'provider',
+          name: pe.get('name') || '',
+          category: pe.get('experience_category') || null,
+          destino: poi ? poi.get('name') : null,
+          active: pe.get('active') === true,
+          popular: pe.get('popular') === true,
+          parentId: prov.id,
+          parentName: prov.get('name') || '',
+        });
+      });
+
+      rows.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+
+      return res.json({ success: true, data: rows, count: rows.length });
+    } catch (error) {
+      logger.error('Error in ExperienceController.getAllCombinedExperiences', {
+        error: error.message,
+        userId: req.user?.id,
+      });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve combined experiences',
+        500
+      );
+    }
+  }
+
+  /**
    * Get experience by ID.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.

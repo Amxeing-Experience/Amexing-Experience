@@ -58,6 +58,11 @@ class PublicExperiencesService {
     try {
       const photo = photos.find((p) => p && p.isPrimary) || photos[0];
       const variants = photo.optimizedVariants || photo.formats;
+      /**
+       * Extrae la s3Key de una variante de imagen (objeto con s3Key, o string).
+       * @param {object|string} v - Variante de imagen.
+       * @returns {string|null} La s3Key o null.
+       */
       const keyFrom = (v) => (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
       let s3Key = null;
       if (variants && typeof variants === 'object') {
@@ -427,6 +432,11 @@ class PublicExperiencesService {
     if (!image) return FALLBACK_IMG;
     try {
       const variants = image.optimizedVariants;
+      /**
+       * Extrae la s3Key de una variante de imagen (objeto con s3Key, o string).
+       * @param {object|string} v - Variante de imagen.
+       * @returns {string|null} La s3Key o null.
+       */
       const keyFrom = (v) => (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
       let s3Key = null;
       if (variants && typeof variants === 'object') {

@@ -26,6 +26,11 @@ router.use('/end_client', async (req, res, next) => {
   // White-label: los clientes de agencia (agency_client) ven el logo de SU agencia (dueña por
   // organizationId = id del AmexingUser del department manager) + leyenda "Powered by Amexing".
   try {
+    /**
+     * Lee un campo del usuario autenticado (Parse object o plano).
+     * @param {string} f - Nombre del campo.
+     * @returns {*} Valor del campo (o undefined).
+     */
     const getField = (f) => (req.user && (req.user.get ? req.user.get(f) : req.user[f]));
     const clientCategory = getField('clientCategory');
     const orgId = getField('organizationId');
