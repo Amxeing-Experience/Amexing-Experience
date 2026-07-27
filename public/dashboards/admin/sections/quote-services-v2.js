@@ -138,6 +138,7 @@ class ItineraryBuilder {
     this.vehiclesCache = null;
     this.experiencesCache = new Map();
     this.entradasCache = new Map(); // Catálogo de Entradas (boletos de admisión): key 'all' -> array
+    this._experienceEntradasCache = new Map(); // experienceId -> array de entradas asociadas
     this.toursCache = new Map();
     // Destinos adicionales combinados en un tour (array de tourId). El mínimo de horas del tour
     // toma el mayor de los mínimos de todos los destinos; el precio del vehículo es del principal.
@@ -1108,7 +1109,11 @@ class ItineraryBuilder {
     ];
 
     experienceFields.forEach((fieldId) => {
+      const isPeopleQty = ['adultsQuantity', 'childrenQuantity', 'adultsNoAlcoholQuantity'].includes(fieldId);
       document.getElementById(fieldId)?.addEventListener('input', () => {
+        // Al cambiar las cantidades de personas, auto-llenar la cantidad de cada entrada con la suma
+        // (adultos + niños + sin-alcohol): cada persona = 1 boleto.
+        if (isPeopleQty) this.syncExperienceEntradaQtys();
         this.updateDevPaymentBreakdown();
         // Small delay to ensure dev breakdown is updated before service breakdown reads it
         setTimeout(() => {
@@ -3764,10 +3769,15 @@ class ItineraryBuilder {
       const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0) || adultPrice;
       const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0) || adultPrice;
 
+      // Entradas asociadas: si el toggle está ON, se suma Σ(precio × cantidad de incluidas) al total.
+      // La cantidad ya es el nº de boletos (default = personas), así que NO se multiplica por personas.
+      const entradasCostMXN = this.getExperienceEntradasCostMXN();
+
       // Calculate base total (efectivo)
       const baseTotal = (adultsQty * adultPrice)
         + (childrenQty * childPrice)
-        + (noAlcoholQty * noAlcoholPrice);
+        + (noAlcoholQty * noAlcoholPrice)
+        + entradasCostMXN;
 
       // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
       const experiencePricing = window.PricingEngine
@@ -4536,6 +4546,13 @@ class ItineraryBuilder {
         data.adultsQuantity = parseInt(document.getElementById('adultsQuantity')?.value || 0);
         data.childrenQuantity = parseInt(document.getElementById('childrenQuantity')?.value || 0);
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
+        // Entradas asociadas a la experiencia: estado editable (incluir/precio/cantidad) + toggle de
+        // "sumar al precio por persona". El precio ya viene incluido en pricesByType si el toggle está ON.
+        {
+          const entState = this.getExperienceEntradasState();
+          data.experienceEntradas = entState.items;
+          data.experienceEntradasPerPerson = entState.perPerson;
+        }
 
         // Always capture provider type + name from selected dropdown option
         const selectedOption = document.getElementById('experienceSelect')?.selectedOptions[0];
@@ -5879,6 +5896,13 @@ class ItineraryBuilder {
             // en 0, pisando los personalizados guardados. Se apaga al final de populateQuantityFields,
             // ya restaurados los precios.
             this._restoringExperienceData = true;
+            // Estado guardado de las entradas de la experiencia: lo consume el render async que dispara
+            // handleExperienceSelection (loadExperienceEntradas().then(...)).
+            this._restoreExperienceEntradas = {
+              experienceId: service.experienceId,
+              list: Array.isArray(service.experienceEntradas) ? service.experienceEntradas : null,
+              perPerson: !!service.experienceEntradasPerPerson,
+            };
             this.handleExperienceSelection(service.experienceId);
 
             // Force show pricing section after selection
@@ -8406,6 +8430,23 @@ class ItineraryBuilder {
                                             </div>
                                         </div>
                                     ` : ''}
+                                    ${service.type === 'experience' && Array.isArray(service.experienceEntradas)
+                                      && service.experienceEntradas.some((e) => e && e.included !== false) ? (() => {
+        const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+        }[ch]));
+        const list = service.experienceEntradas
+          .filter((e) => e && e.included !== false)
+          .map((e) => `${esc(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+          .join(', ');
+        return `
+                                        <div class="row g-2 text-muted small mt-1">
+                                            <div class="col-auto">
+                                                <i class="ti ti-ticket me-1 text-primary"></i>
+                                                <span class="text-muted">Entradas:</span> ${list}
+                                            </div>
+                                        </div>`;
+      })() : ''}
                                     ${(service.type === 'tour' || service.type === 'transport' || service.type === 'a-disposicion') && service.includeGreeter ? `
                                         <div class="row g-2 text-info small mt-1">
                                             <div class="col-auto">
@@ -10031,8 +10072,16 @@ class ItineraryBuilder {
       // (impacta total, pricesByType, guardado y desglose de una sola vez).
       const guideCost = this.getExperienceGuideCostMXN();
 
+      // Entradas asociadas: Σ(precio × cantidad de incluidas). La cantidad ya es el nº de boletos
+      // (default = personas), así que NO se multiplica por personas. 0 si el toggle está OFF.
+      const entradasCost = this.getExperienceEntradasCostMXN();
+      // Total de boletos incluidos (para la etiqueta del desglose). El formato "N boleto(s) = $X"
+      // deja que el parser del desglose separe bien etiqueta y monto (evita "$X ... $X" redundante).
+      const entradasTickets = this.getExperienceEntradasState().items
+        .filter((it) => it.included).reduce((s, it) => s + (it.quantity || 0), 0);
+
       // Calculate base total (efectivo)
-      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal + guideCost;
+      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal + guideCost + entradasCost;
 
       // Totales por forma de pago vía el motor único (un solo nodo: el total base).
       const experiencePricing = window.PricingEngine
@@ -10077,6 +10126,10 @@ class ItineraryBuilder {
         if (efectivoBreakdown) efectivoBreakdown += '\n';
         efectivoBreakdown += `Guía: $${guideCost.toFixed(2)}`;
       }
+      if (entradasCost > 0) {
+        if (efectivoBreakdown) efectivoBreakdown += '\n';
+        efectivoBreakdown += `Entradas: ${entradasTickets} boleto(s) = $${entradasCost.toFixed(2)}`;
+      }
       if (efectivoBreakdown) efectivoBreakdown += '\n';
       efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
 
@@ -10098,6 +10151,10 @@ class ItineraryBuilder {
         if (transferenciaBreakdown) transferenciaBreakdown += '\n';
         transferenciaBreakdown += `Guía: $${(guideCost * tMult).toFixed(2)}`;
       }
+      if (entradasCost > 0) {
+        if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+        transferenciaBreakdown += `Entradas: ${entradasTickets} boleto(s) = $${(entradasCost * tMult).toFixed(2)}`;
+      }
       if (transferenciaBreakdown) transferenciaBreakdown += '\n';
       transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
 
@@ -10118,6 +10175,10 @@ class ItineraryBuilder {
       if (guideCost > 0) {
         if (tarjetaBreakdown) tarjetaBreakdown += '\n';
         tarjetaBreakdown += `Guía: $${(guideCost * cMult).toFixed(2)}`;
+      }
+      if (entradasCost > 0) {
+        if (tarjetaBreakdown) tarjetaBreakdown += '\n';
+        tarjetaBreakdown += `Entradas: ${entradasTickets} boleto(s) = $${(entradasCost * cMult).toFixed(2)}`;
       }
       if (tarjetaBreakdown) tarjetaBreakdown += '\n';
       tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
@@ -12165,6 +12226,166 @@ class ItineraryBuilder {
     return 'Entrada';
   }
 
+  /**
+   * Carga (y cachea) las entradas asociadas a una experiencia vía GET /api/experiences/:id.
+   * @param {string} experienceId
+   * @returns {Promise<Array>} entradas [{id,name,price,destinoName}]
+   * @example
+   */
+  async loadExperienceEntradas(experienceId) {
+    if (!experienceId) return [];
+    if (this._experienceEntradasCache.has(experienceId)) {
+      return this._experienceEntradasCache.get(experienceId);
+    }
+    // Las experiencias DE PROVEEDOR viven en otra clase Parse (ProviderExperiencia) y se leen de otro
+    // endpoint; pedir /api/experiences/:id para ellas da 404. Se detectan por el cache de proveedor.
+    const isProvider = Array.isArray(this.providerExperiencesCache)
+      && this.providerExperiencesCache.some((e) => e && (e.id === experienceId || e.objectId === experienceId));
+    const url = isProvider
+      ? `/api/provider-experiences/${experienceId}`
+      : `/api/experiences/${experienceId}`;
+    try {
+      const accessToken = this.getAccessToken();
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const entradas = (result.data && Array.isArray(result.data.entradas)) ? result.data.entradas : [];
+        this._experienceEntradasCache.set(experienceId, entradas);
+        return entradas;
+      }
+    } catch (error) {
+      console.error('Error loading experience entradas:', error);
+    }
+    return [];
+  }
+
+  /**
+   * Renderiza la lista editable de entradas de la experiencia (checkbox incluir + precio + cantidad),
+   * restaura el estado guardado y cablea el recálculo. Oculta la sección si no hay entradas.
+   * @param {Array} entradas - Entradas del catálogo de la experiencia.
+   * @param {Array} savedList - Estado guardado [{id,price,quantity,included}] (opcional).
+   * @param {boolean} savedPerPerson - Estado guardado del toggle (opcional).
+   * @example
+   */
+  renderExperienceEntradas(entradas, savedList = null, savedPerPerson = null) {
+    const section = document.getElementById('experienceEntradasSection');
+    const list = document.getElementById('experienceEntradasList');
+    const toggle = document.getElementById('experienceEntradasPerPerson');
+    if (!section || !list) return;
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+    }[c]));
+    const arr = Array.isArray(entradas) ? entradas.filter((e) => e && e.id) : [];
+    if (arr.length === 0) {
+      section.classList.add('d-none');
+      list.innerHTML = '';
+      return;
+    }
+    section.classList.remove('d-none');
+    // Cantidad por defecto = nº de personas del servicio (adultos + niños + sin-alcohol; si están en 0,
+    // cae a las personas de la cotización). Vacío con placeholder "0" si no hay. Se re-sincroniza al
+    // cambiar esas cantidades (syncExperienceEntradaQtys).
+    const people = this._experiencePeopleCount();
+    const defaultQty = people > 0 ? people : '';
+    const savedById = new Map((Array.isArray(savedList) ? savedList : []).map((s) => [s.id, s]));
+    list.innerHTML = arr.map((e) => {
+      const saved = savedById.get(e.id);
+      const included = saved ? saved.included !== false : true;
+      const price = (saved && saved.price != null) ? saved.price : (Number(e.price) || 0);
+      const qty = (saved && saved.quantity != null) ? saved.quantity : defaultQty;
+      const destino = e.destinoName ? ` · ${esc(e.destinoName)}` : '';
+      return `
+        <div class="d-flex align-items-center gap-2 mb-2 exp-entrada-row" data-entrada-id="${esc(e.id)}" data-entrada-name="${esc(e.name || 'Entrada')}">
+          <input type="checkbox" class="form-check-input mt-0 exp-entrada-include" ${included ? 'checked' : ''}>
+          <span class="flex-grow-1 text-truncate" title="${esc(e.name || 'Entrada')}">${esc(e.name || 'Entrada')}<span class="text-muted small">${destino}</span></span>
+          <div class="input-group" style="width: 180px;">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control exp-entrada-price" value="${(Number(price) || 0).toFixed(2)}" min="0" step="0.01">
+          </div>
+          <input type="number" class="form-control exp-entrada-qty" value="${qty}" min="0" step="1" style="width: 100px;" placeholder="0" title="Cantidad (personas)">
+        </div>`;
+    }).join('');
+    if (toggle) toggle.checked = savedPerPerson != null ? !!savedPerPerson : false;
+    const recalc = () => { this.serviceModified = true; this.updateServicePriceBreakdown(); };
+    list.querySelectorAll('.exp-entrada-include, .exp-entrada-price, .exp-entrada-qty').forEach((el) => {
+      el.addEventListener('input', recalc);
+      el.addEventListener('change', recalc);
+    });
+    if (toggle && !toggle._entradaWired) {
+      toggle.addEventListener('change', recalc);
+      toggle._entradaWired = true;
+    }
+  }
+
+  /**
+   * Lee el estado actual de las entradas de experiencia del DOM.
+   * @returns {{items: Array, perPerson: boolean}}
+   * @example
+   */
+  getExperienceEntradasState() {
+    const rows = document.querySelectorAll('#experienceEntradasList .exp-entrada-row');
+    const items = [];
+    rows.forEach((row) => {
+      items.push({
+        id: row.dataset.entradaId,
+        name: row.dataset.entradaName || '',
+        included: row.querySelector('.exp-entrada-include')?.checked !== false,
+        price: parseFloat(row.querySelector('.exp-entrada-price')?.value || 0) || 0,
+        // Cantidad = nº de boletos (default = personas de la cotización). Vacío → 0 (no aporta).
+        quantity: parseInt(row.querySelector('.exp-entrada-qty')?.value || 0, 10) || 0,
+      });
+    });
+    const perPerson = document.getElementById('experienceEntradasPerPerson')?.checked || false;
+    return { items, perPerson };
+  }
+
+  /**
+   * Costo TOTAL (efectivo) de las entradas incluidas: Σ(precio × cantidad). La cantidad ya es el nº de
+   * boletos (default = personas), así que NO se multiplica de nuevo por personas. 0 si el toggle está OFF.
+   * @returns {number}
+   * @example
+   */
+  getExperienceEntradasCostMXN() {
+    const { items, perPerson } = this.getExperienceEntradasState();
+    if (!perPerson) return 0;
+    return items
+      .filter((it) => it.included)
+      .reduce((sum, it) => sum + (it.price * it.quantity), 0);
+  }
+
+  /**
+   * Nº de personas del servicio de experiencia: adultos + niños + sin-alcohol (de los inputs del modal).
+   * Si están en 0, cae a las personas de la cotización (numberOfAdults + numberOfChildren).
+   * @returns {number}
+   * @example
+   */
+  _experiencePeopleCount() {
+    const a = parseInt(document.getElementById('adultsQuantity')?.value, 10) || 0;
+    const c = parseInt(document.getElementById('childrenQuantity')?.value, 10) || 0;
+    const n = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value, 10) || 0;
+    let people = a + c + n;
+    if (people === 0 && this.quoteData) {
+      people = (parseInt(this.quoteData.numberOfAdults, 10) || 0) + (parseInt(this.quoteData.numberOfChildren, 10) || 0);
+    }
+    return people;
+  }
+
+  /**
+   * Auto-llena la cantidad de CADA entrada de experiencia con el nº de personas (adultos + niños +
+   * sin-alcohol). Se llama al cambiar esas cantidades: cada persona = 1 boleto. Vacío si personas = 0.
+   * @example
+   */
+  syncExperienceEntradaQtys() {
+    const list = document.getElementById('experienceEntradasList');
+    if (!list) return;
+    const people = this._experiencePeopleCount();
+    list.querySelectorAll('.exp-entrada-qty').forEach((el) => {
+      el.value = people > 0 ? people : '';
+    });
+  }
+
   getExperienceName(experienceId) {
     if (!experienceId) return 'Experiencia';
 
@@ -12725,6 +12946,9 @@ class ItineraryBuilder {
     // Modal nuevo: olvidar la experiencia "ya cargada" para que la primera selección genuina
     // limpie/autollene los precios por persona con el catálogo correcto.
     this._loadedExperienceId = null;
+    // Olvidar el estado de restauración de entradas de una edición previa (si no, un servicio nuevo
+    // con la MISMA experiencia heredaría las entradas guardadas de aquél).
+    this._restoreExperienceEntradas = null;
     this.currentServiceCopy = null;
     this.additionalTourIds = []; // limpiar destinos adicionales combinados del tour
     this.serviceTypeFields = {
@@ -12993,6 +13217,9 @@ class ItineraryBuilder {
             noAlcoholPrice: subconcept.noAlcoholPrice || 0,
             // Checkbox "Guía" de experiencia (incluye guía tipo walking tour SMA en el precio).
             experienceGuide: subconcept.experienceGuide || false,
+            // Entradas asociadas a la experiencia (estado editable + toggle "sumar al precio por persona").
+            experienceEntradas: Array.isArray(subconcept.experienceEntradas) ? subconcept.experienceEntradas : null,
+            experienceEntradasPerPerson: subconcept.experienceEntradasPerPerson || false,
             // Tour-specific fields (from backend)
             duration: subconcept.duration || 1,
             includeGuide: subconcept.includeGuide || false,
@@ -14928,6 +15155,14 @@ class ItineraryBuilder {
   }
 
   handleExperienceSelection(experienceId) {
+    // El estado guardado de entradas (restauración de edición) se descarta SOLO si el usuario elige
+    // una experiencia DISTINTA a la restaurada. Robusto ante el 'change' async de TomSelect, que
+    // vuelve a llamar handleExperienceSelection con el MISMO id después de que _restoringExperienceData
+    // ya es false; usar ese flag pisaba el estado con defaults (toggle OFF → entradas fuera del
+    // desglose). Comparando por experienceId, ambas llamadas de restauración conservan el estado.
+    if (this._restoreExperienceEntradas && this._restoreExperienceEntradas.experienceId !== experienceId) {
+      this._restoreExperienceEntradas = null;
+    }
     if (!experienceId) {
       // Clear price and details when no experience is selected
       document.getElementById('servicePrice').value = '0.00';
@@ -14982,6 +15217,16 @@ class ItineraryBuilder {
 
         // Show experience details
         this.showExperienceDetails(selectedExperience);
+
+        // Entradas asociadas a la experiencia: cargar (async) y renderizar la lista editable. En
+        // edición se restaura el estado guardado vía this._restoreExperienceEntradas.
+        this.loadExperienceEntradas(experienceId).then((entradas) => {
+          const restore = this._restoreExperienceEntradas;
+          this.renderExperienceEntradas(entradas, restore ? restore.list : null, restore ? restore.perPerson : null);
+          // NO se limpia aquí: handleExperienceSelection puede dispararse 2 veces en restauración y
+          // ambas deben aplicar el estado guardado. Se descarta al cambiar de experiencia el usuario.
+          this.updateServicePriceBreakdown();
+        });
 
         // Refresh the desglose with the freshly-loaded prices (fillExperienceFields
         // sets the price fields programmatically, which doesn't fire input events).
@@ -21395,6 +21640,9 @@ class ItineraryBuilder {
             adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity ?? null,
             // Flag "Guía" de experiencia (el precio ya incluye el costo del guía en pricesByType).
             experienceGuide: service.experienceGuide || false,
+            // Entradas asociadas a la experiencia (estado editable + toggle "sumar al precio por persona").
+            experienceEntradas: Array.isArray(service.experienceEntradas) ? service.experienceEntradas : null,
+            experienceEntradasPerPerson: service.experienceEntradasPerPerson || false,
             infantsQuantity: service.infantsQuantity ?? null,
             // Schedule for experiences
             selectedSchedule: service.selectedSchedule || null,

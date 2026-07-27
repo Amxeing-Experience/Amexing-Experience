@@ -1409,8 +1409,24 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                             <small class="text-muted d-block ms-4">Permite modificar los precios calculados automáticamente</small>
                         </div>
                         <% } %>
+
+                        <!-- Entradas asociadas a la experiencia (boletos de acceso). Editable:
+                             incluir + precio + cantidad. Opcional: sumar al precio por persona. -->
+                        <div id="experienceEntradasSection" class="mb-3 d-none">
+                            <label class="form-label d-flex align-items-center mb-1">
+                                <i class="ti ti-ticket me-1"></i> Entradas de la experiencia
+                            </label>
+                            <div id="experienceEntradasList" class="mb-2"></div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="experienceEntradasPerPerson">
+                                <label class="form-check-label" for="experienceEntradasPerPerson">
+                                    Sumar entradas al precio por persona
+                                </label>
+                                <small class="text-muted d-block ms-4">Cada persona paga sus entradas, además del precio actual.</small>
+                            </div>
+                        </div>
                     </div>
-                    
+
 
                     <!-- Descuento por servicio (común a todos los tipos; se aplica sobre el precio base). -->
                     <% if (canEditPrices) { %>
