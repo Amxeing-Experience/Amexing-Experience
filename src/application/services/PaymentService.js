@@ -174,6 +174,33 @@ class PaymentService {
   }
 
   /**
+   * Total de servicios por un método SIN el redondeo físico de efectivo: solo Σ chargeAmount(item, method)
+   * redondeado a 2 decimales (replica las líneas de computeTotals ANTES del bloque applyCashRounding).
+   * Existe específicamente para baseEquivalente. Al convertir un pago YA HECHO a pesos-equivalentes del
+   * ancla, el redondeo de efectivo a múltiplo de 5 NO debe filtrarse a la razón de conversión entre
+   * métodos: ese redondeo es una regla FÍSICA que solo aplica cuando el efectivo es el monto REAL a cobrar
+   * (el método ancla), no cuando el tier de efectivo es apenas la referencia de precio relativo de un pago
+   * hecho en OTRO método. Aplicarlo ahí achica el denominador (tierTotal) e infla el equivalente del pago en
+   * efectivo, empujando coverageAmount por encima del total real (el bug del 100.04% en una reservación
+   * pagada al 100%). Para cualquier método distinto de efectivo devuelve EXACTAMENTE lo mismo que
+   * totalForMethod (el redondeo solo toca efectivo), así que es un reemplazo seguro en ese caso.
+   * @param {Array<object>} serviceItems - Plain items { includeInTotal, pricesByType, total }.
+   * @param {string} method - Método (efectivo|transferencia|tarjeta).
+   * @param {string} [_currency] - Aceptado por paridad de firma con totalForMethod; sin efecto (el total crudo no depende de la moneda: nunca redondea).
+   * @returns {number} Total de servicios por ese método, SIN redondeo de efectivo.
+   * @example
+   * PaymentService.totalForMethodRaw([{ pricesByType: { efectivo: 102 } }], 'efectivo') // 102 (totalForMethod daría 100)
+   */
+  static totalForMethodRaw(serviceItems, method, _currency = 'MXN') {
+    const items = Array.isArray(serviceItems) ? serviceItems : [];
+    let chargeSum = 0;
+    for (const item of items) {
+      chargeSum += this.chargeAmount(item, method);
+    }
+    return round2(chargeSum);
+  }
+
+  /**
    * Tolerancia de cierre de saldo: $5 MXN (única fuente de desvío es el redondeo de efectivo a
    * múltiplo de 5); $0.01 para USD o cualquier combinación sin efectivo.
    * @param {string} currency - Moneda de la reservación.
@@ -205,11 +232,20 @@ class PaymentService {
     serviceItems, anchoredMethod, currency = 'MXN', validMethods = ['efectivo', 'transferencia', 'tarjeta'],
   }) {
     const amt = Number.isFinite(payment?.amount) ? payment.amount : 0;
+    // Mismo método que el ancla: la razón de conversión es trivialmente 1, así que el pago cubre su monto
+    // crudo sin convertir. Explícito (no vía baseTotal/tierTotal) para no arrastrar ninguna discrepancia de
+    // redondeo entre dos totales calculados con fórmulas distintas — en particular el ancla efectivo, cuyo
+    // total SÍ se redondea a múltiplo de 5.
+    if (payment?.method === anchoredMethod) return amt;
+    // El ancla SÍ refleja su redondeo real (totalForMethod): si el ancla es efectivo, su total es el monto
+    // genuino a cobrar. El tier del OTRO método usa el total CRUDO (totalForMethodRaw): un pago hecho en
+    // efectivo convertido a un ancla que no es efectivo no debe heredar el redondeo físico del efectivo,
+    // que inflaría su equivalente (bug del 100.04%). Para métodos != efectivo, raw == totalForMethod.
     const baseTotal = this.totalForMethod(serviceItems, anchoredMethod, currency);
     if (!Number.isFinite(baseTotal) || baseTotal <= 0) return 0;
     const method = payment?.method;
     const isValid = validMethods.includes(method);
-    const tierTotal = isValid ? this.totalForMethod(serviceItems, method, currency) : null;
+    const tierTotal = isValid ? this.totalForMethodRaw(serviceItems, method, currency) : null;
     if (tierTotal === null || !Number.isFinite(tierTotal) || tierTotal <= 0) return amt;
     return amt * (baseTotal / tierTotal);
   }

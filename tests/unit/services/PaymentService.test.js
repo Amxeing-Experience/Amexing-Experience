@@ -860,6 +860,104 @@ describe('PaymentService pure helpers', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // FIX (dinero): el redondeo físico de efectivo (múltiplo de 5) NO debe filtrarse a la conversión
+  // equivalente-ancla. Es un cobro REAL solo cuando el efectivo es el método ANCLA; cuando es apenas la
+  // referencia de precio de un pago hecho en OTRO método, aplicarlo achica el denominador (tierTotal) e
+  // infla el equivalente del pago en efectivo -> coverageAmount por encima del total (bug del 100.04% en
+  // una reservación pagada al 100%). El fix usa totalForMethodRaw (sin redondeo) SOLO para el tier del
+  // pago, deja el ancla (baseTotal) con su redondeo real, y hace explícito el short-circuit mismo-método.
+  // ---------------------------------------------------------------------------
+  describe('baseEquivalente/buildSummary: el redondeo de efectivo NO se filtra a la conversión equivalente-ancla', () => {
+    // Un servicio cuyo total en efectivo (1002) NO es múltiplo de 5: applyCashRounding lo bajaría a 1000.
+    const ITEM = [{ pricesByType: { efectivo: 1002, transferencia: 1160 } }];
+    // Mirror mínimo de loadAndCompute para ejercer buildSummary (coveragePercent vive ahí).
+    const build = (serviceItems, paymentType, paymentRows) => ({
+      totals: PaymentService.computeTotals(serviceItems, paymentType, 0, 'MXN'),
+      paidGlobal: PaymentService.sumPayments(paymentRows),
+      serviceItems,
+      paymentType,
+      currency: 'MXN',
+      paymentRows,
+    });
+
+    it('ancla transferencia, pago en efectivo: el tier usa el efectivo CRUDO (1002), no el redondeado (1000)', () => {
+      // Antes (bug): 501 × (1160 / applyCashRounding(1002)=1000) = 581.16 (inflado).
+      // Ahora: 501 × (1160/1002) = 580 exacto (501/1002 = 0.5 -> 0.5 × 1160).
+      const cov = PaymentService.baseEquivalente(
+        { amount: 501, method: 'efectivo' },
+        { serviceItems: ITEM, anchoredMethod: 'transferencia' }
+      );
+      expect(round2(cov)).toBe(580); // no 581.16
+    });
+
+    it('REPRO del bug (100.04%): ancla transferencia, pago exacto repartido efectivo+transferencia => coveragePercent EXACTO 100', () => {
+      // Deuda (transferencia) = 1160. Pago 501 efectivo (cubre 580) + 580 transferencia (1:1) = 1160 exacto.
+      const summary = PaymentService.buildSummary('r1', build(ITEM, 'transferencia', [
+        { amount: 501, method: 'efectivo' },
+        { amount: 580, method: 'transferencia' },
+      ]));
+      expect(summary.total).toBe(1160);
+      expect(summary.coverageAmount).toBe(1160);
+      expect(summary.coveragePercent).toBe(100); // antes: 100.1 (redondeo de efectivo filtrado)
+      expect(summary.remainingBase).toBe(0);
+      expect(summary.paymentStatus).toBe('paid');
+    });
+
+    it('REPRO 3 efectivo + 3 transferencia (como la reservación real mfHAmASvF7): coveragePercent EXACTO 100', () => {
+      const summary = PaymentService.buildSummary('r1', build(ITEM, 'transferencia', [
+        { amount: 167, method: 'efectivo' },
+        { amount: 167, method: 'efectivo' },
+        { amount: 167, method: 'efectivo' }, // 3 × 167 = 501 efectivo -> 580 transferencia
+        { amount: 200, method: 'transferencia' },
+        { amount: 200, method: 'transferencia' },
+        { amount: 180, method: 'transferencia' }, // 3 pagos = 580 transferencia
+      ]));
+      expect(summary.coveragePercent).toBe(100); // sin decimal parásito por el redondeo de efectivo
+      expect(summary.remainingBase).toBe(0);
+      expect(summary.paymentStatus).toBe('paid');
+    });
+
+    it('SIN REGRESIÓN — ancla efectivo, pago en transferencia: el ancla SÍ conserva su total redondeado (1000)', () => {
+      // baseTotal = totalForMethod('efectivo') = applyCashRounding(1002) = 1000 (monto REAL a cobrar en
+      // efectivo, intacto). El tier transferencia nunca se redondea, así que raw == totalForMethod: idéntico.
+      const summary = PaymentService.buildSummary('r1', build(ITEM, 'efectivo', [
+        { amount: 1160, method: 'transferencia' },
+      ]));
+      expect(summary.total).toBe(1000); // efectivo ancla redondeado (regla física intacta)
+      expect(summary.coverageAmount).toBe(1000); // 1160 × (1000/1160)
+      expect(summary.coveragePercent).toBe(100);
+      expect(summary.paymentStatus).toBe('paid');
+    });
+
+    it('MISMO MÉTODO — ancla efectivo, pago en efectivo: cobertura == monto crudo (ratio 1 explícito, sin reconvertir)', () => {
+      // Short-circuit: mismo método que el ancla devuelve el monto tal cual, sin pasar por baseTotal/tierTotal.
+      expect(PaymentService.baseEquivalente(
+        { amount: 777, method: 'efectivo' },
+        { serviceItems: ITEM, anchoredMethod: 'efectivo' }
+      )).toBe(777);
+      // El cliente paga los 1000 que se le cobran (efectivo redondeado) y cierra al 100%.
+      const summary = PaymentService.buildSummary('r1', build(ITEM, 'efectivo', [
+        { amount: 1000, method: 'efectivo' },
+      ]));
+      expect(summary.coverageAmount).toBe(1000);
+      expect(summary.coveragePercent).toBe(100);
+      expect(summary.paymentStatus).toBe('paid');
+    });
+
+    it('SOBREPAGO GENUINO (no por redondeo): ancla transferencia, pago grande en efectivo => coveragePercent > 100 (Fase D intacta)', () => {
+      // Pago 1503 efectivo contra deuda 1160 transferencia: cubre 1503 × (1160/1002) = 1740 (>> 1160).
+      // Sobrepago REAL de ~$580 en un método más barato, no un artefacto de redondeo (margen grande).
+      const summary = PaymentService.buildSummary('r1', build(ITEM, 'transferencia', [
+        { amount: 1503, method: 'efectivo' },
+      ]));
+      expect(summary.coverageAmount).toBe(1740);
+      expect(summary.coveragePercent).toBe(150); // sobrepago genuino se sigue mostrando > 100
+      expect(summary.coveragePercent).toBeGreaterThan(100);
+      expect(summary.paymentStatus).toBe('paid');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
   // Fase C (carrito de pagos) — métodos disponibles derivados de pricesByType,
   // NUNCA hardcodeados. Inspecciona la llave directamente (no usa el fallback a
   // total de chargeAmount) y siempre mantiene el ancla disponible.
