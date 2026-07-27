@@ -197,6 +197,10 @@
                         border-left-color: ${this.config.typeColors['a-disposicion']};
                     }
 
+                    .service-card.entrada {
+                        border-left-color: ${this.config.typeColors.entrada};
+                    }
+
                     .service-header {
                         display: flex;
                         justify-content: space-between;
@@ -603,7 +607,15 @@
                 // esta línea lo hace visible en el resumen. Se escala por la forma de pago (getServiceDiscount)
                 // para que coincida con el descuento que getServicePrice ya restó al precio mostrado.
                 if (Number(service.discountAmount) > 0) {
-                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(this.getServiceDiscount(service))}</div>`;
+                    html += service.discountType === 'percent'
+                        ? `<div class="service-discount small text-success">Descuento ${service.discountValue}%</div>`
+                        : `<div class="service-discount small text-success">Descuento −${this.formatCurrency(this.getServiceDiscount(service))}</div>`;
+                }
+                // Descuento por volumen (a-disposición): el precio ya viene con el descuento aplicado
+                // (pricesByType); esta línea solo lo hace VISIBLE en la lista/resumen. Sólo el texto,
+                // sin % ni monto (el monto se muestra en el desglose del modal).
+                if (service.type === 'a-disposicion' && Number(service.discountPercent) > 0) {
+                    html += `<div class="service-discount small text-success">Descuento por volumen</div>`;
                 }
                 // Fase 2: propina por servicio (línea aparte, aditiva; se suma al total).
                 const svcTip = this.getServiceTip(service);
@@ -1214,7 +1226,9 @@
                 // Fase 1: descuento por servicio (transporte). El precio ya viene con descuento (pricesByType);
                 // la etiqueta se escala por la forma de pago (getServiceDiscount) para coincidir con él.
                 if (Number(service.discountAmount) > 0) {
-                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(this.getServiceDiscount(service))}</div>`;
+                    html += service.discountType === 'percent'
+                        ? `<div class="service-discount small text-success">Descuento ${service.discountValue}%</div>`
+                        : `<div class="service-discount small text-success">Descuento −${this.formatCurrency(this.getServiceDiscount(service))}</div>`;
                 }
                 // Fase 2: propina por servicio (línea aparte, aditiva; se suma al total).
                 const svcTip = this.getServiceTip(service);

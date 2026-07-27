@@ -798,6 +798,10 @@ document.addEventListener('DOMContentLoaded', () => {
           const aDisposicionContent = document.getElementById('aDisposicionContent');
           if (aDisposicionContent) aDisposicionContent.classList.remove('d-none');
           break;
+        case 'entrada':
+          const entradaContent = document.getElementById('entradaContent');
+          if (entradaContent) entradaContent.classList.remove('d-none');
+          break;
       }
     }
   }

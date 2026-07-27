@@ -339,6 +339,10 @@ const e = __isRes ? 'reservación' : 'cotización';
         border-radius: 0.375rem;
         margin-top: 0.5rem;
     }
+    /* Propina general: mismo tamaño de letra que Subtotal/IVA (antes caía a 1rem de .sm-totals-row). */
+    .sm-totals-tip {
+        font-size: 1.1rem;
+    }
     .sm-totals-grand {
         font-weight: 600;
         font-size: calc(1.1rem + 1px);
@@ -1554,10 +1558,10 @@ const e = __isRes ? 'reservación' : 'cotización';
                 });
             });
 
-            // Fase 2b: propina general de la cotización. NUNCA se lee globalTip.amount persistido: el
-            // wizard lo escala por el recargo de tarjeta para type 'amount' (queda inflado), por eso el
-            // servidor lo IGNORA y lo recalcula limpio (computeGeneralTip) dentro de serviceItems.total.
-            // Aquí se muestra el monto SIN escalar en su línea y el Total sale de serviceItems.total.
+            // Fase 2b: propina general de la cotización. NUNCA se lee globalTip.amount persistido: se
+            // recalcula limpio con la MISMA regla que computeGeneralTip en el servidor (percent escala por
+            // método sobre la base neta del método; amount es literal), para que la línea cuadre con la
+            // propina ya horneada en serviceItems.total, de donde sale el Total.
             const gtMeta = serviceItems.globalTip;
             let globalTipAmount = 0;
             if (gtMeta && Number(gtMeta.value) > 0) {
@@ -1565,20 +1569,28 @@ const e = __isRes ? 'reservación' : 'cotización';
                     // Monto fijo: literal en pesos, sin escalar por método (igual que computeGeneralTip).
                     globalTipAmount = Math.round((Number(gtMeta.value) || 0) * 100) / 100;
                 } else if (gtMeta.type === 'percent') {
-                    // Porcentaje: sobre la base NETA en efectivo (precio efectivo menos descuento) de los
-                    // servicios activos — misma base y tope de 100% que computeGeneralTip en el servidor,
-                    // para que la línea cuadre con la propina ya horneada en serviceItems.total.
-                    let netBaseEfectivo = 0;
+                    // Porcentaje: sobre la base NETA DEL MÉTODO de pago (pricesByType[método] menos su
+                    // descuento escalado) de los servicios activos — misma base, escalado y tope de 100%
+                    // que computeGeneralTip en el servidor, para que la línea cuadre con la propina ya
+                    // horneada en serviceItems.total (que escala por método). Fallback a efectivo si el
+                    // método no tiene precio propio.
+                    const method = savedPayment || 'efectivo';
+                    let netBaseMethod = 0;
                     normalizedData.days.forEach(day => {
                         (day.services || []).forEach(svc => {
                             if (svc.includeInTotal === false) return;
-                            const ef = Number(svc.pricesByType && svc.pricesByType.efectivo) || 0;
-                            const disc = Number(svc.discountAmount) || 0;
-                            netBaseEfectivo += Math.max(0, ef - disc);
+                            const pbt = svc.pricesByType || {};
+                            const ef = Number(pbt.efectivo) || 0;
+                            const mp = Number(pbt[method]);
+                            const hasMethod = Number.isFinite(mp) && pbt[method] != null;
+                            const base = hasMethod ? mp : ef;
+                            const discEf = Number(svc.discountAmount) || 0;
+                            const disc = (ef > 0 && hasMethod) ? discEf * (mp / ef) : discEf;
+                            netBaseMethod += Math.max(0, base - disc);
                         });
                     });
                     const pct = Math.min(Number(gtMeta.value), 100);
-                    globalTipAmount = Math.round(netBaseEfectivo * (pct / 100) * 100) / 100;
+                    globalTipAmount = Math.round(netBaseMethod * (pct / 100) * 100) / 100;
                 }
             }
             const gtRow = document.getElementById('summaryGlobalTipRow');
@@ -1625,17 +1637,15 @@ const e = __isRes ? 'reservación' : 'cotización';
                     ivaRow.classList.remove('d-none');
                 }
             }
-            // Subtotal = neto de servicios (SIN ninguna propina), igual a netSubtotal (arriba) y a
-            // serviceItems.subtotal ya persistido por el servidor (QuoteController.updateServiceItems).
-            // NUNCA "total - iva": total INCLUYE ambas propinas y en efectivo iva=0 siempre, así que esa
-            // resta colapsaba Subtotal=Total (la propina general quedaba "horneada" en el Subtotal
-            // mostrado — bug DISC-100). Se prioriza el subtotal del servidor (misma fuente de verdad que
-            // Total) sobre netSubtotal por si difieren tras un descuento/propina por servicio a medio
-            // guardar; netSubtotal queda de fallback si el servidor no mandó un valor válido.
-            const serverSubtotal = Number(serviceItems.subtotal);
-            subtotal = (Number.isFinite(serverSubtotal) && serverSubtotal >= 0)
-                ? Math.round(serverSubtotal * 100) / 100
-                : Math.round(netSubtotal * 100) / 100;
+            // Subtotal = base de servicios SIN IVA (transferencia/tarjeta) o servicios completos
+            // (efectivo) MÁS las propinas POR SERVICIO (nunca la general, que va en su renglón aparte),
+            // de modo que Subtotal + IVA + Propina general = Total, igual que el widget de la cotización.
+            // Antes se mostraba serviceItems.subtotal (precio CON el IVA adentro), así que el renglón de
+            // IVA parecía duplicarse y las líneas no sumaban al Total. El IVA (arriba) sigue calculándose
+            // SOLO sobre la base de servicios (nunca sobre las propinas — regla CFDI).
+            const serviceTipsTotal = Math.round((serviceTotal - netSubtotal) * 100) / 100;
+            const serviceBaseSinIva = (savedPayment === 'efectivo') ? netSubtotal : netSubtotal / 1.16;
+            subtotal = Math.round((serviceBaseSinIva + serviceTipsTotal) * 100) / 100;
 
             const perPerson = numberOfPeople > 0 ? total / numberOfPeople : 0;
 
