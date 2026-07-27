@@ -35,6 +35,12 @@
                     <span class="badge" id="catalogTransportCount">0</span>
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="catalogTabEntradas" data-bs-toggle="tab" data-bs-target="#catalogPaneEntradas" type="button" role="tab">
+                    <i class="ti ti-ticket"></i><span>Entradas</span>
+                    <span class="badge" id="catalogEntradasCount">0</span>
+                </button>
+            </li>
         </ul>
 
         <div class="tab-content">
@@ -102,6 +108,21 @@
                     </div>
                 </div>
                 <div class="catalog-drag-items-list px-3 pb-3" id="catalogTransportList" style="max-height: calc(100vh - 240px); overflow-y: auto;">
+                    <div class="text-center text-muted py-3">
+                        <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Entradas Tab -->
+            <div class="tab-pane fade" id="catalogPaneEntradas" role="tabpanel">
+                <div class="p-3 pb-2">
+                    <input type="text" class="form-control catalog-search-input mb-2" id="catalogSearchEntradas" placeholder="Buscar entrada...">
+                    <select class="form-select catalog-filter-select" id="catalogFilterEntradasDestination" title="Filtrar por destino">
+                        <option value="all">Todos los destinos</option>
+                    </select>
+                </div>
+                <div class="catalog-drag-items-list px-3 pb-3" id="catalogEntradasList" style="max-height: calc(100vh - 270px); overflow-y: auto;">
                     <div class="text-center text-muted py-3">
                         <span class="spinner-border spinner-border-sm me-1"></span> Cargando...
                     </div>

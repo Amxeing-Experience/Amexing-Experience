@@ -1878,7 +1878,7 @@ class QuoteService {
           if (extras.length > 0) seedExtraAssignments(extras);
         }
       }
-    } else if (serviceType === 'experience' || serviceType === 'concepto') {
+    } else if (serviceType === 'experience' || serviceType === 'concepto' || serviceType === 'entrada') {
       if (sub.assignedServiceCustomer) resSvc.set('assignedServiceCustomer', sub.assignedServiceCustomer);
     }
 

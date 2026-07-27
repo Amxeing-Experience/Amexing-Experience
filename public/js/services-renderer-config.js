@@ -17,7 +17,8 @@
             tour: '#198754',
             concepto: '#6c757d',
             regular: '#6c757d',
-            'a-disposicion': '#fd7e14'
+            'a-disposicion': '#fd7e14',
+            entrada: '#d63384'
         },
 
         // Type labels matching quote-services-v2.js
@@ -29,7 +30,8 @@
             tour: 'Tour',
             concepto: 'Concepto',
             regular: 'Concepto',
-            'a-disposicion': 'A Disposición'
+            'a-disposicion': 'A Disposición',
+            entrada: 'Entrada'
         },
 
         // Transport type labels
@@ -62,7 +64,8 @@
             tour: 'ti-map-2',
             concepto: 'ti-file-text',
             regular: 'ti-file-text',
-            'a-disposicion': 'ti-clock-hour-4'
+            'a-disposicion': 'ti-clock-hour-4',
+            entrada: 'ti-ticket'
         },
 
         // Badge styles for different contexts
