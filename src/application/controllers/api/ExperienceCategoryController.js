@@ -125,6 +125,11 @@ class ExperienceCategoryController {
       if (variants && typeof variants === 'object') {
         const preferred = this.imageOptimizationService.detectPreferredFormat?.(acceptHeader);
         const order = [preferred, 'avif', 'webp', 'jpeg'].filter(Boolean);
+        /**
+         * Extrae la s3Key de una variante de imagen (objeto con s3Key, o string).
+         * @param {object|string} v - Variante de imagen.
+         * @returns {string|null} La s3Key o null.
+         */
         const keyFrom = (v) => (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
         const chosen = order.map((fmt) => keyFrom(variants[fmt])).find(Boolean);
         if (chosen) {

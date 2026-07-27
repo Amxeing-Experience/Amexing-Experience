@@ -375,6 +375,11 @@ class PaymentService {
    */
   static deriveAvailableMethods(serviceItems, anchoredMethod, validMethods = Payment.METHODS) {
     const items = Array.isArray(serviceItems) ? serviceItems : [];
+    /**
+     * Indica si algún ítem incluido soporta el método de pago dado.
+     * @param {string} method - Método de pago a evaluar.
+     * @returns {boolean} true si al menos un ítem lo soporta.
+     */
     const supported = (method) => items.some((item) => item
       && item.includeInTotal !== false
       && item.pricesByType && typeof item.pricesByType === 'object'

@@ -71,6 +71,11 @@ class POIService {
       let s3Key = null;
       const variants = image.optimizedVariants;
       if (variants && typeof variants === 'object') {
+        /**
+         * Extrae la s3Key de una variante de imagen (objeto con s3Key, o string).
+         * @param {object|string} v - Variante de imagen.
+         * @returns {string|null} La s3Key o null.
+         */
         const keyFrom = (v) => (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
         s3Key = ['webp', 'jpeg', 'avif'].map((fmt) => keyFrom(variants[fmt])).find(Boolean) || null;
       }

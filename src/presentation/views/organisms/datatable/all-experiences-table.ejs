@@ -1,0 +1,174 @@
+<%
+/**
+ * All Experiences (índice unificado, solo lectura)
+ * Muestra TODAS las experiencias (estándar + proveedor + establecimiento) en una tabla
+ * buscable/filtrable. Cada fila hace deep-link a su editor correcto (no edita aquí).
+ * Created by Denisse Maldonado
+ */
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'all-experiences-table';
+%>
+
+<style>
+    #all-experiences-content .table-hover tbody tr { cursor: pointer; }
+    #all-experiences-content .src-badge { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
+    #all-experiences-content .src-standalone { background: #eef2e3; color: #55603c; border: 1px solid #d7deca; }
+    #all-experiences-content .src-provider { background: #e6f0f7; color: #34618a; border: 1px solid #cfe0ee; }
+    #all-experiences-content .src-establishment { background: #f7efe3; color: #8a6a34; border: 1px solid #eaddc7; }
+    #all-experiences-content .cat-badge { font-size: 11px; }
+</style>
+
+<div id="all-experiences-content">
+    <div class="row g-2 mb-2 align-items-end">
+        <div class="col-md-6">
+            <label for="srcFilter-<%= dtTableId %>" class="form-label mb-1 text-muted small">Origen</label>
+            <select class="form-select mobile-filter-select" id="srcFilter-<%= dtTableId %>">
+                <option value="">Todos</option>
+                <option value="standalone">Experiencias</option>
+                <option value="provider">De proveedores</option>
+                <option value="establishment">De establecimientos</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label for="catFilter-<%= dtTableId %>" class="form-label mb-1 text-muted small">Categoría</label>
+            <select class="form-select mobile-filter-select" id="catFilter-<%= dtTableId %>">
+                <option value="">Todas</option>
+            </select>
+        </div>
+    </div>
+    <div class="text-muted small mb-2" id="allExpCount-<%= dtTableId %>"></div>
+
+    <div class="table-responsive">
+        <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+            <thead class="table-light">
+                <tr>
+                    <th>Nombre</th>
+                    <th>Origen</th>
+                    <th>Categoría</th>
+                    <th>Destino</th>
+                    <th>Estado</th>
+                    <th class="text-center">Acciones</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script src="/dashboard/js/utils/experience-categories.js"></script>
+<script>
+(function () {
+    const tableId = '<%= dtTableId %>';
+
+    function getAccessToken() {
+        const cookies = document.cookie.split(';');
+        for (const c of cookies) {
+            const [k, v] = c.trim().split('=');
+            if (k === 'clientAccessToken') return v;
+        }
+        return null;
+    }
+
+    // Deep-link al editor correcto según el origen.
+    function hrefFor(row) {
+        if (row.source === 'standalone') return `/dashboard/admin/experiences/${row.id}`;
+        if (row.source === 'establishment') return `/dashboard/admin/experiences?section=establishments&open=${row.parentId}`;
+        return `/dashboard/admin/experiences?section=providers&open=${row.parentId}`;
+    }
+
+    const SRC_LABEL = { standalone: 'Experiencia', provider: 'Proveedor', establishment: 'Establecimiento' };
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+    function boot() {
+        if (!(window.jQuery && $.fn && $.fn.DataTable)) { setTimeout(boot, 120); return; }
+
+        const token = getAccessToken();
+        $.ajax({
+            url: '/api/experiences/all-combined',
+            type: 'GET',
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        }).then(async function (resp) {
+            const rows = (resp && resp.success && resp.data) ? resp.data : [];
+            try { if (window.ExperienceCategories && ExperienceCategories.fetch) await ExperienceCategories.fetch(); } catch (e) { /* noop */ }
+
+            const dt = $(`#${tableId}`).DataTable({
+                data: rows,
+                language: { url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json' },
+                order: [[0, 'asc']],
+                pageLength: 15,
+                columns: [
+                    { data: 'name', render: (d) => `<div class="fw-semibold">${esc(d)}</div>` },
+                    {
+                        data: 'source',
+                        // Ortogonal: valor CRUDO para filtrar/ordenar; HTML solo para mostrar.
+                        render: (d, type, row) => {
+                            if (type === 'filter' || type === 'sort') return d;
+                            const label = SRC_LABEL[d] || d;
+                            const parent = row.parentName ? ` <small class="text-muted">· ${esc(row.parentName)}</small>` : '';
+                            return `<span class="src-badge src-${d}">${label}</span>${parent}`;
+                        },
+                    },
+                    {
+                        data: 'category',
+                        // Ortogonal: código CRUDO para filtrar; etiqueta legible para mostrar.
+                        render: (d, type) => {
+                            if (type === 'filter' || type === 'sort') return d || '';
+                            if (!d) return '<span class="text-muted">—</span>';
+                            const label = (window.ExperienceCategories && ExperienceCategories.labelFor(d)) || d;
+                            return `<span class="badge bg-light text-dark border cat-badge">${esc(label)}</span>`;
+                        },
+                    },
+                    { data: 'destino', render: (d) => d ? `<span><i class="ti ti-map-pin me-1 text-muted"></i>${esc(d)}</span>` : '<span class="text-muted">—</span>' },
+                    {
+                        data: 'active',
+                        render: (d) => d
+                            ? '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Activa</span>'
+                            : '<span class="badge bg-warning text-dark"><i class="ti ti-x me-1"></i>Inactiva</span>',
+                    },
+                    {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-center',
+                        render: (d, type, row) => `<a href="${hrefFor(row)}" class="btn btn-sm btn-primary"><i class="ti ti-external-link me-1"></i>Abrir</a>`,
+                    },
+                ],
+                drawCallback: function () {
+                    const count = this.api().rows({ search: 'applied' }).count();
+                    $(`#allExpCount-${tableId}`).text(`${count} experiencia${count === 1 ? '' : 's'}`);
+                },
+            });
+
+            // Filtro por origen (columna 1 = source crudo).
+            $(`#srcFilter-${tableId}`).on('change', function () {
+                const v = this.value;
+                dt.column(1).search(v ? `^${v}$` : '', true, false).draw();
+            });
+
+            // Filtro por categoría (columna 2 = código crudo). Opciones = categorías presentes.
+            const catCodes = [...new Set(rows.map((r) => r.category).filter(Boolean))];
+            const $cat = $(`#catFilter-${tableId}`);
+            catCodes
+                .map((code) => ({ code, label: (window.ExperienceCategories && ExperienceCategories.labelFor(code)) || code }))
+                .sort((a, b) => a.label.localeCompare(b.label, 'es'))
+                .forEach((c) => $cat.append(`<option value="${esc(c.code)}">${esc(c.label)}</option>`));
+            $cat.on('change', function () {
+                const v = this.value;
+                const escaped = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                dt.column(2).search(v ? `^${escaped}$` : '', true, false).draw();
+            });
+
+            // Click en la fila abre el editor correspondiente (ignora el botón).
+            $(`#${tableId} tbody`).on('click', 'tr', function (e) {
+                if ($(e.target).closest('a, button').length) return;
+                const row = dt.row(this).data();
+                if (row) window.location.href = hrefFor(row);
+            });
+        }).catch(function (e) {
+            console.error('Error cargando el índice combinado de experiencias:', e);
+            $(`#${tableId} tbody`).html('<tr><td colspan="6" class="text-center text-muted py-4">No se pudo cargar el índice de experiencias.</td></tr>');
+        });
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>

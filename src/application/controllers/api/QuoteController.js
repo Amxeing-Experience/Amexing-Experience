@@ -2775,6 +2775,12 @@ class QuoteController {
    */
   tipFieldsChanged(storedSI, incoming) {
     const CENT = 0.01;
+    /**
+     * Compara dos números con tolerancia de un centavo (no finito = 0).
+     * @param {*} a - Primer valor.
+     * @param {*} b - Segundo valor.
+     * @returns {boolean} true si difieren en ≤ 1 centavo.
+     */
     const numEq = (a, b) => {
       const na = Number(a);
       const nb = Number(b);
@@ -2783,12 +2789,22 @@ class QuoteController {
     const stored = storedSI || {};
     const inc = incoming || {};
 
+    /**
+     * Normaliza el tipo de propina a 'amount' | 'percent' | null.
+     * @param {string} t - Tipo crudo.
+     * @returns {string|null} Tipo normalizado o null.
+     */
     const normType = (t) => {
       if (t === 'amount') return 'amount';
       if (t === 'percent') return 'percent';
       return null;
     };
     // globalTip normalizado: propina efectiva o null. `amount` se ignora (lo recomputa computeGeneralTip).
+    /**
+     * Normaliza una propina global a { type, value, mandatory } o null si inválida.
+     * @param {object} gt - Propina global cruda.
+     * @returns {object|null} Propina normalizada o null.
+     */
     const normGT = (gt) => {
       if (!gt || typeof gt !== 'object') return null;
       const type = normType(gt.type);
@@ -2827,6 +2843,11 @@ class QuoteController {
     // detecta sin necesitar rastrear ids que se pierden. Se usa el MISMO criterio que el motor de dinero
     // (QuoteService.sumServiceTipsFromDays / PaymentService.sumServiceTips): tipAmount finito y > 0 de los
     // subconceptos con includeInTotal !== false.
+    /**
+     * Suma agregada de las propinas por subconcepto (tipAmount > 0, incluidos en total).
+     * @param {object} si - serviceItems con days[].subconcepts[].
+     * @returns {number} Suma total de propinas por servicio.
+     */
     const sumServiceTips = (si) => {
       const days = Array.isArray(si.days) ? si.days : [];
       let sum = 0;

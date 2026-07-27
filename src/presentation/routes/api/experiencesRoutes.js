@@ -74,6 +74,19 @@ router.get(
 );
 
 /**
+ * GET /api/experiences/all-combined - Índice unificado (solo lectura) de TODAS las
+ * experiencias: estándar + de proveedor + de establecimiento, normalizadas con `source`
+ * y `parentId` para deep-link. Debe ir ANTES de /:id (ruta literal).
+ * Access: Admin (level 6+)
+ */
+router.get(
+  '/all-combined',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ExperienceController.getAllCombinedExperiences(req, res)
+);
+
+/**
  * GET /api/experiences/:id/dependencies - Check experience/provider dependencies.
  *
  * Access: Admin (level 6+)
