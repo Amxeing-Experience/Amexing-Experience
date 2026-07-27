@@ -23,7 +23,8 @@ const isMobileRequest = typeof req !== 'undefined' ? req.get('User-Agent').match
 const menuItems = [
     { label: 'Experiencias', icon: 'star', section: 'experiences', href: '/dashboard/admin/experiences' },
     { label: 'Proveedores', icon: 'building-store', section: 'providers', href: '/dashboard/admin/experiences?section=providers' },
-    { label: 'Establecimientos', icon: 'building', section: 'establishments', href: '/dashboard/admin/experiences?section=establishments' }
+    { label: 'Establecimientos', icon: 'building', section: 'establishments', href: '/dashboard/admin/experiences?section=establishments' },
+    { label: 'Todas', icon: 'list-search', section: 'all', href: '/dashboard/admin/experiences?section=all' }
 ];
 
 // Check if mobile version should be rendered
@@ -218,6 +219,13 @@ const shouldRenderMobile = (forceMobile || isMobileRequest) && !forceDesktop;
                 apiEndpoint: '/api/experiences',
                 userRole: currentUserRole,
                 showActions: true
+            }) %>
+
+        <% } else if (activeSection === 'all') { %>
+            <!-- Índice unificado (solo lectura) de TODAS las experiencias -->
+            <%- include('../../organisms/datatable/all-experiences-table', {
+                tableId: 'all-experiences-table',
+                userRole: currentUserRole
             }) %>
 
         <% } %>

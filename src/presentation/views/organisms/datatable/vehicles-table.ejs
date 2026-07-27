@@ -20,9 +20,31 @@ const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole); // Admin and superadmin can delete
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+// Modo editorial (plano, sin panel blanco ni header con gradiente). Opt-in por vista.
+const editorialFlat = typeof editorial !== 'undefined' ? editorial : false;
+// Ocultar el botón "Nuevo" del topbar (cuando la vista lo pone en el encabezado de la página).
+const hideCreate = typeof hideCreateBtn !== 'undefined' ? hideCreateBtn : false;
 %>
 
-<div class="card border-0 shadow-sm">
+<div class="<%= editorialFlat ? 'vt-editorial' : 'card border-0 shadow-sm' %>">
+<% if (editorialFlat) { %>
+    <!-- Editorial: filtro por tarifa (chips) + botón Nuevo, en el mismo row -->
+    <div class="vt-topbar">
+        <div class="vt-filter-inline">
+            <span class="vt-filter-label"><i class="ti ti-filter me-1"></i>Tarifa</span>
+            <div class="vt-pills" id="rateFilterPills" role="group" aria-label="Filtro por tarifa">
+                <input type="radio" class="btn-check" name="rateFilter" id="rateFilterAll" value="" checked>
+                <label class="btn btn-sm" for="rateFilterAll">Todas</label>
+                <!-- Pills de tarifas cargadas dinámicamente -->
+            </div>
+        </div>
+        <% if (canCreate && !hideCreate) { %>
+        <button type="button" class="btn btn-sm vt-btn-new" id="createVehicleBtn">
+            <i class="ti ti-plus me-1"></i>Nuevo Vehículo
+        </button>
+        <% } %>
+    </div>
+<% } else { %>
     <div class="card-header text-white" style="background: var(--brand-gradient); border: none;">
         <div class="row align-items-center">
             <div class="col">
@@ -50,8 +72,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <!-- Pills de tarifas cargadas dinámicamente -->
         </div>
     </div>
+<% } %>
 
-    <div class="card-body" id="vehicles-content">
+    <div class="<%= editorialFlat ? 'vt-table' : 'card-body' %>" id="vehicles-content">
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">

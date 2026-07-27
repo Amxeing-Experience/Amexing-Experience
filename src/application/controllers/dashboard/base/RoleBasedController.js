@@ -181,6 +181,7 @@ class RoleBasedController extends DashboardController {
             lastName: parseUser.get('lastName'),
             fullName: parseUser.get('fullName'),
             phone: parseUser.get('phone'),
+            phoneCountry: parseUser.get('phoneCountry') || '',
             department: parseUser.get('department'),
             employeeId: parseUser.get('employeeId'),
             createdAt: parseUser.get('createdAt') || parseUser.createdAt,
@@ -194,6 +195,7 @@ class RoleBasedController extends DashboardController {
             organizationId: parseUser.get('organizationId'),
             // Datos de empresa/fiscales (agencias): para que el perfil muestre lo mismo que el admin.
             companyName: parseUser.get('contextualData')?.companyName || '',
+            companyLogo: parseUser.get('companyLogo') || '',
             taxId: parseUser.get('taxId') || '',
             website: parseUser.get('website') || '',
             notes: parseUser.get('notes') || '',
@@ -210,6 +212,18 @@ class RoleBasedController extends DashboardController {
               fullUserData.profilePicture = await fileStorageService.getPresignedUrl(profilePictureS3Key);
             } catch (imgError) {
               // Si falla, se conserva la URL guardada (el front cae a iniciales si da 403).
+            }
+          }
+
+          // El logo de empresa también se guarda como URL presignada (expira) → regenerar fresca.
+          const companyLogoS3Key = parseUser.get('companyLogoS3Key');
+          if (companyLogoS3Key) {
+            try {
+              const FileStorageService = require('../../../services/FileStorageService');
+              const fileStorageService = new FileStorageService();
+              fullUserData.companyLogo = await fileStorageService.getPresignedUrl(companyLogoS3Key);
+            } catch (logoError) {
+              // Si falla, se conserva la URL guardada (el front cae al placeholder si da 403).
             }
           }
         } else {
@@ -231,6 +245,7 @@ class RoleBasedController extends DashboardController {
         lastName: fullUserData.lastName || fullUserData.last_name || '',
         fullName: fullUserData.fullName || `${fullUserData.firstName || ''} ${fullUserData.lastName || ''}`.trim(),
         phone: fullUserData.phone || fullUserData.phoneNumber || '',
+        phoneCountry: fullUserData.phoneCountry || '',
         department: fullUserData.department || '',
         employeeId: fullUserData.employeeId || fullUserData.employee_id || '',
         createdAt: fullUserData.createdAt,
@@ -242,6 +257,7 @@ class RoleBasedController extends DashboardController {
         role: fullUserData.role || this.role,
         organizationId: fullUserData.organizationId || fullUserData.organization_id || '',
         companyName: fullUserData.companyName || '',
+        companyLogo: fullUserData.companyLogo || '',
         taxId: fullUserData.taxId || '',
         website: fullUserData.website || '',
         notes: fullUserData.notes || '',
@@ -255,6 +271,84 @@ class RoleBasedController extends DashboardController {
           title: 'Profile',
           items: [{ name: 'Profile', active: true }],
         },
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * GET /dashboard/{department_manager|client}/clients/:id — detalle de un cliente de agencia
+   * (propiedad del DM/agente). Reusa los mismos bloques del admin: Información, Facturación y
+   * Perfil de Viaje. Valida ownership (DM: organizationId===su id; agente: createdBy===su id).
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>}
+   */
+  async ownedClientDetail(req, res) {
+    try {
+      const currentUser = req.user;
+      const clientId = req.params.id;
+      if (!currentUser) return this.handleError(res, new Error('Autenticación requerida'), 401);
+      if (!clientId) return this.handleError(res, new Error('ID de cliente no proporcionado'), 400);
+
+      const Parse = require('parse/node');
+      const client = await new Parse.Query('AmexingUser')
+        .include('createdBy')
+        .get(clientId, { useMasterKey: true })
+        .catch(() => null);
+      if (!client || client.get('exists') === false) {
+        return this.handleError(res, new Error('Cliente no encontrado'), 404);
+      }
+
+      // Ownership: el DM (agencia = organizationId del cliente) o el agente que lo creó.
+      const role = this.role || req.userRole;
+      let isOwner;
+      if (role === 'client') {
+        const createdBy = client.get('createdBy');
+        isOwner = !!(createdBy && createdBy.id === currentUser.id);
+      } else {
+        isOwner = client.get('organizationId') === currentUser.id;
+      }
+      if (!isOwner) {
+        return res.redirect(`/dashboard/${role}/clients`);
+      }
+
+      const clientData = {
+        id: client.id,
+        firstName: client.get('firstName') || '',
+        lastName: client.get('lastName') || '',
+        email: client.get('email') || '',
+        phone: client.get('phone') || '',
+        phoneCountry: client.get('phoneCountry') || null,
+        active: client.get('active') !== false,
+        clientCategory: client.get('clientCategory') || null,
+        companyName: client.get('companyName') || client.get('contextualData')?.companyName || '',
+        companyType: client.get('companyType') || null,
+        taxId: client.get('taxId') || '',
+        website: client.get('website') || '',
+        notes: client.get('notes') || '',
+        address: client.get('address') || {},
+        contactFirstName: client.get('contactFirstName') || '',
+        contactLastName: client.get('contactLastName') || '',
+        emergencyContactName: client.get('emergencyContactName') || '',
+        emergencyContactPhone: client.get('emergencyContactPhone') || '',
+        preferredLanguage: client.get('preferredLanguage') || 'es',
+        accessibilityRequirements: client.get('accessibilityRequirements') || '',
+        allergies: client.get('allergies') || [],
+        dietaryRestrictions: client.get('dietaryRestrictions') || [],
+        birthDate: client.get('birthDate') || null,
+      };
+
+      const displayName = clientData.companyName
+        || `${clientData.firstName} ${clientData.lastName}`.trim()
+        || clientData.email || 'Cliente';
+
+      await this.renderDashboard(req, res, 'dashboards/shared/owned-client-detail', {
+        title: `Cliente: ${displayName}`,
+        clientData,
+        ownerRole: role,
+        section: req.query.section || 'information',
       });
     } catch (error) {
       this.handleError(res, error);

@@ -10,7 +10,8 @@
  * filtro de "populares" aún NO existe; se construirá más adelante y consumirá este flag
  * (wedding_planner y home_owner = 'popular'; concierge = 'full'; cliente directo = null).
  * Reservaciones y dashboard base los ven todos.
- * Created by Denisse Maldonado
+ * agency_client (clientes creados por un department manager): SOLO reservaciones (todo lo demás false).
+ * Created by Denisse Maldonado.
  */
 
 const END_CLIENT_CAPABILITIES = {
@@ -26,6 +27,11 @@ const END_CLIENT_CAPABILITIES = {
   home_owner: {
     viewQuotes: false, createQuotes: false, viewTarifario: true, dashboardQuotes: false, catalogScope: 'popular',
   },
+  // Cliente de agencia (creado por un department manager): SOLO ve Reservaciones.
+  // Sin cotizaciones ni tarifario/catálogo. Reservaciones y dashboard base los ve por defecto.
+  agency_client: {
+    viewQuotes: false, createQuotes: false, viewTarifario: false, dashboardQuotes: false, catalogScope: null,
+  },
 };
 
 // Default seguro (categoría desconocida/nula): el más restrictivo que aún ve lo básico = cliente directo.
@@ -34,7 +40,7 @@ const DEFAULT_CAPABILITIES = END_CLIENT_CAPABILITIES.direct_client;
 /**
  * Devuelve las capacidades para una clientCategory dada. Cae al default (cliente directo) si la
  * categoría no se reconoce.
- * @param {string} clientCategory - direct_client | wedding_planner | concierge | home_owner.
+ * @param {string} clientCategory - Direct_client | wedding_planner | concierge | home_owner.
  * @returns {object} Capacidades: viewQuotes, createQuotes, viewTarifario, dashboardQuotes (booleans)
  * y catalogScope ('full' | 'popular').
  * @example

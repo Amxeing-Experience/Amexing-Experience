@@ -213,6 +213,27 @@ document.addEventListener('DOMContentLoaded', function() {
     let allExperiences = [];
     let filteredExperiences = [];
 
+    // Catálogo "populares" (curados por admin):
+    //  - catalogScope === 'popular' (home_owner / wedding_planner): SOLO ven experiencias populares.
+    //  - otros (concierge/directo/agencia): ven todo + una sección "Vista rápida" con las populares arriba.
+    const CATALOG_SCOPE = <%- (typeof endClientCaps !== 'undefined' && endClientCaps && endClientCaps.catalogScope) ? ("'" + endClientCaps.catalogScope + "'") : 'null' %>;
+    const POPULAR_ONLY = CATALOG_SCOPE === 'popular';
+
+    // Base sobre la que operan filtros/contador. En scope 'popular' se restringe a lo popular.
+    function scopedExperiences() {
+        return POPULAR_ONLY ? allExperiences.filter(exp => exp && exp.popular === true) : allExperiences;
+    }
+
+    // Orden del catálogo: populares primero, luego alfabético. (En scope 'popular' todo es popular → solo alfabético.)
+    function compareExperiences(a, b) {
+        const popA = a && a.popular === true ? 0 : 1;
+        const popB = b && b.popular === true ? 0 : 1;
+        if (popA !== popB) return popA - popB;
+        const nameA = (a.displayName || a.name || '').toLowerCase().trim();
+        const nameB = (b.displayName || b.name || '').toLowerCase().trim();
+        return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+    }
+
     // Etiquetas legibles del "Tipo de experiencia" (experience_category) para las cards/filtro.
     // Fallback estático por si el fetch dinámico de categorías (desde la BD) falla.
     const EXPERIENCE_CATEGORY_LABELS = {
@@ -232,10 +253,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Helper function to format experience duration (stored as decimal hours, e.g.
     // 1.5 or 0.75) into a readable "Xh Ymin" string instead of showing ".5h"/".75".
-    function formatDuration(hours) {
-        const h = parseFloat(hours);
-        if (!h || isNaN(h)) return 'No especificada';
-        const totalMinutes = Math.round(h * 60);
+    // Duración de experiencia ahora en MINUTOS (estandarizado; regulares + proveedor/establecimiento).
+    function formatDuration(minutes) {
+        const totalMinutes = Math.round(parseFloat(minutes));
+        if (!totalMinutes || isNaN(totalMinutes)) return 'No especificada';
         const hh = Math.floor(totalMinutes / 60);
         const mm = totalMinutes % 60;
         if (hh > 0 && mm > 0) return `${hh}h ${mm}min`;
@@ -785,14 +806,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update display after each batch
                     allExperiences = [...regularExperiences, ...providerExps];
                     
-                    // Sort experiences alphabetically by name
-                    allExperiences.sort((a, b) => {
-                        const nameA = (a.name || '').toLowerCase().trim();
-                        const nameB = (b.name || '').toLowerCase().trim();
-                        return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
-                    });
+                    // Populares primero, luego alfabético
+                    allExperiences.sort(compareExperiences);
                     
-                    filteredExperiences = [...allExperiences];
+                    filteredExperiences = [...scopedExperiences()];
                     if (document.getElementById('experiencesGrid').style.display === 'flex') {
                         displayExperiences();
                     }
@@ -918,14 +935,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             allExperiences = [...regularExperiences, ...providerExps];
             
-            // Sort experiences alphabetically by name
-            allExperiences.sort((a, b) => {
-                const nameA = (a.name || '').toLowerCase().trim();
-                const nameB = (b.name || '').toLowerCase().trim();
-                return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
-            });
+            // Populares primero, luego alfabético
+            allExperiences.sort(compareExperiences);
             
-            filteredExperiences = [...allExperiences];
+            filteredExperiences = [...scopedExperiences()];
 
             // Show initial experiences immediately
             displayExperiences();
@@ -947,6 +960,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
+    // Encabezado de grupo (full-width) para separar "Populares" de "Todas" dentro del mismo grid.
+    function groupDivider(label, withHeart) {
+        const heart = withHeart ? '<i class="ti ti-heart-filled exp-groupdiv__heart"></i> ' : '';
+        return `<div class="col-12 exp-groupdiv"><span class="exp-groupdiv__label">${heart}${label}</span></div>`;
+    }
+
     // Display experiences as cards
     function displayExperiences() {
         const grid = document.getElementById('experiencesGrid');
@@ -955,7 +974,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Contador de resultados
         const countEl = document.getElementById('expResultCount');
         if (countEl) {
-            const total = (typeof allExperiences !== 'undefined' && Array.isArray(allExperiences)) ? allExperiences.length : filteredExperiences.length;
+            const total = (typeof allExperiences !== 'undefined' && Array.isArray(allExperiences)) ? scopedExperiences().length : filteredExperiences.length;
             countEl.textContent = `${filteredExperiences.length} de ${total} experiencias`;
         }
 
@@ -975,7 +994,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // categoría se oculta en las cards (sería redundante mostrar "Catas" en todas).
         const categoryFilter = document.getElementById('filterCategory')?.value || '';
 
-        grid.innerHTML = filteredExperiences.map((experience, index) => {
+        const buildExperienceCard = (experience, index) => {
             const tipoBadge = experience.displayType && experience.displayType !== 'experiencia'
                 ? experience.displayType.charAt(0).toUpperCase() + experience.displayType.slice(1)
                 : '';
@@ -1003,6 +1022,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 `<div class="no-image"><img src="/img/amexing_logo_horizontal.avif" alt="Amexing"></div>`
                             }
                             <div class="expcard__tags">
+                                ${experience.popular === true ? `<span class="expcard__badge expcard__badge--pop"><i class="ti ti-heart-filled"></i> Popular</span>` : ''}
                                 ${(!categoryFilter && categoryLabel(experience.experience_category)) ? `<span class="expcard__badge expcard__badge--cat">${categoryLabel(experience.experience_category)}</span>` : ''}
                                 ${tipoBadge ? `<span class="expcard__badge expcard__badge--tipo">${tipoBadge}</span>` : ''}
                             </div>
@@ -1041,8 +1061,31 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
             `;
-        }).join('');
-        
+        };
+
+        // Sección "Vista rápida" (populares) para roles que ven el catálogo completo.
+        // Agrupación visual "Populares / Todas": solo cuando NO hay filtro/búsqueda activos,
+        // no es scope 'popular', y hay mezcla de populares y no-populares. Si filtras, solo
+        // importa el orden (populares primero) sin encabezados de grupo.
+        const searchActive = !!(document.getElementById('searchExperience')?.value || '').trim();
+        const anyPopular = filteredExperiences.some(exp => exp && exp.popular === true);
+        const anyRegular = filteredExperiences.some(exp => exp && exp.popular !== true);
+        const showGroups = !POPULAR_ONLY && !searchActive && !categoryFilter && anyPopular && anyRegular;
+
+        let html = '';
+        let regularHeaderDone = false;
+        filteredExperiences.forEach((experience, index) => {
+            if (showGroups) {
+                if (index === 0) html += groupDivider('Populares', true);
+                if (!regularHeaderDone && experience.popular !== true) {
+                    html += groupDivider('Todas las experiencias', false);
+                    regularHeaderDone = true;
+                }
+            }
+            html += buildExperienceCard(experience, index);
+        });
+        grid.innerHTML = html;
+
         // Set up proper event listeners for images (CSP-compliant)
         setTimeout(() => {
             const images = document.querySelectorAll('.experience-img');
@@ -1100,7 +1143,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const searchFilter = document.getElementById('searchExperience').value.toLowerCase();
         const categoryFilter = document.getElementById('filterCategory')?.value || '';
 
-        filteredExperiences = allExperiences.filter(experience => {
+        filteredExperiences = scopedExperiences().filter(experience => {
             // Filtros de contenido (búsqueda + tipo de experiencia); moneda/pago solo recalculan precio.
             const matchesSearch = !searchFilter ||
                 experience.displayName.toLowerCase().includes(searchFilter) ||
@@ -1112,12 +1155,8 @@ document.addEventListener('DOMContentLoaded', function() {
             return matchesSearch && matchesCategory;
         });
         
-        // Sort filtered results alphabetically by name
-        filteredExperiences.sort((a, b) => {
-            const nameA = (a.displayName || a.name || '').toLowerCase().trim();
-            const nameB = (b.displayName || b.name || '').toLowerCase().trim();
-            return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
-        });
+        // Populares primero, luego alfabético
+        filteredExperiences.sort(compareExperiences);
 
         displayExperiences();
     }
@@ -4580,6 +4619,17 @@ document.addEventListener('DOMContentLoaded', function() {
 .exp-catalog__empty { text-align: center; padding: 60px 0; color: var(--exp-muted); }
 .exp-catalog__empty i { font-size: 3rem; color: var(--exp-border); }
 .exp-catalog__empty p { margin-top: 12px; }
+
+/* Encabezado de grupo inline (Populares / Todas) */
+.exp-groupdiv { display: flex; align-items: center; gap: 12px; padding-top: 6px; }
+.exp-groupdiv:not(:first-child) { margin-top: 6px; }
+.exp-groupdiv__label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--exp-olive, #6E7A50); font-weight: 600; white-space: nowrap; }
+.exp-groupdiv__heart { color: #e11d1d; font-size: 0.9rem; }
+.exp-groupdiv::after { content: ''; flex: 1 1 auto; height: 1px; background: var(--exp-border, #e6e2d8); }
+
+/* Badge "Popular" en las cards */
+.expcard__badge--pop { display: inline-flex; align-items: center; gap: 4px; background: #e11d1d; color: #fff; font-weight: 600; }
+.expcard__badge--pop i { font-size: 0.85rem; }
 
 /* Card */
 .expcard {

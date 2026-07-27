@@ -33,8 +33,12 @@ router.get('/user/:userId', (req, res) => billingProfileController.getByUser(req
 // GET /api/billing-profiles/:id - Get billing profile by ID
 router.get('/:id', (req, res) => billingProfileController.getById(req, res));
 
-// POST /api/billing-profiles - Create a new billing profile
+// POST /api/billing-profiles - Create a new billing profile (owned by the authenticated user)
 router.post('/', (req, res) => billingProfileController.create(req, res));
+
+// POST /api/billing-profiles/user/:userId - Admin/dept_manager crea un perfil a nombre de otro
+// usuario (p. ej. el admin agrega perfiles de facturación a una agencia desde su detalle).
+router.post('/user/:userId', (req, res) => billingProfileController.create(req, res));
 
 // PUT /api/billing-profiles/:id - Update a billing profile
 router.put('/:id', (req, res) => billingProfileController.update(req, res));

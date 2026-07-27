@@ -141,8 +141,10 @@ class POIController {
       if (variants && typeof variants === 'object') {
         const preferred = this.imageOptimizationService.detectPreferredFormat?.(acceptHeader);
         const order = [preferred, 'avif', 'webp', 'jpeg'].filter(Boolean);
-        const keyFrom = (v) => (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
-        const chosen = order.map((fmt) => keyFrom(variants[fmt])).find(Boolean);
+        const chosen = order.map((fmt) => {
+          const v = variants[fmt];
+          return (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
+        }).find(Boolean);
         if (chosen) {
           s3Key = chosen;
         }
@@ -248,6 +250,7 @@ class POIController {
           objectId: poi.id,
           name: poi.get('name'),
           active: poi.get('active'),
+          isBaseCity: poi.get('isBaseCity') || false,
           serviceType: serviceType
             ? {
               id: serviceType.id,
@@ -382,6 +385,7 @@ class POIController {
         id: poi.id,
         name: poi.get('name'),
         active: poi.get('active'),
+        isBaseCity: poi.get('isBaseCity') || false,
         serviceType: serviceType
           ? {
             id: serviceType.id,
@@ -423,7 +427,9 @@ class POIController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      const { name, serviceTypeId, image } = req.body;
+      const {
+        name, serviceTypeId, image, isBaseCity,
+      } = req.body;
 
       // Validate required fields
       if (!name || name.trim().length === 0) {
@@ -469,6 +475,19 @@ class POIController {
       poi.set('active', true);
       poi.set('exists', true);
       poi.set('serviceType', serviceType);
+
+      // Ciudad base (fallback de precio de aeropuerto): solo UN POI puede serlo. Al activarlo se
+      // desmarca cualquier otro. Igual que updatePOI, pero al crear no hay self que excluir.
+      if (typeof isBaseCity === 'boolean') {
+        if (isBaseCity) {
+          const otherQuery = new Parse.Query('POI');
+          otherQuery.equalTo('isBaseCity', true);
+          otherQuery.equalTo('exists', true);
+          const others = await otherQuery.find({ useMasterKey: true });
+          await Promise.all(others.map((o) => o.set('isBaseCity', false).save(null, { useMasterKey: true })));
+        }
+        poi.set('isBaseCity', isBaseCity);
+      }
 
       // Save with master key and user context for audit trail
       await poi.save(null, {
@@ -516,6 +535,7 @@ class POIController {
           id: serviceType.id,
           name: serviceType.get('name'),
         },
+        isBaseCity: poi.get('isBaseCity') || false,
         image: await this.formatImageForResponse(poi.get('image'), req.get('accept') || ''),
       };
 
@@ -563,7 +583,7 @@ class POIController {
       }
 
       const {
-        name, active, serviceTypeId, image,
+        name, active, serviceTypeId, image, isBaseCity,
       } = req.body;
 
       // Update name if provided
@@ -606,6 +626,22 @@ class POIController {
         } catch (error) {
           return this.sendError(res, 'El tipo de traslado seleccionado no existe o no está activo', 400);
         }
+      }
+
+      // Ciudad base (fallback de precio de aeropuerto): solo UN POI puede serlo. Al activarlo, se
+      // desmarca cualquier otro. Se usa en getPricesByRoute: si una ruta de aeropuerto no tiene
+      // tarifa para el origen/destino específico, se busca como si el extremo no-aeropuerto fuera
+      // esta ciudad base.
+      if (typeof isBaseCity === 'boolean') {
+        if (isBaseCity) {
+          const otherQuery = new Parse.Query('POI');
+          otherQuery.equalTo('isBaseCity', true);
+          otherQuery.notEqualTo('objectId', poiId);
+          otherQuery.equalTo('exists', true);
+          const others = await otherQuery.find({ useMasterKey: true });
+          await Promise.all(others.map((o) => o.set('isBaseCity', false).save(null, { useMasterKey: true })));
+        }
+        poi.set('isBaseCity', isBaseCity);
       }
 
       // Imagen (opcional): solo se toca si el request la incluye. Objeto con dataUrl →

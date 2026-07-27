@@ -21,15 +21,47 @@ router.use(dashboardAuth.requireAuth);
 
 // Cliente directo (end_client): expone las capacidades según su tipo (clientCategory, que ya viene
 // del JWT en res.locals) para que menú, vistas y controllers decidan qué mostrar/permitir.
-router.use('/end_client', (req, res, next) => {
+router.use('/end_client', async (req, res, next) => {
   res.locals.endClientCaps = getEndClientCapabilities(req.user && req.user.clientCategory);
+  // White-label: los clientes de agencia (agency_client) ven el logo de SU agencia (dueña por
+  // organizationId = id del AmexingUser del department manager) + leyenda "Powered by Amexing".
+  try {
+    /**
+     * Lee un campo del usuario autenticado (Parse object o plano).
+     * @param {string} f - Nombre del campo.
+     * @returns {*} Valor del campo (o undefined).
+     */
+    const getField = (f) => (req.user && (req.user.get ? req.user.get(f) : req.user[f]));
+    const clientCategory = getField('clientCategory');
+    const orgId = getField('organizationId');
+    if (clientCategory === 'agency_client' && orgId && orgId !== 'amexing') {
+      const Parse = require('parse/node');
+      const agency = await new Parse.Query('AmexingUser').get(orgId, { useMasterKey: true }).catch(() => null);
+      if (agency) {
+        let logo = agency.get('companyLogo') || '';
+        const s3Key = agency.get('companyLogoS3Key');
+        if (s3Key) {
+          try {
+            const FileStorageService = require('../../application/services/FileStorageService');
+            logo = await new FileStorageService().getPresignedUrl(s3Key);
+          } catch (imgErr) { /* conserva la URL guardada */ }
+        }
+        if (logo) {
+          res.locals.agencyBranding = {
+            logo,
+            name: agency.get('contextualData')?.companyName || agency.get('companyName') || '',
+          };
+        }
+      }
+    }
+  } catch (brandingErr) { /* sin branding → cae al logo de Amexing */ }
   next();
 });
 
 /**
- * Guard por capacidad para rutas de end_client (p. ej. la sección Tarifario solo para wedding
+ * Guard por capacidad para rutas de end_client (p. Ej. La sección Tarifario solo para wedding
  * planner). Si el tipo de cliente no tiene la capacidad, lo regresa a su dashboard de inicio.
- * @param {string} cap - Capacidad requerida (clave de endClientCapabilities, p. ej. 'viewTarifario').
+ * @param {string} cap - Capacidad requerida (clave de endClientCapabilities, p. Ej. 'viewTarifario').
  * @returns {Function} Middleware Express que permite o redirige según la capacidad del usuario.
  * @example
  * router.get('/end_client/vehicles', requireEndClientCap('viewTarifario'), handler);
@@ -64,6 +96,7 @@ router.get('/superadmin/vehicles', dashboardAuth.requireRole('superadmin'), (req
 router.get('/superadmin/services', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.services(req, res));
 router.get('/superadmin/experiences', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.experiences(req, res));
 router.get('/superadmin/greeter', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.greeter(req, res));
+router.get('/superadmin/entradas', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.entradas(req, res));
 router.get('/superadmin/tarifario-export', dashboardAuth.requireRole('superadmin'), (req, res) => superAdminController.tarifarioExport(req, res));
 
 // Admin Routes
@@ -90,6 +123,7 @@ router.get('/admin/a-disposicion', dashboardAuth.requireRole('admin'), (req, res
 router.get('/admin/pricing', dashboardAuth.requireRole('admin'), (req, res) => adminController.pricing(req, res));
 router.get('/admin/tours', dashboardAuth.requireRole('admin'), (req, res) => adminController.tours(req, res));
 router.get('/admin/greeter', dashboardAuth.requireRole('admin'), (req, res) => adminController.greeter(req, res));
+router.get('/admin/entradas', dashboardAuth.requireRole('admin'), (req, res) => adminController.entradas(req, res));
 router.get('/admin/quotes', dashboardAuth.requireRole('admin'), (req, res) => adminController.quotes(req, res));
 router.get('/admin/quotes/:id', dashboardAuth.requireRole('admin'), (req, res) => adminController.quoteDetail(req, res));
 router.get('/admin/invoices', dashboardAuth.requireRole('admin'), (req, res) => adminController.invoices(req, res));
@@ -110,6 +144,7 @@ router.get('/client', dashboardAuth.requireRole('client'), (req, res) => clientC
 router.get('/client/profile', dashboardAuth.requireRole('client'), (req, res) => clientController.profile(req, res));
 router.get('/client/change-password', dashboardAuth.requireRole('client'), (req, res) => clientController.changePassword(req, res));
 router.get('/client/clients', dashboardAuth.requireRole('client'), (req, res) => clientController.ownedClients(req, res));
+router.get('/client/clients/:id', dashboardAuth.requireRole('client'), (req, res) => clientController.ownedClientDetail(req, res));
 router.get('/client/departments', dashboardAuth.requireRole('client'), (req, res) => clientController.departments(req, res));
 router.get('/client/employees', dashboardAuth.requireRole('client'), (req, res) => clientController.employees(req, res));
 router.get('/client/team', dashboardAuth.requireRole('client'), (req, res) => clientController.team(req, res));
@@ -155,6 +190,7 @@ router.get('/department_manager', dashboardAuth.requireRole('department_manager'
 router.get('/department_manager/profile', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.profile(req, res));
 router.get('/department_manager/change-password', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.changePassword(req, res));
 router.get('/department_manager/clients', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.ownedClients(req, res));
+router.get('/department_manager/clients/:id', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.ownedClientDetail(req, res));
 router.get('/department_manager/team', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));
 router.get('/department_manager/approvals', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));
 router.get('/department_manager/bookings', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.bookings(req, res));

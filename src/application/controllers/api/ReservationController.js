@@ -13,7 +13,9 @@ const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 const FileStorageService = require('../../services/FileStorageService');
 const PaymentService = require('../../services/PaymentService');
+const { withReservationLock } = require('../../../infrastructure/concurrency/reservationLock');
 const { notifyReservationCancellation } = require('../../services/ReservationCancellationNotifier');
+const QuoteActivityService = require('../../services/QuoteActivityService');
 // Models used via Parse.Query string references
 
 // Module-level FileStorageService for presigned S3 URLs (static class needs this)
@@ -125,7 +127,6 @@ class ReservationController {
    * then scoped to these quotes (through quotePtr). Returns null for non-client roles.
    * @param {object} req - Express request with user info from JWT middleware.
    * @returns {Array<string>|null} Eligible quote ids for clients, or null for other roles.
-   * @example
    */
   static async getClientEligibleQuoteIds(req) {
     const { userRole } = req;
@@ -186,6 +187,35 @@ class ReservationController {
     });
 
     return eligibleQuotes.map((quote) => quote.id);
+  }
+
+  /**
+   * Apply the SAME role-based ownership scope the listing uses (getRoleFilterPointers +
+   * getClientEligibleQuoteIds) to a single-reservation query (get-by-id / payment endpoints),
+   * so a nivel-4+ actor can only reach reservations they own. Admin/superadmin: no filter.
+   * Agency (department_manager): clientPtr must be a user in its departmentId (fallback: own
+   * clientPtr). Agent (client): scoped by quote ownership/collaboration ONLY, never by clientPtr
+   * (a clientPtr match can be accidental). Out-of-scope ids then miss the query and .get() throws
+   * OBJECT_NOT_FOUND → surfaced as 404 by the caller (never a 200 with foreign data, never a 403
+   * that confirms the resource exists).
+   * @param {Parse.Query} query - Reservation query to constrain in place.
+   * @param {object} req - Express request with user info from JWT middleware.
+   * @returns {Promise<void>}
+   * @example
+   */
+  static async applyOwnershipScope(query, req) {
+    const roleFilterPointers = await ReservationController.getRoleFilterPointers(req);
+    const clientQuoteIds = await ReservationController.getClientEligibleQuoteIds(req);
+    if (roleFilterPointers) {
+      query.containedIn(roleFilterPointers.field, roleFilterPointers.pointers);
+    }
+    // Client scoping lives on the quote (quotePtr), not on the reservation. An empty eligible list
+    // yields zero matches (containedIn on []), which is exactly what we want (deny by default).
+    if (clientQuoteIds) {
+      const innerQuote = new Parse.Query('Quote');
+      innerQuote.containedIn('objectId', clientQuoteIds);
+      query.matchesQuery('quotePtr', innerQuote);
+    }
   }
 
   /**
@@ -660,6 +690,9 @@ class ReservationController {
       const query = new Parse.Query('Reservation');
       query.equalTo('active', true);
       query.equalTo('exists', true);
+      // Ownership scope (mismo criterio que el listado): una agencia/agente nivel 4+ solo puede ver
+      // SU propia reservación. Fuera de scope, .get() no encuentra match → safeGet null → 404.
+      await ReservationController.applyOwnershipScope(query, req);
       query.include('quotePtr');
       query.include('clientPtr');
       query.include('createdBy');
@@ -896,6 +929,49 @@ class ReservationController {
         }
       }
 
+      // Fallback financiero para cuando PaymentService.summarize() lanzó (paymentSummary === null).
+      // NO derivamos el total de campos persistidos (balance + paidAmount): esos quedan stale si se
+      // agregó un ajuste (cargo/descuento) o propina después del último recalculate() exitoso, y
+      // devolverían un Total que IGNORA los ajustes del cliente. Lo recalculamos igual que
+      // ReservationController.recalculateTotal (servicesSubtotal + cargos - descuentos + propina),
+      // usando datos ya cargados (reservation + services), sin queries nuevas.
+      let fallbackPayment = null;
+      if (!paymentSummary) {
+        const fbSubtotal = Number(reservation.get('servicesSubtotal'))
+          || Number(reservation.get('totalAmount')) || 0;
+        const fbAdjustments = reservation.get('adjustments') || [];
+        const fbCharges = fbAdjustments
+          .filter((a) => a.type === 'charge')
+          .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+        const fbDiscounts = fbAdjustments
+          .filter((a) => a.type === 'discount')
+          .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+        const fbGeneralTip = Number(reservation.get('tip')) || 0;
+        const fbServiceTips = services.reduce((s, svc) => {
+          const sub = svc.get('subconcept') || {};
+          if (sub.includeInTotal === false) return s;
+          const t = Number(sub.tipAmount);
+          return s + (Number.isFinite(t) && t > 0 ? t : 0);
+        }, 0);
+        const fbTip = Math.round((fbGeneralTip + fbServiceTips + Number.EPSILON) * 100) / 100;
+        const fbTotal = Math.round(
+          Math.max(0, fbSubtotal + fbCharges - fbDiscounts + fbTip) * 100
+        ) / 100;
+        const fbPaidAmount = Number(reservation.get('paidAmount')) || 0;
+        fallbackPayment = {
+          paymentStatus: reservation.get('paymentStatus') || 'pending',
+          paidAmount: fbPaidAmount,
+          // Igual que PaymentService.buildSummary (balance = total - pagado): se deriva del fbTotal
+          // fresco, NO del balance persistido (que queda stale tras un ajuste), para que el "Saldo"
+          // (resolveDisplayedBalance) quede consistente con el "Total a pagar" recalculado.
+          balance: Math.round((fbTotal - fbPaidAmount) * 100) / 100,
+          tip: fbTip,
+          generalTip: fbGeneralTip,
+          serviceTipsTotal: fbServiceTips,
+          total: fbTotal,
+        };
+      }
+
       return res.json({
         success: true,
         data: {
@@ -911,23 +987,24 @@ class ReservationController {
           totalAmount: reservation.get('totalAmount'),
           servicesSubtotal: reservation.get('servicesSubtotal') || reservation.get('totalAmount'),
           adjustments: reservation.get('adjustments') || [],
+          // Fase 2d: propina global de la cotización (del snapshot) para mostrarla en el detalle.
+          globalTip: snapshot.globalTip || null,
           currency: reservation.get('currency'),
           paymentType: reservation.get('paymentType'),
-          // Payment rollup (con IVA + propina): paymentStatus pending|partial|paid|refunded.
+          // Payment rollup (con IVA): paymentStatus pending|partial|paid|refunded.
           payment: paymentSummary ? {
             paymentStatus: paymentSummary.paymentStatus,
             paidAmount: paymentSummary.paidAmount,
             balance: paymentSummary.balance,
             subtotal: paymentSummary.subtotal,
             iva: paymentSummary.iva,
+            // Propina cobrada (Fase 2): combinada + desglosada (general vs por servicio) para la línea
+            // "Propina general" del Resumen Financiero. El total ya la incluye.
             tip: paymentSummary.tip,
+            generalTip: paymentSummary.generalTip,
+            serviceTipsTotal: paymentSummary.serviceTipsTotal,
             total: paymentSummary.total,
-          } : {
-            paymentStatus: reservation.get('paymentStatus') || 'pending',
-            paidAmount: reservation.get('paidAmount') || 0,
-            balance: reservation.get('balance'),
-            tip: reservation.get('tip') || 0,
-          },
+          } : fallbackPayment,
           numberOfPeople: reservation.get('numberOfPeople'),
           eventType: reservation.get('eventType'),
           contactPerson: reservation.get('contactPerson'),
@@ -1312,6 +1389,15 @@ class ReservationController {
           reason: req.body?.reason,
           cancellationType,
         });
+        // Timeline (Fase B1): registrar la cancelación en la cotización.
+        await QuoteActivityService.log({
+          quoteId: linkedQuote.id,
+          actor: req.user,
+          actorRole: req.userRole,
+          action: 'reservation_cancelled',
+          summary: `canceló la reservación${reservation.get('folio') ? ` (${reservation.get('folio')})` : ''}`,
+          meta: { reservationId: reservation.id, reservationFolio: reservation.get('folio') },
+        });
       }
 
       return res.json({ success: true, message: 'Reservación cancelada exitosamente' });
@@ -1407,6 +1493,16 @@ class ReservationController {
         targetStatus,
         servicesReverted: services.length,
         performedBy: req.user?.id,
+      });
+
+      // Timeline (Fase B1): registrar el regreso de reservación a cotización.
+      await QuoteActivityService.log({
+        quoteId: quote.id,
+        actor: req.user,
+        actorRole: req.userRole,
+        action: 'reverted_to_quote',
+        summary: `regresó la reservación${reservation.get('folio') ? ` (${reservation.get('folio')})` : ''} a cotización`,
+        meta: { reservationId: reservation.id, reservationFolio: reservation.get('folio') },
       });
 
       return res.json({
@@ -1728,54 +1824,74 @@ class ReservationController {
         }
       }
 
-      // Fetch reservation
-      const query = new Parse.Query('Reservation');
-      query.equalTo('active', true);
-      query.equalTo('exists', true);
-      const reservation = await ReservationController.safeGet(query, id);
-      if (!reservation) {
-        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      // Serializa el read-modify-write de `adjustments` por reservación: dos ajustes casi simultáneos
+      // a la MISMA reservación corren en fila (no en paralelo), así ninguno se pierde por un
+      // last-write-wins sobre el array. PaymentService.recalculate queda FUERA de este lock (usa el
+      // suyo) para no reentrar el mismo candado y provocar deadlock. Lock in-process (ver
+      // reservationLock: no cubre PM2 cluster multi-worker).
+      const outcome = await withReservationLock(id, async () => {
+        const query = new Parse.Query('Reservation');
+        query.equalTo('active', true);
+        query.equalTo('exists', true);
+        const reservation = await ReservationController.safeGet(query, id);
+        if (!reservation) {
+          return { status: 404, error: 'Reservación no encontrada' };
+        }
+
+        // Initialize servicesSubtotal if not set
+        const servicesSubtotal = reservation.get('servicesSubtotal')
+          || reservation.get('totalAmount') || 0;
+        if (!reservation.get('servicesSubtotal')) {
+          reservation.set('servicesSubtotal', servicesSubtotal);
+        }
+
+        // Calculate final amount for percentage discounts
+        let finalAmount = amount;
+        if (type === 'discount' && percentage) {
+          finalAmount = Math.round(((servicesSubtotal * percentage) / 100) * 100) / 100;
+        }
+
+        if (Number(finalAmount) > 100000000) {
+          return { status: 400, error: 'El monto del ajuste no puede exceder 100,000,000' };
+        }
+
+        // Create adjustment entry
+        const adjustment = {
+          id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          type,
+          description: description.trim().slice(0, 150),
+          amount: finalAmount,
+          percentage: type === 'discount' && percentage ? percentage : null,
+          createdAt: new Date().toISOString(),
+        };
+
+        // Append to adjustments array
+        const adjustments = reservation.get('adjustments') || [];
+        adjustments.push(adjustment);
+        reservation.set('adjustments', adjustments);
+
+        // Recalculate total (incluye la propina cobrada; carga los service-tips desde los RS activos)
+        await ReservationController.recalculateTotal(reservation);
+
+        await reservation.save(null, { useMasterKey: true });
+
+        return {
+          ok: true,
+          adjustment,
+          adjustments,
+          servicesSubtotal,
+          finalAmount,
+          totalAmount: reservation.get('totalAmount'),
+        };
+      });
+
+      if (outcome.error) {
+        return res.status(outcome.status).json({ success: false, error: outcome.error });
       }
-
-      // Initialize servicesSubtotal if not set
-      const servicesSubtotal = reservation.get('servicesSubtotal')
-        || reservation.get('totalAmount') || 0;
-      if (!reservation.get('servicesSubtotal')) {
-        reservation.set('servicesSubtotal', servicesSubtotal);
-      }
-
-      // Calculate final amount for percentage discounts
-      let finalAmount = amount;
-      if (type === 'discount' && percentage) {
-        finalAmount = Math.round(((servicesSubtotal * percentage) / 100) * 100) / 100;
-      }
-
-      if (Number(finalAmount) > 100000000) {
-        return res.status(400).json({ success: false, error: 'El monto del ajuste no puede exceder 100,000,000' });
-      }
-
-      // Create adjustment entry
-      const adjustment = {
-        id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        type,
-        description: description.trim().slice(0, 150),
-        amount: finalAmount,
-        percentage: type === 'discount' && percentage ? percentage : null,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Append to adjustments array
-      const adjustments = reservation.get('adjustments') || [];
-      adjustments.push(adjustment);
-      reservation.set('adjustments', adjustments);
-
-      // Recalculate total
-      ReservationController.recalculateTotal(reservation);
-
-      await reservation.save(null, { useMasterKey: true });
 
       // Keep the payment rollup (balance/paymentStatus) in sync with the new amount due (adjustments
-      // now flow into the payment total). Non-fatal: the adjustment itself already saved.
+      // now flow into the payment total). Fuera del lock de arriba (recalculate tiene el suyo).
+      // Non-fatal: the adjustment itself already saved.
       try {
         await require('../../services/PaymentService').recalculate(id);
       } catch (e) {
@@ -1784,9 +1900,9 @@ class ReservationController {
 
       logger.info('Reservation adjustment added', {
         reservationId: id,
-        adjustmentId: adjustment.id,
+        adjustmentId: outcome.adjustment.id,
         type,
-        amount: finalAmount,
+        amount: outcome.finalAmount,
         description: description.trim(),
         performedBy: req.user?.id,
       });
@@ -1795,10 +1911,10 @@ class ReservationController {
         success: true,
         message: type === 'charge' ? 'Cargo agregado' : 'Descuento agregado',
         data: {
-          adjustment,
-          totalAmount: reservation.get('totalAmount'),
-          servicesSubtotal,
-          adjustments,
+          adjustment: outcome.adjustment,
+          totalAmount: outcome.totalAmount,
+          servicesSubtotal: outcome.servicesSubtotal,
+          adjustments: outcome.adjustments,
         },
       });
     } catch (error) {
@@ -1818,29 +1934,46 @@ class ReservationController {
     try {
       const { id, adjustmentId } = req.params;
 
-      const query = new Parse.Query('Reservation');
-      query.equalTo('active', true);
-      query.equalTo('exists', true);
-      const reservation = await ReservationController.safeGet(query, id);
-      if (!reservation) {
-        return res.status(404).json({ success: false, error: 'Reservación no encontrada' });
+      // Mismo serializado por reservación que addAdjustment: el read-modify-write del array corre en
+      // fila para que un remove no pise a otra escritura concurrente. recalculate queda fuera (su lock).
+      const outcome = await withReservationLock(id, async () => {
+        const query = new Parse.Query('Reservation');
+        query.equalTo('active', true);
+        query.equalTo('exists', true);
+        const reservation = await ReservationController.safeGet(query, id);
+        if (!reservation) {
+          return { status: 404, error: 'Reservación no encontrada' };
+        }
+
+        const adjustments = reservation.get('adjustments') || [];
+        const idx = adjustments.findIndex((a) => a.id === adjustmentId);
+        if (idx === -1) {
+          return { status: 404, error: 'Ajuste no encontrado' };
+        }
+
+        const removed = adjustments.splice(idx, 1)[0];
+        reservation.set('adjustments', adjustments);
+
+        // Recalculate total (incluye la propina cobrada; carga los service-tips desde los RS activos)
+        await ReservationController.recalculateTotal(reservation);
+
+        await reservation.save(null, { useMasterKey: true });
+
+        return {
+          ok: true,
+          removed,
+          adjustments,
+          totalAmount: reservation.get('totalAmount'),
+          servicesSubtotal: reservation.get('servicesSubtotal') || reservation.get('totalAmount'),
+        };
+      });
+
+      if (outcome.error) {
+        return res.status(outcome.status).json({ success: false, error: outcome.error });
       }
 
-      const adjustments = reservation.get('adjustments') || [];
-      const idx = adjustments.findIndex((a) => a.id === adjustmentId);
-      if (idx === -1) {
-        return res.status(404).json({ success: false, error: 'Ajuste no encontrado' });
-      }
-
-      const removed = adjustments.splice(idx, 1)[0];
-      reservation.set('adjustments', adjustments);
-
-      // Recalculate total
-      ReservationController.recalculateTotal(reservation);
-
-      await reservation.save(null, { useMasterKey: true });
-
-      // Keep the payment rollup in sync with the new amount due (non-fatal).
+      // Keep the payment rollup in sync with the new amount due (fuera del lock; recalculate tiene el
+      // suyo). Non-fatal.
       try {
         await require('../../services/PaymentService').recalculate(id);
       } catch (e) {
@@ -1850,8 +1983,8 @@ class ReservationController {
       logger.info('Reservation adjustment removed', {
         reservationId: id,
         adjustmentId,
-        type: removed.type,
-        amount: removed.amount,
+        type: outcome.removed.type,
+        amount: outcome.removed.amount,
         performedBy: req.user?.id,
       });
 
@@ -1859,9 +1992,9 @@ class ReservationController {
         success: true,
         message: 'Ajuste eliminado',
         data: {
-          totalAmount: reservation.get('totalAmount'),
-          servicesSubtotal: reservation.get('servicesSubtotal') || reservation.get('totalAmount'),
-          adjustments,
+          totalAmount: outcome.totalAmount,
+          servicesSubtotal: outcome.servicesSubtotal,
+          adjustments: outcome.adjustments,
         },
       });
     } catch (error) {
@@ -1871,11 +2004,46 @@ class ReservationController {
   }
 
   /**
-   * Recalculate totalAmount from servicesSubtotal and adjustments.
-   * @param {object} reservation - Parse Reservation object.
+   * Suma la propina POR SERVICIO (subconcept.tipAmount, ya en pesos fijos) de los ReservationService
+   * ACTIVOS de una reservación. Excluye los includeInTotal === false (aportan $0); los soft-eliminados no
+   * los devuelve la query (active/exists). Solo un tipAmount finito y positivo cuenta. Solo LEE el valor.
+   * @param {object} reservation - Parse Reservation object (ya cargado, con id).
+   * @returns {Promise<number>} Suma de propinas por servicio, a 2 decimales.
    * @example
+   * const svcTips = await ReservationController.sumActiveServiceTips(reservation);
    */
-  static recalculateTotal(reservation) {
+  static async sumActiveServiceTips(reservation) {
+    const svcQuery = new Parse.Query('ReservationService');
+    svcQuery.equalTo('reservationPtr', reservation);
+    svcQuery.equalTo('active', true);
+    svcQuery.equalTo('exists', true);
+    svcQuery.limit(1000);
+    const services = await svcQuery.find({ useMasterKey: true });
+    const sum = services.reduce((s, svc) => {
+      const sub = svc.get('subconcept') || {};
+      if (sub.includeInTotal === false) return s;
+      const tip = Number(sub.tipAmount);
+      return s + (Number.isFinite(tip) && tip > 0 ? tip : 0);
+    }, 0);
+    return Math.round((sum + Number.EPSILON) * 100) / 100;
+  }
+
+  /**
+   * Recalculate totalAmount from servicesSubtotal, adjustments and the collected tip.
+   *
+   * El header (totalAmount, que leen TODAS las vistas) debe cuadrar con el "Total a pagar" del motor de
+   * pagos, que ahora COBRA la propina. total = max(0, servicesSubtotal + cargos − descuentos + propina),
+   * donde propina = general (reservation.tip) + Σ propina por servicio de los servicios ACTIVOS. La propina
+   * son pesos fijos (no escalan por método), igual que los ajustes. serviceTipsTotal se PASA ya calculado
+   * desde la sincronización de cotización (los RS aún no se reconcilian en ese punto); en los demás
+   * llamadores (agregar/quitar ajuste) se omite y se carga aquí desde los ReservationService.
+   * @param {object} reservation - Parse Reservation object.
+   * @param {number|null} [serviceTipsTotal] - Propina por servicio ya calculada; null => se carga aquí.
+   * @returns {Promise<void>}
+   * @example
+   * await ReservationController.recalculateTotal(reservation);
+   */
+  static async recalculateTotal(reservation, serviceTipsTotal = null) {
     const servicesSubtotal = reservation.get('servicesSubtotal')
       || reservation.get('totalAmount') || 0;
     const adjustments = reservation.get('adjustments') || [];
@@ -1888,7 +2056,16 @@ class ReservationController {
       .filter((a) => a.type === 'discount')
       .reduce((sum, a) => sum + (a.amount || 0), 0);
 
-    const finalTotal = Math.max(0, servicesSubtotal + charges - discounts);
+    const generalTip = Number(reservation.get('tip')) || 0;
+    let svcTips = Number(serviceTipsTotal);
+    if (serviceTipsTotal === null || !Number.isFinite(svcTips)) {
+      svcTips = await ReservationController.sumActiveServiceTips(reservation);
+    }
+    const tip = Math.round(
+      (generalTip + (Number.isFinite(svcTips) && svcTips > 0 ? svcTips : 0) + Number.EPSILON) * 100
+    ) / 100;
+
+    const finalTotal = Math.max(0, servicesSubtotal + charges - discounts + tip);
     reservation.set('totalAmount', Math.round(finalTotal * 100) / 100);
   }
 

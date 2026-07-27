@@ -415,12 +415,79 @@ router.put(
  *   data: { id, folio, serviceItems }
  * }
  */
+// PUT de solo ESCRITURA de los servicios de una cotización: nivel 4+ (agencia `department_manager` +
+// agente `client`, además de admin/superadmin) + denyRoles('end_client'). El Cliente Directo comparte
+// nivel 4 en el mapa de fallback de requireRoleLevel (para poder LEER su cotización), pero no edita
+// servicios por diseño de negocio — sin este guard extra podía llamar el endpoint directo (bypass de la
+// UI, que nunca le muestra el editor). Mismo patrón que las rutas de escritura de pagos en
+// reservationRoutes.js.
 router.put(
   '/:id/service-items',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  jwtMiddleware.denyRoles('end_client'),
   (req, res) => QuoteController.updateServiceItems(req, res)
+);
+
+/**
+ * POST /api/quotes/:id/services/:serviceId/request-change — El owner (no-admin) solicita
+ * borrar/modificar un servicio bloqueado por admin (Fase 2 del bloqueo por-servicio).
+ */
+router.post(
+  '/:id/services/:serviceId/request-change',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4) y arriba
+  (req, res) => QuoteController.requestServiceChange(req, res)
+);
+
+/**
+ * POST /api/quotes/:id/services/:serviceId/review-change — Admin aprueba/rechaza la solicitud
+ * de cambio de un servicio. SOLO admin/superadmin.
+ */
+router.post(
+  '/:id/services/:serviceId/review-change',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRole(['admin', 'superadmin']),
+  (req, res) => QuoteController.reviewServiceChange(req, res)
+);
+
+/**
+ * GET /api/quotes/:id/change-requests — Historial de solicitudes de cambio de la cotización
+ * (Fase 3) + contador de novedades. Nivel 4+ (owner y admin).
+ */
+router.get(
+  '/:id/change-requests',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.getServiceChangeRequests(req, res)
+);
+
+/**
+ * POST /api/quotes/:id/change-requests/mark-seen — Marca como vistas las solicitudes resueltas
+ * del owner (limpia el contador). Nivel 4+.
+ */
+router.post(
+  '/:id/change-requests/mark-seen',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.markServiceChangeRequestsSeen(req, res)
+);
+
+/**
+ * GET /api/quotes/:id/activity — Timeline de actividades legible de la cotización (Fase A).
+ * Nivel 4+ (admin y owner/agencia).
+ */
+router.get(
+  '/:id/activity',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.getQuoteActivity(req, res)
 );
 
 /**

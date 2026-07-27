@@ -18,6 +18,7 @@ const QuoteOwnershipService = require('../services/QuoteOwnershipService');
 const logger = require('../../infrastructure/logger');
 const FileStorageService = require('../services/FileStorageService');
 const { renderUrlToPdf } = require('../services/PdfRenderService');
+const { getArponaEmbedCss, getMyriadEmbedCss } = require('../../infrastructure/utils/fontEmbed');
 
 const fileStorageService = new FileStorageService({
   baseFolder: 'general',
@@ -79,6 +80,9 @@ class PublicQuoteController {
         isPublicView: true,
         // Pestaña sin folio/id, consistente con el detalle admin.
         pageTitle: 'Cotización - Amexing',
+        // Fuentes embebidas (TTF) para el PDF: títulos Arpona, cuerpo Myriad Pro.
+        arponaEmbedCss: getArponaEmbedCss(),
+        myriadEmbedCss: getMyriadEmbedCss(),
       });
     } catch (error) {
       return this.handlePublicQuoteError(error, folio, req, res);
@@ -134,6 +138,14 @@ class PublicQuoteController {
    * const error = this.validateFolio('QTE-2024-0001', req, res);
    */
   validateFolio(folio, req, res) {
+    // Cuando la cotización se resuelve por id exacto (?q=), el folio del path es solo una
+    // etiqueta (no se usa para buscar), así que se aceptan folios legados/no estándar (p. ej.
+    // "QCT-F1") o incluso sin folio. Sin ?q= se sigue exigiendo el formato QTE-YYYY-#### como
+    // control de acceso público. Esto evita que la exportación de esas cotizaciones caiga por
+    // error al PDF de reservación / a un 400 de folio inválido.
+    if (req && req.query && req.query.q) {
+      return null;
+    }
     const folioRegex = /^QTE-\d{4}-\d{4}$/;
     if (!folioRegex.test(folio)) {
       logger.warn('Invalid folio format for public access', {

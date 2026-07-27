@@ -57,7 +57,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <div id="establishmentDetailBody" style="display: none;">
                 <div class="card-header d-flex justify-content-between align-items-center" style="background: var(--brand-gradient);">
                     <h5 class="mb-0 text-white">
-                        <i class="ti ti-building me-2"></i><span id="establishmentModalTitle">Crear Nuevo Establecimiento</span>
+                        <i class="ti ti-edit me-2"></i><span id="establishmentModalTitle">Crear Nuevo Establecimiento</span>
                     </h5>
                     <button type="button" class="btn-close btn-close-white" id="closeEstablishmentDetailBtn" title="Cerrar" aria-label="Cerrar"></button>
                 </div>
@@ -275,7 +275,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <div class="mb-4">
                         <h6 class="fw-bold text-success border-bottom pb-2 mb-3">
                             <i class="ti ti-sparkles me-1"></i>
-                            Experiencias del Establecimiento
+                            Experiencias
                         </h6>
 
                         <!-- Lista de experiencias editables inline -->
@@ -298,7 +298,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <button type="button" class="btn btn-link text-decoration-none p-0 fw-bold text-success d-flex align-items-center gap-2" id="toggleEstablishmentInfoBtn">
                             <i class="ti ti-chevron-right" id="establishmentInfoChevron" style="transition: transform .15s ease;"></i>
                             <i class="ti ti-building"></i>
-                            Información del establecimiento
+                            Información
                         </button>
 
                         <div id="establishmentInfoSection" class="mt-3" style="display: none;">
@@ -351,6 +351,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             </span>
             <span class="d-flex align-items-center gap-2 flex-shrink-0">
                 <span class="fw-semibold text-success small experiencia-acc-price"></span>
+                <button type="button" class="btn btn-sm btn-light toggle-experiencia-popular-btn experiencia-acc-popular d-none" title="Marcar como popular">
+                    <span class="popular-heart" style="display:inline-block;width:15px;height:15px;background-color:#c7c7c7;-webkit-mask:url('/images/heart_black.png') center/contain no-repeat;mask:url('/images/heart_black.png') center/contain no-repeat;vertical-align:-2px;"></span>
+                </button>
                 <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn experiencia-acc-delete" title="Eliminar experiencia">
                     <i class="ti ti-trash"></i>
                 </button>
@@ -384,6 +387,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <%# Opciones cargadas dinámicamente desde la BD (ExperienceCategories.populateSelect). %>
                     <option value="">Seleccionar</option>
                 </select>
+            </div>
+
+            <!-- Entradas (Opcional) -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium" style="color: var(--brand-success, #2bb673);">Entradas <span class="text-muted">(opcional)</span></label>
+                <select class="experiencia-entradas-input" multiple placeholder="Buscar y agregar entradas..."></select>
+                <div class="form-text">Boletos de acceso asociados. Puedes elegir entradas de cualquier destino.</div>
             </div>
 
             <!-- Descripción -->
@@ -589,18 +599,23 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <!-- Uploaded photos will be displayed here -->
                     </div>
                     
-                    <!-- Add photo button -->
-                    <div class="d-grid">
+                    <!-- Add photo button + guardar fotos (las fotos NO se autoguardan) -->
+                    <div class="d-grid gap-2">
                         <button type="button" class="btn btn-outline-warning btn-sm add-photo-btn">
                             <i class="ti ti-camera-plus me-1"></i>
                             Agregar Foto
                         </button>
+                        <button type="button" class="btn btn-success btn-sm save-experiencia-photos-btn">
+                            <i class="ti ti-device-floppy me-1"></i>
+                            Guardar fotos
+                        </button>
                     </div>
-                    
+                    <div class="form-text"><small><i class="ti ti-info-circle me-1"></i>Las fotos no se autoguardan: usa <b>Guardar fotos</b>.</small></div>
+
                     <!-- Hidden file input -->
-                    <input type="file" 
-                           class="d-none experience-photo-input" 
-                           accept=".jpg,.jpeg,.png,.webp" 
+                    <input type="file"
+                           class="d-none experience-photo-input"
+                           accept=".jpg,.jpeg,.png,.webp"
                            multiple>
                 </div>
                 <div class="form-text">
@@ -762,7 +777,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             processing: true,
             serverSide: true,
             ajax: {
-                url: apiEndpoint + '?type=Establishment&includeInactive=true', // Show all establishments in admin
+                url: apiEndpoint + '?type=Establishment&includeInactive=true&searchChildren=true', // Show all establishments in admin; búsqueda también por experiencia hija
                 type: 'GET',
                 dataSrc: function(json) {
                     return json.data || [];
@@ -827,6 +842,23 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         order: [],
         ordering: false,
         pageLength: 10,
+        searchDelay: 300,
+        initComplete: function () {
+            // Buscador grande + placeholder (también busca por experiencia hija)
+            const container = $(this.api().table().container());
+            const filter = container.find('div.dataTables_filter');
+            // Quitar el texto "Buscar:" dejando solo el input
+            filter.find('label').contents().filter(function () { return this.nodeType === 3; }).remove();
+            filter.find('label').css({ 'width': '100%', 'margin': '0' });
+            filter.find('input')
+                .attr('placeholder', 'Busca establecimiento o experiencia…')
+                .css({
+                    'display': 'block', 'width': '100%', 'height': '46px',
+                    'font-size': '0.98rem', 'padding': '0 14px',
+                    'border-radius': '10px', 'margin': '0'
+                });
+            filter.css({ 'width': '100%', 'float': 'none', 'text-align': 'left' });
+        },
         language: {
             url: '/assets/vendor/datatables/es-ES.json'
         },
@@ -860,6 +892,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $(this).addClass('table-active');
             loadEstablishmentData(id);
         });
+
+        // Deep-link: ?open=<establishmentId> (viene del índice "Todas") abre ese establecimiento.
+        (function autoOpenFromQuery() {
+            try {
+                const openId = new URLSearchParams(window.location.search).get('open');
+                if (openId) setTimeout(function () { loadEstablishmentData(openId); }, 300);
+            } catch (e) { /* noop */ }
+        })();
 
         // Cerrar el panel de detalle -> volver al estado vacío
         $('#closeEstablishmentDetailBtn').on('click', function() { closeEstablishmentDetail(); });
@@ -1000,25 +1040,91 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             console.log('✅ Deleted experiences queue cleared');
         });
 
-        // Event delegation for experience management
-        $(document).on('click', '.delete-experiencia-btn', function() {
-            const experienciaCard = $(this).closest('.experiencia-editable');
-            const index = experienciaCard.data('index');
-            const experienceId = experienciaCard.data('id');
-            
-            console.log('🗑️ Deleting establishment experience:', {
-                index: index,
-                experienceId: experienceId,
-                hasId: !!experienceId
+        // Marca visual del corazón "popular" en un botón de experiencia.
+        function setExperienciaPopularBtn(btn, isPopular) {
+            const heart = btn.querySelector('.popular-heart');
+            if (heart) heart.style.backgroundColor = isPopular ? '#e11d1d' : '#c7c7c7';
+            btn.setAttribute('data-current-popular', isPopular ? 'true' : 'false');
+            btn.setAttribute('title', isPopular ? 'Quitar de populares' : 'Marcar como popular');
+        }
+
+        // Toggle "popular" de una experiencia de establecimiento (PATCH instantáneo).
+        $(document).on('click', '.toggle-experiencia-popular-btn', function(e) {
+            e.preventDefault();
+            e.stopPropagation(); // no expandir/colapsar el acordeón
+            const btn = this;
+            const experienciaId = btn.getAttribute('data-id');
+            if (!experienciaId) return;
+            const isPopular = btn.getAttribute('data-current-popular') === 'true';
+            const newPopular = !isPopular;
+
+            if (btn.getAttribute('data-loading') === '1') return;
+            btn.setAttribute('data-loading', '1');
+            const heart = btn.querySelector('.popular-heart');
+            const prevHeartHtml = heart ? heart.outerHTML : '';
+            $(btn).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width:13px;height:13px;"></span>');
+
+            const token = getAccessToken();
+            $.ajax({
+                url: `/api/provider-experiencias/${experienciaId}/popular`,
+                type: 'PATCH',
+                contentType: 'application/json',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                data: JSON.stringify({ popular: newPopular }),
+                success: function(response) {
+                    btn.removeAttribute('data-loading');
+                    $(btn).html(prevHeartHtml);
+                    if (response && response.success) {
+                        setExperienciaPopularBtn(btn, newPopular);
+                        showSuccessAlert(newPopular ? 'Experiencia marcada como popular' : 'Experiencia removida de populares');
+                    } else {
+                        setExperienciaPopularBtn(btn, isPopular);
+                        showErrorAlert((response && response.error) || 'Error al actualizar el estado popular');
+                    }
+                },
+                error: function(xhr) {
+                    btn.removeAttribute('data-loading');
+                    $(btn).html(prevHeartHtml);
+                    setExperienciaPopularBtn(btn, isPopular);
+                    showErrorAlert(xhr.responseJSON?.error || 'Error al actualizar el estado popular');
+                }
             });
-            
-            // Track deleted experience ID if it's an existing experience
-            if (experienceId && experienceId !== '') {
+        });
+
+        // Event delegation for experience management
+        $(document).on('click', '.delete-experiencia-btn', async function() {
+            const experienciaCard = $(this).closest('.experiencia-editable');
+            const experienceId = experienciaCard.data('id');
+            const establishmentId = $('#establishmentId').val();
+
+            if (!confirm('¿Eliminar esta experiencia? Esta acción no se puede deshacer.')) return;
+
+            // Loader en el botón mientras borra (para que no parezca que no hace nada).
+            const $btn = $(this);
+            const prevBtnHtml = $btn.html();
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+
+            // Si la experiencia YA está guardada (tiene id) en un establecimiento existente, se
+            // borra de inmediato en el backend. Antes solo se encolaba y se dependía del
+            // "Guardar": si el usuario recargaba sin guardar, la experiencia reaparecía.
+            if (experienceId && experienceId !== '' && establishmentId) {
+                try {
+                    const token = getAccessToken();
+                    await $.ajax({
+                        url: `/api/providers/${establishmentId}/experiencias/${experienceId}`,
+                        type: 'DELETE',
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                    });
+                } catch (e) {
+                    $btn.prop('disabled', false).html(prevBtnHtml);
+                    showErrorAlert((e.responseJSON && e.responseJSON.error) || 'No se pudo eliminar la experiencia. Intenta de nuevo.');
+                    return; // no la quites de la UI si el backend falló
+                }
+            } else if (experienceId && experienceId !== '') {
+                // Sin establishmentId a mano: cae a la cola que se procesa al guardar.
                 deletedExperienceIds.push(experienceId);
-                console.log('📝 Added to deletion queue:', experienceId);
-                console.log('📋 Current deletion queue:', deletedExperienceIds);
             }
-            
+
             experienciaCard.fadeOut(300, function() {
                 $(this).remove();
                 updateEstablishmentNoExperienciasMessage();
@@ -1797,7 +1903,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                     if (finalEstablishmentId) {
                         $('#establishmentId').val(finalEstablishmentId);
-                        $('#establishmentModalTitle').text('Editar Establecimiento');
+                        syncAddEstablishmentExperienciaEnabled(); // establecimiento guardado → habilita agregar
+                        $('#establishmentModalTitle').text($('#establishmentName').val() || 'Establecimiento');
                         currentModalState = { mode: 'edit', establishmentId: finalEstablishmentId, isOpen: true, sessionId: currentModalState.sessionId };
                         loadEstablishmentExperiencias(finalEstablishmentId, function() {
                             const cards = document.querySelectorAll('#establishmentExperienciasList .experiencia-editable');
@@ -1947,6 +2054,90 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             else collapseEstablishmentInfo();
         });
 
+        // ===== Entradas por tarjeta (boletos de acceso; NO ligadas al destino) =====
+        let _entradasCache = null;
+
+        function entradasEnsureStyles() {
+            if (document.getElementById('entradas-ts-styles')) return;
+            const st = document.createElement('style');
+            st.id = 'entradas-ts-styles';
+            st.textContent = '.ts-dropdown .optgroup-header{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:#8a8f78;background:#f3f2ec;padding:7px 12px;cursor:default;position:sticky;top:0;z-index:1;border-top:1px solid #e4dfcf;}'
+                + '.ts-dropdown .optgroup-header .ti{margin-right:5px;opacity:.7;}'
+                + '.ts-dropdown .optgroup:first-child .optgroup-header{border-top:0;}'
+                + '.ts-dropdown .option{padding:8px 12px 8px 22px;}'
+                + '.ts-dropdown .ent-opt{display:flex;justify-content:space-between;align-items:center;gap:12px;}'
+                + '.ts-dropdown .ent-opt-name{color:#2b2b2b;}'
+                + '.ts-dropdown .ent-opt-price{color:#6E7A50;font-weight:600;white-space:nowrap;}';
+            document.head.appendChild(st);
+        }
+
+        async function entradasFetchAll() {
+            if (_entradasCache) return _entradasCache;
+            try {
+                const token = (typeof getAccessToken === 'function') ? getAccessToken() : (localStorage.getItem('accessToken') || localStorage.getItem('token'));
+                const res = await fetch('/api/destinos/all-entradas', { credentials: 'same-origin', headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
+                const json = res.ok ? await res.json() : {};
+                _entradasCache = (json && json.data) || [];
+            } catch (e) { _entradasCache = []; }
+            return _entradasCache;
+        }
+
+        function entradaChipLabel(name, price) {
+            return `${name} · $${Number(price || 0).toLocaleString('es-MX')}`;
+        }
+
+        function _cardEntradasSelect(cardEl) {
+            if (!cardEl) return null;
+            return cardEl.querySelector ? cardEl.querySelector('.experiencia-entradas-input') : (($(cardEl).find('.experiencia-entradas-input')[0]) || null);
+        }
+
+        async function initCardEntradas(cardEl, selected) {
+            if (typeof TomSelect === 'undefined') return;
+            const el = _cardEntradasSelect(cardEl);
+            if (!el) return;
+            entradasEnsureStyles();
+            if (el.tomselect) { el.tomselect.destroy(); }
+
+            const all = await entradasFetchAll();
+            const optgroups = []; const seen = {};
+            const options = all.map((e) => {
+                const group = e.destinoName || 'Sin destino';
+                if (!seen[group]) { seen[group] = true; optgroups.push({ value: group, label: group }); }
+                return { id: e.id, label: entradaChipLabel(e.name, e.price), name: e.name || '', price: Number(e.price || 0), group, destinoName: e.destinoName || '' };
+            });
+
+            const ts = new TomSelect(el, {
+                plugins: ['remove_button'], maxItems: null, valueField: 'id', labelField: 'label',
+                searchField: ['label', 'destinoName'], optgroupField: 'group', lockOptgroupOrder: true,
+                optgroups, options,
+                render: {
+                    option: (d, escape) => `<div class="ent-opt"><span class="ent-opt-name">${escape(d.name || d.label)}</span><span class="ent-opt-price">$${Number(d.price || 0).toLocaleString('es-MX')}</span></div>`,
+                    item: (d, escape) => `<div>${escape(d.label)}</div>`,
+                    optgroup_header: (d, escape) => `<div class="optgroup-header"><i class="ti ti-map-pin"></i>${escape(d.label)}</div>`,
+                },
+            });
+
+            if (Array.isArray(selected) && selected.length) {
+                const ids = [];
+                selected.forEach((e) => {
+                    if (!e || !e.id) return;
+                    if (!ts.options[e.id]) {
+                        ts.addOption({ id: e.id, label: entradaChipLabel(e.name || e.id, e.price), name: e.name || String(e.id), price: Number(e.price || 0), group: e.destinoName || 'Sin destino', destinoName: e.destinoName || '' });
+                    }
+                    ids.push(e.id);
+                });
+                ts.setValue(ids, true);
+            }
+        }
+
+        function getCardEntradaIds(cardEl) {
+            const el = _cardEntradasSelect(cardEl);
+            const ts = el && el.tomselect;
+            if (!ts) return [];
+            const v = ts.getValue();
+            return Array.isArray(v) ? v : (v ? [v] : []);
+        }
+
         function addEstablishmentExperiencia() {
             const template = document.getElementById('establishmentExperienciaEditableTemplate');
             const clone = template.content.cloneNode(true);
@@ -1965,6 +2156,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 applyCat();
                 window.ExperienceCategories.fetch().then(applyCat);
             }
+
+            // Inicializa el multiselect de Entradas de la tarjeta nueva
+            initCardEntradas(experienciaCard, []);
 
             updateEstablishmentNoExperienciasMessage();
 
@@ -2256,6 +2450,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     description: getName('.experiencia-description-input'),
                     tipo: getName('.experiencia-tipo-input'),
                     experience_category: getName('.experiencia-category-input'),
+                    entradas: getCardEntradaIds(card),
                     price: getNumber('.experiencia-price-input') || 0,
                     price_no_alcohol: getNumber('.experiencia-price-no-alcohol-input'),
                     price_child: getNumber('.experiencia-price-child-input'),
@@ -2357,6 +2552,216 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             return experiencias;
         }
+
+        // ===== AUTOGUARDADO por experiencia + campos del establecimiento (estrategia B) =====
+        // Requiere que el establecimiento YA exista (#establishmentId). Fotos = botón aparte.
+        const _estExpAutoSaveTimers = new WeakMap();
+        let _estAutoSaveTimer = null;
+
+        function setEstablishmentToast(state) {
+            let el = document.getElementById('establishmentAutoSaveToast');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'establishmentAutoSaveToast';
+                el.style.cssText = 'position:fixed;z-index:2000;right:18px;bottom:18px;display:inline-flex;align-items:center;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.18);opacity:0;transition:opacity .25s;pointer-events:none;';
+                document.body.appendChild(el);
+            }
+            if (state === 'saving') {
+                el.style.background = '#ffffff'; el.style.color = '#2f7d4f'; el.style.border = '1px solid #cfe8d6';
+                el.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando…';
+                el.style.opacity = '1';
+            } else if (state === 'saved') {
+                el.style.background = '#eaf3e4'; el.style.color = '#2f7d4f'; el.style.border = '1px solid #c3ddb6';
+                el.innerHTML = '<i class="ti ti-cloud-check me-2"></i>Cambios guardados';
+                el.style.opacity = '1';
+                setTimeout(function () { el.style.opacity = '0'; }, 1800);
+            } else {
+                el.style.opacity = '0';
+            }
+        }
+
+        // Habilita "Agregar Experiencia" solo cuando el establecimiento ya existe.
+        function syncAddEstablishmentExperienciaEnabled() {
+            const has = !!$('#establishmentId').val();
+            const $btn = $('#addEstablishmentExperienciaBtn');
+            if (!$btn.length) return;
+            $btn.prop('disabled', !has);
+            $btn.attr('title', has ? '' : 'Guarda el establecimiento primero para poder agregar experiencias');
+        }
+
+        // Payload de UNA tarjeta. includePhotos=false para el autosave de campos.
+        function buildEstablishmentExperienciaPayload(cardEl, includePhotos) {
+            const card = cardEl;
+            const getName = (sel) => card.querySelector(sel)?.value?.trim() || '';
+            const getNumber = (sel) => { const v = card.querySelector(sel)?.value; return v ? parseFloat(v) : null; };
+            const getInt = (sel) => { const v = card.querySelector(sel)?.value; return v ? parseInt(v) : null; };
+            const experienceId = card.getAttribute('data-id') || '';
+            const originalProviderId = card.getAttribute('data-original-provider-id') || '';
+            const estId = $('#establishmentId').val();
+            // Protección anti-contaminación cruzada (igual que el colector batch).
+            if (experienceId && originalProviderId && originalProviderId !== estId) return null;
+            const exp = {
+                id: experienceId,
+                originalProviderId,
+                name: getName('.experiencia-name-input'),
+                description: getName('.experiencia-description-input'),
+                tipo: getName('.experiencia-tipo-input'),
+                experience_category: getName('.experiencia-category-input'),
+                entradas: getCardEntradaIds(card),
+                price: getNumber('.experiencia-price-input') || 0,
+                price_no_alcohol: getNumber('.experiencia-price-no-alcohol-input'),
+                price_child: getNumber('.experiencia-price-child-input'),
+                duration: getNumber('.experiencia-duration-input'),
+                travel_duration: getInt('.experiencia-travel-duration-input'),
+                advance_booking_time: getInt('.experiencia-advance-minutes-input'),
+                min_people: getInt('.experiencia-min-people-input'),
+                max_people: getInt('.experiencia-max-people-input'),
+                private_min_type: getName('.experiencia-private-min-type-input'),
+                private_min_value: getNumber('.experiencia-private-min-value-input'),
+                buyout: getNumber('.experiencia-buyout-input'),
+                fixed_schedule: card.querySelector('.experiencia-fixed-schedule-input') ? card.querySelector('.experiencia-fixed-schedule-input').checked : false,
+                includes: getName('.experiencia-includes-input') ? getName('.experiencia-includes-input').split('\n').map(i => i.trim()).filter(i => i.length > 0) : [],
+                notincludes: getName('.experiencia-notincludes-input') ? getName('.experiencia-notincludes-input').split('\n').map(i => i.trim()).filter(i => i.length > 0) : [],
+                languages: getName('.experiencia-languages-input') ? getName('.experiencia-languages-input').split('\n').map(i => i.trim()).filter(i => i.length > 0) : [],
+                internal_notes: getName('.experiencia-internal-notes-input'),
+                client_booking_notes: getName('.experiencia-client-booking-notes-input'),
+                provider_notes: getName('.experiencia-provider-notes-input'),
+                team_notes: getName('.experiencia-team-notes-input')
+            };
+            const availabilitySection = card.querySelector('.availability-section');
+            if (availabilitySection) {
+                const selectedDays = availabilitySection.querySelectorAll('.day-schedule');
+                if (selectedDays.length > 0) {
+                    exp.availability = [];
+                    const estToMin = (t) => { const p = String(t || '').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); };
+                    selectedDays.forEach(daySchedule => {
+                        const day = parseInt(daySchedule.getAttribute('data-day'));
+                        const daySlots = [];
+                        daySchedule.querySelectorAll('.time-slot').forEach(slot => {
+                            const s = slot.querySelector('.start-time').value; const e = slot.querySelector('.end-time').value;
+                            if (s && e) daySlots.push({ day, start_time: s, end_time: e });
+                        });
+                        daySlots.sort((a, b) => estToMin(a.start_time) - estToMin(b.start_time));
+                        daySlots.forEach(s => exp.availability.push(s));
+                    });
+                }
+            }
+            if (includePhotos) {
+                const photoElements = card.querySelectorAll('.photos-preview-container .photo-preview');
+                if (photoElements.length > 0) {
+                    exp.photos = [];
+                    photoElements.forEach(photoEl => {
+                        const img = $(photoEl).find('img');
+                        if (img.length === 0) return;
+                        const photoElement = $(photoEl);
+                        const photoFullData = photoElement.attr('data-photo-full');
+                        if (photoFullData) {
+                            try { const fullData = JSON.parse(photoFullData.replace(/&#39;/g, "'")); fullData.dataUrl = img.attr('src'); exp.photos.push(fullData); }
+                            catch (e) { const pd = photoElement.data('file'); const du = photoElement.data('dataUrl') || img.attr('src'); exp.photos.push({ dataUrl: du, fileName: pd ? pd.name : 'image.jpg', isNew: !!(pd && du && du.startsWith('data:')) }); }
+                        } else {
+                            const pd = photoElement.data('file'); const du = photoElement.data('dataUrl') || img.attr('src');
+                            exp.photos.push({ dataUrl: du, fileName: pd ? pd.name : 'image.jpg', isNew: !!(pd && du && du.startsWith('data:')) });
+                        }
+                    });
+                }
+            }
+            return exp;
+        }
+
+        async function autoSaveEstablishmentExperiencia(cardEl) {
+            const establishmentId = $('#establishmentId').val();
+            if (!establishmentId) return;
+            const $card = $(cardEl);
+            if ($card.data('_autosaving')) { scheduleEstExperienciaAutoSave(cardEl); return; }
+            const payload = buildEstablishmentExperienciaPayload(cardEl, false);
+            if (!payload || !payload.name || !payload.description) return;
+            const token = getAccessToken();
+            const id = $card.data('id');
+            $card.data('_autosaving', true);
+            setEstablishmentToast('saving');
+            try {
+                if (id) {
+                    await $.ajax({ url: `/api/providers/${establishmentId}/experiencias/${id}`, type: 'PUT', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(payload) });
+                } else {
+                    const res = await $.ajax({ url: `/api/providers/${establishmentId}/experiencias`, type: 'POST', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(payload) });
+                    const newId = res && res.data && (res.data.id || res.data.objectId);
+                    if (newId) { $card.attr('data-id', newId); $card.data('id', newId); $card.attr('data-original-provider-id', establishmentId); }
+                }
+                setEstablishmentToast('saved');
+            } catch (e) {
+                setEstablishmentToast('idle');
+                console.warn('Autoguardado de experiencia (establecimiento) falló:', (e && e.responseJSON) || (e && e.statusText) || e);
+            } finally {
+                $card.data('_autosaving', false);
+            }
+        }
+
+        function scheduleEstExperienciaAutoSave(cardEl) {
+            clearTimeout(_estExpAutoSaveTimers.get(cardEl));
+            _estExpAutoSaveTimers.set(cardEl, setTimeout(function () { autoSaveEstablishmentExperiencia(cardEl); }, 900));
+        }
+
+        async function autoSaveEstablishmentFields() {
+            const establishmentId = $('#establishmentId').val();
+            if (!establishmentId) return;
+            const name = $('#establishmentName').val().trim();
+            if (!name) return;
+            const data = { name, description: $('#establishmentDescription').val().trim(), type: 'Establishment', cost: 0 };
+            const destId = $('#establishmentDestino').val();
+            data.destinationPOI = (destId && destId.trim() !== '') ? destId.trim() : '';
+            const token = getAccessToken();
+            setEstablishmentToast('saving');
+            try {
+                await $.ajax({ url: `${apiEndpoint}/${establishmentId}`, type: 'PUT', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(data) });
+                setEstablishmentToast('saved');
+            } catch (e) {
+                setEstablishmentToast('idle');
+                console.warn('Autoguardado de establecimiento falló:', (e && e.responseJSON) || (e && e.statusText) || e);
+            }
+        }
+
+        function scheduleEstablishmentAutoSave() {
+            clearTimeout(_estAutoSaveTimer);
+            _estAutoSaveTimer = setTimeout(autoSaveEstablishmentFields, 900);
+        }
+
+        async function saveEstablishmentExperienciaPhotos(cardEl, btnEl) {
+            const establishmentId = $('#establishmentId').val();
+            if (!establishmentId) { showErrorAlert('Guarda el establecimiento primero para poder subir fotos.'); return; }
+            const $card = $(cardEl);
+            let id = $card.data('id');
+            const $btn = btnEl ? $(btnEl) : null;
+            const prevHtml = $btn ? $btn.html() : '';
+            if ($btn) $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Guardando fotos…');
+            try {
+                if (!id) { await autoSaveEstablishmentExperiencia(cardEl); id = $card.data('id'); }
+                if (!id) { showErrorAlert('Completa nombre y descripción para poder subir fotos.'); return; }
+                const payload = buildEstablishmentExperienciaPayload(cardEl, true);
+                if (!payload) return;
+                payload.id = id;
+                const token = getAccessToken();
+                await $.ajax({ url: `/api/providers/${establishmentId}/experiencias/${id}`, type: 'PUT', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(payload) });
+                if (typeof showSuccessAlert === 'function') showSuccessAlert('Fotos guardadas'); else setEstablishmentToast('saved');
+            } catch (e) {
+                showErrorAlert((e && e.responseJSON && e.responseJSON.error) || 'No se pudieron guardar las fotos.');
+            } finally {
+                if ($btn) $btn.prop('disabled', false).html(prevHtml);
+            }
+        }
+
+        // Wiring delegado desde document.
+        (function wireEstablishmentAutoSave() {
+            $(document).on('input change', '#establishmentExperienciasList .experiencia-editable :input', function () {
+                const t = this;
+                if (t.type === 'file' || $(t).closest('.photo-preview, .experience-photos-container').length) return;
+                const card = $(t).closest('.experiencia-editable')[0];
+                if (card) scheduleEstExperienciaAutoSave(card);
+            });
+            $(document).on('input change', '#establishmentName, #establishmentDescription, #establishmentDestino', scheduleEstablishmentAutoSave);
+            $(document).on('click', '#establishmentExperienciasList .save-experiencia-photos-btn', function () {
+                saveEstablishmentExperienciaPhotos($(this).closest('.experiencia-editable')[0], this);
+            });
+        })();
 
         function showEstablishmentModalError(message) {
         const alertHtml = `
@@ -2596,6 +3001,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             if (!isEdit) {
                 $('#establishmentId').val(''); // Ensure no residual ID from previous sessions
                 $('#establishmentDestino').val(''); // Ensure no residual destino from previous sessions
+                syncAddEstablishmentExperienciaEnabled(); // crear → botón agregar bloqueado hasta guardar
                 console.log('🧹 Cleared establishmentId and destino fields for create mode');
             }
             
@@ -2633,7 +3039,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             // Update modal title and button text
             const modalTitle = document.getElementById('establishmentModalTitle');
-            if (modalTitle) modalTitle.textContent = isEdit ? 'Editar Establecimiento' : 'Crear Nuevo Establecimiento';
+            // En edición el título muestra el nombre del establecimiento (lo llena loadEstablishmentData).
+            if (modalTitle) modalTitle.textContent = isEdit ? '' : 'Crear Nuevo Establecimiento';
             // Crear: info del establecimiento abierta (hay que llenarla). Editar: colapsada.
             setEstablishmentInfo(!isEdit);
             
@@ -2699,7 +3106,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         
                         // Populate form fields
                         $('#establishmentId').val(establishment.id);
+                        syncAddEstablishmentExperienciaEnabled(); // establecimiento cargado → habilita agregar
                         $('#establishmentName').val(establishment.name);
+                        $('#establishmentModalTitle').text(establishment.name || 'Establecimiento');
                         $('#establishmentDescription').val(establishment.description || '');
                         
                         // Populate destinationPOI field — guarda el destino como "pendiente"
@@ -2837,6 +3246,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             card.setAttribute('data-index', index);
             card.setAttribute('data-id', experiencia.id || '');
+
+            // Botón "popular": solo para experiencias ya guardadas (con id).
+            const popBtn = card.querySelector('.toggle-experiencia-popular-btn');
+            if (popBtn && experiencia.id) {
+                popBtn.setAttribute('data-id', experiencia.id);
+                setExperienciaPopularBtn(popBtn, experiencia.popular === true);
+                popBtn.classList.remove('d-none');
+            }
 
             // Poblar el resumen de la cabecera del acordeón (nombre / precio / tipo)
             syncEstablishmentHeader(card, experiencia);
@@ -2981,6 +3398,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Add to container
             document.getElementById('establishmentExperienciasList').appendChild(card);
             updateEstablishmentNoExperienciasMessage();
+
+            // Inicializa el multiselect de Entradas de esta tarjeta (todas, agrupadas por destino)
+            initCardEntradas(card, experiencia.entradas || []);
         }
 
         // Populate availability interface from data

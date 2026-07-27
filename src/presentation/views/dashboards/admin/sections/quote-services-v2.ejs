@@ -25,6 +25,13 @@
                 <p class="text-muted mb-0">Organiza los servicios por día</p>
             </div>
             <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" id="quoteActivityBtn" title="Actividad de la cotización">
+                    <i class="ti ti-timeline-event me-1"></i>Actividad
+                </button>
+                <button type="button" class="btn btn-outline-secondary position-relative" id="changeRequestsBtn" title="Historial de solicitudes de cambio">
+                    <i class="ti ti-inbox me-1"></i>Solicitudes
+                    <span id="changeRequestsCounter" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+                </button>
                 <button type="button" class="btn btn-outline-secondary" id="toggleCatalogBtn" title="Catálogo de servicios">
                     <i class="ti ti-layout-grid me-1"></i>Catálogo
                 </button>
@@ -95,6 +102,48 @@
                         <div class="d-flex justify-content-between mb-2" id="ivaRow">
                             <span class="text-muted">IVA (16%):</span>
                             <span class="fw-semibold" id="ivaAmount">$0.00</span>
+                        </div>
+                        <!-- Propina general de la cotización (Fase 2b). Este template NO recibe
+                             canEditPrices; el control se oculta para no-admins vía JS
+                             (#globalTipSection) usando this.canEditPrices. Empieza oculto y el
+                             builder lo muestra si el rol puede editar precios. -->
+                        <div class="mb-2 d-none" id="globalTipSection">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="applyGlobalTip">
+                                <label class="form-check-label small" for="applyGlobalTip"><i class="ti ti-coin me-1"></i>Propina general</label>
+                            </div>
+                            <div id="globalTipFields" class="d-none mt-1">
+                                <div class="input-group input-group-sm">
+                                    <select class="form-select" id="globalTipType" style="max-width: 72px;">
+                                        <option value="percent" selected>%</option>
+                                        <option value="amount">$</option>
+                                    </select>
+                                    <input type="number" class="form-control" id="globalTipValue" placeholder="0" step="0.01" min="0">
+                                </div>
+                                <div class="form-check mt-1">
+                                    <input class="form-check-input" type="checkbox" id="globalTipMandatory">
+                                    <label class="form-check-label small text-muted" for="globalTipMandatory">Obligatoria</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 d-none" id="globalTipRow">
+                            <span class="text-muted"><i class="ti ti-coin me-1"></i>Propina general:</span>
+                            <span class="fw-semibold text-info" id="globalTipAmount">$0.00</span>
+                        </div>
+                        <!-- Fase 2c: nota de propina SUGERIDA. Solo aparece si NO hay propina (ni
+                             por servicio ni global). Solo advierte (no bloquea ni suma al total).
+                             El % es editable por admin (se oculta el editor/botón para no-admins vía JS). -->
+                        <div class="alert alert-info py-2 px-2 mb-2 small d-none" id="suggestedTipNotice" role="note">
+                            <div class="d-flex align-items-center flex-wrap" style="gap: 4px;">
+                                <i class="ti ti-bulb me-1"></i><span>Propina sugerida</span>
+                                <span class="input-group input-group-sm d-none" id="suggestedTipPctEdit" style="width: 74px;">
+                                    <input type="number" class="form-control" id="suggestedTipPct" value="10" min="0" step="1" style="padding: 0 4px;">
+                                    <span class="input-group-text px-1">%</span>
+                                </span>
+                                <span id="suggestedTipPctLabel">(10%)</span>
+                                <span>≈ <strong id="suggestedTipAmount">$0.00</strong></span>
+                                <button type="button" class="btn btn-sm btn-outline-info py-0 px-2 ms-auto d-none" id="applySuggestedTipBtn">Aplicar</button>
+                            </div>
                         </div>
                         <hr>
                         <div class="d-flex justify-content-between mb-3">
@@ -605,25 +654,27 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Motor de cálculo único (isomórfico): debe cargar ANTES de pricing-utils y del builder -->
-<script src="/shared/pricing/pricingEngine.js"></script>
-<script src="/dashboard/js/utils/pricing-utils.js"></script>
-<script src="/js/services-renderer-config.js"></script>
-<script src="/js/services-renderer.js"></script>
+<script src="/shared/pricing/pricingEngine.js?v=<%= Date.now() %>"></script>
+<script src="/dashboard/js/utils/pricing-utils.js?v=<%= Date.now() %>"></script>
+<script src="/js/services-renderer-config.js?v=<%= Date.now() %>"></script>
+<script src="/js/services-renderer.js?v=<%= Date.now() %>"></script>
 <% if (process.env.NODE_ENV === 'development') { %>
 <!-- Renderer DevTools for development -->
-<script src="/js/renderer-dev-tools.js"></script>
+<script src="/js/renderer-dev-tools.js?v=<%= Date.now() %>"></script>
 <% } %>
 <!-- Registro de opciones data-driven (costura #2): debe cargar ANTES del builder -->
-<script src="/dashboards/admin/sections/quote-services/option-registry.js"></script>
-<script src="/dashboards/admin/sections/quote-services-v2.js"></script>
+<script src="/dashboards/admin/sections/quote-services/option-registry.js?v=<%= Date.now() %>"></script>
+<script src="/dashboards/admin/sections/quote-services-v2.js?v=<%= Date.now() %>"></script>
 <!-- Helpers de formato/tiempo (prototype de ItineraryBuilder); debe cargar DESPUÉS de quote-services-v2.js -->
-<script src="/dashboards/admin/sections/quote-services-v2-formatters.js"></script>
+<script src="/dashboards/admin/sections/quote-services-v2-formatters.js?v=<%= Date.now() %>"></script>
 <!-- Helpers puros (prototype de ItineraryBuilder); debe cargar DESPUÉS de quote-services-v2.js -->
-<script src="/dashboards/admin/sections/quote-services-v2-helpers.js"></script>
+<script src="/dashboards/admin/sections/quote-services-v2-helpers.js?v=<%= Date.now() %>"></script>
 <!-- Gestión de días del itinerario (prototype de ItineraryBuilder); debe cargar DESPUÉS de quote-services-v2.js -->
-<script src="/dashboards/admin/sections/quote-services-v2-days.js"></script>
+<script src="/dashboards/admin/sections/quote-services-v2-days.js?v=<%= Date.now() %>"></script>
 <!-- Rutas/forms/UI de transporte (prototype de ItineraryBuilder); debe cargar DESPUÉS de quote-services-v2.js -->
-<script src="/dashboards/admin/sections/quote-services-v2-transport.js"></script>
+<script src="/dashboards/admin/sections/quote-services-v2-transport.js?v=<%= Date.now() %>"></script>
 <!-- Funciones a nivel módulo extraídas del builder; debe cargar DESPUÉS de quote-services-v2.js -->
-<script src="/dashboards/admin/sections/quote-services-v2-module.js"></script>
-<script src="/dashboards/admin/sections/quote-services/quote-catalog-drag.js"></script>
+<script src="/dashboards/admin/sections/quote-services-v2-module.js?v=<%= Date.now() %>"></script>
+<!-- Labels dinámicos de categorías de experiencia (para agrupar el catálogo por categoría) -->
+<script src="/dashboard/js/utils/experience-categories.js?v=<%= Date.now() %>"></script>
+<script src="/dashboards/admin/sections/quote-services/quote-catalog-drag.js?v=<%= Date.now() %>"></script>

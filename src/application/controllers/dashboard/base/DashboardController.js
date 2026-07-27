@@ -195,6 +195,9 @@ class DashboardController extends BaseController {
         // fusiona en la vista, así que se pasan explícitamente aquí. null/default para otros roles.
         clientCategory: req.user?.clientCategory || null,
         endClientCaps: getEndClientCapabilities(req.user?.clientCategory || null),
+        // White-label de agencia (logo + "Powered by Amexing"): lo resuelve el middleware /end_client
+        // en res.locals; se pasa explícito porque res.locals no se fusiona en la vista.
+        agencyBranding: res.locals.agencyBranding || null,
         breadcrumb: this.buildBreadcrumb(req.path, req.user?.role),
         ...additionalData, // Spread additionalData last so it can override defaults
       };

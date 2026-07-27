@@ -59,7 +59,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <div id="providerDetailBody" style="display: none;">
                 <div class="card-header d-flex justify-content-between align-items-center" style="background: var(--brand-gradient);">
                     <h5 class="mb-0 text-white">
-                        <i class="ti ti-building-store me-2"></i><span id="modalTitle">Crear Nuevo Proveedor</span>
+                        <i class="ti ti-edit me-2"></i><span id="modalTitle">Crear Nuevo Proveedor</span>
                     </h5>
                     <button type="button" class="btn-close btn-close-white" id="closeProviderDetailBtn" title="Cerrar" aria-label="Cerrar"></button>
                 </div>
@@ -459,7 +459,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <div class="mb-4">
                         <h6 class="fw-bold text-success border-bottom pb-2 mb-3">
                             <i class="ti ti-sparkles me-1"></i>
-                            Experiencias del Proveedor
+                            Experiencias
                         </h6>
 
                         <!-- Lista de experiencias editables inline -->
@@ -482,7 +482,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <button type="button" class="btn btn-link text-decoration-none p-0 fw-bold text-success d-flex align-items-center gap-2" id="toggleProviderInfoBtn">
                             <i class="ti ti-chevron-right" id="providerInfoChevron" style="transition: transform .15s ease;"></i>
                             <i class="ti ti-building-store"></i>
-                            Información del proveedor
+                            Información
                         </button>
 
                         <div id="providerInfoSection" class="mt-3" style="display: none;">
@@ -535,6 +535,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             </span>
             <span class="d-flex align-items-center gap-2 flex-shrink-0">
                 <span class="fw-semibold text-success small experiencia-acc-price"></span>
+                <button type="button" class="btn btn-sm btn-light toggle-experiencia-popular-btn experiencia-acc-popular d-none" title="Marcar como popular">
+                    <span class="popular-heart" style="display:inline-block;width:15px;height:15px;background-color:#c7c7c7;-webkit-mask:url('/images/heart_black.png') center/contain no-repeat;mask:url('/images/heart_black.png') center/contain no-repeat;vertical-align:-2px;"></span>
+                </button>
                 <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn experiencia-acc-delete" title="Eliminar experiencia">
                     <i class="ti ti-trash"></i>
                 </button>
@@ -568,6 +571,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <%# Opciones cargadas dinámicamente desde la BD (ExperienceCategories.populateSelect). %>
                     <option value="">Seleccionar</option>
                 </select>
+            </div>
+
+            <!-- Entradas (Opcional) -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium text-success">Entradas <span class="text-muted">(opcional)</span></label>
+                <select class="experiencia-entradas-input" multiple placeholder="Buscar y agregar entradas..."></select>
+                <div class="form-text">Boletos de acceso asociados. Puedes elegir entradas de cualquier destino.</div>
             </div>
 
             <!-- Descripción -->
@@ -781,17 +791,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <!-- Uploaded photos will be displayed here -->
                     </div>
                     
-                    <!-- Add photo button -->
-                    <div class="d-grid">
+                    <!-- Add photo button + guardar fotos (las fotos NO se autoguardan) -->
+                    <div class="d-grid gap-2">
                         <button type="button" class="btn btn-outline-primary btn-sm add-photo-btn">
                             <i class="ti ti-camera-plus me-1"></i>
                             Agregar Foto
                         </button>
+                        <button type="button" class="btn btn-success btn-sm save-experiencia-photos-btn">
+                            <i class="ti ti-device-floppy me-1"></i>
+                            Guardar fotos
+                        </button>
                     </div>
-                    
+                    <div class="form-text"><small><i class="ti ti-info-circle me-1"></i>Las fotos no se autoguardan: usa <b>Guardar fotos</b>.</small></div>
+
                     <!-- Hidden file input -->
-                    <input type="file" 
-                           class="d-none experience-photo-input" 
+                    <input type="file"
+                           class="d-none experience-photo-input"
                            accept=".jpg,.jpeg,.png,.webp" 
                            multiple>
                 </div>
@@ -995,7 +1010,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             processing: true,
             serverSide: true,
             ajax: {
-                url: apiEndpoint + '?type=Provider&includeInactive=true', // Show all providers in admin
+                url: apiEndpoint + '?type=Provider&includeInactive=true&searchChildren=true', // Show all providers in admin; búsqueda también por experiencia hija
                 type: 'GET',
                 dataSrc: function(json) {
                     return json.data || [];
@@ -1065,6 +1080,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             ordering: false, // Disable all column sorting UI
             pageLength: 10,
             searchDelay: 300,
+            initComplete: function () {
+                // Buscador grande + placeholder (también busca por experiencia hija)
+                const container = $(this.api().table().container());
+                const filter = container.find('div.dataTables_filter');
+                // Quitar el texto "Buscar:" dejando solo el input
+                filter.find('label').contents().filter(function () { return this.nodeType === 3; }).remove();
+                filter.find('label').css({ 'width': '100%', 'margin': '0' });
+                filter.find('input')
+                    .attr('placeholder', 'Busca proveedor o experiencia…')
+                    .css({
+                        'display': 'block', 'width': '100%', 'height': '46px',
+                        'font-size': '0.98rem', 'padding': '0 14px',
+                        'border-radius': '10px', 'margin': '0'
+                    });
+                filter.css({ 'width': '100%', 'float': 'none', 'text-align': 'left' });
+            },
             // Bandeja: sin colapso responsive (interfiere con el click de fila en
             // columna angosta); la lista usa scroll horizontal del wrapper.
             responsive: false,
@@ -1111,6 +1142,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $(this).addClass('table-active');
             loadProviderData(id);
         });
+
+        // Deep-link: ?open=<providerId> (viene del índice "Todas") abre ese proveedor.
+        (function autoOpenFromQuery() {
+            try {
+                const openId = new URLSearchParams(window.location.search).get('open');
+                if (openId) setTimeout(function () { loadProviderData(openId); }, 300);
+            } catch (e) { /* noop */ }
+        })();
 
         // Cerrar el panel de detalle -> volver al estado vacío
         $('#closeProviderDetailBtn').on('click', function() { closeProviderDetail(); });
@@ -1426,7 +1465,58 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         
         $(document).on('click', '.delete-experiencia-btn', function() {
             const index = $(this).closest('.experiencia-editable').data('index');
-            deleteExperiencia(index);
+            deleteExperiencia(index, this);
+        });
+
+        // Marca visual del corazón "popular" en un botón de experiencia.
+        function setExperienciaPopularBtn(btn, isPopular) {
+            const heart = btn.querySelector('.popular-heart');
+            if (heart) heart.style.backgroundColor = isPopular ? '#e11d1d' : '#c7c7c7';
+            btn.setAttribute('data-current-popular', isPopular ? 'true' : 'false');
+            btn.setAttribute('title', isPopular ? 'Quitar de populares' : 'Marcar como popular');
+        }
+
+        // Toggle "popular" de una experiencia de proveedor/establecimiento (PATCH instantáneo).
+        $(document).on('click', '.toggle-experiencia-popular-btn', function(e) {
+            e.preventDefault();
+            e.stopPropagation(); // no expandir/colapsar el acordeón
+            const btn = this;
+            const experienciaId = btn.getAttribute('data-id');
+            if (!experienciaId) return;
+            const isPopular = btn.getAttribute('data-current-popular') === 'true';
+            const newPopular = !isPopular;
+
+            if (btn.getAttribute('data-loading') === '1') return;
+            btn.setAttribute('data-loading', '1');
+            const heart = btn.querySelector('.popular-heart');
+            const prevHeartHtml = heart ? heart.outerHTML : '';
+            $(btn).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width:13px;height:13px;"></span>');
+
+            const token = getAccessToken();
+            $.ajax({
+                url: `/api/provider-experiencias/${experienciaId}/popular`,
+                type: 'PATCH',
+                contentType: 'application/json',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                data: JSON.stringify({ popular: newPopular }),
+                success: function(response) {
+                    btn.removeAttribute('data-loading');
+                    $(btn).html(prevHeartHtml);
+                    if (response && response.success) {
+                        setExperienciaPopularBtn(btn, newPopular);
+                        showSuccessAlert(newPopular ? 'Experiencia marcada como popular' : 'Experiencia removida de populares');
+                    } else {
+                        setExperienciaPopularBtn(btn, isPopular);
+                        showErrorAlert((response && response.error) || 'Error al actualizar el estado popular');
+                    }
+                },
+                error: function(xhr) {
+                    btn.removeAttribute('data-loading');
+                    $(btn).html(prevHeartHtml);
+                    setExperienciaPopularBtn(btn, isPopular);
+                    showErrorAlert(xhr.responseJSON?.error || 'Error al actualizar el estado popular');
+                }
+            });
         });
 
         // ========== SUBEXPERIENCIA ACCORDION (collapse/expand) ==========
@@ -1572,6 +1662,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.setAttribute('data-index', index);
             card.setAttribute('data-id', experiencia.id || '');
 
+            // Botón "popular": solo para experiencias ya guardadas (con id).
+            const popBtn = card.querySelector('.toggle-experiencia-popular-btn');
+            if (popBtn && experiencia.id) {
+                popBtn.setAttribute('data-id', experiencia.id);
+                setExperienciaPopularBtn(popBtn, experiencia.popular === true);
+                popBtn.classList.remove('d-none');
+            }
+
             // Populate the collapsed accordion header summary (name / price / tipo)
             syncExperienciaHeader(card, experiencia);
 
@@ -1699,6 +1797,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Add to container
             $('#providerExperienciasList').append(card);
             updateNoExperienciasMessage();
+
+            // Inicializa el multiselect de Entradas de esta tarjeta (todas, agrupadas por destino)
+            initCardEntradas(card, experiencia.entradas || []);
         }
         
         function updateExperienciaFromCard(card, index) {
@@ -2324,13 +2425,38 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#noExperienciasMessage').toggle(!hasExperiencias);
         }
         
-        function deleteExperiencia(index) {
+        async function deleteExperiencia(index, btnEl) {
             const experiencia = providerExperiencias[index];
-            
-            if (confirm(`¿Está seguro de que desea eliminar la experiencia "${experiencia.name || 'Sin nombre'}"?`)) {
-                providerExperiencias.splice(index, 1);
-                renderAllExperienciaCards();
+            if (!experiencia) return;
+
+            if (!confirm(`¿Está seguro de que desea eliminar la experiencia "${experiencia.name || 'Sin nombre'}"?`)) return;
+
+            // Loader en el botón mientras borra (para que no parezca que no hace nada).
+            const $btn = btnEl ? $(btnEl) : null;
+            const prevBtnHtml = $btn ? $btn.html() : '';
+            if ($btn) $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+
+            // Si la experiencia YA está guardada (tiene id) en un proveedor existente, se borra
+            // de inmediato en el backend. Antes solo se quitaba de memoria y se dependía del
+            // "Guardar": si el usuario recargaba sin guardar, la experiencia reaparecía.
+            const providerId = $('#providerId').val();
+            if (experiencia.id && providerId) {
+                try {
+                    const token = getAccessToken();
+                    await $.ajax({
+                        url: `/api/providers/${providerId}/experiencias/${experiencia.id}`,
+                        type: 'DELETE',
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                    });
+                } catch (e) {
+                    if ($btn) $btn.prop('disabled', false).html(prevBtnHtml);
+                    showErrorAlert((e.responseJSON && e.responseJSON.error) || 'No se pudo eliminar la experiencia. Intenta de nuevo.');
+                    return; // no la quites de memoria si el backend falló
+                }
             }
+
+            providerExperiencias.splice(index, 1);
+            renderAllExperienciaCards(); // re-render quita la tarjeta (y su botón) — no hace falta restaurar
         }
         
         function renderAllExperienciaCards() {
@@ -2410,13 +2536,96 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             });
         }
 
-        function collectExperienciasFromCards() {
-            const experiencias = [];
-            
-            $('.experiencia-editable').each(function(index) {
-                const card = $(this);
+        // ===== Entradas por tarjeta (boletos de acceso; NO ligadas al destino) =====
+        let _entradasCache = null;
+
+        function entradasEnsureStyles() {
+            if (document.getElementById('entradas-ts-styles')) return;
+            const st = document.createElement('style');
+            st.id = 'entradas-ts-styles';
+            st.textContent = '.ts-dropdown .optgroup-header{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:#8a8f78;background:#f3f2ec;padding:7px 12px;cursor:default;position:sticky;top:0;z-index:1;border-top:1px solid #e4dfcf;}'
+                + '.ts-dropdown .optgroup-header .ti{margin-right:5px;opacity:.7;}'
+                + '.ts-dropdown .optgroup:first-child .optgroup-header{border-top:0;}'
+                + '.ts-dropdown .option{padding:8px 12px 8px 22px;}'
+                + '.ts-dropdown .ent-opt{display:flex;justify-content:space-between;align-items:center;gap:12px;}'
+                + '.ts-dropdown .ent-opt-name{color:#2b2b2b;}'
+                + '.ts-dropdown .ent-opt-price{color:#6E7A50;font-weight:600;white-space:nowrap;}';
+            document.head.appendChild(st);
+        }
+
+        async function entradasFetchAll() {
+            if (_entradasCache) return _entradasCache;
+            try {
+                const token = (typeof getAccessToken === 'function') ? getAccessToken() : (localStorage.getItem('accessToken') || localStorage.getItem('token'));
+                const res = await fetch('/api/destinos/all-entradas', { credentials: 'same-origin', headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
+                const json = res.ok ? await res.json() : {};
+                _entradasCache = (json && json.data) || [];
+            } catch (e) { _entradasCache = []; }
+            return _entradasCache;
+        }
+
+        function entradaChipLabel(name, price) {
+            return `${name} · $${Number(price || 0).toLocaleString('es-MX')}`;
+        }
+
+        function _cardEntradasSelect(cardEl) {
+            if (!cardEl) return null;
+            return cardEl.querySelector ? cardEl.querySelector('.experiencia-entradas-input') : (($(cardEl).find('.experiencia-entradas-input')[0]) || null);
+        }
+
+        async function initCardEntradas(cardEl, selected) {
+            if (typeof TomSelect === 'undefined') return;
+            const el = _cardEntradasSelect(cardEl);
+            if (!el) return;
+            entradasEnsureStyles();
+            if (el.tomselect) { el.tomselect.destroy(); }
+
+            const all = await entradasFetchAll();
+            const optgroups = []; const seen = {};
+            const options = all.map((e) => {
+                const group = e.destinoName || 'Sin destino';
+                if (!seen[group]) { seen[group] = true; optgroups.push({ value: group, label: group }); }
+                return { id: e.id, label: entradaChipLabel(e.name, e.price), name: e.name || '', price: Number(e.price || 0), group, destinoName: e.destinoName || '' };
+            });
+
+            const ts = new TomSelect(el, {
+                plugins: ['remove_button'], maxItems: null, valueField: 'id', labelField: 'label',
+                searchField: ['label', 'destinoName'], optgroupField: 'group', lockOptgroupOrder: true,
+                optgroups, options,
+                render: {
+                    option: (d, escape) => `<div class="ent-opt"><span class="ent-opt-name">${escape(d.name || d.label)}</span><span class="ent-opt-price">$${Number(d.price || 0).toLocaleString('es-MX')}</span></div>`,
+                    item: (d, escape) => `<div>${escape(d.label)}</div>`,
+                    optgroup_header: (d, escape) => `<div class="optgroup-header"><i class="ti ti-map-pin"></i>${escape(d.label)}</div>`,
+                },
+            });
+
+            if (Array.isArray(selected) && selected.length) {
+                const ids = [];
+                selected.forEach((e) => {
+                    if (!e || !e.id) return;
+                    if (!ts.options[e.id]) {
+                        ts.addOption({ id: e.id, label: entradaChipLabel(e.name || e.id, e.price), name: e.name || String(e.id), price: Number(e.price || 0), group: e.destinoName || 'Sin destino', destinoName: e.destinoName || '' });
+                    }
+                    ids.push(e.id);
+                });
+                ts.setValue(ids, true);
+            }
+        }
+
+        function getCardEntradaIds(cardEl) {
+            const el = _cardEntradasSelect(cardEl);
+            const ts = el && el.tomselect;
+            if (!ts) return [];
+            const v = ts.getValue();
+            return Array.isArray(v) ? v : (v ? [v] : []);
+        }
+
+        // Construye el payload de UNA tarjeta (incluye fotos). Reutilizado por el guardado
+        // batch (collectExperienciasFromCards) y por el AUTOGUARDADO por-experiencia.
+        function buildExperienciaPayload(cardEl, index) {
+                const card = $(cardEl);
                 const id = card.data('id');
-                
+
                 // Process includes field - convert lines to array
                 const includesText = card.find('.experiencia-includes-input').val().trim();
                 const includesList = includesText ? 
@@ -2484,6 +2693,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     description: card.find('.experiencia-description-input').val().trim(),
                     tipo: card.find('.experiencia-tipo-input').val().trim() || null,
                     experience_category: card.find('.experiencia-category-input').val() || null,
+                    entradas: getCardEntradaIds(cardEl),
                     price: parseFloat(card.find('.experiencia-price-input').val()) || 0,
                     price_no_alcohol: card.find('.experiencia-price-no-alcohol-input').val() ? parseFloat(card.find('.experiencia-price-no-alcohol-input').val()) : null,
                     price_child: card.find('.experiencia-price-child-input').val() ? parseFloat(card.find('.experiencia-price-child-input').val()) : null,
@@ -2509,18 +2719,160 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     provider_notes: card.find('.experiencia-provider-notes-input').val().trim() || null,
                     team_notes: card.find('.experiencia-team-notes-input').val().trim() || null
                 };
-                
-                // Only include experiences with at least name and description
-                if (experiencia.name && experiencia.description) {
-                    if (id) {
-                        experiencia.id = id;
-                    }
-                    experiencias.push(experiencia);
-                }
+
+                if (id) experiencia.id = id;
+                return experiencia;
+        }
+
+        function collectExperienciasFromCards() {
+            const experiencias = [];
+            $('.experiencia-editable').each(function(index) {
+                const exp = buildExperienciaPayload(this, index);
+                // Solo se incluyen las que tengan al menos nombre y descripción.
+                if (exp.name && exp.description) experiencias.push(exp);
             });
-            
             return experiencias;
         }
+
+        // ===== AUTOGUARDADO por experiencia + campos del proveedor (estrategia B) =====
+        // Requiere que el proveedor YA exista (#providerId). El proveedor nuevo se crea con
+        // el botón "Guardar" una vez; de ahí en adelante todo autoguarda. Fotos = botón aparte.
+        const _expAutoSaveTimers = new WeakMap();
+        let _providerAutoSaveTimer = null;
+
+        function setProviderToast(state) {
+            let el = document.getElementById('providerAutoSaveToast');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'providerAutoSaveToast';
+                el.style.cssText = 'position:fixed;z-index:2000;right:18px;bottom:18px;display:inline-flex;align-items:center;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.18);opacity:0;transition:opacity .25s;pointer-events:none;';
+                document.body.appendChild(el);
+            }
+            if (state === 'saving') {
+                el.style.background = '#ffffff'; el.style.color = '#2f7d4f'; el.style.border = '1px solid #cfe8d6';
+                el.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando…';
+                el.style.opacity = '1';
+            } else if (state === 'saved') {
+                el.style.background = '#eaf3e4'; el.style.color = '#2f7d4f'; el.style.border = '1px solid #c3ddb6';
+                el.innerHTML = '<i class="ti ti-cloud-check me-2"></i>Cambios guardados';
+                el.style.opacity = '1';
+                setTimeout(function () { el.style.opacity = '0'; }, 1800);
+            } else {
+                el.style.opacity = '0';
+            }
+        }
+
+        // Habilita "Agregar Experiencia" solo cuando el proveedor ya existe (estrategia B).
+        function syncAddExperienciaEnabled() {
+            const has = !!$('#providerId').val();
+            const $btn = $('#addExperienciaBtn');
+            if (!$btn.length) return;
+            $btn.prop('disabled', !has);
+            $btn.attr('title', has ? '' : 'Guarda el proveedor primero para poder agregar experiencias');
+        }
+
+        async function autoSaveExperiencia(cardEl) {
+            const providerId = $('#providerId').val();
+            if (!providerId) return; // proveedor nuevo aún sin guardar
+            const $card = $(cardEl);
+            if ($card.data('_autosaving')) { scheduleExperienciaAutoSave(cardEl); return; } // evita carreras/duplicados
+            const index = $('#providerExperienciasList .experiencia-editable').index(cardEl);
+            const payload = buildExperienciaPayload(cardEl, index);
+            if (!payload.name || !payload.description) return; // faltan mínimos
+            delete payload.photos; // las fotos van por su propio botón
+            const token = getAccessToken();
+            const id = $card.data('id');
+            $card.data('_autosaving', true);
+            setProviderToast('saving');
+            try {
+                if (id) {
+                    await $.ajax({ url: `/api/providers/${providerId}/experiencias/${id}`, type: 'PUT', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(payload) });
+                } else {
+                    const res = await $.ajax({ url: `/api/providers/${providerId}/experiencias`, type: 'POST', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(payload) });
+                    const newId = res && res.data && (res.data.id || res.data.objectId);
+                    if (newId) { $card.attr('data-id', newId); $card.data('id', newId); }
+                }
+                setProviderToast('saved');
+            } catch (e) {
+                setProviderToast('idle');
+                console.warn('Autoguardado de experiencia falló:', (e && e.responseJSON) || (e && e.statusText) || e);
+            } finally {
+                $card.data('_autosaving', false);
+            }
+        }
+
+        function scheduleExperienciaAutoSave(cardEl) {
+            clearTimeout(_expAutoSaveTimers.get(cardEl));
+            _expAutoSaveTimers.set(cardEl, setTimeout(function () { autoSaveExperiencia(cardEl); }, 900));
+        }
+
+        async function autoSaveProviderFields() {
+            const providerId = $('#providerId').val();
+            if (!providerId) return; // solo en edición (proveedor ya existe)
+            const name = $('#name').val().trim();
+            if (!name) return;
+            const providerData = { name, description: $('#description').val().trim(), type: 'Provider', cost: 0 };
+            const destId = $('#providerDestino').val();
+            providerData.destinationPOI = (destId && destId.trim() !== '') ? destId.trim() : '';
+            const token = getAccessToken();
+            setProviderToast('saving');
+            try {
+                await $.ajax({ url: `${apiEndpoint}/${providerId}`, type: 'PUT', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(providerData) });
+                setProviderToast('saved');
+            } catch (e) {
+                setProviderToast('idle');
+                console.warn('Autoguardado de proveedor falló:', (e && e.responseJSON) || (e && e.statusText) || e);
+            }
+        }
+
+        function scheduleProviderAutoSave() {
+            clearTimeout(_providerAutoSaveTimer);
+            _providerAutoSaveTimer = setTimeout(autoSaveProviderFields, 900);
+        }
+
+        // Sube SOLO las fotos de una tarjeta (PUT con photos). Requiere que la experiencia
+        // ya tenga id; si es nueva, primero la autoguarda para obtenerlo.
+        async function saveExperienciaPhotos(cardEl, btnEl) {
+            const providerId = $('#providerId').val();
+            if (!providerId) { showErrorAlert('Guarda el proveedor primero para poder subir fotos.'); return; }
+            const $card = $(cardEl);
+            let id = $card.data('id');
+            const $btn = btnEl ? $(btnEl) : null;
+            const prevHtml = $btn ? $btn.html() : '';
+            if ($btn) $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Guardando fotos…');
+            try {
+                if (!id) { await autoSaveExperiencia(cardEl); id = $card.data('id'); }
+                if (!id) { showErrorAlert('Completa nombre y descripción para poder subir fotos.'); return; }
+                const index = $('#providerExperienciasList .experiencia-editable').index(cardEl);
+                const payload = buildExperienciaPayload(cardEl, index); // incluye fotos
+                payload.id = id;
+                const token = getAccessToken();
+                await $.ajax({ url: `/api/providers/${providerId}/experiencias/${id}`, type: 'PUT', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(payload) });
+                if (typeof showSuccessAlert === 'function') showSuccessAlert('Fotos guardadas'); else setProviderToast('saved');
+            } catch (e) {
+                showErrorAlert((e && e.responseJSON && e.responseJSON.error) || 'No se pudieron guardar las fotos.');
+            } finally {
+                if ($btn) $btn.prop('disabled', false).html(prevHtml);
+            }
+        }
+
+        // Wiring de listeners (delegado desde document → robusto aunque el modal se cree
+        // dinámicamente; una sola vez).
+        (function wireProviderAutoSave() {
+            // Campos de experiencias (excluye fotos/archivos): autoguarda la tarjeta que cambió.
+            $(document).on('input change', '#providerExperienciasList .experiencia-editable :input', function () {
+                const t = this;
+                if (t.type === 'file' || $(t).closest('.photo-preview, .experience-photos-container').length) return;
+                const card = $(t).closest('.experiencia-editable')[0];
+                if (card) scheduleExperienciaAutoSave(card);
+            });
+            // Campos del proveedor.
+            $(document).on('input change', '#name, #description, #providerDestino', scheduleProviderAutoSave);
+            // Botón "Guardar fotos" por tarjeta.
+            $(document).on('click', '#providerExperienciasList .save-experiencia-photos-btn', function () {
+                saveExperienciaPhotos($(this).closest('.experiencia-editable')[0], this);
+            });
+        })();
 
         // ========== QUICK ADD AVAILABILITY MANAGEMENT ==========
         let quickAddAvailability = {};
@@ -2914,7 +3266,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 $('#providerDestino').val(''); // Ensure no residual destino from previous sessions
                 console.log('🧹 Cleared destino field for create mode');
             }
-            $('#modalTitle').text(isEdit ? 'Editar Proveedor' : 'Crear Nuevo Proveedor');
+            // En edición el título muestra el nombre del proveedor (lo llena loadProviderData).
+            $('#modalTitle').text(isEdit ? '' : 'Crear Nuevo Proveedor');
             // Crear: info del proveedor abierta (hay que llenarla). Editar: colapsada.
             setProviderInfo(!isEdit);
             initializeDaySelection();
@@ -2923,7 +3276,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             providerExperiencias = [];
             $('.experiencia-editable').remove();
             updateNoExperienciasMessage();
-            
+            // Estrategia B: en "crear" el botón de agregar experiencia queda bloqueado hasta
+            // guardar el proveedor; en "editar" ya está habilitado.
+            syncAddExperienciaEnabled();
+
             // Load POI options for Destino selectbox
             loadProviderDestinoOptions();
         }
@@ -2944,7 +3300,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     if (response.success && response.data) {
                         const provider = response.data;
                         $('#providerId').val(provider.id);
+                        syncAddExperienciaEnabled(); // proveedor cargado → habilita agregar experiencia
                         $('#name').val(provider.name);
+                        $('#modalTitle').text(provider.name || 'Proveedor');
                         $('#description').val(provider.description || '');
                         
                         // Populate destinationPOI field — guarda como pendiente y aplica; se
@@ -3047,8 +3405,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     if (response.success) {
                         const actualProviderId = response.data?.id || response.data?.objectId || providerId;
                         
-                        // Save experiencias for the provider
-                        if (actualProviderId && experienciasToSave.length > 0) {
+                        // Save experiencias for the provider.
+                        // IMPORTANTE: NO condicionar a experienciasToSave.length > 0. Si el
+                        // usuario borra la ÚLTIMA experiencia (quedan 0), igual hay que correr
+                        // la reconciliación (GET existentes → DELETE de las removidas); si no,
+                        // la experiencia borrada nunca se elimina en el backend y reaparece.
+                        if (actualProviderId) {
                             try {
                                 // Count total images that need optimization
                                 let totalImages = 0;
@@ -3203,7 +3565,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             const scrollTop = $scroll.scrollTop();
 
                             $('#providerId').val(actualProviderId);
-                            $('#modalTitle').text('Editar Proveedor');
+                            syncAddExperienciaEnabled(); // proveedor recién guardado → habilita agregar
+                            $('#modalTitle').text($('#name').val() || 'Proveedor');
 
                             if (actualProviderId) {
                                 loadProviderExperiencias(actualProviderId, function() {

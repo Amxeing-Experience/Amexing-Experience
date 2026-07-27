@@ -560,23 +560,68 @@ class PublicReservationController {
     const totalItems = [];
     for (const day of days) {
       for (const sc of day.subconcepts) {
-        totalItems.push({ includeInTotal: sc.includeInTotal, pricesByType: sc.pricesByType, total: sc.total });
+        // discountAmount es obligatorio: chargeAmount lo resta del bruto; sin él la vista pública y el
+        // PDF (misma construcción, ambos vía este método) mostraban el precio sin descuento. Alimenta
+        // dispTotals (Subtotal/Total de la vista) Y methodTotals (desglose por método) por igual.
+        totalItems.push({
+          includeInTotal: sc.includeInTotal,
+          pricesByType: sc.pricesByType,
+          total: sc.total,
+          discountAmount: sc.discountAmount,
+        });
       }
     }
-    // Servicios solos (sin ajustes ni propina) para el desglose Subtotal/recargo/Total de la vista.
-    const dispTotals = PaymentService.computeTotals(totalItems, paymentType, 0, 0, currency);
+    // Servicios solos (sin ajustes) para el desglose Subtotal/recargo/Total de la vista.
+    const dispTotals = PaymentService.computeTotals(totalItems, paymentType, 0, currency);
     const { subtotal } = dispTotals; // base (efectivo)
     const { iva } = dispTotals; // recargo por método (IVA, o IVA + comisión de tarjeta)
     const total = dispTotals.servicesTotal; // base × factor
 
+    // Framing por tipo de cliente DUEÑO de la reservación (no de quién ve la página: la vista
+    // pública se sirve por folio, sin sesión). Señal primaria = rol department_manager, con el
+    // que ClientsController crea las agencias; clientCategory casi nunca queda seteado en el
+    // registro real, así que solo suma como condición OR. Se lee el rol string barato del pointer
+    // (mismo patrón que dashboard/AdminController), sin un fetch extra de Role en esta página.
+    const clientRole = (client && typeof client.get === 'function') ? (client.get('role') || '') : '';
+    const clientCategory = (client && typeof client.get === 'function') ? (client.get('clientCategory') || '') : '';
+    const isAgency = clientRole === 'department_manager' || clientCategory === 'agency';
+
+    // Totales por los TRES métodos a nivel reservación (mismo motor), para la línea de
+    // descuento/IVA. Se computa junto a dispTotals (FUERA del try/catch de summarize) para que
+    // el desglose/framing siga renderizando aunque summarize() falle.
+    const methodTotals = {
+      efectivo: PaymentService.computeTotals(totalItems, 'efectivo', 0, currency).servicesTotal,
+      transferencia: PaymentService.computeTotals(totalItems, 'transferencia', 0, currency).servicesTotal,
+      tarjeta: PaymentService.computeTotals(totalItems, 'tarjeta', 0, currency).servicesTotal,
+    };
+    // Sin ningún pricesByType no se puede armar el desglose por método: se cae al render legado.
+    const hasPricesByType = totalItems.some((it) => it.pricesByType && typeof it.pricesByType === 'object');
+
+    // Ajustes de la reservación (cargos/descuentos), itemizados en la vista. Se renderizan verbatim
+    // (la descripción ya viene lista) y se normalizan fuera del try/catch para que sobrevivan a un
+    // fallo de summarize.
+    const rawAdjustments = reservation.get('adjustments');
+    const adjustments = (Array.isArray(rawAdjustments) ? rawAdjustments : []).map((a) => ({
+      id: (a && a.id) ? a.id : '',
+      type: (a && a.type === 'discount') ? 'discount' : 'charge',
+      description: (a && typeof a.description === 'string') ? a.description : '',
+      amount: Number(a && a.amount) || 0,
+      source: (a && a.source) ? a.source : null,
+    }));
+
     // Payment rollup (fresh, non-persisting): amount paid, balance and status.
-    // payment.total includes the reservation tip (the full amount due); serviceItems.total does not.
+    // payment.total es el monto total a pagar (servicios + ajustes); serviceItems.total es solo servicios.
     let payment = {
       paymentStatus: reservation.get('paymentStatus') || 'pending',
       paidAmount: reservation.get('paidAmount') || 0,
       balance: reservation.get('balance'),
-      tip: reservation.get('tip') || 0,
-      total,
+      // Fallback (summarize() lanzó): deriva total = balance + paidAmount (los campos que sobreviven
+      // al fallo) para que el Total no se contradiga con el desglose de ajustes ya renderizado —
+      // usar dispTotals.servicesTotal ignoraba ajustes. Mismo fix que
+      // ReservationController.getReservationById (Fase 3); Fase 2 no lo tenía.
+      total: Math.round(
+        ((Number(reservation.get('balance')) || 0) + (Number(reservation.get('paidAmount')) || 0)) * 100
+      ) / 100,
     };
     try {
       const summary = await PaymentService.summarize(reservation.id);
@@ -584,7 +629,6 @@ class PublicReservationController {
         paymentStatus: summary.paymentStatus,
         paidAmount: summary.paidAmount,
         balance: summary.balance,
-        tip: summary.tip,
         total: summary.total,
       };
     } catch (payErr) {
@@ -613,6 +657,8 @@ class PublicReservationController {
       leadGuestFirstName: reservation.get('leadGuestFirstName') || snapshot.leadGuestFirstName || '',
       leadGuestLastName: reservation.get('leadGuestLastName') || snapshot.leadGuestLastName || '',
       rate: this.formatRateData(rate),
+      isAgency,
+      adjustments,
       serviceItems: {
         days,
         subtotal,
@@ -620,6 +666,8 @@ class PublicReservationController {
         total,
         paymentType,
         currency,
+        methodTotals,
+        hasPricesByType,
       },
       payment,
       createdAt: reservation.get('createdAt') || null,
@@ -828,6 +876,14 @@ class PublicReservationController {
       isWalkingTour: sub.isWalkingTour || false,
       pricesByType: sub.pricesByType || null,
       includeInTotal: sub.includeInTotal !== false,
+      // Descuento por servicio (Fase 1): se expone para que preparePublicReservationData lo pase a
+      // PaymentService.computeTotals (chargeAmount resta discountAmount del precio bruto). Sin este
+      // campo la vista/PDF PÚBLICOS (sin auth) mostraban/cobraban el precio BRUTO, divergiendo de
+      // PaymentService.summarize (que sí lo resta vía toServiceItems). discountType/discountValue
+      // viajan para el desglose por servicio, igual que en el subconcepto del lado cotización.
+      discountAmount: Number(sub.discountAmount) || 0,
+      discountType: sub.discountType || '',
+      discountValue: Number(sub.discountValue) || 0,
       category: sub.category || '',
       categoryName,
       categoryColor,

@@ -219,6 +219,11 @@ class PublicToursService {
 
       const image = images.find((img) => img.get('isPrimary')) || images[0];
       const variants = image.get('optimizedVariants');
+      /**
+       * Extrae la s3Key de una variante de imagen (objeto con s3Key, o string).
+       * @param {object|string} v - Variante de imagen.
+       * @returns {string|null} La s3Key o null.
+       */
       const keyFrom = (v) => (v && (v.s3Key || (typeof v === 'string' ? v : null))) || null;
       let s3Key = null;
       if (variants && typeof variants === 'object') {

@@ -561,6 +561,10 @@ router.use('/vehicle-types', vehicleTypesRoutes);
 router.use('/vehicles', vehiclesRoutes);
 router.use('/vehicles', vehicleImagesRoutes); // Vehicle images endpoints
 router.use('/pois', poisRoutes);
+router.use('/destinos', require('./api/entradasRoutes'));
+// Entradas por destino (tarifario)
+router.use('/partner-requests', require('./api/partnerRequestsRoutes'));
+// Solicitudes de colaboradores (admin)
 router.use('/service-types', serviceTypesRoutes);
 router.use('/experience-categories', experienceCategoriesRoutes);
 router.use('/services', servicesRoutes);

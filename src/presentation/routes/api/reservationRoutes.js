@@ -115,6 +115,11 @@ router.delete(
 // Payments — nivel 4+ (agencia `department_manager` + agente `client`, además de admin/superadmin), igual
 // que el resto de la superficie de reservación (ver/asignar/cancelar). Adjustments siguen admin-only por
 // ser acción de pricing de Amexing. Nivel 4 (no 5) para incluir a la agencia — ver "niveles invertidos" en CLAUDE.md.
+// Los 4 endpoints de ESCRITURA (POST/PUT/DELETE payments + POST receipt) agregan denyRoles('end_client'):
+// el Cliente Directo comparte nivel 4 en el mapa de fallback de requireRoleLevel (para poder LEER su propia
+// reservación), pero de solo lectura por diseño de negocio — sin este guard extra, podía llamar estos
+// endpoints directo (bypass de la UI, que nunca le muestra el formulario). GET se deja abierto: leer su
+// propio historial de pagos sí es parte de su scope.
 /**
  * GET /api/reservations/:id/payments — List payments + summary (agencia+ / admin).
  */
@@ -134,6 +139,7 @@ router.post(
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4),
+  jwtMiddleware.denyRoles('end_client'),
   (req, res) => PaymentController.addPayment(req, res)
 );
 
@@ -145,6 +151,7 @@ router.put(
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4),
+  jwtMiddleware.denyRoles('end_client'),
   (req, res) => PaymentController.updatePayment(req, res)
 );
 
@@ -156,6 +163,7 @@ router.delete(
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4),
+  jwtMiddleware.denyRoles('end_client'),
   (req, res) => PaymentController.deletePayment(req, res)
 );
 
@@ -168,6 +176,7 @@ router.post(
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4),
+  jwtMiddleware.denyRoles('end_client'),
   (req, res) => PaymentController.uploadReceipt(req, res)
 );
 

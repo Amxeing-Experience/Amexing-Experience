@@ -7,6 +7,10 @@ const Parse = require('parse/node');
 const Quote = require('../../../domain/models/Quote');
 const QuoteOwnership = require('../../../domain/models/QuoteOwnership');
 const ReservationService = require('../../../domain/models/ReservationService');
+const Payment = require('../../../domain/models/Payment');
+const ExchangeRate = require('../../../domain/models/ExchangeRate');
+const ServiceChangeRequest = require('../../../domain/models/ServiceChangeRequest');
+const QuoteActivityService = require('../../services/QuoteActivityService');
 const QuoteService = require('../../services/QuoteService');
 const QuoteOwnershipService = require('../../services/QuoteOwnershipService');
 const QuoteCollaborationService = require('../../services/QuoteCollaborationService');
@@ -21,6 +25,11 @@ const fileStorageService = new FileStorageService({
   isPublic: false,
   presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
 });
+
+// Tolerancia (MXN) de divergencia entre lo que el front envía y lo que el motor de precios recalcula
+// al guardar service-items (costura #1). Hasta $1.00 se acepta como redondeo normal (solo se loggea);
+// una divergencia mayor rechaza el guardado, porque esos centavos se acumulan en pérdidas reales.
+const PRICE_MISMATCH_TOLERANCE = 1.00;
 
 /**
  * Batch fetch primary images for a list of item IDs.
@@ -176,6 +185,72 @@ async function injectServiceIncludes(serviceItems) {
       }
     });
   });
+}
+
+/**
+ * Aplana los subconceptos de un serviceItems a un Map por id → { sc, dayNumber }.
+ * @param {object} serviceItems - ServiceItems con days[].subconcepts[].
+ * @returns {Map<string, object>} Map por id de subconcepto.
+ * @example flattenSubconcepts(quote.get('serviceItems'))
+ */
+function flattenSubconcepts(serviceItems) {
+  const map = new Map();
+  ((serviceItems && serviceItems.days) || []).forEach((d) => {
+    (d.subconcepts || []).forEach((sc) => {
+      if (sc && sc.id) map.set(sc.id, { sc, dayNumber: d.dayNumber });
+    });
+  });
+  return map;
+}
+
+/**
+ * Firma de contenido "significativo" de un subconcepto (ignora metadata de lock/solicitud)
+ * para detectar ediciones reales en el timeline.
+ * @param {object} sc - Subconcepto.
+ * @returns {string} Firma JSON.
+ * @example subconceptSignature(sc)
+ */
+function subconceptSignature(sc) {
+  return JSON.stringify({
+    concept: sc.concept || '',
+    time: sc.time || '',
+    quantity: sc.quantity ?? null,
+    unitPrice: sc.unitPrice ?? 0,
+    total: sc.total ?? 0,
+    notes: sc.notes || '',
+    originName: sc.originName || '',
+    destinationName: sc.destinationName || '',
+    vehicleTypeName: sc.vehicleTypeName || '',
+  });
+}
+
+/**
+ * Compara el serviceItems previo vs el nuevo y arma los eventos legibles del timeline
+ * (agregado/editado/quitado por servicio).
+ * @param {object} before - ServiceItems previo.
+ * @param {object} after - ServiceItems nuevo (ya guardado).
+ * @returns {Array<object>} Eventos { action, summary, meta }.
+ * @example buildServiceItemsActivities(before, after)
+ */
+function buildServiceItemsActivities(before, after) {
+  const b = flattenSubconcepts(before);
+  const a = flattenSubconcepts(after);
+  const events = [];
+  a.forEach(({ sc, dayNumber }, id) => {
+    const label = sc.concept || 'servicio';
+    if (!b.has(id)) {
+      events.push({ action: 'service_added', summary: `agregó "${label}" al Día ${dayNumber || '?'}`, meta: { serviceId: id, dayNumber } });
+    } else if (subconceptSignature(sc) !== subconceptSignature(b.get(id).sc)) {
+      events.push({ action: 'service_edited', summary: `editó "${label}" (Día ${dayNumber || '?'})`, meta: { serviceId: id, dayNumber } });
+    }
+  });
+  b.forEach(({ sc, dayNumber }, id) => {
+    if (!a.has(id)) {
+      const label = sc.concept || 'servicio';
+      events.push({ action: 'service_removed', summary: `quitó "${label}" (Día ${dayNumber || '?'})`, meta: { serviceId: id, dayNumber } });
+    }
+  });
+  return events;
 }
 
 /**
@@ -1539,6 +1614,26 @@ class QuoteController {
           req.userRole
         );
 
+        // Timeline (Fase A): registrar el cambio de estado en un texto legible.
+        if (result && result.success !== false) {
+          const STATUS_LABELS = {
+            quoted: 'COTIZADO',
+            requested: 'SOLICITADO',
+            hold: 'BLOQUEADO',
+            scheduled: 'AGENDADO',
+            rejected: 'RECHAZADO',
+            cancelled: 'CANCELADO',
+          };
+          await QuoteActivityService.log({
+            quoteId,
+            actor: currentUser,
+            actorRole: req.userRole,
+            action: 'status_changed',
+            summary: `cambió el estado a ${STATUS_LABELS[updates.status] || updates.status}`,
+            meta: { status: updates.status },
+          });
+        }
+
         // Add edit tracking info to result (handle null editRecord for status-only updates)
         if (editRecord) {
           result.editId = editRecord.id;
@@ -1567,6 +1662,32 @@ class QuoteController {
       result.editId = editRecord.id;
       result.version = editRecord.version;
       result.requiresApproval = editRecord.approvalStatus === 'pending';
+
+      // Timeline (Fase B1): edición de datos generales (personas/fechas/cliente/notas).
+      const FIELD_LABELS = {
+        numberOfPeople: 'personas',
+        eventType: 'tipo de evento',
+        startDate: 'fechas',
+        endDate: 'fechas',
+        eventDate: 'fechas',
+        clientFinalId: 'cliente final',
+        clientFinalName: 'cliente final',
+        clientType: 'tipo de cliente',
+        notes: 'notas',
+        clientNotes: 'notas',
+      };
+      const changedKeys = Object.keys(updates).filter((k) => k !== 'reason' && k !== 'status');
+      const changedLabels = [...new Set(changedKeys.map((k) => FIELD_LABELS[k]).filter(Boolean))];
+      if (changedLabels.length) {
+        await QuoteActivityService.log({
+          quoteId,
+          actor: currentUser,
+          actorRole: req.userRole,
+          action: 'quote_edited',
+          summary: `editó la cotización (${changedLabels.join(', ')})`,
+          meta: { fields: Object.keys(updates).filter((k) => k !== 'reason') },
+        });
+      }
 
       return res.json(result);
     } catch (error) {
@@ -1982,6 +2103,18 @@ class QuoteController {
         response: response.data,
       });
 
+      // Timeline (Fase B1): registrar la conversión a reservación.
+      if (reservationData) {
+        await QuoteActivityService.log({
+          quoteId,
+          actor: currentUser,
+          actorRole: req.userRole,
+          action: 'converted_to_reservation',
+          summary: `convirtió la cotización en reservación${reservationData.folio ? ` (${reservationData.folio})` : ''}`,
+          meta: { reservationId: reservationData.id, reservationFolio: reservationData.folio },
+        });
+      }
+
       return res.json(response);
     } catch (error) {
       logger.error('Error in QuoteController.convertToReservation', {
@@ -2071,7 +2204,25 @@ class QuoteController {
       const {
         days = [], subtotal = 0, iva = 0, total = 0,
         currency = 'MXN', paymentType = 'efectivo',
+        globalTip = null, // Fase 2b: propina global de la cotización (persistir tal cual).
+        suggestedTipPct = null, // Fase 2c: % de propina sugerida (default 10 en el front).
       } = req.body;
+
+      // Enum guard: paymentType alimenta reservation.paymentType (ancla del carrito de pagos) y se
+      // renderiza en el desglose de las 3 vistas de reservación. Un valor fuera de los métodos válidos
+      // habilitaba stored XSS (council L3F0) y corrompía el ancla (bloqueaba el registro de pagos). Se
+      // rechaza aquí, el único punto de escritura de paymentType desde el request.
+      if (!Payment.isValidMethod(paymentType)) {
+        return this.sendError(res, `Forma de pago inválida. Use: ${Payment.METHODS.join(', ')}`, 400);
+      }
+
+      // FIX 3: tope de 100% en la propina general de tipo porcentaje. El monto fijo (type 'amount') no
+      // lleva límite. Se rechaza (400) antes de tocar la BD; computeGeneralTip además recorta a 100 en
+      // la función pura (defensa en profundidad). Se valida ANTES de la comparación RBAC para que un
+      // porcentaje imposible se rechace con 400 sin importar el rol.
+      if (globalTip && globalTip.type === 'percent' && Number(globalTip.value) > 100) {
+        return this.sendError(res, 'El porcentaje de propina no puede ser mayor a 100%', 400);
+      }
 
       // Validate serviceItems structure
       if (!Array.isArray(days)) {
@@ -2178,6 +2329,52 @@ class QuoteController {
               );
             }
           }
+
+          // FIX 3: tope de 100% en la propina POR SERVICIO de tipo porcentaje (el monto fijo no se
+          // limita). Rechaza aquí, antes de persistir, identificando el subconcepto/día.
+          if (sub.tipType === 'percent' && Number(sub.tipValue) > 100) {
+            return this.sendError(
+              res,
+              `El porcentaje de propina no puede ser mayor a 100% (subconcepto ${j + 1} del día ${day.dayNumber})`,
+              400
+            );
+          }
+
+          // FIX (council LOW): el descuento por servicio nunca se validaba server-side. Un discountAmount
+          // negativo infla la base neta de la propina general porcentual en computeGeneralTip
+          // (netBaseEfectivo += Math.max(0, ef - disc): con disc<0 => ef + |disc|), cobrando MÁS propina
+          // en vez de menos. Se rechaza aquí, antes de persistir, con el mismo patrón que los demás campos.
+          if (sub.discountAmount !== null && sub.discountAmount !== undefined) {
+            if (typeof sub.discountAmount !== 'number' || sub.discountAmount < 0) {
+              return this.sendError(
+                res,
+                `Descuento inválido en subconcepto ${j + 1} del día ${day.dayNumber}`,
+                400
+              );
+            }
+          }
+
+          // Descuento porcentual: tope de 100% (un descuento no puede exceder el precio), análogo al tope
+          // de tipValue de FIX 3. El monto fijo ('amount') no lleva tope superior, igual que el tip fijo.
+          if (sub.discountType === 'percent' && sub.discountValue !== null && sub.discountValue !== undefined) {
+            if (typeof sub.discountValue !== 'number' || sub.discountValue < 0 || sub.discountValue > 100) {
+              return this.sendError(
+                res,
+                `El porcentaje de descuento no puede ser mayor a 100% (subconcepto ${j + 1} del día ${day.dayNumber})`,
+                400
+              );
+            }
+          }
+
+          if (sub.discountType === 'amount' && sub.discountValue !== null && sub.discountValue !== undefined) {
+            if (typeof sub.discountValue !== 'number' || sub.discountValue < 0) {
+              return this.sendError(
+                res,
+                `Monto de descuento inválido en subconcepto ${j + 1} del día ${day.dayNumber}`,
+                400
+              );
+            }
+          }
         }
 
         // Validate dayTotal (new field - must equal sum of subconcepts totals)
@@ -2185,7 +2382,13 @@ class QuoteController {
           return this.sendError(res, `El total del día ${day.dayNumber} debe ser un número positivo`, 400);
         }
 
-        const calculatedDayTotal = day.subconcepts.reduce((sum, sub) => sum + (parseFloat(sub.total) || 0), 0);
+        // Excluye los subconceptos "Pago externo" (includeInTotal === false) igual que
+        // evaluateTotalsConsistency: el wizard manda un dayTotal que ya los excluye, así que sumarlos
+        // aquí divergiría siempre por el monto completo del servicio externo y rechazaría el guardado.
+        const calculatedDayTotal = day.subconcepts.reduce(
+          (sum, sub) => (sub.includeInTotal === false ? sum : sum + (parseFloat(sub.total) || 0)),
+          0
+        );
 
         const dayTotalRounded = Math.round(day.dayTotal * 100) / 100;
         const expectedRounded = Math.round(calculatedDayTotal * 100) / 100;
@@ -2199,59 +2402,43 @@ class QuoteController {
         }
       }
 
-      // Consistencia de totales (costura #1 — backend, motor único). SOLO OBSERVA: re-verifica
-      // con el motor que los números del front sean consistentes y loggea divergencias; NO
-      // cambia valores ni bloquea el guardado (prioridad: que funcione). Usa solo los datos del
-      // payload (sin fetches extra a la BD) para no afectar el rendimiento.
+      // Consistencia de totales (costura #1 — backend, motor único). Re-verifica con el motor que los
+      // números del front cuadren, usando solo los datos del payload (sin fetches extra a la BD).
+      // Divergencias de centavos (redondeo normal) solo se loggean y siguen guardando; una divergencia
+      // mayor a PRICE_MISMATCH_TOLERANCE ($1.00) RECHAZA el guardado — ocurre ANTES del query/save de
+      // la cotización, así que nada se persiste si se rechaza.
       try {
-        const pricingEngine = require('../../../domain/pricing/pricingEngine');
-        const r2 = pricingEngine.round2;
-
-        // 1) Subtotal vs suma de los totales de los subconcepts (lo que realmente se cobra),
-        //    y por-subconcept que su total coincida con pricesByType[forma de pago].
-        let sumOfSubconceptTotals = 0;
-        let subconceptMismatches = 0;
-        days.forEach((day) => {
-          (day.subconcepts || []).forEach((sc) => {
-            if (sc.includeInTotal === false) return;
-            const scTotal = parseFloat(sc.total) || 0;
-            sumOfSubconceptTotals += scTotal;
-            if (sc.pricesByType && typeof sc.pricesByType === 'object') {
-              const expected = parseFloat(sc.pricesByType[paymentType]);
-              if (!Number.isNaN(expected) && Math.abs(r2(expected) - r2(scTotal)) > 0.01) {
-                subconceptMismatches += 1;
-              }
-            }
-          });
+        const consistency = this.evaluateTotalsConsistency({
+          days, subtotal, iva, total, paymentType,
         });
-        sumOfSubconceptTotals = r2(sumOfSubconceptTotals);
-        const subtotalRounded = r2(subtotal);
-        if (Math.abs(sumOfSubconceptTotals - subtotalRounded) > 0.01) {
+
+        if (consistency.subtotalDiff > 0.01) {
           logger.warn('⚠️ Inconsistencia de subtotal (front vs suma de subconcepts)', {
             quoteId,
-            subtotalRecibido: subtotalRounded,
-            sumaSubconcepts: sumOfSubconceptTotals,
-            diferencia: r2(subtotalRounded - sumOfSubconceptTotals),
+            subtotalRecibido: consistency.subtotalRounded,
+            sumaSubconcepts: consistency.sumOfSubconceptTotals,
+            diferencia: consistency.subtotalSignedDiff,
             paymentType,
             currency,
           });
         }
-        if (subconceptMismatches > 0) {
+        if (consistency.subconceptMismatches > 0) {
           logger.warn('⚠️ Subconcepts cuyo total no coincide con pricesByType[formaPago]', {
-            quoteId, count: subconceptMismatches, paymentType,
+            quoteId, count: consistency.subconceptMismatches, paymentType,
+          });
+        }
+        if (consistency.totalDiff > 0.01) {
+          logger.warn('⚠️ Inconsistencia de total (subtotal + IVA vs total recibido)', {
+            quoteId,
+            subtotal: consistency.subtotalRounded,
+            iva: consistency.ivaRounded,
+            totalEsperado: consistency.totalEsperado,
+            totalRecibido: consistency.totalRecibido,
           });
         }
 
-        // 2) total = subtotal + IVA (coherencia del agregado).
-        const totalEsperado = r2(subtotalRounded + (parseFloat(iva) || 0));
-        if (Math.abs(totalEsperado - r2(total)) > 0.01) {
-          logger.warn('⚠️ Inconsistencia de total (subtotal + IVA vs total recibido)', {
-            quoteId,
-            subtotal: subtotalRounded,
-            iva: r2(parseFloat(iva) || 0),
-            totalEsperado,
-            totalRecibido: r2(total),
-          });
+        if (consistency.rejectMessage) {
+          return this.sendError(res, consistency.rejectMessage, 400);
         }
       } catch (calcErr) {
         logger.warn('No se pudo verificar la consistencia de totales con el motor', { error: calcErr.message });
@@ -2265,6 +2452,38 @@ class QuoteController {
       if (!quote) {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
+
+      // Aislamiento entre agencias: sin esto, cualquier department_manager/client autenticado podía
+      // sobrescribir servicios/precios de una cotización de OTRA agencia mandando el PUT directo con su
+      // quoteId (bypass de tenant). Mismo control de acceso que la LECTURA en getQuoteById: hasAccess
+      // (colaboración) con fallback legacy a checkQuoteAccess (admin/superadmin pasan siempre; la agencia
+      // por su client pointer/departamento; el agente solo por ownership).
+      const hasAccess = await this.collaborationService.hasAccess(quoteId, currentUser.id);
+      if (!hasAccess) {
+        const hasLegacyAccess = await this.checkQuoteAccess(currentUser, quote, req.userRole);
+        if (!hasLegacyAccess) {
+          return this.sendError(res, 'No tienes permisos para modificar esta cotización', 403);
+        }
+      }
+
+      // Timeline (Fase A): snapshot del serviceItems previo para diffear agregados/editados/quitados.
+      const beforeServiceItems = quote.get('serviceItems') || { days: [] };
+
+      // Deduplicación (keep-first) + ordenamiento ADELANTADOS aquí, ANTES del enforcement por-servicio y del
+      // guard RBAC de propina (ambos más abajo), para que el guard evalúe EXACTAMENTE los datos que se van a
+      // persistir (antes se deduplicaba después del guard). Sin esto, un no-admin podía mandar en el mismo
+      // día DOS subconceptos con el MISMO id (el primero con tip bajo/cero, el segundo con el tip real):
+      // tipFieldsChanged sumaba AMBAS ocurrencias sobre el payload crudo -> la suma cuadraba con lo guardado
+      // -> no bloqueaba (200); pero al persistir,
+      // sortAndCleanServiceDays deja solo la PRIMERA ocurrencia (tip bajo/cero), bajando/anulando la propina
+      // fijada por un admin sin disparar 403. Al deduplicar antes, ambas ocurrencias colapsan en una sola y
+      // el guard ve el tip real que quedaría guardado -> el intento se bloquea con 403.
+      // evaluateTotalsConsistency (arriba) se deja intencionalmente sobre `days` crudos: valida el
+      // subtotal/total COSMÉTICO del header (PaymentService no depende de él, y los servicios bloqueados se
+      // recomputan más abajo desde el contenido restaurado); correrlo sobre los días deduplicados
+      // rechazaría con 400 quotes legítimos con servicios idénticos sin id (que el dedup colapsa por
+      // contenido), un cambio de comportamiento fuera del alcance de este fix de propina.
+      const sortedAndCleanedDays = this.sortAndCleanServiceDays(days);
 
       // Debug: Log transport services with suggested departure time fields
       days.forEach((day, dayIndex) => {
@@ -2290,10 +2509,7 @@ class QuoteController {
         }
       });
 
-      // Apply sorting and deduplication to days before saving
-      const sortedAndCleanedDays = this.sortAndCleanServiceDays(days);
-
-      // Update serviceItems
+      // Update serviceItems (days ya deduplicados/ordenados arriba, antes del guard de propina)
       const serviceItems = {
         days: sortedAndCleanedDays,
         subtotal,
@@ -2301,7 +2517,170 @@ class QuoteController {
         total,
         currency,
         paymentType,
+        globalTip, // Fase 2b: propina global de la cotización.
+        suggestedTipPct, // Fase 2c: % de propina sugerida.
       };
+
+      // Asegura un id estable por subconcepto ANTES de guardar. Los servicios agregados desde
+      // "Agregar a cotización" (tarifario) llegan sin id; sin id se rompen request-change y el
+      // bloqueo por-servicio, que keyean por sc.id. Se asigna solo a los que falten.
+      const nowId = Date.now();
+      serviceItems.days = (serviceItems.days || []).map((d, di) => ({
+        ...d,
+        subconcepts: (d.subconcepts || []).map((sc, si) => (
+          (sc && !sc.id)
+            ? { ...sc, id: `service_${nowId}_${di}_${si}_${Math.random().toString(36).slice(2, 8)}` }
+            : sc
+        )),
+      }));
+
+      // Congelamiento del tipo de cambio: en cotizaciones USD se captura la tasa vigente que produjo
+      // los pricesByType actuales, y viaja dentro del mismo blob serviceItems. Se re-captura en cada
+      // guardado (los precios también se recalculan con la tasa vigente en cada edición del wizard); el
+      // congelamiento real ocurre al pasar de cotización a reservación (QuoteService no pisa uno existente).
+      if (String(currency).toUpperCase() === 'USD') {
+        serviceItems.exchangeRateSnapshot = await ExchangeRate.getCurrentValue();
+      }
+
+      // Bloqueo por-servicio: los subconceptos PROTEGIDOS no pueden ser editados ni eliminados
+      // por no-admins (el servidor los restaura), reforzando lo que la UI ya impide.
+      // Un subconcepto está protegido si:
+      //  - es adminLocked (agregado/editado por un admin), o
+      //  - la cotización ya es reservación (scheduled/hold): cualquier cambio a un servicio EXISTENTE
+      //    debe pasar por una solicitud aprobada por admin (agregar nuevos sí se permite directo,
+      //    porque un servicio nuevo aún no está en el estado guardado).
+      // Los locks son "sticky" por id. Solo admin/superadmin pueden editar directo.
+      const isAdminUser = ['admin', 'superadmin'].includes(req.userRole);
+      const isReservation = ['scheduled', 'hold'].includes(quote.get('status'));
+      const storedServiceItems = quote.get('serviceItems') || {};
+      const storedLockedById = new Map();
+      (Array.isArray(storedServiceItems.days) ? storedServiceItems.days : []).forEach((d) => {
+        (d.subconcepts || []).forEach((sc) => {
+          // Protegido: adminLocked, o cualquier servicio existente si la cotización ya es reservación.
+          if (sc && sc.id && (sc.adminLocked || isReservation)) {
+            storedLockedById.set(sc.id, { sub: sc, dayNumber: d.dayNumber });
+          }
+        });
+      });
+
+      // El enforcement por-servicio corre SIEMPRE, no solo cuando hay servicios protegidos: cuando
+      // storedLockedById está vacío el .map() es un no-op sobre el CONTENIDO (no hay ids que restaurar) y
+      // enforcedDays queda equivalente en contenido a sortedAndCleanedDays, pero subtotal/total se
+      // recomputan igual desde el contenido real (abajo). Antes esto vivía dentro de un
+      // `if (storedLockedById.size > 0)`, así que una cotización SIN ningún servicio bloqueado persistía
+      // el subtotal/total fabricado del payload -> reintroducía el "cuarto total" (el header muestra un
+      // número y el motor de pagos calcula otro) para roles nivel 4. Correrlo siempre también asegura que
+      // un no-admin nunca deje adminLocked=true en un servicio nuevo aunque no hubiera bloqueados previos.
+      const seenLockedIds = new Set();
+      const enforcedDays = serviceItems.days.map((d) => ({
+        ...d,
+        subconcepts: (d.subconcepts || []).map((sc) => {
+          if (!sc || !sc.id) return sc;
+          const locked = storedLockedById.get(sc.id);
+          if (locked) {
+            seenLockedIds.add(sc.id);
+            // Sticky: para no-admin se restaura el contenido guardado (no puede editar un
+            // servicio protegido); admin conserva sus cambios. Se PRESERVA el adminLocked
+            // original: un servicio de proveedor del owner (adminLocked=false) sigue sin
+            // marcarse como admin-locked; solo queda protegido por la regla de reservación.
+            return isAdminUser
+              ? { ...sc, adminLocked: true }
+              : { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
+          }
+          // Un no-admin no puede marcar como bloqueado un servicio nuevo.
+          if (!isAdminUser && sc.adminLocked) {
+            return { ...sc, adminLocked: false };
+          }
+          return sc;
+        }),
+      }));
+
+      // No-admin: re-insertar los servicios bloqueados que se hayan quitado del payload (intento de
+      // borrado no permitido). No-op cuando no hay servicios protegidos.
+      if (!isAdminUser) {
+        storedLockedById.forEach((locked, id) => {
+          if (seenLockedIds.has(id)) return;
+          const restored = { ...locked.sub, adminLocked: locked.sub.adminLocked === true };
+          let idx = enforcedDays.findIndex((d) => d.dayNumber === locked.dayNumber);
+          if (idx < 0) idx = enforcedDays.length > 0 ? 0 : -1;
+          if (idx >= 0) {
+            enforcedDays[idx] = {
+              ...enforcedDays[idx],
+              subconcepts: [...(enforcedDays[idx].subconcepts || []), restored],
+            };
+          } else {
+            enforcedDays.push({ dayNumber: locked.dayNumber || 1, dayTitle: '', subconcepts: [restored] });
+          }
+        });
+        if (storedLockedById.size > 0) {
+          logger.info('updateServiceItems: enforced protected services for non-admin', {
+            quoteId: quote.id,
+            userRole: req.userRole,
+            lockedCount: storedLockedById.size,
+            reinserted: storedLockedById.size - seenLockedIds.size,
+          });
+        }
+      }
+
+      serviceItems.days = enforcedDays;
+
+      // Re-deriva subtotal/total desde el contenido FINAL (protegido ya restaurado), nunca desde lo que
+      // mandó el front. evaluateTotalsConsistency (arriba) solo valida que el payload sea AUTOCONSISTENTE
+      // contra SUS PROPIOS days: un no-admin puede pasarla trayendo un subtotal/total fabricados a juego
+      // con un precio de servicio protegido alterado (council L2F0/L5F1) o, aun SIN ningún protegido, con
+      // un subtotal dentro de la tolerancia de $1 y un `total` cualquiera (esa validación no limita
+      // `total`). Sin este recálculo esos números se persistían igual, reintroduciendo el total espurio en
+      // el header de las 4 vistas para roles nivel 4, no solo admin.
+      const pricingEngine = require('../../../domain/pricing/pricingEngine');
+      const r2 = pricingEngine.round2;
+      let enforcedSubtotal = 0;
+      enforcedDays.forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          if (sc && sc.includeInTotal !== false) enforcedSubtotal += (parseFloat(sc.total) || 0);
+        });
+      });
+      serviceItems.subtotal = r2(enforcedSubtotal);
+      // El total del HEADER INCLUYE las propinas (general + por servicio), igual que el motor de pagos
+      // (QuoteService.create/sync fija totalAmount = cleanSubtotal + computeGeneralTip + sumServiceTipsFromDays).
+      // Recomputarlo como subtotal+iva a secas dejaba fuera las propinas y hacía DIVERGIR el header del motor
+      // -- el mismo "tercer total" que este arco elimina. Los subconceptos guardan SOLO precio (una propina
+      // horneada en sc.total se rechaza con 400 arriba), así que sumar las propinas UNA vez sobre el contenido
+      // restaurado no las duplica. Se usan las MISMAS funciones canónicas del motor para no reintroducir la
+      // divergencia; se computan sobre serviceItems ya con los days restaurados y el globalTip del payload.
+      const enforcedGeneralTip = this.quoteService.computeGeneralTip(serviceItems);
+      const enforcedServiceTips = this.quoteService.sumServiceTipsFromDays(serviceItems);
+      serviceItems.total = r2(
+        serviceItems.subtotal + (r2(parseFloat(serviceItems.iva) || 0)) + enforcedGeneralTip + enforcedServiceTips
+      );
+
+      // FIX 1: RBAC server-side de la propina. El wizard oculta los controles de propina a los no-admin,
+      // pero el server persistía globalTip/suggestedTipPct + tipType/tipValue/tipMandatory/tipAmount por
+      // subconcepto sin validar rol -> un agente/agencia podía FIJAR cualquier propina por API directa.
+      // Solo admin/superadmin puede fijar o cambiar la propina; un no-admin únicamente puede REENVIAR la
+      // misma propina ya guardada (el wizard la reenvía para no perderla). El guard va DENTRO del
+      // controller y condicional a si la propina realmente cambia: en la ruta bloquearía TODA edición de
+      // servicios (horario/precio) de agentes/agencias, que sí está permitida.
+      // Se prioriza req.roleObject (fila fresca de Role en DB, ya cargada por el middleware) sobre
+      // req.userRole (claim del JWT, puede quedar stale hasta 8h tras un cambio de rol — council
+      // L3F1): un admin recién degradado no debe conservar el privilegio de tocar propina solo porque
+      // su token viejo todavía diga 'admin'. Fallback a userRole SOLO si no hay roleObject fresco.
+      // El guard corre DESPUÉS del enforcement, sobre serviceItems.days FINAL (contenido ya restaurado),
+      // NO sobre sortedAndCleanedDays: evaluarlo antes de restaurar permitía un bypass -- un no-admin ponía
+      // en $0 la propina de un servicio PROTEGIDO y "la movía" a un servicio NUEVO (decoy) con el mismo
+      // monto; la suma agregada pre-restauración cuadraba con lo guardado (no bloqueaba), pero la
+      // restauración revertía el protegido a su tip real y el decoy sobrevivía, DUPLICANDO la propina
+      // persistida sin 403. Sobre el contenido restaurado la suma refleja lo que realmente quedaría
+      // guardado. El 403 sale ANTES de cualquier quote.set/quote.save: un bloqueo no deja escritura parcial.
+      const isAdminForTip = req.roleObject
+        ? (typeof req.roleObject.getLevel === 'function' && req.roleObject.getLevel() >= 6)
+        : ['admin', 'superadmin'].includes(req.userRole);
+      const incomingTipData = { globalTip, suggestedTipPct, days: serviceItems.days };
+      if (!isAdminForTip && this.tipFieldsChanged(beforeServiceItems, incomingTipData)) {
+        logger.warn('updateServiceItems: non-admin attempted to set/change tip fields', {
+          quoteId: quote.id, userRole: req.userRole,
+        });
+        return this.sendError(res, 'Solo un administrador puede modificar la propina', 403);
+      }
 
       quote.set('serviceItems', serviceItems);
 
@@ -2320,6 +2699,14 @@ class QuoteController {
 
       // Create or update ReservationService records for transport services with suggested departure times
       await this.persistSuggestedDepartureTimes(quote.id, sortedAndCleanedDays, currentUser);
+
+      // Timeline (Fase A): eventos legibles de agregados/editados/quitados de servicios.
+      const activityEvents = buildServiceItemsActivities(beforeServiceItems, serviceItems);
+      if (activityEvents.length) {
+        await QuoteActivityService.logMany(activityEvents.map((e) => ({
+          quoteId: quote.id, actor: currentUser, actorRole: req.userRole, ...e,
+        })));
+      }
 
       // If this quote is already a reservation, keep the reservation in sync with
       // the edited service items (preserving driver/vehicle assignments). Isolated
@@ -2365,6 +2752,446 @@ class QuoteController {
       return this.sendError(
         res,
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al actualizar los servicios',
+        500
+      );
+    }
+  }
+
+  /**
+   * FIX 1: detecta si un payload de service-items INTENTA fijar/cambiar/quitar la propina respecto a lo
+   * ya guardado. Se usa para bloquear (403) a los no-admin, que solo pueden reenviar la misma propina
+   * existente. Compara: globalTip (type/value/mandatory; ignora `amount`, que es derivado y lo recomputa
+   * el server), suggestedTipPct (solo se protege MODIFICAR/QUITAR una sugerencia ya guardada — el wizard
+   * SIEMPRE manda un default 10, bloquearlo sobre cotizaciones legacy sin sugerencia rompería ediciones
+   * legítimas; además es una nota, no se cobra) y la SUMA AGREGADA de la propina por servicio (Σ tipAmount
+   * de los subconceptos activos, sin emparejar por id) — si esa suma cambia, es un cambio de propina. La
+   * suma agregada permite splits/fusiones que preservan el total (ej. round-trip que parte la propina de
+   * un servicio en dos piernas) y bloquea cualquier subida/bajada real. Números con tolerancia de centavo.
+   * @param {object} storedSI - serviceItems actualmente guardado en la cotización.
+   * @param {object} incoming - Datos del request { globalTip, suggestedTipPct, days }.
+   * @returns {boolean} true si la propina cambia (debe bloquearse para no-admin).
+   * @example
+   * this.tipFieldsChanged(quote.get('serviceItems'), { globalTip, suggestedTipPct, days });
+   */
+  tipFieldsChanged(storedSI, incoming) {
+    const CENT = 0.01;
+    /**
+     * Compara dos números con tolerancia de un centavo (no finito = 0).
+     * @param {*} a - Primer valor.
+     * @param {*} b - Segundo valor.
+     * @returns {boolean} true si difieren en ≤ 1 centavo.
+     */
+    const numEq = (a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      return Math.abs((Number.isFinite(na) ? na : 0) - (Number.isFinite(nb) ? nb : 0)) <= CENT;
+    };
+    const stored = storedSI || {};
+    const inc = incoming || {};
+
+    /**
+     * Normaliza el tipo de propina a 'amount' | 'percent' | null.
+     * @param {string} t - Tipo crudo.
+     * @returns {string|null} Tipo normalizado o null.
+     */
+    const normType = (t) => {
+      if (t === 'amount') return 'amount';
+      if (t === 'percent') return 'percent';
+      return null;
+    };
+    // globalTip normalizado: propina efectiva o null. `amount` se ignora (lo recomputa computeGeneralTip).
+    /**
+     * Normaliza una propina global a { type, value, mandatory } o null si inválida.
+     * @param {object} gt - Propina global cruda.
+     * @returns {object|null} Propina normalizada o null.
+     */
+    const normGT = (gt) => {
+      if (!gt || typeof gt !== 'object') return null;
+      const type = normType(gt.type);
+      const value = Number(gt.value);
+      if (!type || !Number.isFinite(value) || value <= 0) return null;
+      return { type, value, mandatory: gt.mandatory === true };
+    };
+    const storedGT = normGT(stored.globalTip);
+    const incomingGT = normGT(inc.globalTip);
+    if (!storedGT !== !incomingGT) return true; // se agrega o se quita la propina general
+    if (storedGT && incomingGT && (
+      storedGT.type !== incomingGT.type
+      || !numEq(storedGT.value, incomingGT.value)
+      || storedGT.mandatory !== incomingGT.mandatory
+    )) return true;
+
+    // suggestedTipPct: solo se protege MODIFICAR/QUITAR una sugerencia ya guardada (>0).
+    const storedPct = Number(stored.suggestedTipPct);
+    if (Number.isFinite(storedPct) && storedPct > 0) {
+      const inPct = Number(inc.suggestedTipPct);
+      const normInPct = Number.isFinite(inPct) && inPct > 0 ? inPct : 0;
+      if (!numEq(storedPct, normInPct)) return true;
+    }
+
+    // Propina por subconcepto: se compara la SUMA AGREGADA de tipAmount (lo que realmente se cobra) de
+    // TODOS los subconceptos activos, sea cual sea su id, en lo guardado vs lo entrante. NO se empareja
+    // por id ni se comparan campos uno a uno: un split ida-vuelta reparte la propina de un servicio en
+    // dos piernas (id reutilizado para Ida + id nuevo para Vuelta) conservando la suma total; empatar por
+    // id daba un falso positivo (el id existente pasa de 200 a 100 y el id nuevo aporta 100 "sin previo")
+    // y bloqueaba con 403 a un no-admin aunque la SUMA no cambiara (100+100=200). Con la suma agregada,
+    // cualquier reparto/fusión que preserve el total se permite, y toda subida/bajada real (o la
+    // desaparición de un servicio con propina sin compensación) mueve la suma y se bloquea.
+    //
+    // Esto subsume de raíz el chequeo previo "tipSilentlyRemoved" (council L0F0: borrar el servicio o
+    // reenviarlo con id vacío para quitar la propina): al desaparecer su tipAmount la suma baja y se
+    // detecta sin necesitar rastrear ids que se pierden. Se usa el MISMO criterio que el motor de dinero
+    // (QuoteService.sumServiceTipsFromDays / PaymentService.sumServiceTips): tipAmount finito y > 0 de los
+    // subconceptos con includeInTotal !== false.
+    /**
+     * Suma agregada de las propinas por subconcepto (tipAmount > 0, incluidos en total).
+     * @param {object} si - serviceItems con days[].subconcepts[].
+     * @returns {number} Suma total de propinas por servicio.
+     */
+    const sumServiceTips = (si) => {
+      const days = Array.isArray(si.days) ? si.days : [];
+      let sum = 0;
+      days.forEach((d) => {
+        ((d && Array.isArray(d.subconcepts)) ? d.subconcepts : []).forEach((sc) => {
+          if (sc && sc.includeInTotal !== false) {
+            const tip = Number(sc.tipAmount);
+            if (Number.isFinite(tip) && tip > 0) sum += tip;
+          }
+        });
+      });
+      return sum;
+    };
+    if (!numEq(sumServiceTips(stored), sumServiceTips(inc))) return true;
+
+    return false;
+  }
+
+  /**
+   * POST /api/quotes/:id/services/:serviceId/request-change — Fase 2 del bloqueo por-servicio.
+   * El owner (no-admin) solicita BORRAR o MODIFICAR un servicio bloqueado por admin. Solo
+   * guarda la solicitud en el subconcepto (no elimina/edita nada); el admin la aprueba/rechaza.
+   * @param {object} req - Express request; params id/serviceId; body { type: 'delete'|'modify', note? }.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON con la solicitud creada.
+   * @example
+   *   POST /api/quotes/abc/services/service_17/request-change { "type": "delete", "note": "..." }
+   */
+  async requestServiceChange(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId, serviceId } = req.params;
+      const type = req.body?.type === 'modify' ? 'modify' : 'delete';
+      const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
+
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      const quote = await query.get(quoteId, { useMasterKey: true });
+      if (!quote) return this.sendError(res, 'Cotización no encontrada', 404);
+
+      const serviceItems = quote.get('serviceItems') || {};
+      let target = null;
+      (serviceItems.days || []).forEach((d) => (d.subconcepts || []).forEach((sc) => {
+        if (sc && sc.id === serviceId) target = sc;
+      }));
+      if (!target) return this.sendError(res, 'Servicio no encontrado en la cotización', 404);
+      // Se permite solicitar cambio si el servicio está protegido: adminLocked, o bien la
+      // cotización ya es reservación (scheduled/hold) — ahí cualquier servicio requiere aprobación.
+      const isReservation = ['scheduled', 'hold'].includes(quote.get('status'));
+      if (!target.adminLocked && !isReservation) {
+        return this.sendError(res, 'Este servicio no está bloqueado; puedes editarlo directamente', 400);
+      }
+      if (target.changeRequest && target.changeRequest.status === 'pending') {
+        return this.sendError(res, 'Este servicio ya tiene una solicitud pendiente', 400);
+      }
+
+      const requesterName = `${currentUser.get('firstName') || ''} ${currentUser.get('lastName') || ''}`.trim()
+        || currentUser.get('email') || currentUser.get('username') || 'Owner';
+      const serviceLabel = target.concept || target.name || 'Servicio';
+      const requestedAt = new Date();
+
+      // Registro durable (historial + contador). Sobrevive si el servicio se elimina.
+      const record = new ServiceChangeRequest();
+      record.set('active', true);
+      record.set('exists', true);
+      record.set('quote', { __type: 'Pointer', className: 'Quote', objectId: quote.id });
+      record.set('serviceId', serviceId);
+      record.set('serviceLabel', serviceLabel);
+      record.set('type', type);
+      record.set('note', note);
+      record.set('status', ServiceChangeRequest.STATUS.PENDING);
+      record.set('requestedBy', { __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id });
+      record.set('requestedByName', requesterName);
+      record.set('requestedAt', requestedAt);
+      record.set('seenByRequester', true); // el owner ya la conoce (la acaba de crear)
+      await record.save(null, { useMasterKey: true });
+
+      // Marcador inline en el subconcepto (UI de acción de Fase 2 + badge del owner).
+      target.changeRequest = {
+        requestId: record.id,
+        type,
+        note,
+        requestedBy: currentUser.id,
+        requestedByName: requesterName,
+        requestedAt: requestedAt.toISOString(),
+        status: 'pending',
+      };
+      quote.set('serviceItems', serviceItems);
+      await quote.save(null, { useMasterKey: true });
+
+      logger.info('Service change requested', {
+        quoteId: quote.id, serviceId, type, requestId: record.id, requestedBy: currentUser.id,
+      });
+      await QuoteActivityService.log({
+        quoteId: quote.id,
+        actor: currentUser,
+        actorRole: req.userRole,
+        action: 'change_requested',
+        summary: `solicitó ${type === 'delete' ? 'borrar' : 'modificar'} "${serviceLabel}"`,
+        meta: { serviceId, type, requestId: record.id },
+      });
+      return this.sendSuccess(res, { serviceId, changeRequest: target.changeRequest }, 'Solicitud enviada', 200);
+    } catch (error) {
+      logger.error('Error in requestServiceChange', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al solicitar el cambio',
+        500
+      );
+    }
+  }
+
+  /**
+   * POST /api/quotes/:id/services/:serviceId/review-change — Admin aprueba/rechaza la solicitud
+   * de cambio de un servicio. approve+delete elimina el servicio; approve+modify y reject dejan
+   * el servicio pero transicionan la solicitud (aprobada/rechazada) para el historial y el badge
+   * del owner. SOLO admin/superadmin (gate en la ruta).
+   * @param {object} req - Express request; params id/serviceId; body { decision, reviewNote? }.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON con la acción aplicada.
+   * @example
+   *   POST /api/quotes/abc/services/service_17/review-change { "decision": "approve" }
+   */
+  async reviewServiceChange(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId, serviceId } = req.params;
+      const decision = req.body?.decision === 'reject' ? 'reject' : 'approve';
+      const reviewNote = typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 1000) : '';
+
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      const quote = await query.get(quoteId, { useMasterKey: true });
+      if (!quote) return this.sendError(res, 'Cotización no encontrada', 404);
+
+      const serviceItems = quote.get('serviceItems') || {};
+      let target = null;
+      let targetDay = null;
+      (serviceItems.days || []).forEach((d) => (d.subconcepts || []).forEach((sc) => {
+        if (sc && sc.id === serviceId) { target = sc; targetDay = d; }
+      }));
+      if (!target) return this.sendError(res, 'Servicio no encontrado en la cotización', 404);
+      if (!target.changeRequest || target.changeRequest.status !== 'pending') {
+        return this.sendError(res, 'Este servicio no tiene una solicitud pendiente', 400);
+      }
+
+      const reqType = target.changeRequest.type;
+      const { requestId } = target.changeRequest;
+      const reviewerName = `${currentUser.get('firstName') || ''} ${currentUser.get('lastName') || ''}`.trim()
+        || currentUser.get('email') || currentUser.get('username') || 'Admin';
+      const reviewedAt = new Date();
+      const newStatus = decision === 'approve' ? 'approved' : 'rejected';
+      let action;
+      let serviceDeleted = false;
+
+      if (decision === 'approve' && reqType === 'delete') {
+        targetDay.subconcepts = (targetDay.subconcepts || []).filter((sc) => sc.id !== serviceId);
+        serviceDeleted = true;
+        action = 'deleted';
+      } else {
+        // modify-approve o reject: el servicio se queda; el marcador inline transiciona a
+        // aprobada/rechazada (badge del owner) hasta que lo vea (seenByRequester=false).
+        target.changeRequest = {
+          ...target.changeRequest,
+          status: newStatus,
+          reviewedByName: reviewerName,
+          reviewedAt: reviewedAt.toISOString(),
+          reviewNote,
+          seenByRequester: false,
+        };
+        action = decision === 'approve' ? 'modify-approved' : 'rejected';
+      }
+
+      quote.set('serviceItems', serviceItems);
+      await quote.save(null, { useMasterKey: true });
+
+      // Actualizar el registro durable (historial).
+      if (requestId) {
+        try {
+          const rec = await new Parse.Query('ServiceChangeRequest').get(requestId, { useMasterKey: true });
+          if (rec) {
+            rec.set('status', newStatus);
+            rec.set('reviewedBy', { __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id });
+            rec.set('reviewedByName', reviewerName);
+            rec.set('reviewedAt', reviewedAt);
+            rec.set('reviewNote', reviewNote);
+            rec.set('serviceDeleted', serviceDeleted);
+            rec.set('seenByRequester', false); // el owner debe enterarse del resultado
+            await rec.save(null, { useMasterKey: true });
+          }
+        } catch (recErr) {
+          logger.warn('reviewServiceChange: no se pudo actualizar el registro', { error: recErr.message, requestId });
+        }
+      }
+
+      logger.info('Service change reviewed', {
+        quoteId: quote.id, serviceId, decision, reqType, action, reviewedBy: currentUser.id,
+      });
+      const reviewedLabel = (target && target.concept) || 'servicio';
+      await QuoteActivityService.log({
+        quoteId: quote.id,
+        actor: currentUser,
+        actorRole: req.userRole,
+        action: decision === 'approve' ? 'change_approved' : 'change_rejected',
+        summary: `${decision === 'approve' ? 'aprobó' : 'rechazó'} la solicitud de ${reqType === 'delete' ? 'borrado' : 'modificación'} de "${reviewedLabel}"`,
+        meta: { serviceId, type: reqType, requestId },
+      });
+      return this.sendSuccess(res, { serviceId, action, type: reqType }, 'Solicitud revisada', 200);
+    } catch (error) {
+      logger.error('Error in reviewServiceChange', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al revisar la solicitud',
+        500
+      );
+    }
+  }
+
+  /**
+   * GET /api/quotes/:id/change-requests — Historial de solicitudes de cambio de la cotización
+   * (Fase 3). Devuelve la lista para el modal y un contador de novedades: admin = pendientes;
+   * owner = sus solicitudes resueltas sin ver.
+   * @param {object} req - Express request; params id.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { requests, counter }.
+   * @example
+   *   GET /api/quotes/abc/change-requests
+   */
+  async getServiceChangeRequests(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId } = req.params;
+      const isAdmin = ['admin', 'superadmin'].includes(req.userRole);
+
+      const q = new Parse.Query('ServiceChangeRequest');
+      q.equalTo('quote', { __type: 'Pointer', className: 'Quote', objectId: quoteId });
+      q.equalTo('exists', true);
+      q.descending('createdAt');
+      q.limit(500);
+      const records = await q.find({ useMasterKey: true });
+      const requests = records.map((r) => r.toDisplayJSON());
+
+      const counter = isAdmin
+        ? requests.filter((r) => r.status === 'pending').length
+        : requests.filter((r) => r.status !== 'pending' && !r.seenByRequester
+          && r.requestedById === currentUser.id).length;
+
+      return this.sendSuccess(res, { requests, counter, isAdmin }, 'OK', 200);
+    } catch (error) {
+      logger.error('Error in getServiceChangeRequests', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al obtener las solicitudes',
+        500
+      );
+    }
+  }
+
+  /**
+   * POST /api/quotes/:id/change-requests/mark-seen — Marca como vistas las solicitudes resueltas
+   * del owner (limpia el contador) y limpia los marcadores inline resueltos del subconcepto.
+   * @param {object} req - Express request; params id.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON.
+   * @example
+   *   POST /api/quotes/abc/change-requests/mark-seen
+   */
+  async markServiceChangeRequestsSeen(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId } = req.params;
+
+      const q = new Parse.Query('ServiceChangeRequest');
+      q.equalTo('quote', { __type: 'Pointer', className: 'Quote', objectId: quoteId });
+      q.equalTo('requestedBy', { __type: 'Pointer', className: 'AmexingUser', objectId: currentUser.id });
+      q.equalTo('exists', true);
+      q.notEqualTo('status', 'pending');
+      q.equalTo('seenByRequester', false);
+      q.limit(500);
+      const records = await q.find({ useMasterKey: true });
+      records.forEach((r) => r.set('seenByRequester', true));
+      if (records.length) await Parse.Object.saveAll(records, { useMasterKey: true });
+
+      // Limpiar los marcadores inline resueltos del owner en el subconcepto.
+      const quote = await new Parse.Query('Quote').equalTo('exists', true).get(quoteId, { useMasterKey: true }).catch(() => null);
+      if (quote) {
+        const serviceItems = quote.get('serviceItems') || {};
+        let changed = false;
+        const newDays = (serviceItems.days || []).map((d) => ({
+          ...d,
+          subconcepts: (d.subconcepts || []).map((sc) => {
+            const cr = sc && sc.changeRequest;
+            if (cr && cr.status && cr.status !== 'pending' && cr.requestedBy === currentUser.id) {
+              changed = true;
+              const rest = { ...sc };
+              delete rest.changeRequest;
+              return rest;
+            }
+            return sc;
+          }),
+        }));
+        if (changed) {
+          serviceItems.days = newDays;
+          quote.set('serviceItems', serviceItems);
+          await quote.save(null, { useMasterKey: true });
+        }
+      }
+
+      return this.sendSuccess(res, { seen: records.length }, 'OK', 200);
+    } catch (error) {
+      logger.error('Error in markServiceChangeRequestsSeen', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error',
+        500
+      );
+    }
+  }
+
+  /**
+   * GET /api/quotes/:id/activity — Timeline de actividades legible de la cotización (Fase A).
+   * Lo ven admin y owner/agencia (nivel 4+). Read-only.
+   * @param {object} req - Express request; params id.
+   * @param {object} res - Express response.
+   * @returns {Promise<void>} JSON { activities }.
+   * @example
+   *   GET /api/quotes/abc/activity
+   */
+  async getQuoteActivity(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) return this.sendError(res, 'Autenticación requerida', 401);
+      const { id: quoteId } = req.params;
+      const activities = await QuoteActivityService.list(quoteId);
+      return this.sendSuccess(res, { activities }, 'OK', 200);
+    } catch (error) {
+      logger.error('Error in getQuoteActivity', { error: error.message });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al obtener la actividad',
         500
       );
     }
@@ -3622,6 +4449,8 @@ class QuoteController {
         paymentInfoId,
         billingProfileId,
         force,
+        showTips,
+        showDiscounts,
       } = req.body;
 
       const result = await this.quoteService.generateReceipt(
@@ -3631,7 +4460,9 @@ class QuoteController {
         includePaymentInfo, // Pass the flag from request
         paymentInfoId, // Pass the specific payment info ID
         billingProfileId, // Perfil de facturación elegido (o undefined)
-        force === true // Override admin del bloqueo de reservación no saldada
+        force === true, // Override admin del bloqueo de reservación no saldada
+        // Desglose por servicio en el recibo (default: mostrar). No afecta los totales.
+        { showTips: showTips !== false, showDiscounts: showDiscounts !== false }
       );
 
       // If PDF buffer is returned, send it as a downloadable file
@@ -4574,6 +5405,103 @@ class QuoteController {
       success: false,
       error,
     });
+  }
+
+  /**
+   * Evalúa la consistencia de totales del payload de service-items contra el motor de precios
+   * (costura #1). Compara el subtotal recibido contra la suma de los totales de subconceptos, y cada
+   * subconcepto contra pricesByType[paymentType]. Es pura: no toca Parse ni loggea. Divergencias de
+   * hasta 0.01 se ignoran; entre 0.01 y PRICE_MISMATCH_TOLERANCE ($1.00) se reportan como warning
+   * (subtotalDiff / subconceptMismatches / totalDiff, para que el controller loggee igual que antes);
+   * una divergencia MAYOR a la tolerancia produce `rejectMessage`, que el controller convierte en 400
+   * sin guardar nada. El límite es inclusivo del lado "está bien": exactamente $1.00 no rechaza.
+   * @param {object} params - Payload numérico ya validado.
+   * @param {Array<object>} params.days - Días con `subconcepts`.
+   * @param {number} params.subtotal - Subtotal recibido del front.
+   * @param {number} params.iva - IVA recibido del front.
+   * @param {number} params.total - Total recibido del front.
+   * @param {string} params.paymentType - Método de pago ancla (llave de pricesByType).
+   * @returns {object} Métricas de divergencia + `rejectMessage` (string|null).
+   * @example
+   * this.evaluateTotalsConsistency({ days, subtotal, iva, total, paymentType });
+   */
+  evaluateTotalsConsistency({
+    days, subtotal, iva, total, paymentType,
+  }) {
+    const pricingEngine = require('../../../domain/pricing/pricingEngine');
+    const r2 = pricingEngine.round2;
+
+    let sumOfSubconceptTotals = 0;
+    let subconceptMismatches = 0;
+    let subconceptHardMismatch = null; // primer subconcepto que supera la tolerancia
+    (Array.isArray(days) ? days : []).forEach((day) => {
+      ((day && day.subconcepts) || []).forEach((sc) => {
+        if (!sc || sc.includeInTotal === false) return;
+        const scTotal = parseFloat(sc.total) || 0;
+        sumOfSubconceptTotals += scTotal;
+        if (sc.pricesByType && typeof sc.pricesByType === 'object') {
+          const base = parseFloat(sc.pricesByType[paymentType]);
+          if (!Number.isNaN(base)) {
+            // El descuento por servicio (Fase 1) se captura en efectivo y ya viene restado del precio
+            // neto guardado (sc.total). Se escala por el mismo factor multiplicativo que el front
+            // (getServiceDiscountInPaymentType) para que ambos lados comparen la misma fórmula; sin
+            // restarlo aquí, cualquier servicio con descuento divergiría del pricesByType bruto y se
+            // rechazaría por error.
+            const discEf = parseFloat(sc.discountAmount) || 0;
+            let discountInType = 0;
+            if (discEf > 0) {
+              const efBase = Number(sc.pricesByType.efectivo);
+              discountInType = (efBase > 0 && sc.pricesByType[paymentType] != null)
+                ? r2(discEf * (base / efBase))
+                : discEf;
+            }
+            const expected = Math.max(0, r2(base - discountInType));
+            const diff = Math.abs(expected - r2(scTotal));
+            if (diff > 0.01) {
+              subconceptMismatches += 1;
+              if (diff > PRICE_MISMATCH_TOLERANCE && !subconceptHardMismatch) {
+                subconceptHardMismatch = { concept: sc.concept, diff: r2(diff) };
+              }
+            }
+          }
+        }
+      });
+    });
+
+    sumOfSubconceptTotals = r2(sumOfSubconceptTotals);
+    const subtotalRounded = r2(subtotal);
+    const subtotalSignedDiff = r2(subtotalRounded - sumOfSubconceptTotals);
+    const subtotalDiff = Math.abs(subtotalSignedDiff);
+
+    const ivaRounded = r2(parseFloat(iva) || 0);
+    const totalEsperado = r2(subtotalRounded + ivaRounded);
+    const totalRecibido = r2(total);
+    const totalDiff = Math.abs(totalEsperado - totalRecibido);
+
+    // Se prefiere el mensaje específico del subconcepto (más accionable); si no, el del subtotal.
+    let rejectMessage = null;
+    if (subconceptHardMismatch) {
+      const label = subconceptHardMismatch.concept ? `"${subconceptHardMismatch.concept}"` : 'un servicio';
+      rejectMessage = `El precio de ${label} no coincide con lo calculado `
+        + `(diferencia de $${subconceptHardMismatch.diff.toFixed(2)}). Verifica el precio antes de guardar.`;
+    } else if (subtotalDiff > PRICE_MISMATCH_TOLERANCE) {
+      rejectMessage = `El subtotal ($${subtotalRounded.toFixed(2)}) no coincide con la suma de los servicios `
+        + `($${sumOfSubconceptTotals.toFixed(2)}), diferencia de $${subtotalDiff.toFixed(2)}. `
+        + 'Verifica los precios antes de guardar.';
+    }
+
+    return {
+      subtotalRounded,
+      sumOfSubconceptTotals,
+      subtotalSignedDiff,
+      subtotalDiff,
+      subconceptMismatches,
+      ivaRounded,
+      totalEsperado,
+      totalRecibido,
+      totalDiff,
+      rejectMessage,
+    };
   }
 }
 

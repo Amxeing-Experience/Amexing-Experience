@@ -65,6 +65,9 @@ class ExperienceController {
 
       // Parse the includeInactive parameter (for admin views)
       const includeInactive = req.query.includeInactive === 'true';
+      // Solo el admin (tablas de Proveedores/Establecimientos) manda searchChildren=true
+      // para que la búsqueda también encuentre por nombre de experiencia hija.
+      const searchChildren = req.query.searchChildren === 'true';
 
       // Get total records count
       const totalQuery = this.buildBaseQuery(params.typeFilter, null, null, includeInactive);
@@ -72,12 +75,13 @@ class ExperienceController {
 
       // Build filtered query (with day-of-week filtering if dayDate provided)
       const filteredQuery = params.searchValue
-        ? this.buildSearchQuery(
+        ? await this.buildSearchQuery(
           params.searchValue,
           params.typeFilter,
           params.excludeId,
           params.dayDate,
-          includeInactive
+          includeInactive,
+          searchChildren
         )
         : this.buildBaseQuery(params.typeFilter, params.excludeId, params.dayDate, includeInactive);
 
@@ -229,6 +233,11 @@ class ExperienceController {
       cancellation_policy: experience.get('cancellation_policy') || null,
       buyout: (experience.get('buyout') !== undefined ? experience.get('buyout') : null),
       experience_category: experience.get('experience_category') || null,
+      tipo: experience.get('tipo') || null,
+      general_guide: experience.get('general_guide') || false,
+      general_chofer: experience.get('general_chofer') || false,
+      general_guide_rate: experience.get('general_guide_rate') || null,
+      general_chofer_rate: experience.get('general_chofer_rate') || null,
       private_min_type: experience.get('private_min_type') || null,
       private_min_value: (experience.get('private_min_value') !== undefined ? experience.get('private_min_value') : null),
       time_journey: experience.get('time_journey'),
@@ -267,6 +276,97 @@ class ExperienceController {
   }
 
   /**
+   * Get ALL experiences combined from the 3 sources (standalone Experience + provider &
+   * establishment ProviderExperiencia) normalized into a single list for the admin index.
+   * Read-only: each row carries `source` and `parentId` so the UI can deep-link to the
+   * correct editor. No pagination (admin catalog is small enough).
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Returns the normalized combined list or error.
+   * @author Denisse Maldonado
+   * @since 1.0.0
+   * @example
+   * // GET /api/experiences/all-combined
+   */
+  async getAllCombinedExperiences(req, res) {
+    try {
+      if (!req.user) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      // 1) Experiencias estándar (type=Experience, vigentes).
+      const expQuery = new Parse.Query('Experience');
+      expQuery.equalTo('type', 'Experience');
+      expQuery.equalTo('exists', true);
+      expQuery.doesNotExist('valid_until');
+      expQuery.include('destinationPOI');
+      expQuery.limit(10000);
+
+      // 2) Experiencias de proveedor/establecimiento (ProviderExperiencia activas).
+      const peQuery = new Parse.Query('ProviderExperiencia');
+      peQuery.equalTo('exists', true);
+      peQuery.include('provider');
+      peQuery.include('provider.destinationPOI');
+      peQuery.limit(10000);
+
+      const [standalone, providerExps] = await Promise.all([
+        expQuery.find({ useMasterKey: true }),
+        peQuery.find({ useMasterKey: true }),
+      ]);
+
+      const rows = [];
+
+      standalone.forEach((e) => {
+        const poi = e.get('destinationPOI');
+        rows.push({
+          id: e.id,
+          source: 'standalone',
+          name: e.get('name') || '',
+          category: e.get('experience_category') || null,
+          destino: poi ? poi.get('name') : null,
+          active: e.get('active') === true,
+          popular: e.get('popular') === true,
+          parentId: null,
+          parentName: null,
+        });
+      });
+
+      providerExps.forEach((pe) => {
+        const prov = pe.get('provider');
+        // Ignora experiencias cuyo proveedor ya no existe (huérfanas).
+        if (!prov || prov.get('exists') !== true) return;
+        const provType = prov.get('type'); // 'Provider' | 'Establishment'
+        const poi = prov.get('destinationPOI');
+        rows.push({
+          id: pe.id,
+          source: provType === 'Establishment' ? 'establishment' : 'provider',
+          name: pe.get('name') || '',
+          category: pe.get('experience_category') || null,
+          destino: poi ? poi.get('name') : null,
+          active: pe.get('active') === true,
+          popular: pe.get('popular') === true,
+          parentId: prov.id,
+          parentName: prov.get('name') || '',
+        });
+      });
+
+      rows.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
+
+      return res.json({ success: true, data: rows, count: rows.length });
+    } catch (error) {
+      logger.error('Error in ExperienceController.getAllCombinedExperiences', {
+        error: error.message,
+        userId: req.user?.id,
+      });
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve combined experiences',
+        500
+      );
+    }
+  }
+
+  /**
    * Get experience by ID.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
@@ -297,6 +397,8 @@ class ExperienceController {
       query.include('tours');
       query.include('vehicleType');
       query.include('destinationPOI');
+      query.include('entradas');
+      query.include('entradas.destino');
 
       const experience = await query.get(experienceId, { useMasterKey: true });
 
@@ -318,6 +420,22 @@ class ExperienceController {
         vehicleType,
         destinationPOI
       );
+
+      // Entradas asociadas (boletos de acceso). NO ligadas al destino de la experiencia.
+      const entradas = experience.get('entradas') || [];
+      data.entradas = entradas
+        .filter((e) => e && e.id)
+        .map((e) => {
+          const destino = e.get('destino');
+          const priceVal = e.get('price');
+          return {
+            id: e.id,
+            name: e.get('name') || '',
+            price: typeof priceVal === 'number' ? priceVal : Number(priceVal) || 0,
+            destinoId: destino ? destino.id : null,
+            destinoName: destino ? destino.get('name') || '' : '',
+          };
+        });
 
       // Debug logging
       logger.info('Experience getById - Returning data', {
@@ -346,6 +464,72 @@ class ExperienceController {
       return this.sendError(
         res,
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve experience',
+        500
+      );
+    }
+  }
+
+  /**
+   * PATCH /api/experiences/:id/popular - Toggle the "popular" flag (admin curation).
+   * Popular items are surfaced as a quick-view section for certain end clients.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async togglePopular(req, res) {
+    try {
+      const currentUser = req.user;
+      const experienceId = req.params.id;
+
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      if (!experienceId) {
+        return this.sendError(res, 'Experience ID is required', 400);
+      }
+
+      const popular = req.body && (req.body.popular === true || req.body.popular === 'true');
+
+      const query = new Parse.Query('Experience');
+      query.equalTo('exists', true);
+      // Only touch the current (non-versioned) record - price versioning
+      query.doesNotExist('valid_until');
+
+      const experience = await query.get(experienceId, { useMasterKey: true });
+
+      if (!experience) {
+        return this.sendError(res, 'Experience not found', 404);
+      }
+
+      experience.set('popular', popular);
+      await experience.save(null, { useMasterKey: true });
+
+      logger.info('Experience popular flag toggled', {
+        experienceId,
+        popular,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: { id: experience.id, popular },
+      });
+    } catch (error) {
+      logger.error('Error in ExperienceController.togglePopular', {
+        error: error.message,
+        experienceId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      if (error.code === Parse.Error.OBJECT_NOT_FOUND) {
+        return this.sendError(res, 'Experience not found', 404);
+      }
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to update experience',
         500
       );
     }
@@ -697,6 +881,23 @@ class ExperienceController {
     if (experienceCategory !== undefined && experienceCategory !== null && experienceCategory !== '') {
       experienceObj.set('experience_category', experienceCategory);
     }
+    // Tipo de experiencia (Exclusivo / Compartido / Privado), como en experiencias de proveedor.
+    if (data.tipo !== undefined && data.tipo !== null && data.tipo !== '') {
+      experienceObj.set('tipo', String(data.tipo));
+    }
+    // Guía/chofer GENERALES: aplican a toda la experiencia (costo fijo = tarifa/h × duración).
+    if (data.general_guide !== undefined && data.general_guide !== null) {
+      experienceObj.set('general_guide', !!data.general_guide);
+    }
+    if (data.general_chofer !== undefined && data.general_chofer !== null) {
+      experienceObj.set('general_chofer', !!data.general_chofer);
+    }
+    if (data.general_guide_rate !== undefined && data.general_guide_rate !== null && data.general_guide_rate !== '') {
+      experienceObj.set('general_guide_rate', parseFloat(data.general_guide_rate));
+    }
+    if (data.general_chofer_rate !== undefined && data.general_chofer_rate !== null && data.general_chofer_rate !== '') {
+      experienceObj.set('general_chofer_rate', parseFloat(data.general_chofer_rate));
+    }
     if (privateMinType !== undefined && privateMinType !== null && privateMinType !== '') {
       experienceObj.set('private_min_type', privateMinType);
     }
@@ -756,6 +957,18 @@ class ExperienceController {
       const poiPointer = new Parse.Object('POI');
       poiPointer.id = destinationPOI.trim();
       experienceObj.set('destinationPOI', poiPointer);
+    }
+
+    // Entradas asociadas (boletos de acceso; NO ligadas al destino de la experiencia)
+    if (Array.isArray(data.entradas)) {
+      const entradaPointers = data.entradas
+        .filter((id) => id && String(id).trim() !== '')
+        .map((id) => {
+          const p = new Parse.Object('Entrada');
+          p.id = String(id).trim();
+          return p;
+        });
+      experienceObj.set('entradas', entradaPointers);
     }
 
     return experienceObj;
@@ -1081,6 +1294,23 @@ class ExperienceController {
     if (experienceCategory !== undefined) {
       experienceObj.set('experience_category', (experienceCategory === null || experienceCategory === '') ? null : experienceCategory);
     }
+    // Tipo de experiencia (Exclusivo / Compartido / Privado).
+    if (data.tipo !== undefined) {
+      experienceObj.set('tipo', (data.tipo === null || data.tipo === '') ? null : String(data.tipo));
+    }
+    // Guía/chofer GENERALES (toda la experiencia).
+    if (data.general_guide !== undefined) {
+      experienceObj.set('general_guide', !!data.general_guide);
+    }
+    if (data.general_chofer !== undefined) {
+      experienceObj.set('general_chofer', !!data.general_chofer);
+    }
+    if (data.general_guide_rate !== undefined) {
+      experienceObj.set('general_guide_rate', (data.general_guide_rate === null || data.general_guide_rate === '') ? null : parseFloat(data.general_guide_rate));
+    }
+    if (data.general_chofer_rate !== undefined) {
+      experienceObj.set('general_chofer_rate', (data.general_chofer_rate === null || data.general_chofer_rate === '') ? null : parseFloat(data.general_chofer_rate));
+    }
 
     if (privateMinType !== undefined) {
       if (privateMinType === null || privateMinType === '') {
@@ -1261,7 +1491,29 @@ class ExperienceController {
    * @example
    */
   async updateExperienceRelationships(experienceObj, experienceId, data) {
-    const { experiences, providerExperiences, tours } = data;
+    const {
+      experiences, providerExperiences, tours, entradas,
+    } = data;
+
+    // Update entradas array (boletos de acceso asociados; NO ligados al destino)
+    if (entradas !== undefined) {
+      if (Array.isArray(entradas) && entradas.length > 0) {
+        const entradaPointers = [];
+        for (const entId of entradas) {
+          try {
+            const entQuery = new Parse.Query('Entrada');
+            entQuery.notEqualTo('exists', false);
+            const ent = await entQuery.get(entId, { useMasterKey: true });
+            if (ent) entradaPointers.push(ent);
+          } catch (err) {
+            // Ignora entradas inexistentes en lugar de fallar todo el guardado.
+          }
+        }
+        experienceObj.set('entradas', entradaPointers);
+      } else {
+        experienceObj.set('entradas', []);
+      }
+    }
 
     // Update experiences array
     if (experiences !== undefined) {
@@ -1457,6 +1709,14 @@ class ExperienceController {
       // Extract cost change information if it exists
       const costChangeInfo = basicFieldsResult && basicFieldsResult.costChanged ? basicFieldsResult : null;
 
+      // Versionado EXPLÍCITO: solo se crea una nueva versión (nuevo registro) si el cliente
+      // pide createVersion === true. Si no, el cambio de costo se guarda EN EL MISMO registro
+      // (sin nuevo objectId), evitando ids obsoletos y versiones basura del autoguardado.
+      const shouldVersion = !!(costChangeInfo && costChangeInfo.costChanged && req.body.createVersion === true);
+      if (costChangeInfo && costChangeInfo.costChanged && !shouldVersion) {
+        experienceObj.set('cost', costChangeInfo.newCost);
+      }
+
       const relationshipsError = await this.updateExperienceRelationships(experienceObj, experienceId, req.body);
       if (relationshipsError) {
         return this.sendError(res, relationshipsError.error, relationshipsError.status);
@@ -1486,8 +1746,8 @@ class ExperienceController {
         }
       }
 
-      // Handle cost versioning if cost was changed
-      if (costChangeInfo && costChangeInfo.costChanged) {
+      // Handle cost versioning ONLY when explicitly requested (createVersion === true).
+      if (shouldVersion) {
         logger.info('Cost changed, implementing versioning', {
           experienceId: experienceObj.id,
           oldCost: costChangeInfo.oldCost,
@@ -1817,11 +2077,19 @@ class ExperienceController {
    * @param {string} excludeId - ID to exclude.
    * @param {string} dayDate - Date in YYYY-MM-DD format for day-of-week filtering.
    * @param {boolean} includeInactive - Whether to include inactive experiences (default: false).
+   * @param includeChildren
    * @returns {Parse.Query} Filtered query.
    * @private
    * @example
    */
-  buildSearchQuery(searchValue, typeFilter, excludeId, dayDate, includeInactive = false) {
+  async buildSearchQuery(
+    searchValue,
+    typeFilter,
+    excludeId,
+    dayDate,
+    includeInactive = false,
+    includeChildren = false
+  ) {
     const nameQuery = new Parse.Query('Experience');
     nameQuery.equalTo('exists', true);
 
@@ -1860,7 +2128,38 @@ class ExperienceController {
       }
     }
 
-    return Parse.Query.or(nameQuery, descQuery);
+    const queries = [nameQuery, descQuery];
+
+    // Rama opcional (solo admin): incluir padres cuyas experiencias hijas
+    // (ProviderExperiencia) coinciden por nombre. Cubre Proveedores y Establecimientos.
+    if (includeChildren) {
+      const childQuery = new Parse.Query('ProviderExperiencia');
+      childQuery.equalTo('exists', true);
+      childQuery.matches('name', searchValue, 'i');
+      childQuery.select('provider');
+      childQuery.limit(1000);
+      const children = await childQuery.find({ useMasterKey: true });
+      const parentIds = [
+        ...new Set(children.map((c) => (c.get('provider') ? c.get('provider').id : null)).filter(Boolean)),
+      ];
+
+      const byExperiencia = new Parse.Query('Experience');
+      byExperiencia.equalTo('exists', true);
+      if (!includeInactive) byExperiencia.equalTo('active', true);
+      byExperiencia.doesNotExist('valid_until');
+      if (typeFilter) byExperiencia.equalTo('type', typeFilter);
+      if (excludeId) byExperiencia.notEqualTo('objectId', excludeId);
+      if (dayDate) {
+        const QuoteServiceHelper = require('../../services/QuoteServiceHelper');
+        const dayCode = QuoteServiceHelper.getDayOfWeekCode(dayDate);
+        if (dayCode !== null) byExperiencia.equalTo('availability.day', dayCode);
+      }
+      // Si no hubo coincidencias, un id imposible evita traer todo por error.
+      byExperiencia.containedIn('objectId', parentIds.length ? parentIds : ['__none_match__']);
+      queries.push(byExperiencia);
+    }
+
+    return Parse.Query.or(...queries);
   }
 
   /**
@@ -1939,6 +2238,11 @@ class ExperienceController {
       cancellation_policy: experience.get('cancellation_policy') || null,
       buyout: (experience.get('buyout') !== undefined ? experience.get('buyout') : null),
       experience_category: experience.get('experience_category') || null,
+      tipo: experience.get('tipo') || null,
+      general_guide: experience.get('general_guide') || false,
+      general_chofer: experience.get('general_chofer') || false,
+      general_guide_rate: experience.get('general_guide_rate') || null,
+      general_chofer_rate: experience.get('general_chofer_rate') || null,
       private_min_type: experience.get('private_min_type') || null,
       private_min_value: (experience.get('private_min_value') !== undefined ? experience.get('private_min_value') : null),
       experienciasCount,
@@ -1980,6 +2284,7 @@ class ExperienceController {
       totalItemCount: includedExperiences.length + includedProviderExperiences.length + includedTours.length,
       availability: experience.get('availability') || null,
       fixed_schedule: experience.get('fixed_schedule') === true,
+      popular: experience.get('popular') === true,
       photos,
       active: experience.get('active'),
       createdAt: experience.createdAt,

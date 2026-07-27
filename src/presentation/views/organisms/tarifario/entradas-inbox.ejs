@@ -1,0 +1,455 @@
+<%
+/**
+ * Entradas Inbox Organism — bandeja master-detail de Entradas por destino.
+ * Created by Denisse Maldonado
+ *
+ * Atomic Design Level: Organism
+ * Category: Tarifario
+ *
+ * Izquierda: lista de Destinos (POI, GET /api/pois/active). El buscador filtra
+ * por nombre de destino Y por nombre de entrada (índice GET /api/destinos/all-entradas).
+ * Derecha: tabla de Entradas del destino seleccionado + formulario inline SIEMPRE
+ * visible (nombre, precio). Editar una fila reusa el mismo formulario.
+ * Endpoints Entradas: /api/destinos/:destinoId/entradas (GET/POST/PUT/DELETE).
+ */
+%>
+
+<style>
+.entradas-inbox { --ent-olive: #6E7A50; --ent-border: #d6d1c4; --ent-muted: #8a8f78; }
+.entradas-inbox .card { border-radius: 12px; }
+.entradas-inbox .entradas-list { max-height: 70vh; overflow-y: auto; }
+.entradas-inbox .destino-item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 12px 16px; border: none; background: transparent; text-align: left;
+    border-bottom: 1px solid var(--ent-border); cursor: pointer; transition: background .12s;
+}
+.entradas-inbox .destino-item:hover { background: rgba(110,122,80,0.06); }
+.entradas-inbox .destino-item.active { background: #eef0e8; box-shadow: inset 3px 0 0 0 var(--ent-olive); }
+.entradas-inbox .destino-item .destino-name { font-weight: 600; color: #2b2b2b; font-size: 0.9rem; }
+.entradas-inbox .destino-item .destino-meta { font-size: 0.72rem; color: var(--ent-muted); }
+.entradas-inbox .destino-item .destino-hit { font-size: 0.72rem; color: var(--ent-olive); }
+.entradas-inbox .destino-icon { width: 34px; height: 34px; border-radius: 8px; background: rgba(110,122,80,0.12); color: var(--ent-olive); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.entradas-inbox .list-search { border: 1px solid var(--ent-border); border-radius: 8px; }
+.entradas-inbox .btn-olive { background: var(--ent-olive); border-color: var(--ent-olive); color: #fff; }
+.entradas-inbox .btn-olive:hover { background: #7C8A5A; border-color: #7C8A5A; color: #fff; }
+.entradas-inbox .empty-state { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ent-muted); text-align: center; padding: 24px; }
+.entradas-inbox .price-cell { font-weight: 600; color: var(--ent-olive); white-space: nowrap; }
+.entradas-inbox mark { background: #fff3ba; padding: 0 2px; border-radius: 3px; }
+
+/* -------- Composer (formulario inline) -------- */
+.entradas-inbox .ent-composer {
+    position: relative; background: #fff; border: 1px solid var(--ent-border);
+    border-radius: 12px; padding: 16px 18px 18px 20px; box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    transition: box-shadow .15s, border-color .15s;
+}
+.entradas-inbox .ent-composer::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+    background: var(--ent-olive); border-radius: 12px 0 0 12px; transition: background .15s;
+}
+.entradas-inbox .ent-composer.editing { border-color: #ecd7a6; box-shadow: 0 2px 10px rgba(217,164,65,.12); }
+.entradas-inbox .ent-composer.editing::before { background: #d9a441; }
+.entradas-inbox .ent-composer-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.entradas-inbox .ent-composer-icon {
+    width: 38px; height: 38px; border-radius: 10px; background: rgba(110,122,80,.12); color: var(--ent-olive);
+    display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex: 0 0 auto; transition: all .15s;
+}
+.entradas-inbox .ent-composer.editing .ent-composer-icon { background: rgba(217,164,65,.16); color: #b9822a; }
+.entradas-inbox .ent-composer-title { display: block; font-weight: 700; font-size: .95rem; color: #2b2b2b; line-height: 1.15; }
+.entradas-inbox .ent-composer-sub { display: block; font-size: .75rem; color: var(--ent-muted); }
+.entradas-inbox .ent-composer .form-label { font-size: .7rem; letter-spacing: .04em; text-transform: uppercase; color: var(--ent-muted); font-weight: 600; margin-bottom: 4px; }
+.entradas-inbox .ent-composer .form-control:focus,
+.entradas-inbox .ent-composer .input-group:focus-within .form-control { border-color: var(--ent-olive); box-shadow: 0 0 0 .2rem rgba(110,122,80,.15); }
+.entradas-inbox .ent-composer .input-group-text { background: #f3f2ec; border-color: var(--ent-border); color: var(--ent-muted); font-weight: 600; }
+.entradas-inbox .ent-cancel-link { text-decoration: none; font-size: .8rem; }
+</style>
+
+<div class="entradas-inbox">
+    <div class="row g-3">
+        <!-- ================= IZQUIERDA: DESTINOS ================= -->
+        <div class="col-lg-5 col-xl-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-bottom">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <h6 class="mb-0 fw-bold"><i class="ti ti-map-pin me-2"></i>Destinos</h6>
+                        <span class="badge bg-light text-muted" id="entDestinoCount">0</span>
+                    </div>
+                    <input type="text" id="entDestinoSearch" class="form-control form-control-sm list-search"
+                           placeholder="Buscar destino o entrada..." autocomplete="off">
+                </div>
+                <div class="card-body p-0">
+                    <div class="entradas-list" id="entDestinoList">
+                        <div class="p-4 text-center text-muted">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            <div class="mt-2 small">Cargando destinos...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= DERECHA: ENTRADAS ================= -->
+        <div class="col-lg-7 col-xl-8">
+            <div class="card border-0 shadow-sm h-100">
+                <!-- Empty state -->
+                <div id="entEmpty" class="empty-state">
+                    <div class="destino-icon mb-3" style="width:56px;height:56px;">
+                        <i class="ti ti-ticket" style="font-size:1.6rem;"></i>
+                    </div>
+                    <h6 class="fw-bold mb-1">Selecciona un destino</h6>
+                    <p class="small mb-0">Elige un destino de la izquierda para ver y administrar sus entradas.</p>
+                </div>
+
+                <!-- Detail -->
+                <div id="entDetail" class="d-none">
+                    <div class="card-header bg-white border-bottom">
+                        <h5 class="mb-0 fw-bold" id="entDestinoName">—</h5>
+                        <small class="text-muted" id="entDestinoMeta"></small>
+                    </div>
+                    <div class="card-body">
+                        <div id="entAlert"></div>
+
+                        <!-- Composer inline (siempre visible; crea o edita) -->
+                        <div class="ent-composer mb-3" id="entComposer">
+                            <div class="ent-composer-head">
+                                <span class="ent-composer-icon"><i class="ti ti-plus" id="entComposerIcon"></i></span>
+                                <div class="flex-grow-1">
+                                    <span class="ent-composer-title" id="entFormTitle">Nueva entrada</span>
+                                    <span class="ent-composer-sub" id="entFormSub">Agrégala a este destino</span>
+                                </div>
+                                <button type="button" class="btn btn-link text-muted p-0 d-none ent-cancel-link" id="entBtnCancel">
+                                    <i class="ti ti-x me-1"></i>Cancelar
+                                </button>
+                            </div>
+                            <form id="entForm" autocomplete="off">
+                                <input type="hidden" id="entId">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="entName">Nombre</label>
+                                        <input type="text" class="form-control" id="entName" maxlength="280" required
+                                               placeholder="Ej. Entrada general">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label" for="entPrice">Precio</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">$</span>
+                                            <input type="number" class="form-control" id="entPrice" min="0" step="0.01" required
+                                                   placeholder="0.00">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3 d-grid">
+                                        <button type="submit" class="btn btn-olive" id="entBtnSave">
+                                            <i class="ti ti-plus me-1"></i>Agregar
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Tabla de entradas -->
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th style="width:160px;">Precio</th>
+                                        <th style="width:110px;" class="text-end">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="entTableBody"></tbody>
+                            </table>
+                        </div>
+                        <div id="entTableEmpty" class="text-center text-muted py-4 d-none">
+                            <i class="ti ti-ticket-off d-block mb-2" style="font-size:1.4rem;"></i>
+                            <span class="small">Este destino no tiene entradas todavía.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    // -------- Auth helper (cookie httpOnly + fallback Bearer) --------
+    function entGetToken() {
+        try {
+            if (typeof window.getAccessToken === 'function') return window.getAccessToken();
+            return localStorage.getItem('accessToken') || localStorage.getItem('token');
+        } catch (e) { return null; }
+    }
+    async function entFetch(url, opts) {
+        opts = opts || {};
+        var headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+        var t = entGetToken();
+        if (t) headers['Authorization'] = 'Bearer ' + t;
+        return fetch(url, Object.assign({ credentials: 'same-origin' }, opts, { headers: headers }));
+    }
+    function entMoney(n) {
+        return '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+    }
+    function highlight(text, term) {
+        var safe = esc(text);
+        if (!term) return safe;
+        var i = text.toLowerCase().indexOf(term);
+        if (i === -1) return safe;
+        // Reconstruye resaltando sobre el texto original (ya escapado por segmentos)
+        return esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + term.length)) + '</mark>' + esc(text.slice(i + term.length));
+    }
+
+    // -------- State & elements --------
+    var destinos = [];
+    var entradasByDestino = {}; // { destinoId: [entradaName, ...] }
+    var selectedDestino = null;
+
+    var listEl = document.getElementById('entDestinoList');
+    var countEl = document.getElementById('entDestinoCount');
+    var searchEl = document.getElementById('entDestinoSearch');
+    var emptyEl = document.getElementById('entEmpty');
+    var detailEl = document.getElementById('entDetail');
+    var nameEl = document.getElementById('entDestinoName');
+    var metaEl = document.getElementById('entDestinoMeta');
+    var tableBody = document.getElementById('entTableBody');
+    var tableEmpty = document.getElementById('entTableEmpty');
+    var alertEl = document.getElementById('entAlert');
+    var form = document.getElementById('entForm');
+    var composer = document.getElementById('entComposer');
+    var composerIcon = document.getElementById('entComposerIcon');
+    var formTitle = document.getElementById('entFormTitle');
+    var formSub = document.getElementById('entFormSub');
+    var btnCancel = document.getElementById('entBtnCancel');
+    var saveBtn = document.getElementById('entBtnSave');
+    var idInput = document.getElementById('entId');
+    var nameInput = document.getElementById('entName');
+    var priceInput = document.getElementById('entPrice');
+
+    function showAlert(type, msg) {
+        alertEl.innerHTML = '<div class="alert alert-' + type + ' alert-dismissible fade show py-2 small" role="alert">' +
+            esc(msg) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+    }
+    function clearAlert() { alertEl.innerHTML = ''; }
+
+    // -------- Destinos (izquierda) --------
+    function renderDestinos() {
+        var term = (searchEl.value || '').trim().toLowerCase();
+
+        var rows = destinos.map(function (d) {
+            var names = entradasByDestino[d.value] || [];
+            var nameMatch = !term || (d.label || '').toLowerCase().indexOf(term) !== -1;
+            var hit = term ? names.filter(function (n) { return n.toLowerCase().indexOf(term) !== -1; })[0] : null;
+            return { d: d, nameMatch: nameMatch, hit: hit || null };
+        }).filter(function (r) { return !term || r.nameMatch || r.hit; });
+
+        countEl.textContent = rows.length;
+
+        if (!rows.length) {
+            listEl.innerHTML = '<div class="p-4 text-center text-muted small">Sin resultados.</div>';
+            return;
+        }
+        listEl.innerHTML = rows.map(function (r) {
+            var d = r.d;
+            var meta = d.serviceType && d.serviceType.name ? esc(d.serviceType.name) : 'Destino';
+            var active = selectedDestino && selectedDestino.value === d.value ? ' active' : '';
+            var hitLine = r.hit
+                ? '<span class="destino-hit d-block text-truncate"><i class="ti ti-ticket me-1"></i>' + highlight(r.hit, term) + '</span>'
+                : '';
+            return '<button type="button" class="destino-item' + active + '" data-id="' + esc(d.value) + '">' +
+                '<span class="destino-icon"><i class="ti ti-map-pin"></i></span>' +
+                '<span class="flex-grow-1 text-truncate">' +
+                '<span class="destino-name d-block text-truncate">' + highlight(d.label || '', term) + '</span>' +
+                '<span class="destino-meta">' + meta + '</span>' +
+                hitLine +
+                '</span></button>';
+        }).join('');
+    }
+
+    async function loadDestinos() {
+        try {
+            var res = await entFetch('/api/pois/active');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            destinos = Array.isArray(data) ? data : (data.data || []);
+            renderDestinos();
+        } catch (e) {
+            listEl.innerHTML = '<div class="p-4 text-center text-danger small">Error al cargar destinos.</div>';
+        }
+    }
+
+    // Índice de entradas para búsqueda (destinoId -> [nombres])
+    async function loadEntradasIndex() {
+        try {
+            var res = await entFetch('/api/destinos/all-entradas');
+            if (!res.ok) return;
+            var data = await res.json();
+            var map = {};
+            ((data && data.data) || []).forEach(function (e) {
+                if (!e.destinoId) return;
+                (map[e.destinoId] = map[e.destinoId] || []).push(e.name || '');
+            });
+            entradasByDestino = map;
+            renderDestinos();
+        } catch (e) { /* búsqueda por entrada opcional */ }
+    }
+
+    function selectDestino(id) {
+        selectedDestino = destinos.filter(function (d) { return d.value === id; })[0] || null;
+        renderDestinos();
+        if (!selectedDestino) return;
+
+        emptyEl.classList.add('d-none');
+        detailEl.classList.remove('d-none');
+        nameEl.textContent = selectedDestino.label || 'Destino';
+        metaEl.textContent = selectedDestino.serviceType && selectedDestino.serviceType.name
+            ? selectedDestino.serviceType.name : '';
+        resetForm();
+        clearAlert();
+        loadEntradas(id);
+    }
+
+    // -------- Entradas (derecha) --------
+    function renderEntradas(items) {
+        if (!items.length) {
+            tableBody.innerHTML = '';
+            tableEmpty.classList.remove('d-none');
+            return;
+        }
+        tableEmpty.classList.add('d-none');
+        tableBody.innerHTML = items.map(function (e) {
+            return '<tr data-id="' + esc(e.id) + '">' +
+                '<td>' + esc(e.name) + '</td>' +
+                '<td class="price-cell">' + entMoney(e.price) + '</td>' +
+                '<td class="text-end">' +
+                '<div class="btn-group btn-group-sm" role="group">' +
+                '<button type="button" class="btn btn-outline-secondary ent-edit" data-id="' + esc(e.id) +
+                '" data-name="' + esc(e.name) + '" data-price="' + esc(e.price) + '" title="Editar"><i class="ti ti-edit"></i></button>' +
+                '<button type="button" class="btn btn-outline-danger ent-del" data-id="' + esc(e.id) +
+                '" data-name="' + esc(e.name) + '" title="Eliminar"><i class="ti ti-trash"></i></button>' +
+                '</div></td></tr>';
+        }).join('');
+    }
+
+    async function loadEntradas(destinoId) {
+        tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-3">' +
+            '<span class="spinner-border spinner-border-sm"></span></td></tr>';
+        tableEmpty.classList.add('d-none');
+        try {
+            var res = await entFetch('/api/destinos/' + encodeURIComponent(destinoId) + '/entradas');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var data = await res.json();
+            renderEntradas((data && data.data) || []);
+        } catch (e) {
+            tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger py-3 small">Error al cargar entradas.</td></tr>';
+        }
+    }
+
+    // -------- Formulario (siempre visible) --------
+    function resetForm() {
+        idInput.value = '';
+        nameInput.value = '';
+        priceInput.value = '';
+        composer.classList.remove('editing');
+        composerIcon.className = 'ti ti-plus';
+        formTitle.textContent = 'Nueva entrada';
+        formSub.textContent = 'Agrégala a este destino';
+        saveBtn.innerHTML = '<i class="ti ti-plus me-1"></i>Agregar';
+        btnCancel.classList.add('d-none');
+    }
+    function enterEditMode(entrada) {
+        idInput.value = entrada.id;
+        nameInput.value = entrada.name;
+        priceInput.value = entrada.price;
+        composer.classList.add('editing');
+        composerIcon.className = 'ti ti-edit';
+        formTitle.textContent = 'Editar entrada';
+        formSub.textContent = 'Modifica el nombre o el precio';
+        saveBtn.innerHTML = '<i class="ti ti-device-floppy me-1"></i>Guardar';
+        btnCancel.classList.remove('d-none');
+        composer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        nameInput.focus();
+    }
+
+    async function saveEntrada(ev) {
+        ev.preventDefault();
+        if (!selectedDestino) return;
+        var name = (nameInput.value || '').trim();
+        var price = priceInput.value;
+        if (!name) { showAlert('warning', 'El nombre es obligatorio.'); return; }
+        if (price === '' || Number(price) < 0 || !isFinite(Number(price))) {
+            showAlert('warning', 'Ingresa un precio válido.'); return;
+        }
+
+        var id = idInput.value;
+        var base = '/api/destinos/' + encodeURIComponent(selectedDestino.value) + '/entradas';
+        var url = id ? base + '/' + encodeURIComponent(id) : base;
+        var method = id ? 'PUT' : 'POST';
+
+        var original = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        try {
+            var res = await entFetch(url, { method: method, body: JSON.stringify({ name: name, price: Number(price) }) });
+            var data = await res.json().catch(function () { return {}; });
+            if (!res.ok || !data.success) throw new Error(data.error || 'Error al guardar');
+            resetForm(); // éxito: resetForm define el label del botón
+            clearAlert();
+            await loadEntradas(selectedDestino.value);
+            loadEntradasIndex(); // mantiene el buscador al día
+        } catch (e) {
+            showAlert('danger', e.message || 'Error al guardar la entrada.');
+            saveBtn.innerHTML = original; // error: restaura el label previo
+        } finally {
+            saveBtn.disabled = false;
+        }
+    }
+
+    async function deleteEntrada(id, name) {
+        if (!selectedDestino) return;
+        if (!confirm('¿Eliminar la entrada "' + name + '"?')) return;
+        try {
+            var url = '/api/destinos/' + encodeURIComponent(selectedDestino.value) + '/entradas/' + encodeURIComponent(id);
+            var res = await entFetch(url, { method: 'DELETE' });
+            var data = await res.json().catch(function () { return {}; });
+            if (!res.ok || !data.success) throw new Error(data.error || 'Error al eliminar');
+            if (idInput.value === id) resetForm();
+            await loadEntradas(selectedDestino.value);
+            loadEntradasIndex();
+        } catch (e) {
+            showAlert('danger', e.message || 'Error al eliminar la entrada.');
+        }
+    }
+
+    // -------- Wiring --------
+    searchEl.addEventListener('input', renderDestinos);
+
+    listEl.addEventListener('click', function (e) {
+        var item = e.target.closest('.destino-item');
+        if (item) selectDestino(item.getAttribute('data-id'));
+    });
+
+    btnCancel.addEventListener('click', function () { resetForm(); clearAlert(); });
+    form.addEventListener('submit', saveEntrada);
+
+    tableBody.addEventListener('click', function (e) {
+        var edit = e.target.closest('.ent-edit');
+        if (edit) {
+            clearAlert();
+            enterEditMode({ id: edit.getAttribute('data-id'), name: edit.getAttribute('data-name'), price: edit.getAttribute('data-price') });
+            return;
+        }
+        var del = e.target.closest('.ent-del');
+        if (del) deleteEntrada(del.getAttribute('data-id'), del.getAttribute('data-name'));
+    });
+
+    // Init
+    loadDestinos();
+    loadEntradasIndex();
+})();
+</script>

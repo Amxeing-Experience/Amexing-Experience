@@ -1,0 +1,37 @@
+<%
+/**
+ * SuperAdmin Entradas — bandeja master-detail de Entradas por destino.
+ * Created by Denisse Maldonado
+ *
+ * Izquierda: destinos (POI). Derecha: entradas del destino (nombre + precio).
+ */
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'superadmin';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="mb-1 fw-bold">Entradas</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/<%= currentUserRole %>"><i class="ti ti-home me-1"></i>Dashboard</a>
+                        </li>
+                        <li class="breadcrumb-item active">
+                            <i class="ti ti-ticket me-1"></i>Entradas
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="row">
+    <div class="col-12">
+        <%- include('../../organisms/tarifario/entradas-inbox', { userRole: currentUserRole }) %>
+    </div>
+</div>

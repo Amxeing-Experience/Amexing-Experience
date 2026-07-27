@@ -12,6 +12,9 @@
 const sidebarUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
 const sidebarCurrentPath = typeof currentPath !== 'undefined' ? currentPath : '';
 const sidebarUser = typeof user !== 'undefined' ? user : {};
+// White-label para clientes de agencia: logo de la agencia arriba + "Powered by Amexing" abajo.
+const sidebarAgencyBranding = (typeof agencyBranding !== 'undefined' && agencyBranding && agencyBranding.logo)
+  ? agencyBranding : null;
 
 // Colores del sidebar: se usan las variables de marca del theme (salvia) en el CSS,
 // iguales para todos los roles. Ya no hay paleta hardcodeada por rol.
@@ -31,7 +34,11 @@ function isActiveMenuItem(itemPath, currentPath) {
         <!-- Brand Logo -->
         <div class="brand-logo d-flex align-items-center justify-content-between p-3">
             <a href="/dashboard/<%= sidebarUserRole %>" class="text-nowrap brand-logo-link">
-                <img src="/img/amexing_logo_horizontal.avif" alt="Amexing Logo" class="brand-logo-img" />
+                <% if (sidebarAgencyBranding) { %>
+                    <img src="<%= sidebarAgencyBranding.logo %>" alt="<%= sidebarAgencyBranding.name || 'Agencia' %>" class="brand-logo-img" />
+                <% } else { %>
+                    <img src="/img/amexing_logo_horizontal.avif" alt="Amexing Logo" class="brand-logo-img" />
+                <% } %>
             </a>
             <button class="close-btn d-lg-none sidebartoggler cursor-pointer" id="sidebarCollapse" type="button" aria-label="Cerrar menú">
                 <i class="ti ti-x fs-6"></i>
@@ -50,6 +57,14 @@ function isActiveMenuItem(itemPath, currentPath) {
             }) %>
         </nav>
         <!-- End Sidebar navigation -->
+
+        <% if (sidebarAgencyBranding) { %>
+        <!-- White-label: crédito a Amexing para clientes de agencia -->
+        <div class="sidebar-powered">
+            <span class="sidebar-powered__label">Powered by</span>
+            <img src="/img/amexing_logo_horizontal.avif" alt="Amexing" class="sidebar-powered__logo" />
+        </div>
+        <% } %>
     </div>
     <!-- End Sidebar scroll-->
 </aside>
@@ -142,6 +157,31 @@ function isActiveMenuItem(itemPath, currentPath) {
         padding-bottom: 2rem;
         min-height: 0; /* Important for flex scroll */
     }
+
+    /* Powered by Amexing (white-label de agencia) */
+    .sidebar-powered {
+        flex-shrink: 0;
+        border-top: 1px solid #e0e6ed;
+        padding: 12px 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        opacity: 0.7;
+    }
+    .sidebar-powered__label {
+        font-size: 0.62rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #9a9a8e;
+    }
+    .sidebar-powered__logo {
+        height: 16px;
+        width: auto;
+        object-fit: contain;
+    }
+    .left-sidebar.collapsed .sidebar-powered__label { display: none; }
+    .left-sidebar.collapsed .sidebar-powered__logo { height: 14px; }
 
     /* Close Button */
     .close-btn {

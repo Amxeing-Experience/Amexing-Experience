@@ -253,6 +253,59 @@ ItineraryBuilder.prototype.handleTransportTypeChange = function () {
     }
 };
 
+/**
+ * Punto a Punto: si el DESTINO de una pierna es un aeropuerto, oculta su "Dirección de drop-off"
+ * (se deja al pasajero EN el aeropuerto, no hace falta dirección) y el pick-up toma todo el ancho.
+ * Aplica a one-way y a cada pierna del round-trip (Ida/Vuelta). Solo drop-off (no pick-up) y solo
+ * para 'punto-a-punto': el tipo Aeropuerto ya maneja sus columnas y Local nunca tiene destino
+ * aeropuerto. Se llama al cambiar tipo/dirección y al cambiar cualquier select de destino.
+ */
+ItineraryBuilder.prototype._applyPuntoAPuntoAirportDropoff = function () {
+  const transportType = document.querySelector('input[name="transportType"]:checked')?.value;
+  if (transportType !== 'punto-a-punto') return;
+
+  const pois = window.allActivePois || [];
+  const isAirportName = (name) => {
+    const target = String(name || '').trim().toLowerCase();
+    if (!target) return false;
+    return pois.some((p) => String(p.label || '').trim().toLowerCase() === target
+      && String((p.serviceType && p.serviceType.name) || '').trim().toLowerCase() === 'aeropuerto');
+  };
+  // Nombre visible (label del POI) del destino seleccionado en un <select>.
+  const destNameOf = (selectId) => {
+    const el = document.getElementById(selectId);
+    if (!el || el.selectedIndex < 0) return '';
+    const text = (el.options[el.selectedIndex]?.textContent || '').trim();
+    return text.startsWith('--') ? '' : text;
+  };
+  // Oculta/restaura la columna de drop-off de una pierna según si su destino es aeropuerto.
+  const applyLeg = (destName, dropoffColId, pickupColId) => {
+    const dropoffCol = document.getElementById(dropoffColId);
+    const pickupCol = document.getElementById(pickupColId);
+    if (!dropoffCol || !pickupCol) return;
+    if (isAirportName(destName)) {
+      dropoffCol.classList.add('d-none');
+      pickupCol.classList.remove('d-none');
+      pickupCol.classList.remove('col-md-6');
+      pickupCol.classList.add('col-md-12');
+    } else {
+      dropoffCol.classList.remove('d-none');
+      dropoffCol.classList.remove('col-md-12');
+      dropoffCol.classList.add('col-md-6');
+      pickupCol.classList.remove('col-md-12');
+      pickupCol.classList.add('col-md-6');
+    }
+  };
+
+  const tripType = document.querySelector('input[name="tripType"]:checked')?.value;
+  if (tripType === 'round-trip' || tripType === 'roundtrip') {
+    applyLeg(destNameOf('roundTripDestinationIdaSelect'), 'papDropoffColIda', 'papPickupColIda');
+    applyLeg(destNameOf('roundTripDestinationVueltaSelect'), 'papDropoffColVuelta', 'papPickupColVuelta');
+  } else {
+    applyLeg(destNameOf('transportDestinationSelect'), 'papDropoffCol', 'papPickupCol');
+  }
+};
+
 ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
     const transportTypes = { aeropuerto: 'Aeropuerto', 'punto-a-punto': 'Punto a Punto', local: 'Local' };
     const transportLabel = transportTypes[service.transportType] || 'Transporte';
@@ -623,6 +676,7 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                     </div>
                     <div class="d-flex flex-column align-items-end">
                         <div class="service-actions mb-2">
+                            ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <div class="btn-group btn-group-sm">
                                 <button type="button" class="btn btn-light edit-service-btn"
                                         data-day-id="${service.dayId}" data-service-id="${service.id}" title="Editar">
@@ -637,20 +691,26 @@ ItineraryBuilder.prototype.renderTransportServiceItem = function (service) {
                                     <i class="ti ti-trash"></i>
                                 </button>
                             </div>
+                            ` : ''}
+                            ${this.renderServiceLockControls(service)}
                         </div>
                         ${!(service.type === 'concepto' && this.getServiceDisplayPrice(service) <= 0) ? `
                             ${service.includeInTotal === false ? `
                             <span class="badge bg-secondary-subtle text-secondary mb-1">Pago externo</span>
                             ` : ''}
                             <div class="fw-semibold ${service.includeInTotal === false ? 'text-muted text-decoration-line-through' : 'text-primary'}">
-                                ${this.formatCurrency(this.getServiceDisplayPrice(service))}
+                                ${this.formatCurrency(this.getServiceDisplayPrice(service) + this.getServiceTipInPaymentType(service))}
                                 ${this.getPriceTypeLabel()}
                             </div>
+                            ${Number(service.discountAmount) > 0 ? `<div class="small text-success mt-1" title="Descuento aplicado"><i class="ti ti-discount-2 me-1"></i>Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>` : ''}
+                            ${this.getServiceTipInPaymentType(service) > 0 ? `<div class="small text-info mt-1" title="Propina"><i class="ti ti-coin me-1"></i>Propina ${service.tipType === 'percent' ? service.tipValue + '%' : ''} +${this.formatCurrency(this.getServiceTipInPaymentType(service))}${service.tipMandatory ? ' <span class="badge bg-info-subtle text-info ms-1">obligatoria</span>' : ''}</div>` : ''}
+                            ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
                                     data-service-id="${service.id}" title="${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}" style="text-decoration: none;">
                                 <i class="ti ${service.includeInTotal === false ? 'ti-circle-plus text-success' : 'ti-circle-minus text-muted'}" style="font-size: 0.85rem;"></i>
                                 <small class="${service.includeInTotal === false ? 'text-success' : 'text-muted'}" style="font-size: 0.7rem;">${service.includeInTotal === false ? 'Incluir en total' : 'Excluir del total'}</small>
                             </button>
+                            ` : ''}
                         ` : ''}
                     </div>
                 </div>

@@ -295,6 +295,9 @@ ItineraryBuilder.prototype.saveDay = async function () {
 
 ItineraryBuilder.prototype.deleteDay = function (dayId) {
     this.currentDayId = dayId;
+    // Limpiar currentServiceId: si quedó set de un borrado/edición previa de servicio,
+    // confirmDelete tomaba la rama de "borrar servicio" y el DÍA nunca se eliminaba.
+    this.currentServiceId = null;
     const day = this.days.find((d) => d.id === dayId);
 
     if (!day) return;

@@ -287,7 +287,8 @@
             userRole: typeof userRole !== 'undefined' ? userRole : 'guest',
             currentPath: typeof currentPath !== 'undefined' ? currentPath : '',
             user: typeof user !== 'undefined' ? user : {},
-            endClientCaps: typeof endClientCaps !== 'undefined' ? endClientCaps : null
+            endClientCaps: typeof endClientCaps !== 'undefined' ? endClientCaps : null,
+            agencyBranding: typeof agencyBranding !== 'undefined' ? agencyBranding : null
         }) %>
 
         <!-- Main Content Area -->
@@ -475,7 +476,7 @@
       <%
         const breadcrumbDeleteId = breadcrumb ? breadcrumb.title ? breadcrumb.title.replace(/\s+/g, '-').toLowerCase() : 'principal-title' : 'principal-title';
       %>
-      document.getElementById('breadcrumb-<%= breadcrumbDeleteId %>').remove();
+      document.getElementById('breadcrumb-<%= breadcrumbDeleteId %>')?.remove();
     </script>
 
 </body>
