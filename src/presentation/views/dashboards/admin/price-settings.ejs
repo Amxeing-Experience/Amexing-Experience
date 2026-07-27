@@ -2082,7 +2082,7 @@ function setDefaultDateTime() {
 function getAccessToken() {
     // Get token from cookie or API
     return document.cookie.split('; ')
-        .find(row => row.startsWith('accessToken='))
+        .find(row => row.startsWith('accessToken=') || row.startsWith('clientAccessToken='))
         ?.split('=')[1];
 }
 

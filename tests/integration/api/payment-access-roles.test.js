@@ -28,8 +28,29 @@ describe('Payment endpoints — access by role (integration)', () => {
     reservation.set('active', true);
     reservation.set('exists', true);
     reservation.set('status', 'confirmed');
+    // Fix 2 (ownership scope): the reservation must belong to the acting agency (its clientPtr is a
+    // user in the manager's departmentId) — the manager itself qualifies. Without this the new 404
+    // scoping would hide it from the department_manager and this suite's intent (agency operates on
+    // ITS OWN reservation) would be lost.
+    const managerUser = await AuthTestHelper.getUserByRole('department_manager');
+    reservation.set('clientPtr', managerUser);
+    reservation.set('paymentType', 'efectivo');
     await reservation.save(null, { useMasterKey: true });
     testReservationId = reservation.id;
+
+    // Fase C: este suite prueba ACCESO por rol, no disponibilidad de método. La reservación necesita
+    // respaldo real de pricesByType para que efectivo y tarjeta (usados abajo) estén disponibles y el
+    // guard de contenido no interfiera con lo que aquí se verifica (RBAC por nivel).
+    const service = new Parse.Object('ReservationService');
+    service.set('active', true);
+    service.set('exists', true);
+    service.set('reservationPtr', reservation);
+    service.set('subconcept', {
+      includeInTotal: true,
+      pricesByType: { efectivo: 100, transferencia: 116, tarjeta: 121 },
+      total: 100,
+    });
+    await service.save(null, { useMasterKey: true });
   }, 30000);
 
   afterAll(async () => {
@@ -53,11 +74,15 @@ describe('Payment endpoints — access by role (integration)', () => {
     }
   });
 
+  const TODAY = new Date().toISOString().slice(0, 10);
+
   it('lets a department_manager (agencia, level 4) register a payment', async () => {
     const response = await request(app)
       .post(`/api/reservations/${testReservationId}/payments`)
       .set('Authorization', `Bearer ${managerToken}`)
-      .send({ amount: 100, currency: 'MXN', method: 'efectivo' });
+      .send({
+        amount: 100, currency: 'MXN', method: 'efectivo', paidAt: TODAY, receivedBy: 'QA Cajero',
+      });
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
@@ -78,7 +103,9 @@ describe('Payment endpoints — access by role (integration)', () => {
     const response = await request(app)
       .post(`/api/reservations/${testReservationId}/payments`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ amount: 200, currency: 'MXN', method: 'tarjeta' });
+      .send({
+        amount: 200, currency: 'MXN', method: 'tarjeta', paidAt: TODAY,
+      });
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);

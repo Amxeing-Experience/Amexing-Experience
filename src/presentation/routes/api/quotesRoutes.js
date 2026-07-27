@@ -415,11 +415,18 @@ router.put(
  *   data: { id, folio, serviceItems }
  * }
  */
+// PUT de solo ESCRITURA de los servicios de una cotización: nivel 4+ (agencia `department_manager` +
+// agente `client`, además de admin/superadmin) + denyRoles('end_client'). El Cliente Directo comparte
+// nivel 4 en el mapa de fallback de requireRoleLevel (para poder LEER su cotización), pero no edita
+// servicios por diseño de negocio — sin este guard extra podía llamar el endpoint directo (bypass de la
+// UI, que nunca le muestra el editor). Mismo patrón que las rutas de escritura de pagos en
+// reservationRoutes.js.
 router.put(
   '/:id/service-items',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  jwtMiddleware.denyRoles('end_client'),
   (req, res) => QuoteController.updateServiceItems(req, res)
 );
 

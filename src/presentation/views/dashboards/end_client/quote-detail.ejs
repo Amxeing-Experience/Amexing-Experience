@@ -1073,7 +1073,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Set up global access token for itinerary builder
     const token = document.cookie.split('; ')
-        .find(row => row.startsWith('accessToken='))
+        .find(row => row.startsWith('accessToken=') || row.startsWith('clientAccessToken='))
         ?.split('=')[1];
 
     if (token) {
@@ -1095,7 +1095,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const quoteId = '<%= quoteId %>';
             const token = document.cookie.split('; ')
-                .find(row => row.startsWith('accessToken='))
+                .find(row => row.startsWith('accessToken=') || row.startsWith('clientAccessToken='))
                 ?.split('=')[1];
 
             const response = await (window.amxDedupFetch || fetch)(`/api/quotes/${quoteId}`, {

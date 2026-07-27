@@ -9,166 +9,304 @@
 <!-- Util del selector amigable de "Tiempo de Anticipación" (presets + Días/Horas/Min → minutos) -->
 <script src="/dashboard/js/utils/advance-time-picker.js"></script>
 
-<div id="experienceInformationCard" class="p-4">
+<div id="experienceInformationCard" class="py-4">
     <!-- Alerts Container -->
     <div id="experienceInfoAlerts"></div>
 
-    <form id="experienceInformationForm" class="needs-validation" novalidate>
-        <input type="hidden" id="experienceId" value="<%= typeof experienceId !== 'undefined' ? experienceId : '' %>">
-        <input type="hidden" id="experienceType" value="Experience">
+    <%# El <form> ahora abre DESPUÉS del hero + Servicios (más abajo), para que #serviceForm
+        no quede anidado. Los inputs ocultos y el hero se leen por getElementById igual. %>
+    <input type="hidden" id="experienceId" value="<%= typeof experienceId !== 'undefined' ? experienceId : '' %>">
+    <input type="hidden" id="experienceType" value="Experience">
 
-        <div class="row g-4">
+        <!-- ===== HERO editable (estilo exp-lux): portada + categoría + nombre + descripción =====
+             Se edita viéndose como el detalle del catálogo del cliente. -->
+        <style>
+            .exp-hero{display:grid;grid-template-columns:1.05fr 1fr;gap:0;background:#fff;
+                border:1px solid #e2ded1;border-radius:16px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.06);margin-bottom:24px;}
+            .exp-hero__media{position:relative;min-height:420px;background:linear-gradient(135deg,#5c6a48,#8a9470 60%,#b6bd9e);}
+            .exp-hero__media #mainImageContainer{position:absolute;inset:0;}
+            .exp-hero__media #mainImagePreview{display:block;position:absolute;inset:0;margin:0;}
+            .exp-hero__media #mainImagePreview .position-relative{display:block !important;width:100%;height:100%;}
+            .exp-hero__media #mainImageImg{max-width:none !important;max-height:none !important;width:100%;height:100%;object-fit:cover;border-radius:0 !important;}
+            .exp-hero__media #mainImageUpload{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
+                background:rgba(255,255,255,.92);border-color:#cfd3c2 !important;max-width:78%;z-index:3;}
+            .exp-hero__overlay{position:absolute;inset:0;pointer-events:none;
+                background:linear-gradient(to top,rgba(0,0,0,.62) 0%,rgba(0,0,0,.12) 45%,transparent 70%);}
+            .exp-hero__caption{position:absolute;left:26px;right:26px;bottom:24px;z-index:4;}
+            .exp-hero__category{display:inline-block;width:auto;max-width:90%;background:rgba(110,122,80,.92);color:#fff;
+                border:0;border-radius:999px;padding:7px 16px;font-size:.72rem;font-weight:700;letter-spacing:.12em;
+                text-transform:uppercase;cursor:pointer;outline:none;}
+            .exp-hero__category option{color:#2b2b2b;}
+            .exp-hero__title{display:block;width:100%;margin-top:12px;background:transparent;border:0;color:#fff;
+                font-size:2.2rem;font-weight:700;letter-spacing:-.01em;outline:none;padding:0;}
+            .exp-hero__title::placeholder{color:rgba(255,255,255,.65);}
+            .exp-hero__underline{display:block;width:60px;height:4px;background:#e6b34a;margin-top:10px;border-radius:2px;}
+            .exp-hero__panel{padding:28px 28px 24px;display:flex;flex-direction:column;}
+            .exp-hero__label{font-size:.7rem;text-transform:uppercase;letter-spacing:.1em;color:#8a8f78;font-weight:700;margin-bottom:7px;display:block;}
+            .exp-hero__desc{flex:1;min-height:200px;border:1px solid #e2ded1;border-radius:12px;padding:15px;
+                font-size:1rem;line-height:1.6;color:#3a3a3a;resize:vertical;outline:none;background:#fcfbf7;width:100%;}
+            .exp-hero__desc:focus{border-color:#6E7A50;box-shadow:0 0 0 .18rem rgba(110,122,80,.14);}
+            .exp-hero__meta{margin-top:16px;}
+            @media (max-width:768px){ .exp-hero{grid-template-columns:1fr;} .exp-hero__media{min-height:260px;} }
+
+            /* Config en una sola columna, cada bloque como tarjeta colapsable */
+            .exp-config > .col-md-6{flex:0 0 100%;max-width:100%;}
+            .exp-config .mb-4{background:#fff;border:1px solid #e2ded1;border-radius:14px;padding:16px 20px;margin-bottom:14px !important;}
+            .exp-config .mb-4 > h6{cursor:pointer;user-select:none;display:flex;align-items:center;gap:8px;}
+            .exp-config .mb-4 > h6 .cfg-chev{margin-left:auto;transition:transform .15s;color:#8a8f78;font-size:.95rem;}
+            .exp-config .mb-4.collapsed > h6{border-bottom:0 !important;padding-bottom:0 !important;margin-bottom:0 !important;}
+            .exp-config .mb-4.collapsed > h6 .cfg-chev{transform:rotate(-90deg);}
+            .exp-config .mb-4.collapsed > *:not(h6){display:none !important;}
+        </style>
+        <div class="exp-hero">
+            <div class="exp-hero__media">
+                <div id="mainImageContainer">
+                    <div id="mainImagePreview" style="display: none;">
+                        <div class="position-relative d-inline-block">
+                            <img id="mainImageImg" src="" alt="Portada" class="rounded shadow-sm">
+                            <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2" id="removeMainImageBtn" title="Eliminar imagen" style="z-index:5;">
+                                <i class="ti ti-x"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="mainImageUpload" class="border border-2 border-dashed rounded p-4 text-center" style="cursor: pointer;">
+                        <i class="ti ti-cloud-upload fs-1 text-muted d-block mb-2"></i>
+                        <p class="text-muted mb-1">Arrastra la portada o haz clic para seleccionar</p>
+                        <small class="text-muted">JPG, PNG, WebP</small>
+                        <input type="file" id="mainImageInput" accept="image/jpeg,image/png,image/webp" style="display: none;">
+                    </div>
+                </div>
+                <div class="exp-hero__overlay"></div>
+                <div class="exp-hero__caption">
+                    <select class="exp-hero__category" id="experienceCategory" name="experience_category" title="Categoría de la experiencia">
+                        <%# Opciones cargadas dinámicamente (ExperienceCategories.populateSelect). %>
+                        <option value="">Categoría…</option>
+                    </select>
+                    <input type="text" class="exp-hero__title" id="experienceName" name="name" required maxlength="280"
+                           autocomplete="off" placeholder="Nombre de la experiencia *">
+                    <span class="exp-hero__underline"></span>
+                </div>
+                <!-- Loader dedicado de categorías (defensivo): si el init no las pobló, las llena aquí
+                     sin pisar un valor ya cargado. -->
+                <script>
+                (function () {
+                    function fillCategories() {
+                        var sel = document.getElementById('experienceCategory');
+                        if (!sel || !window.ExperienceCategories) return;
+                        window.ExperienceCategories.fetch().then(function () {
+                            if (sel.options.length <= 1) {
+                                window.ExperienceCategories.populateSelect(sel, sel.value, { placeholder: 'Categoría…' });
+                            }
+                        }).catch(function () { /* silencioso */ });
+                    }
+                    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(fillCategories, 350); });
+                    else setTimeout(fillCategories, 350);
+                })();
+                </script>
+            </div>
+            <div class="exp-hero__panel">
+                <label class="exp-hero__label" for="experienceDescription">Descripción</label>
+                <textarea class="exp-hero__desc" id="experienceDescription" name="description"
+                          placeholder="Describe la experiencia como se mostrará al cliente…"></textarea>
+                <div class="invalid-feedback" id="description-error"></div>
+                <div class="exp-hero__meta">
+                    <label class="exp-hero__label" for="experienceTipo">Tipo de experiencia</label>
+                    <select class="form-select mb-3" id="experienceTipo" name="tipo">
+                        <option value="">Seleccionar</option>
+                        <option value="Exclusivo">Exclusivo</option>
+                        <option value="Compartido">Compartido</option>
+                        <option value="Privado">Privado</option>
+                    </select>
+                    <label class="exp-hero__label" for="experienceDestino">Destino <span class="text-muted">(Opcional)</span></label>
+                    <select class="form-select mb-3" id="experienceDestino" name="destinationPOI">
+                        <option value="">Seleccione un destino...</option>
+                        <!-- Dynamically populated with POI data -->
+                    </select>
+                    <%# Duración: movida a la barra General de la sección de Servicios (junto a la tarifa). %>
+                </div>
+            </div>
+        </div>
+
+        <!-- Servicios de la experiencia: JUSTO DESPUÉS del hero (header premium), fuera del form. -->
+        <%- include('./experience-services', { experienceId: (typeof experienceId !== 'undefined' ? experienceId : '') }) %>
+
+        <!-- A partir de aquí abre el form de Información (config + guardar). -->
+        <form id="experienceInformationForm" class="needs-validation" novalidate>
+
+        <!-- Colapsables de config (progressive enhancement): cada bloque .mb-4 con h6 se vuelve tarjeta. -->
+        <script>
+        (function () {
+            function initCfgCards() {
+                var blocks = document.querySelectorAll('#experienceInformationForm .exp-config .mb-4');
+                var collapseByDefault = /nota|disponibilidad|fotos/i;
+                blocks.forEach(function (b) {
+                    var h = b.querySelector(':scope > h6');
+                    if (!h || h.dataset.cfgWired) return;
+                    h.dataset.cfgWired = '1';
+                    var chev = document.createElement('i');
+                    chev.className = 'ti ti-chevron-down cfg-chev';
+                    h.appendChild(chev);
+                    h.addEventListener('click', function (e) {
+                        if (e.target.closest('input, select, textarea, .form-check, .form-switch, label, button')) return;
+                        b.classList.toggle('collapsed');
+                    });
+                    if (collapseByDefault.test(h.textContent || '')) b.classList.add('collapsed');
+                });
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(initCfgCards, 450); });
+            else setTimeout(initCfgCards, 450);
+        })();
+        </script>
+
+        <div class="row g-4 exp-config">
             <!-- Left Column: Image + Basic Info + Tiempos + Capacidad + Notas -->
             <div class="col-md-6">
-                <!-- Imagen Principal (Portada) -->
+                <!-- Tarifas (la Capacidad Mín/Máx se define en la sección de Servicios: fuente única) -->
                 <div class="mb-4">
                     <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                        <i class="ti ti-photo me-1"></i>
-                        Imagen Principal (Portada)
+                        <i class="ti ti-cash me-1"></i>
+                        Tarifas
                     </h6>
-                    <div id="mainImageContainer">
-                        <div id="mainImagePreview" class="mb-3" style="display: none;">
-                            <div class="position-relative d-inline-block">
-                                <img id="mainImageImg" src="" alt="Portada" class="rounded shadow-sm" style="max-width: 100%; max-height: 200px; object-fit: cover;">
-                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" id="removeMainImageBtn" title="Eliminar imagen">
-                                    <i class="ti ti-x"></i>
-                                </button>
+                    <div class="row">
+                        <!-- Adult Prices Row -->
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceCost" class="form-label">Precio Adulto <span class="text-muted small">(opcional)</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experienceCost" name="cost" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="invalid-feedback" id="cost-error"></div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="experienceCreateVersion">
+                                <label class="form-check-label small text-muted" for="experienceCreateVersion">
+                                    Crear <b>nueva versión</b> de precio al Guardar (conserva el historial). Sin marcar, el precio se actualiza en el mismo registro.
+                                </label>
                             </div>
                         </div>
-                        <div id="mainImageUpload" class="border border-2 border-dashed rounded p-4 text-center" style="cursor: pointer;">
-                            <i class="ti ti-cloud-upload fs-1 text-muted d-block mb-2"></i>
-                            <p class="text-muted mb-1">Arrastra una imagen o haz clic para seleccionar</p>
-                            <small class="text-muted">JPG, PNG, WebP</small>
-                            <input type="file" id="mainImageInput" accept="image/jpeg,image/png,image/webp" style="display: none;">
+                        <div class="col-md-6 mb-3">
+                            <label for="experiencePriceNoAlcohol" class="form-label">Precio Sin Alcohol</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experiencePriceNoAlcohol" name="price_no_alcohol" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <!-- Child Prices Row -->
+                        <div class="col-md-6 mb-3">
+                            <label for="experiencePriceChild" class="form-label">Precio Niño (3-12)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experiencePriceChild" name="price_child" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experiencePriceInfant" class="form-label">Precio Infante (0-2)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experiencePriceInfant" name="price_infant" min="0" step="0.01" placeholder="0.00">
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Informacion Basica -->
+            </div>
+
+            <!-- Right Column: Incluye/NoIncluye + Idiomas + Disponibilidad + Fotos + Precios -->
+            <div class="col-md-6">
+                <!-- Incluye / No Incluye -->
                 <div class="mb-4">
                     <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                        <i class="ti ti-info-circle me-1"></i>
-                        Informacion Basica
+                        <i class="ti ti-list-check me-1"></i>
+                        Incluye / No Incluye
                     </h6>
-                    <%# El campo "Nombre" es ahora GLOBAL: vive en el header del editor
-                        (experience-detail.ejs), obligatorio y visible en ambos tabs.
-                        Info y Servicios leen ese único #experienceName. %>
-                    <div class="mb-3">
-                        <label for="experienceDescription" class="form-label">Descripcion <span class="text-muted small">(opcional)</span></label>
-                        <textarea class="form-control" id="experienceDescription" name="description" rows="2" placeholder="Descripcion detallada de lo que incluye esta experiencia..."></textarea>
-                        <div class="invalid-feedback" id="description-error"></div>
-                    </div>
-                    <!-- Tipo de experiencia (categoría temática) -->
-                    <div class="mb-3">
-                        <label for="experienceCategory" class="form-label">Tipo de experiencia</label>
-                        <select class="form-control" id="experienceCategory" name="experience_category">
-                            <%# Opciones cargadas dinámicamente desde la BD (ExperienceCategories.populateSelect). %>
-                            <option value="">Seleccionar</option>
-                        </select>
-                    </div>
-                    <!-- Destino (Optional) -->
-                    <div class="mb-3">
-                        <label for="experienceDestino" class="form-label">
-                            Destino <small class="text-muted">(Opcional)</small>
-                        </label>
-                        <select class="form-control" id="experienceDestino" name="destinationPOI">
-                            <option value="">Seleccione un destino...</option>
-                            <!-- Dynamically populated with POI data -->
-                        </select>
-                        <div class="form-text">Punto de interés o destino principal asociado con esta experiencia</div>
-                    </div>
-
-                    <!-- Entradas (Opcional) -->
-                    <style>
-                        /* Encabezado de destino: claramente una sección, NO una opción clicable */
-                        .ts-dropdown .optgroup-header {
-                            font-size: .7rem; text-transform: uppercase; letter-spacing: .05em;
-                            font-weight: 700; color: #8a8f78; background: #f3f2ec;
-                            padding: 7px 12px; cursor: default; position: sticky; top: 0; z-index: 1;
-                            border-top: 1px solid #e4dfcf;
-                        }
-                        .ts-dropdown .optgroup-header .ti { margin-right: 5px; opacity: .7; }
-                        .ts-dropdown .optgroup:first-child .optgroup-header { border-top: 0; }
-                        /* Opción (entrada): indentada bajo el encabezado, precio a la derecha */
-                        .ts-dropdown .option { padding: 8px 12px 8px 22px; }
-                        .ts-dropdown .ent-opt { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-                        .ts-dropdown .ent-opt-name { color: #2b2b2b; }
-                        .ts-dropdown .ent-opt-price { color: #6E7A50; font-weight: 600; white-space: nowrap; }
-                    </style>
-                    <div class="mb-3">
-                        <label for="experienceEntradas" class="form-label">
-                            Entradas <small class="text-muted">(Opcional)</small>
-                        </label>
-                        <select id="experienceEntradas" name="entradas" multiple placeholder="Buscar y agregar entradas...">
-                        </select>
-                        <div class="form-text">Boletos de acceso asociados. Puedes elegir entradas de cualquier destino.</div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceIncludes" class="form-label">Incluye <span class="text-muted">(uno por linea)</span></label>
+                            <textarea class="form-control" id="experienceIncludes" rows="4" placeholder="Transporte ida y vuelta&#10;Guia bilingue certificado&#10;Entrada al sitio&#10;Degustacion de platillos"></textarea>
+                            <div class="form-text"><small><i class="ti ti-info-circle me-1"></i>Cada elemento en una linea nueva</small></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="experienceNotIncludes" class="form-label">No incluye <span class="text-muted">(uno por linea)</span></label>
+                            <textarea class="form-control" id="experienceNotIncludes" rows="4" placeholder="Propinas&#10;Comidas adicionales&#10;Transporte desde aeropuerto&#10;Gastos personales"></textarea>
+                            <div class="form-text"><small><i class="ti ti-alert-circle me-1"></i>Cada exclusion en una linea nueva</small></div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Tiempos -->
+                <!-- Idiomas -->
                 <div class="mb-4">
-                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                        <i class="ti ti-clock me-1"></i>
-                        Tiempos
+                    <label for="experienceLanguages" class="form-label">
+                        <i class="ti ti-language me-1"></i>Idiomas disponibles <span class="text-muted">(uno por linea)</span>
+                    </label>
+                    <textarea class="form-control" id="experienceLanguages" rows="3" placeholder="Espanol&#10;Ingles&#10;Frances"></textarea>
+                    <div class="form-text"><small><i class="ti ti-world me-1"></i>Escriba cada idioma en una linea nueva</small></div>
+                </div>
+
+                <!-- Agenda: tiempos (arriba) + disponibilidad (abajo) -->
+                <div class="mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span><i class="ti ti-calendar-time me-1"></i>Logística</span>
+                        <span class="form-check form-switch mb-0 fw-normal" title='Si se activa, en el detalle se muestra "Horarios" en lugar de "Horarios sugeridos" (ej. viñedos).'>
+                            <input class="form-check-input" type="checkbox" id="experienceFixedSchedule" name="fixed_schedule">
+                            <label class="form-check-label small" for="experienceFixedSchedule">Horario fijo</label>
+                        </span>
                     </h6>
-                    <%# "Duración (hrs)" es ahora GLOBAL: vive en el header, junto al nombre,
-                        con la "duración sugerida" (suma de tiempos de los servicios). %>
+                    <!-- Tiempos: trayecto + anticipación -->
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Duración de Trayecto</label>
                             <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceTravelDuration', hiddenName: 'travel_duration', showDays: false, presets: [{ label: '30 min', minutes: 30 }, { label: '45 min', minutes: 45 }, { label: '1 h', minutes: 60 }, { label: '1 h 30', minutes: 90 }] }) %>
                         </div>
-                    </div>
-                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Tiempo de Anticipación</label>
                             <%- include('../../../molecules/forms/advance-time-picker', { hiddenId: 'experienceAdvanceMinutes', hiddenName: 'advance_minutes' }) %>
                         </div>
                     </div>
+                    <!-- Disponibilidad: días + horarios -->
+                    <label class="form-label mt-1">Disponibilidad</label>
+                    <div class="mb-3">
+                        <div class="d-flex gap-1 flex-wrap mb-3" id="availableDaysContainer">
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="1" data-day-name="Lunes">Lu</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="2" data-day-name="Martes">Ma</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="3" data-day-name="Miercoles">Mi</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="4" data-day-name="Jueves">Ju</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="5" data-day-name="Viernes">Vi</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="6" data-day-name="Sabado">Sa</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="0" data-day-name="Domingo">Do</button>
+                        </div>
+                    </div>
+                    <div id="daySchedulesContainer" class="mb-3">
+                        <div id="noDaysSelected" class="text-center text-muted py-2 border rounded bg-light" style="font-size: 1rem;">
+                            <i class="ti ti-calendar-off me-1"></i>
+                            <small>Selecciona dias para configurar horarios</small>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Personas y Vehiculo -->
+                <!-- Fotos -->
                 <div class="mb-4">
                     <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                        <i class="ti ti-users me-1"></i>
-                        Capacidad
+                        <i class="ti ti-camera me-1"></i>
+                        Fotos
                     </h6>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="experienceMinPeople" class="form-label">Min. Personas</label>
-                            <input type="number" class="form-control" id="experienceMinPeople" name="min_people" min="1" step="1" placeholder="1">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="experienceMaxPeople" class="form-label">Max. Personas</label>
-                            <input type="number" class="form-control" id="experienceMaxPeople" name="max_people" min="1" step="1" placeholder="10">
-                        </div>
+                    <div class="alert alert-warning py-2 px-3 mb-2 d-flex align-items-center" role="alert" style="font-size: 0.85rem;">
+                        <i class="ti ti-alert-triangle me-2"></i>
+                        <span>Las imágenes (portada y fotos) <b>no</b> se autoguardan: da clic en <b>Guardar imágenes</b> para subirlas.</span>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Mínimo para privado</label>
-                            <div class="input-group">
-                                <select class="form-control" id="experiencePrivateMinType" name="private_min_type" style="max-width: 160px;">
-                                    <option value="">N/A</option>
-                                    <option value="personas">Por personas</option>
-                                    <option value="monto">Monto fijo ($)</option>
-                                </select>
-                                <input type="number" class="form-control" id="experiencePrivateMinValue" name="private_min_value" min="0" step="0.01" placeholder="N° personas o monto">
-                            </div>
-                            <div class="form-text">Personas mínimas o monto fijo para hacerlo privado</div>
+                    <div class="experience-photos-container">
+                        <div class="row g-2 mb-2" id="photosPreviewContainer"></div>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="addPhotoBtn">
+                                <i class="ti ti-camera-plus me-1"></i>Agregar Foto
+                            </button>
+                            <button type="button" class="btn btn-success btn-sm" id="savePhotosBtn">
+                                <i class="ti ti-device-floppy me-1"></i>Guardar imágenes
+                            </button>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="experienceBuyout" class="form-label">Buy-out</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="experienceBuyout" name="buyout" min="0" step="0.01" placeholder="0.00">
-                            </div>
-                            <div class="form-text">Monto para reservar la experiencia completa (buy-out)</div>
-                        </div>
+                        <input type="file" class="d-none" id="experiencePhotoInput" accept=".jpg,.jpeg,.png,.webp" multiple>
                     </div>
-                    <div class="mb-3">
-                        <label for="experienceCancellationPolicy" class="form-label">Políticas de cancelación</label>
-                        <textarea class="form-control" id="experienceCancellationPolicy" name="cancellation_policy" rows="3" placeholder="Ej. Cancelación gratuita hasta 48h antes; después se cobra el 50%..."></textarea>
-                    </div>
+                    <div class="form-text"><small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small></div>
                 </div>
 
                 <!-- Notas -->
@@ -210,130 +348,44 @@
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Right Column: Incluye/NoIncluye + Idiomas + Disponibilidad + Fotos + Precios -->
-            <div class="col-md-6">
-                <!-- Incluye / No Incluye -->
+                <!-- Términos y condiciones (último, debajo de Fotos) -->
                 <div class="mb-4">
                     <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                        <i class="ti ti-list-check me-1"></i>
-                        Incluye / No Incluye
+                        <i class="ti ti-file-description me-1"></i>
+                        Términos y condiciones
                     </h6>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="experienceIncludes" class="form-label">Incluye <span class="text-muted">(uno por linea)</span></label>
-                            <textarea class="form-control" id="experienceIncludes" rows="4" placeholder="Transporte ida y vuelta&#10;Guia bilingue certificado&#10;Entrada al sitio&#10;Degustacion de platillos"></textarea>
-                            <div class="form-text"><small><i class="ti ti-info-circle me-1"></i>Cada elemento en una linea nueva</small></div>
+                            <label class="form-label">Mínimo para privado</label>
+                            <div class="input-group">
+                                <select class="form-control" id="experiencePrivateMinType" name="private_min_type" style="max-width: 160px;">
+                                    <option value="">N/A</option>
+                                    <option value="personas">Por personas</option>
+                                    <option value="monto">Monto fijo ($)</option>
+                                </select>
+                                <input type="number" class="form-control" id="experiencePrivateMinValue" name="private_min_value" min="0" step="0.01" placeholder="N° personas o monto">
+                            </div>
+                            <div class="form-text">Personas mínimas o monto fijo para hacerlo privado</div>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="experienceNotIncludes" class="form-label">No incluye <span class="text-muted">(uno por linea)</span></label>
-                            <textarea class="form-control" id="experienceNotIncludes" rows="4" placeholder="Propinas&#10;Comidas adicionales&#10;Transporte desde aeropuerto&#10;Gastos personales"></textarea>
-                            <div class="form-text"><small><i class="ti ti-alert-circle me-1"></i>Cada exclusion en una linea nueva</small></div>
+                            <label for="experienceBuyout" class="form-label">Buy-out</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="experienceBuyout" name="buyout" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="form-text">Monto para reservar la experiencia completa (buy-out)</div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Idiomas -->
-                <div class="mb-4">
-                    <label for="experienceLanguages" class="form-label">
-                        <i class="ti ti-language me-1"></i>Idiomas disponibles <span class="text-muted">(uno por linea)</span>
-                    </label>
-                    <textarea class="form-control" id="experienceLanguages" rows="3" placeholder="Espanol&#10;Ingles&#10;Frances"></textarea>
-                    <div class="form-text"><small><i class="ti ti-world me-1"></i>Escriba cada idioma en una linea nueva</small></div>
-                </div>
-
-                <!-- Disponibilidad -->
-                <div class="mb-4">
-                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <span><i class="ti ti-calendar-time me-1"></i>Disponibilidad <span class="text-muted fw-normal">(Opcional)</span></span>
-                        <span class="form-check form-switch mb-0 fw-normal" title='Si se activa, en el detalle se muestra "Horarios" en lugar de "Horarios sugeridos" (ej. viñedos).'>
-                            <input class="form-check-input" type="checkbox" id="experienceFixedSchedule" name="fixed_schedule">
-                            <label class="form-check-label small" for="experienceFixedSchedule">Horario fijo</label>
-                        </span>
-                    </h6>
                     <div class="mb-3">
-                        <div class="d-flex gap-1 flex-wrap mb-3" id="availableDaysContainer">
-                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="1" data-day-name="Lunes">Lu</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="2" data-day-name="Martes">Ma</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="3" data-day-name="Miercoles">Mi</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="4" data-day-name="Jueves">Ju</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="5" data-day-name="Viernes">Vi</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="6" data-day-name="Sabado">Sa</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary day-btn" data-day="0" data-day-name="Domingo">Do</button>
-                        </div>
-                    </div>
-                    <div id="daySchedulesContainer" class="mb-3">
-                        <div id="noDaysSelected" class="text-center text-muted py-2 border rounded bg-light" style="font-size: 1rem;">
-                            <i class="ti ti-calendar-off me-1"></i>
-                            <small>Selecciona dias para configurar horarios</small>
-                        </div>
+                        <label for="experienceCancellationPolicy" class="form-label">Políticas de cancelación</label>
+                        <textarea class="form-control" id="experienceCancellationPolicy" name="cancellation_policy" rows="3" placeholder="Ej. Cancelación gratuita hasta 48h antes; después se cobra el 50%..."></textarea>
                     </div>
                 </div>
 
-                <!-- Fotos -->
-                <div class="mb-4">
-                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                        <i class="ti ti-camera me-1"></i>
-                        Fotos <span class="text-muted fw-normal">(Opcional)</span>
-                    </h6>
-                    <div class="experience-photos-container">
-                        <div class="row g-2 mb-2" id="photosPreviewContainer"></div>
-                        <div class="d-grid">
-                            <button type="button" class="btn btn-outline-primary btn-sm" id="addPhotoBtn">
-                                <i class="ti ti-camera-plus me-1"></i>Agregar Foto
-                            </button>
-                        </div>
-                        <input type="file" class="d-none" id="experiencePhotoInput" accept=".jpg,.jpeg,.png,.webp" multiple>
-                    </div>
-                    <div class="form-text"><small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small></div>
-                </div>
-
-                <!-- Precios -->
-                <div class="mb-4">
-                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                        <i class="ti ti-currency-dollar me-1"></i>
-                        Precios
-                    </h6>
-                    <div class="row">
-                        <!-- Adult Prices Row -->
-                        <div class="col-md-6 mb-3">
-                            <label for="experienceCost" class="form-label">Precio Adulto <span class="text-muted small">(opcional)</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="experienceCost" name="cost" min="0" step="0.01" placeholder="0.00">
-                            </div>
-                            <div class="invalid-feedback" id="cost-error"></div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="experiencePriceNoAlcohol" class="form-label">Precio Sin Alcohol</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="experiencePriceNoAlcohol" name="price_no_alcohol" min="0" step="0.01" placeholder="0.00">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <!-- Child Prices Row -->
-                        <div class="col-md-6 mb-3">
-                            <label for="experiencePriceChild" class="form-label">Precio Niño (3-12)</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="experiencePriceChild" name="price_child" min="0" step="0.01" placeholder="0.00">
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="experiencePriceInfant" class="form-label">Precio Infante (0-2)</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="experiencePriceInfant" name="price_infant" min="0" step="0.01" placeholder="0.00">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Services Price Breakdown -->
-                <div class="mb-4">
+                <!-- Services Price Breakdown — OCULTO: redundante con los servicios inline.
+                     Se conservan los elementos (el builder los actualiza y alimenta el total del header). -->
+                <div class="mb-4 d-none">
                     <div class="card border-0 shadow-sm">
                         <div class="card-header bg-light border-bottom-0 d-flex justify-content-between align-items-center py-3">
                             <h6 class="mb-0 fw-bold">
@@ -387,7 +439,8 @@
         </div>
 
         <!-- Save Button -->
-        <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+        <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top flex-wrap">
+            <small class="text-muted me-auto"><i class="ti ti-cloud-check me-1"></i>Los cambios se guardan solos. <b>Las imágenes solo se guardan con este botón.</b></small>
             <a href="/dashboard/admin/experiences" id="cancelExperienceBtn" class="btn btn-secondary">
                 <i class="ti ti-x me-1"></i>Cancelar
             </a>
@@ -551,99 +604,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`✅ Populated Destino with ${pois.length} POI options`);
     }
 
-    // ===== Entradas asociadas (boletos de acceso; NO ligadas al destino) =====
-    let experienceEntradasTom = null;
-
-    async function fetchAllEntradas() {
-        try {
-            const token = (typeof getAccessToken === 'function')
-                ? getAccessToken()
-                : (localStorage.getItem('accessToken') || localStorage.getItem('token'));
-            const res = await fetch('/api/destinos/all-entradas', {
-                credentials: 'same-origin',
-                headers: token ? { 'Authorization': 'Bearer ' + token } : {},
-            });
-            if (!res.ok) return [];
-            const json = await res.json();
-            return (json && json.data) || [];
-        } catch (e) {
-            console.warn('No se pudieron cargar las entradas:', e);
-            return [];
-        }
-    }
-
-    function entradaLabel(name, price) {
-        return `${name} · $${Number(price || 0).toLocaleString('es-MX')}`;
-    }
-
-    // Construye el multiselect (Tom Select) con TODAS las entradas, agrupadas por destino.
-    async function buildEntradasPicker() {
-        const el = document.getElementById('experienceEntradas');
-        if (!el || typeof TomSelect === 'undefined') return;
-
-        const all = await fetchAllEntradas();
-        const optgroups = [];
-        const seenGroups = {};
-        const options = all.map((e) => {
-            const group = e.destinoName || 'Sin destino';
-            if (!seenGroups[group]) { seenGroups[group] = true; optgroups.push({ value: group, label: group }); }
-            return {
-                id: e.id,
-                label: entradaLabel(e.name, e.price),
-                name: e.name || '',
-                price: Number(e.price || 0),
-                group,
-                destinoName: e.destinoName || '',
-            };
-        });
-
-        if (experienceEntradasTom) { experienceEntradasTom.destroy(); experienceEntradasTom = null; }
-
-        experienceEntradasTom = new TomSelect(el, {
-            plugins: ['remove_button'],
-            maxItems: null,
-            valueField: 'id',
-            labelField: 'label',
-            searchField: ['label', 'destinoName'],
-            optgroupField: 'group',
-            lockOptgroupOrder: true,
-            optgroups,
-            options,
-            render: {
-                option: (d, escape) => `<div class="ent-opt"><span class="ent-opt-name">${escape(d.name || d.label)}</span><span class="ent-opt-price">$${Number(d.price || 0).toLocaleString('es-MX')}</span></div>`,
-                item: (d, escape) => `<div>${escape(d.label)}</div>`,
-                optgroup_header: (d, escape) => `<div class="optgroup-header"><i class="ti ti-map-pin"></i>${escape(d.label)}</div>`,
-            },
-        });
-    }
-
-    // Preselecciona las entradas guardadas (agrega la opción si ya no está activa/listada).
-    function setEntradasSelection(entradas) {
-        if (!experienceEntradasTom || !Array.isArray(entradas)) return;
-        const ids = [];
-        entradas.forEach((e) => {
-            if (!e || !e.id) return;
-            if (!experienceEntradasTom.options[e.id]) {
-                experienceEntradasTom.addOption({
-                    id: e.id,
-                    label: entradaLabel(e.name || e.id, e.price),
-                    name: e.name || String(e.id),
-                    price: Number(e.price || 0),
-                    group: e.destinoName || 'Sin destino',
-                    destinoName: e.destinoName || '',
-                });
-            }
-            ids.push(e.id);
-        });
-        experienceEntradasTom.setValue(ids, true);
-    }
-
-    function getSelectedEntradaIds() {
-        if (!experienceEntradasTom) return [];
-        const v = experienceEntradasTom.getValue();
-        return Array.isArray(v) ? v : (v ? [v] : []);
-    }
-
     async function init() {
         // Add debug mode indicator if active
         if (isDebugMode()) {
@@ -673,9 +633,6 @@ document.addEventListener('DOMContentLoaded', function() {
             populateDestinoSelect(pois);
         }
 
-        // Construye el multiselect de Entradas (todas, agrupadas por destino)
-        await buildEntradasPicker();
-
         // Carga dinámica de categorías de experiencia (desde la BD).
         // Se puebla antes de loadExperienceData para que el valor guardado se preserve.
         if (window.ExperienceCategories) {
@@ -695,6 +652,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function setupEventListeners() {
         document.getElementById('saveExperienceInfoBtn').addEventListener('click', saveExperience);
+        // Botón dedicado del panel de fotos: sube solo imágenes (portada + fotos).
+        document.getElementById('savePhotosBtn')?.addEventListener('click', saveImagesOnly);
+
+        // AUTOGUARDADO: cualquier cambio en el HERO (nombre/tipo/destino/descripción, fuera
+        // del form) y en el FORM de info dispara el autosave de la experiencia completa.
+        // Las imágenes se excluyen (input file / contenedores de imagen). Los controles de
+        // la sección Servicios (guía/chofer general, mín/máx, duración) lo disparan desde
+        // el builder vía window.scheduleExperienceInfoAutoSave.
+        const isImageField = (t) => t && (t.type === 'file'
+            || t.closest('#mainImageContainer') || t.closest('.experience-photos-container'));
+        const onInfoChange = (e) => { if (!isImageField(e.target)) scheduleExperienceInfoAutoSave(); };
+        [document.querySelector('.exp-hero'), document.getElementById('experienceInformationForm')].forEach((cont) => {
+            if (!cont) return;
+            cont.addEventListener('input', onInfoChange);
+            cont.addEventListener('change', onInfoChange);
+        });
 
         // F3 (draft-first): si se creó un borrador (active:false) al agregar servicios
         // y el usuario cancela sin finalizar, borramos ese borrador para no dejar
@@ -721,7 +694,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Capture form values in real-time to avoid timing issues
         // Use specific form ID to guarantee correct element targeting
         const nameInput = document.querySelector('#experienceName');
-        const descriptionTextarea = document.querySelector('#experienceInformationForm #experienceDescription');
+        const descriptionTextarea = document.querySelector('#experienceDescription');
         const costInput = document.querySelector('#experienceInformationForm #experienceCost');
         const includesTextarea = document.querySelector('#experienceInformationForm #experienceIncludes');
         const notincludesTextarea = document.querySelector('#experienceInformationForm #experienceNotIncludes');
@@ -1442,15 +1415,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Basic fields - use specific form ID to guarantee correct element targeting
             document.querySelector('#experienceName').value = data.name || '';
-            document.querySelector('#experienceInformationForm #experienceDescription').value = data.description || '';
+            document.querySelector('#experienceDescription').value = data.description || '';
             document.querySelector('#experienceInformationForm #experienceCost').value = data.cost || '';
             
             debugLog('Load Experience Data - Fields Populated', {
                 name: document.querySelector('#experienceName').value,
-                description: document.querySelector('#experienceInformationForm #experienceDescription').value,
+                description: document.querySelector('#experienceDescription').value,
                 cost: document.querySelector('#experienceInformationForm #experienceCost').value,
                 nameFieldExists: !!document.querySelector('#experienceName'),
-                descriptionFieldExists: !!document.querySelector('#experienceInformationForm #experienceDescription')
+                descriptionFieldExists: !!document.querySelector('#experienceDescription')
             });
             document.getElementById('experiencePriceNoAlcohol').value = data.price_no_alcohol || '';
             document.getElementById('experiencePriceChild').value = data.price_child || '';
@@ -1501,6 +1474,19 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 document.getElementById('experienceCategory').value = data.experience_category || '';
             }
+            // Tipo de experiencia (Exclusivo/Compartido/Privado)
+            var tipoEl = document.getElementById('experienceTipo');
+            if (tipoEl) tipoEl.value = data.tipo || '';
+            // Guía/chofer generales (barra en la sección de Servicios)
+            var gGuideEl = document.getElementById('generalGuideToggle');
+            if (gGuideEl) gGuideEl.checked = !!data.general_guide;
+            var gChoferEl = document.getElementById('generalChoferToggle');
+            if (gChoferEl) gChoferEl.checked = !!data.general_chofer;
+            var gGuideRateEl = document.getElementById('generalGuideRate');
+            if (gGuideRateEl) gGuideRateEl.value = (data.general_guide_rate != null ? data.general_guide_rate : '');
+            var gChoferRateEl = document.getElementById('generalChoferRate');
+            if (gChoferRateEl) gChoferRateEl.value = (data.general_chofer_rate != null ? data.general_chofer_rate : '');
+            if (typeof window.updateGeneralBar === 'function') window.updateGeneralBar();
             document.getElementById('experiencePrivateMinType').value = data.private_min_type || '';
             document.getElementById('experiencePrivateMinValue').value = (data.private_min_value !== null && data.private_min_value !== undefined) ? data.private_min_value : '';
             document.getElementById('experienceFixedSchedule').checked = !!data.fixed_schedule;
@@ -1533,8 +1519,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('experienceDestino').value = '';
             }
 
-            // Preselecciona las entradas asociadas
-            setEntradasSelection(data.entradas || []);
 
             // Includes / NotIncludes / Languages (arrays to textarea)
             console.log('🔍 Loading textarea fields - API Response data:', { 
@@ -1802,6 +1786,152 @@ document.addEventListener('DOMContentLoaded', function() {
         return null;
     }
 
+    // Construye el payload JSON de la experiencia (TODOS los campos menos imágenes).
+    // Reutilizado por el guardado manual y por el autoguardado.
+    function buildExperienceInfoBody() {
+        const nameEl = document.getElementById('experienceName');
+        const descEl = document.getElementById('experienceDescription');
+        const costEl = document.querySelector('#experienceInformationForm #experienceCost') || document.getElementById('experienceCost');
+        const bName = ((capturedFormValues.name || (nameEl && nameEl.value) || '')).trim();
+        const bDescription = ((capturedFormValues.description || (descEl && descEl.value) || '')).trim() || bName;
+        const bCost = parseFloat(capturedFormValues.cost || (costEl && costEl.value)) || 0;
+
+        const availability = [];
+        document.querySelectorAll('#daySchedulesContainer .day-schedule-row').forEach(row => {
+            const daySchedule = { day: parseInt(row.dataset.day), times: [] };
+            row.querySelectorAll('.time-slot-row').forEach(slotRow => {
+                const start = slotRow.querySelector('.start-time').value;
+                const end = slotRow.querySelector('.end-time').value;
+                if (start && end) daySchedule.times.push({ start, end });
+            });
+            daySchedule.times = sortExpTimes(daySchedule.times);
+            if (daySchedule.times.length > 0) availability.push(daySchedule);
+        });
+
+        return {
+            name: bName,
+            description: bDescription,
+            type: 'Experience',
+            cost: bCost,
+            price_no_alcohol: parseFloat(document.getElementById('experiencePriceNoAlcohol').value) || null,
+            price_child: parseFloat(document.getElementById('experiencePriceChild').value) || null,
+            price_infant: parseFloat(document.getElementById('experiencePriceInfant').value) || null,
+            duration: parseFloat(document.getElementById('experienceDuration').value) || null,
+            travel_duration: parseInt(document.getElementById('experienceTravelDuration').value) || null,
+            advance_minutes: parseInt(document.getElementById('experienceAdvanceMinutes').value) || null,
+            min_people: parseInt(document.getElementById('experienceMinPeople').value) || null,
+            max_people: parseInt(document.getElementById('experienceMaxPeople').value) || null,
+            cancellation_policy: document.getElementById('experienceCancellationPolicy').value.trim() || null,
+            buyout: parseFloat(document.getElementById('experienceBuyout').value) || null,
+            experience_category: document.getElementById('experienceCategory').value || null,
+            tipo: (document.getElementById('experienceTipo') || {}).value || null,
+            general_guide: !!(document.getElementById('generalGuideToggle') || {}).checked,
+            general_chofer: !!(document.getElementById('generalChoferToggle') || {}).checked,
+            general_guide_rate: parseFloat((document.getElementById('generalGuideRate') || {}).value) || null,
+            general_chofer_rate: parseFloat((document.getElementById('generalChoferRate') || {}).value) || null,
+            private_min_type: document.getElementById('experiencePrivateMinType').value || null,
+            private_min_value: parseFloat(document.getElementById('experiencePrivateMinValue').value) || null,
+            includes: stringToArray(capturedFormValues.includes) || textareaToArray('experienceIncludes'),
+            notincludes: stringToArray(capturedFormValues.notincludes) || textareaToArray('experienceNotIncludes'),
+            languages: stringToArray(capturedFormValues.languages) || textareaToArray('experienceLanguages'),
+            internal_notes: document.getElementById('experienceInternalNotes').value.trim() || null,
+            client_booking_notes: document.getElementById('experienceClientBookingNotes').value.trim() || null,
+            provider_notes: document.getElementById('experienceProviderNotes').value.trim() || null,
+            team_notes: document.getElementById('experienceTeamNotes').value.trim() || null,
+            availability: availability.length > 0 ? availability : null,
+            fixed_schedule: document.getElementById('experienceFixedSchedule').checked,
+            destinationPOI: document.getElementById('experienceDestino').value || null,
+        };
+    }
+
+    // Versionado por costo: cuando cambia 'cost', el backend crea una NUEVA versión con
+    // otro objectId (y marca la vieja con valid_until). Si el front sigue usando el id
+    // viejo, el siguiente GET/PUT falla (queda histórico). Aquí adoptamos el id nuevo.
+    function applyVersionedId(result) {
+        if (!result || !result.success || !result.data) return;
+        const d = result.data;
+        if (!d.costChanged || !d.id) return;
+        const newId = d.id;
+        window.__experienceDraftId = newId;                 // id de trabajo para el autosave
+        if (window.experienceServicesBuilder) window.experienceServicesBuilder.experienceId = newId; // service-items al id vigente
+        try {
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', `/dashboard/admin/experiences/${newId}`);
+            }
+        } catch (e) { /* noop */ }
+    }
+
+    // ===== AUTOGUARDADO de la EXPERIENCIA COMPLETA (sin imágenes) =====
+    // Las imágenes son pesadas: NO entran al autosave; solo se suben con el botón Guardar.
+    let _infoAutoSaveTimer = null;
+    let _infoAutoSaveInFlight = false;
+    function setAutoSaveStatus(state) {
+        // Toast FIJO (position:fixed en <body>) para que se vea aunque estés haciendo scroll.
+        let el = document.getElementById('expAutoSaveToast');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'expAutoSaveToast';
+            el.style.cssText = 'position:fixed;z-index:2000;right:18px;bottom:18px;display:inline-flex;align-items:center;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.18);opacity:0;transition:opacity .25s;pointer-events:none;';
+            document.body.appendChild(el);
+        }
+        if (state === 'saving') {
+            el.style.background = '#ffffff'; el.style.color = '#6E7A50'; el.style.border = '1px solid #d9dcc9';
+            el.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando cambios…';
+            el.style.opacity = '1';
+        } else if (state === 'saved') {
+            el.style.background = '#eaf3e4'; el.style.color = '#3f7a3f'; el.style.border = '1px solid #c3ddb6';
+            el.innerHTML = '<i class="ti ti-cloud-check me-2"></i>Cambios guardados';
+            el.style.opacity = '1';
+            setTimeout(() => { el.style.opacity = '0'; }, 2000);
+        } else {
+            el.style.opacity = '0';
+        }
+    }
+    function scheduleExperienceInfoAutoSave() {
+        clearTimeout(_infoAutoSaveTimer);
+        _infoAutoSaveTimer = setTimeout(() => { autoSaveExperienceInfo(); }, 900);
+    }
+    async function autoSaveExperienceInfo() {
+        const nameEl = document.getElementById('experienceName');
+        if (!nameEl || !nameEl.value.trim()) return;            // sin nombre no se guarda
+        if (_infoAutoSaveInFlight) { scheduleExperienceInfoAutoSave(); return; } // reintenta luego
+        if (typeof validateAllNumericFields === 'function' && !validateAllNumericFields()) return; // no guardar con errores
+        const accessToken = getAccessToken() || localStorage.getItem('authToken');
+        if (!accessToken) return;
+
+        // Necesita un id: experiencia existente o borrador. Para una nueva, crea el borrador.
+        let targetId = window.__experienceDraftId || (isNew ? null : experienceId);
+        if (!targetId && isNew && window.experienceServicesBuilder && window.experienceServicesBuilder.ensureDraftExperience) {
+            try { targetId = (await window.experienceServicesBuilder.ensureDraftExperience()) || window.__experienceDraftId; } catch (e) { return; }
+        }
+        if (!targetId) return;
+
+        const body = buildExperienceInfoBody(); // sin imágenes, sin tocar 'active' (no finaliza el borrador)
+        _infoAutoSaveInFlight = true;
+        setAutoSaveStatus('saving');
+        try {
+            const res = await fetch(`/api/experiences/${targetId}`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const result = await res.json().catch(() => null);
+            if (res.ok && result && result.success) {
+                applyVersionedId(result); // si versionó por costo, adopta el nuevo id
+                setAutoSaveStatus('saved');
+            } else {
+                setAutoSaveStatus('idle');
+            }
+        } catch (e) {
+            console.warn('Autoguardado de experiencia falló:', e);
+            setAutoSaveStatus('idle');
+        } finally {
+            _infoAutoSaveInFlight = false;
+        }
+    }
+    // Exponer para que la sección de Servicios (toggles generales, mín/máx, duración) lo dispare.
+    window.scheduleExperienceInfoAutoSave = scheduleExperienceInfoAutoSave;
+
     async function saveExperience() {
         // Nombre global obligatorio: no se puede guardar sin él. Enfoca el campo.
         const globalNameEl = document.getElementById('experienceName');
@@ -1838,7 +1968,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Enhanced debugging - check element existence first
         // Use specific form ID to guarantee correct element targeting
         const nameElement = document.querySelector('#experienceName');
-        const descriptionElement = document.querySelector('#experienceInformationForm #experienceDescription');
+        const descriptionElement = document.querySelector('#experienceDescription');
         const costElement = document.querySelector('#experienceInformationForm #experienceCost');
 
         debugLog('Save Experience - Element Check', {
@@ -1930,57 +2060,12 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             updateProgress('Guardando datos...');
 
-            // Build availability (multi-slot format matching provider)
-            const availability = [];
-            document.querySelectorAll('#daySchedulesContainer .day-schedule-row').forEach(row => {
-                const daySchedule = {
-                    day: parseInt(row.dataset.day),
-                    times: []
-                };
-                row.querySelectorAll('.time-slot-row').forEach(slotRow => {
-                    const start = slotRow.querySelector('.start-time').value;
-                    const end = slotRow.querySelector('.end-time').value;
-                    if (start && end) {
-                        daySchedule.times.push({ start, end });
-                    }
-                });
-                // Ordena por hora de inicio (pueden capturarse desordenados)
-                daySchedule.times = sortExpTimes(daySchedule.times);
-                if (daySchedule.times.length > 0) {
-                    availability.push(daySchedule);
-                }
-            });
-
-            const body = {
-                name,
-                description,
-                type: 'Experience',
-                cost,
-                price_no_alcohol: parseFloat(document.getElementById('experiencePriceNoAlcohol').value) || null,
-                price_child: parseFloat(document.getElementById('experiencePriceChild').value) || null,
-                price_infant: parseFloat(document.getElementById('experiencePriceInfant').value) || null,
-                duration: parseFloat(document.getElementById('experienceDuration').value) || null,
-                travel_duration: parseInt(document.getElementById('experienceTravelDuration').value) || null,
-                advance_minutes: parseInt(document.getElementById('experienceAdvanceMinutes').value) || null,
-                min_people: parseInt(document.getElementById('experienceMinPeople').value) || null,
-                max_people: parseInt(document.getElementById('experienceMaxPeople').value) || null,
-                cancellation_policy: document.getElementById('experienceCancellationPolicy').value.trim() || null,
-                buyout: parseFloat(document.getElementById('experienceBuyout').value) || null,
-                experience_category: document.getElementById('experienceCategory').value || null,
-                private_min_type: document.getElementById('experiencePrivateMinType').value || null,
-                private_min_value: parseFloat(document.getElementById('experiencePrivateMinValue').value) || null,
-                includes: stringToArray(capturedFormValues.includes) || textareaToArray('experienceIncludes'),
-                notincludes: stringToArray(capturedFormValues.notincludes) || textareaToArray('experienceNotIncludes'),
-                languages: stringToArray(capturedFormValues.languages) || textareaToArray('experienceLanguages'),
-                internal_notes: document.getElementById('experienceInternalNotes').value.trim() || null,
-                client_booking_notes: document.getElementById('experienceClientBookingNotes').value.trim() || null,
-                provider_notes: document.getElementById('experienceProviderNotes').value.trim() || null,
-                team_notes: document.getElementById('experienceTeamNotes').value.trim() || null,
-                availability: availability.length > 0 ? availability : null,
-                fixed_schedule: document.getElementById('experienceFixedSchedule').checked,
-                destinationPOI: document.getElementById('experienceDestino').value || null,
-                entradas: getSelectedEntradaIds(),
-            };
+            // Payload común (todos los campos menos imágenes). Mismo builder que el autosave.
+            const body = buildExperienceInfoBody();
+            // Versionado EXPLÍCITO: solo el guardado MANUAL puede versionar el precio, y solo
+            // si el usuario marcó el checkbox. El autoguardado nunca manda esto (actualiza en
+            // el mismo registro), por eso no crea versiones ni cambia el id.
+            body.createVersion = !!document.getElementById('experienceCreateVersion')?.checked;
 
             // 🔍 SAVE DEBUG - Log destinationPOI save details
             const destinoValue = document.getElementById('experienceDestino').value;
@@ -2066,6 +2151,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 showAlert(result.error || 'Error al guardar', 'danger');
                 return;
             }
+
+            // Si el guardado versionó por costo (nuevo objectId), adopta el id nuevo para
+            // que las imágenes y guardados siguientes no apunten al registro histórico.
+            applyVersionedId(result);
+            // Desmarca "crear versión": es una acción puntual, no debe repetirse en el
+            // siguiente guardado sin que el usuario lo vuelva a pedir.
+            const verChk = document.getElementById('experienceCreateVersion');
+            if (verChk) verChk.checked = false;
 
             // Delete old main image if removed (without replacement)
             if (window._mainImageRemoved && !window._mainImageFile && window._mainImageId) {
@@ -2199,6 +2292,65 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (error) {
             console.error('Error uploading photo:', error);
+        }
+    }
+
+    // Guarda SOLO imágenes (portada + fotos), sin el resto del formulario. Sirve para que
+    // el usuario no las olvide: el autoguardado no las sube (son pesadas).
+    async function saveImagesOnly() {
+        const nameEl = document.getElementById('experienceName');
+        if (!nameEl || !nameEl.value.trim()) {
+            showAlert('Escribe primero el nombre de la experiencia para poder subir imágenes.', 'warning');
+            if (nameEl) { nameEl.focus(); nameEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+            return;
+        }
+        const accessToken = getAccessToken() || localStorage.getItem('authToken');
+        if (!accessToken) { showAlert('Error de autenticación. Recarga la página.', 'danger'); return; }
+
+        const hasMainNew = !!window._mainImageFile;
+        const hasMainRemoved = !!(window._mainImageRemoved && !window._mainImageFile && window._mainImageId);
+        const hasPhotos = pendingPhotoFiles.length > 0;
+        if (!hasMainNew && !hasMainRemoved && !hasPhotos) {
+            showAlert('No hay imágenes nuevas por guardar.', 'info');
+            return;
+        }
+
+        // Asegura que la experiencia exista (borrador o real) antes de subir imágenes.
+        let targetId = window.__experienceDraftId || (isNew ? null : experienceId);
+        if (!targetId && isNew && window.experienceServicesBuilder && window.experienceServicesBuilder.ensureDraftExperience) {
+            try { targetId = (await window.experienceServicesBuilder.ensureDraftExperience()) || window.__experienceDraftId; } catch (e) {}
+        }
+        if (!targetId) { showAlert('No se pudo preparar la experiencia para subir imágenes.', 'danger'); return; }
+
+        const btn = document.getElementById('savePhotosBtn');
+        const btnHtml = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando imágenes...'; }
+        try {
+            if (hasMainRemoved) {
+                try {
+                    await fetch(`/api/experiences/${targetId}/images/${window._mainImageId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } });
+                    window._mainImageId = null; window._mainImageRemoved = false;
+                } catch (delErr) { console.warn('No se pudo borrar la portada:', delErr); }
+            }
+            if (hasMainNew) {
+                await uploadMainImage(targetId, window._mainImageFile);
+                window._mainImageFile = null; window._mainImageRemoved = false;
+            }
+            if (pendingPhotoFiles.length > 0) {
+                const count = pendingPhotoFiles.length;
+                for (let i = 0; i < count; i++) {
+                    // eslint-disable-next-line no-await-in-loop
+                    await uploadPhoto(targetId, pendingPhotoFiles[i]);
+                }
+                pendingPhotoFiles.length = 0;
+            }
+            showAlert('Imágenes guardadas correctamente.', 'success');
+            setAutoSaveStatus('saved');
+        } catch (e) {
+            console.error('Error guardando imágenes:', e);
+            showAlert('Error al subir las imágenes.', 'danger');
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
         }
     }
 

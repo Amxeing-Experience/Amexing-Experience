@@ -144,6 +144,12 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                     <i class="ti ti-file-text me-1" style="font-size: 1.1rem;"></i>
                                     <span style="font-size: 0.9rem;">Concepto</span>
                                 </label>
+
+                                <input type="radio" class="btn-check" name="serviceType" id="typeEntrada" value="entrada">
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeEntrada">
+                                    <i class="ti ti-ticket me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Entradas</span>
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -207,7 +213,44 @@ const canEditAdminNotes = ['admin', 'superadmin'].includes(currentUserRole);
                                     *Se verificará disponibilidad y se confirmará en la reservación
                                 </div>
                             </div>
-                            
+
+                        </div>
+
+                        <!-- Entradas (boletos de admisión) Selection -->
+                        <div id="entradaContent" class="service-content d-none">
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label for="entradaSelect" class="form-label">Seleccionar Entrada <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="entradaSelect" required>
+                                        <option value="">-- Selecciona una entrada --</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="entradaQuantity" class="form-label">Cantidad</label>
+                                    <input type="number" class="form-control" id="entradaQuantity" min="1" step="1" value="1">
+                                </div>
+                            </div>
+                            <!-- Horario de la entrada (mismo componente que Concepto) -->
+                            <div id="entradaScheduleFields">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="entradaStartTime" class="form-label">Hora de inicio</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="ti ti-clock"></i></span>
+                                            <input type="text" class="form-control time-input" id="entradaStartTime" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
+                                        </div>
+                                        <small class="form-text text-muted">Ej: 09:00, 14:30</small>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="entradaEndTime" class="form-label">Hora de fin</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text"><i class="ti ti-clock"></i></span>
+                                            <input type="text" class="form-control time-input" id="entradaEndTime" list="quoteTimeOptions" placeholder="__:__" maxlength="5" autocomplete="off">
+                                        </div>
+                                        <small class="form-text text-muted">Ej: 17:00, 20:30</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Tour Selection -->

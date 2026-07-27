@@ -599,18 +599,23 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <!-- Uploaded photos will be displayed here -->
                     </div>
                     
-                    <!-- Add photo button -->
-                    <div class="d-grid">
+                    <!-- Add photo button + guardar fotos (las fotos NO se autoguardan) -->
+                    <div class="d-grid gap-2">
                         <button type="button" class="btn btn-outline-warning btn-sm add-photo-btn">
                             <i class="ti ti-camera-plus me-1"></i>
                             Agregar Foto
                         </button>
+                        <button type="button" class="btn btn-success btn-sm save-experiencia-photos-btn">
+                            <i class="ti ti-device-floppy me-1"></i>
+                            Guardar fotos
+                        </button>
                     </div>
-                    
+                    <div class="form-text"><small><i class="ti ti-info-circle me-1"></i>Las fotos no se autoguardan: usa <b>Guardar fotos</b>.</small></div>
+
                     <!-- Hidden file input -->
-                    <input type="file" 
-                           class="d-none experience-photo-input" 
-                           accept=".jpg,.jpeg,.png,.webp" 
+                    <input type="file"
+                           class="d-none experience-photo-input"
+                           accept=".jpg,.jpeg,.png,.webp"
                            multiple>
                 </div>
                 <div class="form-text">
@@ -888,6 +893,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             loadEstablishmentData(id);
         });
 
+        // Deep-link: ?open=<establishmentId> (viene del índice "Todas") abre ese establecimiento.
+        (function autoOpenFromQuery() {
+            try {
+                const openId = new URLSearchParams(window.location.search).get('open');
+                if (openId) setTimeout(function () { loadEstablishmentData(openId); }, 300);
+            } catch (e) { /* noop */ }
+        })();
+
         // Cerrar el panel de detalle -> volver al estado vacío
         $('#closeEstablishmentDetailBtn').on('click', function() { closeEstablishmentDetail(); });
 
@@ -1079,24 +1092,39 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         });
 
         // Event delegation for experience management
-        $(document).on('click', '.delete-experiencia-btn', function() {
+        $(document).on('click', '.delete-experiencia-btn', async function() {
             const experienciaCard = $(this).closest('.experiencia-editable');
-            const index = experienciaCard.data('index');
             const experienceId = experienciaCard.data('id');
-            
-            console.log('🗑️ Deleting establishment experience:', {
-                index: index,
-                experienceId: experienceId,
-                hasId: !!experienceId
-            });
-            
-            // Track deleted experience ID if it's an existing experience
-            if (experienceId && experienceId !== '') {
+            const establishmentId = $('#establishmentId').val();
+
+            if (!confirm('¿Eliminar esta experiencia? Esta acción no se puede deshacer.')) return;
+
+            // Loader en el botón mientras borra (para que no parezca que no hace nada).
+            const $btn = $(this);
+            const prevBtnHtml = $btn.html();
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>');
+
+            // Si la experiencia YA está guardada (tiene id) en un establecimiento existente, se
+            // borra de inmediato en el backend. Antes solo se encolaba y se dependía del
+            // "Guardar": si el usuario recargaba sin guardar, la experiencia reaparecía.
+            if (experienceId && experienceId !== '' && establishmentId) {
+                try {
+                    const token = getAccessToken();
+                    await $.ajax({
+                        url: `/api/providers/${establishmentId}/experiencias/${experienceId}`,
+                        type: 'DELETE',
+                        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                    });
+                } catch (e) {
+                    $btn.prop('disabled', false).html(prevBtnHtml);
+                    showErrorAlert((e.responseJSON && e.responseJSON.error) || 'No se pudo eliminar la experiencia. Intenta de nuevo.');
+                    return; // no la quites de la UI si el backend falló
+                }
+            } else if (experienceId && experienceId !== '') {
+                // Sin establishmentId a mano: cae a la cola que se procesa al guardar.
                 deletedExperienceIds.push(experienceId);
-                console.log('📝 Added to deletion queue:', experienceId);
-                console.log('📋 Current deletion queue:', deletedExperienceIds);
             }
-            
+
             experienciaCard.fadeOut(300, function() {
                 $(this).remove();
                 updateEstablishmentNoExperienciasMessage();
@@ -1875,6 +1903,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                     if (finalEstablishmentId) {
                         $('#establishmentId').val(finalEstablishmentId);
+                        syncAddEstablishmentExperienciaEnabled(); // establecimiento guardado → habilita agregar
                         $('#establishmentModalTitle').text($('#establishmentName').val() || 'Establecimiento');
                         currentModalState = { mode: 'edit', establishmentId: finalEstablishmentId, isOpen: true, sessionId: currentModalState.sessionId };
                         loadEstablishmentExperiencias(finalEstablishmentId, function() {
@@ -2524,6 +2553,216 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             return experiencias;
         }
 
+        // ===== AUTOGUARDADO por experiencia + campos del establecimiento (estrategia B) =====
+        // Requiere que el establecimiento YA exista (#establishmentId). Fotos = botón aparte.
+        const _estExpAutoSaveTimers = new WeakMap();
+        let _estAutoSaveTimer = null;
+
+        function setEstablishmentToast(state) {
+            let el = document.getElementById('establishmentAutoSaveToast');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'establishmentAutoSaveToast';
+                el.style.cssText = 'position:fixed;z-index:2000;right:18px;bottom:18px;display:inline-flex;align-items:center;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.18);opacity:0;transition:opacity .25s;pointer-events:none;';
+                document.body.appendChild(el);
+            }
+            if (state === 'saving') {
+                el.style.background = '#ffffff'; el.style.color = '#2f7d4f'; el.style.border = '1px solid #cfe8d6';
+                el.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando…';
+                el.style.opacity = '1';
+            } else if (state === 'saved') {
+                el.style.background = '#eaf3e4'; el.style.color = '#2f7d4f'; el.style.border = '1px solid #c3ddb6';
+                el.innerHTML = '<i class="ti ti-cloud-check me-2"></i>Cambios guardados';
+                el.style.opacity = '1';
+                setTimeout(function () { el.style.opacity = '0'; }, 1800);
+            } else {
+                el.style.opacity = '0';
+            }
+        }
+
+        // Habilita "Agregar Experiencia" solo cuando el establecimiento ya existe.
+        function syncAddEstablishmentExperienciaEnabled() {
+            const has = !!$('#establishmentId').val();
+            const $btn = $('#addEstablishmentExperienciaBtn');
+            if (!$btn.length) return;
+            $btn.prop('disabled', !has);
+            $btn.attr('title', has ? '' : 'Guarda el establecimiento primero para poder agregar experiencias');
+        }
+
+        // Payload de UNA tarjeta. includePhotos=false para el autosave de campos.
+        function buildEstablishmentExperienciaPayload(cardEl, includePhotos) {
+            const card = cardEl;
+            const getName = (sel) => card.querySelector(sel)?.value?.trim() || '';
+            const getNumber = (sel) => { const v = card.querySelector(sel)?.value; return v ? parseFloat(v) : null; };
+            const getInt = (sel) => { const v = card.querySelector(sel)?.value; return v ? parseInt(v) : null; };
+            const experienceId = card.getAttribute('data-id') || '';
+            const originalProviderId = card.getAttribute('data-original-provider-id') || '';
+            const estId = $('#establishmentId').val();
+            // Protección anti-contaminación cruzada (igual que el colector batch).
+            if (experienceId && originalProviderId && originalProviderId !== estId) return null;
+            const exp = {
+                id: experienceId,
+                originalProviderId,
+                name: getName('.experiencia-name-input'),
+                description: getName('.experiencia-description-input'),
+                tipo: getName('.experiencia-tipo-input'),
+                experience_category: getName('.experiencia-category-input'),
+                entradas: getCardEntradaIds(card),
+                price: getNumber('.experiencia-price-input') || 0,
+                price_no_alcohol: getNumber('.experiencia-price-no-alcohol-input'),
+                price_child: getNumber('.experiencia-price-child-input'),
+                duration: getNumber('.experiencia-duration-input'),
+                travel_duration: getInt('.experiencia-travel-duration-input'),
+                advance_booking_time: getInt('.experiencia-advance-minutes-input'),
+                min_people: getInt('.experiencia-min-people-input'),
+                max_people: getInt('.experiencia-max-people-input'),
+                private_min_type: getName('.experiencia-private-min-type-input'),
+                private_min_value: getNumber('.experiencia-private-min-value-input'),
+                buyout: getNumber('.experiencia-buyout-input'),
+                fixed_schedule: card.querySelector('.experiencia-fixed-schedule-input') ? card.querySelector('.experiencia-fixed-schedule-input').checked : false,
+                includes: getName('.experiencia-includes-input') ? getName('.experiencia-includes-input').split('\n').map(i => i.trim()).filter(i => i.length > 0) : [],
+                notincludes: getName('.experiencia-notincludes-input') ? getName('.experiencia-notincludes-input').split('\n').map(i => i.trim()).filter(i => i.length > 0) : [],
+                languages: getName('.experiencia-languages-input') ? getName('.experiencia-languages-input').split('\n').map(i => i.trim()).filter(i => i.length > 0) : [],
+                internal_notes: getName('.experiencia-internal-notes-input'),
+                client_booking_notes: getName('.experiencia-client-booking-notes-input'),
+                provider_notes: getName('.experiencia-provider-notes-input'),
+                team_notes: getName('.experiencia-team-notes-input')
+            };
+            const availabilitySection = card.querySelector('.availability-section');
+            if (availabilitySection) {
+                const selectedDays = availabilitySection.querySelectorAll('.day-schedule');
+                if (selectedDays.length > 0) {
+                    exp.availability = [];
+                    const estToMin = (t) => { const p = String(t || '').split(':'); return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0); };
+                    selectedDays.forEach(daySchedule => {
+                        const day = parseInt(daySchedule.getAttribute('data-day'));
+                        const daySlots = [];
+                        daySchedule.querySelectorAll('.time-slot').forEach(slot => {
+                            const s = slot.querySelector('.start-time').value; const e = slot.querySelector('.end-time').value;
+                            if (s && e) daySlots.push({ day, start_time: s, end_time: e });
+                        });
+                        daySlots.sort((a, b) => estToMin(a.start_time) - estToMin(b.start_time));
+                        daySlots.forEach(s => exp.availability.push(s));
+                    });
+                }
+            }
+            if (includePhotos) {
+                const photoElements = card.querySelectorAll('.photos-preview-container .photo-preview');
+                if (photoElements.length > 0) {
+                    exp.photos = [];
+                    photoElements.forEach(photoEl => {
+                        const img = $(photoEl).find('img');
+                        if (img.length === 0) return;
+                        const photoElement = $(photoEl);
+                        const photoFullData = photoElement.attr('data-photo-full');
+                        if (photoFullData) {
+                            try { const fullData = JSON.parse(photoFullData.replace(/&#39;/g, "'")); fullData.dataUrl = img.attr('src'); exp.photos.push(fullData); }
+                            catch (e) { const pd = photoElement.data('file'); const du = photoElement.data('dataUrl') || img.attr('src'); exp.photos.push({ dataUrl: du, fileName: pd ? pd.name : 'image.jpg', isNew: !!(pd && du && du.startsWith('data:')) }); }
+                        } else {
+                            const pd = photoElement.data('file'); const du = photoElement.data('dataUrl') || img.attr('src');
+                            exp.photos.push({ dataUrl: du, fileName: pd ? pd.name : 'image.jpg', isNew: !!(pd && du && du.startsWith('data:')) });
+                        }
+                    });
+                }
+            }
+            return exp;
+        }
+
+        async function autoSaveEstablishmentExperiencia(cardEl) {
+            const establishmentId = $('#establishmentId').val();
+            if (!establishmentId) return;
+            const $card = $(cardEl);
+            if ($card.data('_autosaving')) { scheduleEstExperienciaAutoSave(cardEl); return; }
+            const payload = buildEstablishmentExperienciaPayload(cardEl, false);
+            if (!payload || !payload.name || !payload.description) return;
+            const token = getAccessToken();
+            const id = $card.data('id');
+            $card.data('_autosaving', true);
+            setEstablishmentToast('saving');
+            try {
+                if (id) {
+                    await $.ajax({ url: `/api/providers/${establishmentId}/experiencias/${id}`, type: 'PUT', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(payload) });
+                } else {
+                    const res = await $.ajax({ url: `/api/providers/${establishmentId}/experiencias`, type: 'POST', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(payload) });
+                    const newId = res && res.data && (res.data.id || res.data.objectId);
+                    if (newId) { $card.attr('data-id', newId); $card.data('id', newId); $card.attr('data-original-provider-id', establishmentId); }
+                }
+                setEstablishmentToast('saved');
+            } catch (e) {
+                setEstablishmentToast('idle');
+                console.warn('Autoguardado de experiencia (establecimiento) falló:', (e && e.responseJSON) || (e && e.statusText) || e);
+            } finally {
+                $card.data('_autosaving', false);
+            }
+        }
+
+        function scheduleEstExperienciaAutoSave(cardEl) {
+            clearTimeout(_estExpAutoSaveTimers.get(cardEl));
+            _estExpAutoSaveTimers.set(cardEl, setTimeout(function () { autoSaveEstablishmentExperiencia(cardEl); }, 900));
+        }
+
+        async function autoSaveEstablishmentFields() {
+            const establishmentId = $('#establishmentId').val();
+            if (!establishmentId) return;
+            const name = $('#establishmentName').val().trim();
+            if (!name) return;
+            const data = { name, description: $('#establishmentDescription').val().trim(), type: 'Establishment', cost: 0 };
+            const destId = $('#establishmentDestino').val();
+            data.destinationPOI = (destId && destId.trim() !== '') ? destId.trim() : '';
+            const token = getAccessToken();
+            setEstablishmentToast('saving');
+            try {
+                await $.ajax({ url: `${apiEndpoint}/${establishmentId}`, type: 'PUT', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(data) });
+                setEstablishmentToast('saved');
+            } catch (e) {
+                setEstablishmentToast('idle');
+                console.warn('Autoguardado de establecimiento falló:', (e && e.responseJSON) || (e && e.statusText) || e);
+            }
+        }
+
+        function scheduleEstablishmentAutoSave() {
+            clearTimeout(_estAutoSaveTimer);
+            _estAutoSaveTimer = setTimeout(autoSaveEstablishmentFields, 900);
+        }
+
+        async function saveEstablishmentExperienciaPhotos(cardEl, btnEl) {
+            const establishmentId = $('#establishmentId').val();
+            if (!establishmentId) { showErrorAlert('Guarda el establecimiento primero para poder subir fotos.'); return; }
+            const $card = $(cardEl);
+            let id = $card.data('id');
+            const $btn = btnEl ? $(btnEl) : null;
+            const prevHtml = $btn ? $btn.html() : '';
+            if ($btn) $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-1"></span>Guardando fotos…');
+            try {
+                if (!id) { await autoSaveEstablishmentExperiencia(cardEl); id = $card.data('id'); }
+                if (!id) { showErrorAlert('Completa nombre y descripción para poder subir fotos.'); return; }
+                const payload = buildEstablishmentExperienciaPayload(cardEl, true);
+                if (!payload) return;
+                payload.id = id;
+                const token = getAccessToken();
+                await $.ajax({ url: `/api/providers/${establishmentId}/experiencias/${id}`, type: 'PUT', contentType: 'application/json', headers: token ? { 'Authorization': `Bearer ${token}` } : {}, data: JSON.stringify(payload) });
+                if (typeof showSuccessAlert === 'function') showSuccessAlert('Fotos guardadas'); else setEstablishmentToast('saved');
+            } catch (e) {
+                showErrorAlert((e && e.responseJSON && e.responseJSON.error) || 'No se pudieron guardar las fotos.');
+            } finally {
+                if ($btn) $btn.prop('disabled', false).html(prevHtml);
+            }
+        }
+
+        // Wiring delegado desde document.
+        (function wireEstablishmentAutoSave() {
+            $(document).on('input change', '#establishmentExperienciasList .experiencia-editable :input', function () {
+                const t = this;
+                if (t.type === 'file' || $(t).closest('.photo-preview, .experience-photos-container').length) return;
+                const card = $(t).closest('.experiencia-editable')[0];
+                if (card) scheduleEstExperienciaAutoSave(card);
+            });
+            $(document).on('input change', '#establishmentName, #establishmentDescription, #establishmentDestino', scheduleEstablishmentAutoSave);
+            $(document).on('click', '#establishmentExperienciasList .save-experiencia-photos-btn', function () {
+                saveEstablishmentExperienciaPhotos($(this).closest('.experiencia-editable')[0], this);
+            });
+        })();
+
         function showEstablishmentModalError(message) {
         const alertHtml = `
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -2762,6 +3001,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             if (!isEdit) {
                 $('#establishmentId').val(''); // Ensure no residual ID from previous sessions
                 $('#establishmentDestino').val(''); // Ensure no residual destino from previous sessions
+                syncAddEstablishmentExperienciaEnabled(); // crear → botón agregar bloqueado hasta guardar
                 console.log('🧹 Cleared establishmentId and destino fields for create mode');
             }
             
@@ -2866,6 +3106,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         
                         // Populate form fields
                         $('#establishmentId').val(establishment.id);
+                        syncAddEstablishmentExperienciaEnabled(); // establecimiento cargado → habilita agregar
                         $('#establishmentName').val(establishment.name);
                         $('#establishmentModalTitle').text(establishment.name || 'Establecimiento');
                         $('#establishmentDescription').val(establishment.description || '');

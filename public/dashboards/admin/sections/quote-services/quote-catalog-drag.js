@@ -20,6 +20,7 @@ class DragCatalogManager {
     this.tourTypeFilter = 'all'; // Track current tour filter
     this.tourSearchQuery = ''; // Track current search query
     this.destinationFilter = 'all'; // Filtro por destino (experiencias)
+    this.entradaDestinationFilter = 'all'; // Filtro por destino (entradas)
     this.transportTypeFilter = 'all'; // Filtro por tipo de transporte (aeropuerto/punto-a-punto/local)
 
     if (!this.offcanvasEl) {
@@ -97,6 +98,79 @@ class DragCatalogManager {
   renderCatalog() {
     this.renderExperiences();
     this.renderTours();
+    this.renderEntradas();
+  }
+
+  /**
+   * Renderiza la lista de Entradas (boletos de admisión) del catálogo global (builder.entradasCache),
+   * como items arrastrables ordenados por nombre. Sublabel: "Destino · $precio".
+   */
+  renderEntradas() {
+    const container = document.getElementById('catalogEntradasList');
+    if (!container) return;
+    const all = (this.builder.entradasCache && this.builder.entradasCache.get('all')) || [];
+    this.populateEntradaDestinationFilter(all);
+    const df = this.entradaDestinationFilter || 'all';
+    let html = '';
+    let count = 0;
+    [...all]
+      .filter((e) => {
+        if (df === 'all') return true;
+        if (df === '__nodest__') return !e.destinoName;
+        return e.destinoName === df;
+      })
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      .forEach((e) => {
+        if (!e || !e.id) return;
+        const price = Number(e.price) || 0;
+        const subParts = [];
+        if (e.destinoName) subParts.push(e.destinoName);
+        if (price > 0) {
+          subParts.push(this.builder.formatCurrency ? this.builder.formatCurrency(price) : `$${price.toFixed(2)}`);
+        }
+        html += this.renderDraggableItem(e.id, e.name || 'Entrada', 'entrada', 'ti-ticket', subParts.join(' · '));
+        count++;
+      });
+    if (count === 0) {
+      html = '<div class="text-center text-muted py-3">Sin entradas en el catálogo</div>';
+    }
+    container.innerHTML = html;
+    this.updateBadge('catalogEntradasCount', count);
+    // Re-aplicar la búsqueda vigente sobre lo recién renderizado.
+    const searchEl = document.getElementById('catalogSearchEntradas');
+    if (searchEl && searchEl.value) this.filterItems(searchEl.value, 'catalogEntradasList');
+  }
+
+  /**
+   * Puebla el <select> de filtro por destino de Entradas con los destinos que tienen al menos una
+   * entrada (+ conteo). Se oculta si no hay destinos. Mismo patrón que populateDestinationFilter.
+   * @param {Array} allEntradas - Todas las entradas del catálogo.
+   */
+  populateEntradaDestinationFilter(allEntradas) {
+    const sel = document.getElementById('catalogFilterEntradasDestination');
+    if (!sel) return;
+    const counts = new Map();
+    let noDest = 0;
+    allEntradas.forEach((e) => {
+      if (e.destinoName) counts.set(e.destinoName, (counts.get(e.destinoName) || 0) + 1);
+      else noDest += 1;
+    });
+    const dests = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+    if (dests.length === 0) {
+      sel.style.display = 'none';
+      this.entradaDestinationFilter = 'all';
+      return;
+    }
+    sel.style.display = '';
+    const signature = dests.map((d) => `${d}:${counts.get(d)}`).join('|') + (noDest ? `|__nodest__:${noDest}` : '');
+    if (sel.dataset.built !== signature) {
+      let opts = '<option value="all">Todos los destinos</option>';
+      dests.forEach((d) => { opts += `<option value="${this.escapeHtml(d)}">${this.escapeHtml(d)} (${counts.get(d)})</option>`; });
+      if (noDest) opts += `<option value="__nodest__">Sin destino (${noDest})</option>`;
+      sel.innerHTML = opts;
+      sel.dataset.built = signature;
+    }
+    sel.value = this.entradaDestinationFilter || 'all';
   }
 
   renderExperiences() {
@@ -426,6 +500,7 @@ class DragCatalogManager {
       { input: 'catalogSearchExperiences', container: 'catalogExperiencesList' },
       { input: 'catalogSearchTours', container: 'catalogToursList' },
       { input: 'catalogSearchTransport', container: 'catalogTransportList' },
+      { input: 'catalogSearchEntradas', container: 'catalogEntradasList' },
     ];
 
     searchInputs.forEach(({ input, container }) => {
@@ -441,6 +516,15 @@ class DragCatalogManager {
       destSel.addEventListener('change', (e) => {
         this.destinationFilter = e.target.value;
         this.renderExperiences();
+      });
+    }
+
+    // Filtro por destino (entradas) — re-renderiza la lista de entradas.
+    const entradaDestSel = document.getElementById('catalogFilterEntradasDestination');
+    if (entradaDestSel) {
+      entradaDestSel.addEventListener('change', (e) => {
+        this.entradaDestinationFilter = e.target.value;
+        this.renderEntradas();
       });
     }
 
@@ -692,8 +776,22 @@ class DragCatalogManager {
         this.preselectTour(itemId);
       } else if (itemType === 'transport') {
         this.preselectTransport(itemId);
+      } else if (itemType === 'entrada') {
+        this.preselectEntrada(itemId);
       }
     }, 250);
+  }
+
+  preselectEntrada(entradaId) {
+    const radio = document.getElementById('typeEntrada');
+    if (radio) {
+      radio.checked = true;
+      this.builder.handleServiceTypeChange('entrada');
+    }
+    // Espera a que el dropdown de entradas se pueble y selecciona el item.
+    this.waitForOptionAndSelect('entradaSelect', entradaId, (id) => {
+      this.builder.handleEntradaSelection(id);
+    });
   }
 
   preselectExperience(experienceId) {

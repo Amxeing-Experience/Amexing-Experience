@@ -162,6 +162,11 @@
                             </div>
                             <small class="text-muted" id="personCount">(0 personas)</small>
                         </div>
+                        <!-- Espejo del estado de guardado (mismo que el del pie): al modificar solo la
+                             propina/total, el usuario ve aquí que ya se guardó sin bajar hasta abajo. -->
+                        <div class="d-flex justify-content-center mt-3" id="saveStatusIndicatorTotals">
+                            <span class="badge bg-success"><i class="ti ti-check me-1"></i>Guardado</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -654,27 +659,27 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/l10n/es.js"></script>
 <!-- Motor de cálculo único (isomórfico): debe cargar ANTES de pricing-utils y del builder -->
-<script src="/shared/pricing/pricingEngine.js"></script>
-<script src="/dashboard/js/utils/pricing-utils.js"></script>
+<script src="/shared/pricing/pricingEngine.js?v=<%= Date.now() %>"></script>
+<script src="/dashboard/js/utils/pricing-utils.js?v=<%= Date.now() %>"></script>
 <script src="/js/services-renderer-config.js?v=<%= Date.now() %>"></script>
 <script src="/js/services-renderer.js?v=<%= Date.now() %>"></script>
 <% if (process.env.NODE_ENV === 'development') { %>
 <!-- Renderer DevTools for development -->
-<script src="/js/renderer-dev-tools.js"></script>
+<script src="/js/renderer-dev-tools.js?v=<%= Date.now() %>"></script>
 <% } %>
 <!-- Registro de opciones data-driven (costura #2): debe cargar ANTES del builder -->
-<script src="/dashboards/admin/sections/quote-services/option-registry.js"></script>
-<script src="/dashboards/admin/sections/quote-services-v2.js"></script>
+<script src="/dashboards/admin/sections/quote-services/option-registry.js?v=<%= Date.now() %>"></script>
+<script src="/dashboards/admin/sections/quote-services-v2.js?v=<%= Date.now() %>"></script>
 <!-- Helpers de formato/tiempo (prototype de ItineraryBuilder); debe cargar DESPUÉS de quote-services-v2.js -->
-<script src="/dashboards/admin/sections/quote-services-v2-formatters.js"></script>
+<script src="/dashboards/admin/sections/quote-services-v2-formatters.js?v=<%= Date.now() %>"></script>
 <!-- Helpers puros (prototype de ItineraryBuilder); debe cargar DESPUÉS de quote-services-v2.js -->
-<script src="/dashboards/admin/sections/quote-services-v2-helpers.js"></script>
+<script src="/dashboards/admin/sections/quote-services-v2-helpers.js?v=<%= Date.now() %>"></script>
 <!-- Gestión de días del itinerario (prototype de ItineraryBuilder); debe cargar DESPUÉS de quote-services-v2.js -->
-<script src="/dashboards/admin/sections/quote-services-v2-days.js"></script>
+<script src="/dashboards/admin/sections/quote-services-v2-days.js?v=<%= Date.now() %>"></script>
 <!-- Rutas/forms/UI de transporte (prototype de ItineraryBuilder); debe cargar DESPUÉS de quote-services-v2.js -->
-<script src="/dashboards/admin/sections/quote-services-v2-transport.js"></script>
+<script src="/dashboards/admin/sections/quote-services-v2-transport.js?v=<%= Date.now() %>"></script>
 <!-- Funciones a nivel módulo extraídas del builder; debe cargar DESPUÉS de quote-services-v2.js -->
-<script src="/dashboards/admin/sections/quote-services-v2-module.js"></script>
+<script src="/dashboards/admin/sections/quote-services-v2-module.js?v=<%= Date.now() %>"></script>
 <!-- Labels dinámicos de categorías de experiencia (para agrupar el catálogo por categoría) -->
-<script src="/dashboard/js/utils/experience-categories.js"></script>
-<script src="/dashboards/admin/sections/quote-services/quote-catalog-drag.js"></script>
+<script src="/dashboard/js/utils/experience-categories.js?v=<%= Date.now() %>"></script>
+<script src="/dashboards/admin/sections/quote-services/quote-catalog-drag.js?v=<%= Date.now() %>"></script>

@@ -8,17 +8,20 @@
  */
 
 ItineraryBuilder.prototype.updateSaveStatus = function (status) {
-    const indicator = document.getElementById('saveStatusIndicator');
-    if (!indicator) return;
-
     const badges = {
       saved: '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Guardado</span>',
       saving: '<span class="badge bg-warning"><i class="ti ti-loader me-1"></i>Guardando...</span>',
       unsaved: '<span class="badge bg-secondary"><i class="ti ti-edit me-1"></i>Sin guardar</span>',
       error: '<span class="badge bg-danger"><i class="ti ti-alert-circle me-1"></i>Error al guardar</span>',
     };
+    const html = badges[status] || badges.saved;
 
-    indicator.innerHTML = badges[status] || badges.saved;
+    // Refresca el indicador del pie Y el espejo bajo el panel de totales, para que al modificar solo
+    // la propina/total (guardado que puede tardar) el usuario vea el estado sin bajar hasta abajo.
+    ['saveStatusIndicator', 'saveStatusIndicatorTotals'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    });
 
     // Update continue button state
     this.updateContinueButton(status);
@@ -295,6 +298,9 @@ ItineraryBuilder.prototype.saveDay = async function () {
 
 ItineraryBuilder.prototype.deleteDay = function (dayId) {
     this.currentDayId = dayId;
+    // Limpiar currentServiceId: si quedó set de un borrado/edición previa de servicio,
+    // confirmDelete tomaba la rama de "borrar servicio" y el DÍA nunca se eliminaba.
+    this.currentServiceId = null;
     const day = this.days.find((d) => d.id === dayId);
 
     if (!day) return;

@@ -32,6 +32,13 @@ const staticRoutes = [
     directory: path.join(__dirname, '..', '..', 'domain', 'pricing'),
   },
   {
+    // Helpers isomórficos del desglose de pagos compartidos por las 3 plantillas
+    // booking-detail.ejs (admin/department_manager/client): mismo archivo que usa Jest,
+    // servido al navegador como /shared/payments/paymentBreakdownHelpers.js (sin drift).
+    route: '/shared/payments',
+    directory: path.join(__dirname, '..', '..', 'presentation', 'views', 'dashboards', 'shared'),
+  },
+  {
     route: '/dashboard',
     directory: path.join(__dirname, '..', '..', '..', 'public', 'dashboard'),
   },
