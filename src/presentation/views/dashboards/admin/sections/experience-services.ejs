@@ -20,22 +20,24 @@
                         <input class="form-check-input" type="checkbox" id="generalGuideToggle" role="switch">
                         <label class="form-check-label small" for="generalGuideToggle"><i class="ti ti-headphones me-1"></i>Guía</label>
                     </div>
-                    <div class="input-group input-group-sm gen-rate">
+                    <div class="input-group input-group-sm gen-rate" id="generalGuideRateGroup">
                         <span class="input-group-text">$</span>
-                        <input type="number" class="form-control" id="generalGuideRate" min="0" step="0.01" placeholder="0.00" title="Tarifa por hora de la guía">
+                        <input type="number" class="form-control" id="generalGuideRate" min="0" step="0.01" placeholder="0.00" title="Tarifa por hora de la guía (fallback si no hay walking tour SMA)">
                         <span class="input-group-text">/h</span>
                     </div>
+                    <span id="generalGuideSmaHint" class="small text-success d-none" title="La guía se cobra según el walking tour de San Miguel de Allende (varía por pax)"><i class="ti ti-walk me-1"></i>según walking SMA</span>
                 </div>
                 <div class="gen-group">
                     <div class="form-check form-switch m-0">
                         <input class="form-check-input" type="checkbox" id="generalChoferToggle" role="switch">
                         <label class="form-check-label small" for="generalChoferToggle"><i class="ti ti-steering-wheel me-1"></i>Chofer</label>
                     </div>
-                    <div class="input-group input-group-sm gen-rate">
+                    <div class="input-group input-group-sm gen-rate" id="generalChoferRateGroup">
                         <span class="input-group-text">$</span>
-                        <input type="number" class="form-control" id="generalChoferRate" min="0" step="0.01" placeholder="0.00" title="Tarifa por hora del chofer">
+                        <input type="number" class="form-control" id="generalChoferRate" min="0" step="0.01" placeholder="0.00" title="Tarifa por hora del chofer (fallback si no hay tarifa en Ajustes)">
                         <span class="input-group-text">/h</span>
                     </div>
+                    <span id="generalChoferSettingsHint" class="small text-success d-none" title="La tarifa del chofer viene de Ajustes → Guía+Chofer"><i class="ti ti-settings me-1"></i>según ajustes</span>
                 </div>
             </div>
             <!-- Duración de la experiencia (debajo de Incluye, alineada). -->
