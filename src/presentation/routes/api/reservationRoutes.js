@@ -9,6 +9,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const ReservationController = require('../../../application/controllers/api/ReservationController');
 const PaymentController = require('../../../application/controllers/api/PaymentController');
+const StripeCheckoutController = require('../../../application/controllers/api/StripeCheckoutController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 
 const router = express.Router();
@@ -178,6 +179,21 @@ router.post(
   jwtMiddleware.requireRoleLevel(4),
   jwtMiddleware.denyRoles('end_client'),
   (req, res) => PaymentController.uploadReceipt(req, res)
+);
+
+/**
+ * POST /api/reservations/:id/pay/checkout — Open a hosted Stripe Checkout Session for the card
+ * balance (internal/staff flow). MÁS restrictivo que el resto de payments (nivel 4+): admin-only
+ * en Fase 1/2 con requireRoleLevel(6) — intencional (plan seccion 5.3/13.3). NO nivel 5 (deja pasar
+ * al agente pero excluye a la agencia, trampa de niveles invertidos de CLAUDE.md), NO nivel 4. El
+ * endpoint entero va detrás del feature flag PAYMENTS_ENABLED (OFF => 503 en el controller).
+ */
+router.post(
+  '/:id/pay/checkout',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6),
+  (req, res) => StripeCheckoutController.createCheckout(req, res)
 );
 
 /**

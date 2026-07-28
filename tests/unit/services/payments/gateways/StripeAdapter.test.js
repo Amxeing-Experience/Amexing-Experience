@@ -1,13 +1,18 @@
 /**
- * StripeAdapter (PR1 stub) unit tests.
- * Pure logic, no Parse/Mongo/network. Identity, supported currencies, unconfigured
- * state, and consistent NOT_CONFIGURED behavior of charge-related capabilities under
- * repeated / malformed inputs.
+ * StripeAdapter identity + not-yet-wired-capability unit tests (no Parse/Mongo/network).
+ *
+ * As of PR4 the charge path (buildCheckout/createCharge) is REAL and covered by
+ * StripeAdapter.buildCheckout.test.js against a mock client. Here we assert the pieces that are
+ * still stub-shaped: identity, supported currencies, unconfigured state when no client/key is
+ * present, and that the DEFERRED capabilities (getCharge=PR6, refund=PR11, verifyWebhook=PR5)
+ * still fail with NOT_CONFIGURED (an override, never the inherited NOT_IMPLEMENTED) under repeated
+ * / malformed inputs.
  */
 
 const StripeAdapter = require('../../../../../src/application/services/payments/gateways/StripeAdapter');
 const PaymentGatewayService = require('../../../../../src/application/services/payments/PaymentGatewayService');
 const PaymentGatewayError = require('../../../../../src/application/services/payments/PaymentGatewayError');
+const stripeClient = require('../../../../../src/infrastructure/payments/stripeClient');
 
 const CAPABILITIES = [
   'getId',
@@ -18,11 +23,15 @@ const CAPABILITIES = [
   'refund',
   'verifyWebhook',
 ];
-const CHARGE_METHODS = ['createCharge', 'getCharge', 'refund', 'verifyWebhook'];
+// Capabilities NOT yet wired in PR4 -> still throw NOT_CONFIGURED synchronously. createCharge is
+// deliberately excluded: it is the real (async) Checkout path now.
+const CHARGE_METHODS = ['getCharge', 'refund', 'verifyWebhook'];
 
-describe('StripeAdapter (stub)', () => {
+describe('StripeAdapter', () => {
   let adapter;
   beforeEach(() => {
+    // No injected client / no key -> isConfigured() must read false, independent of test order.
+    stripeClient.resetForTests();
     adapter = new StripeAdapter();
   });
 
@@ -44,7 +53,7 @@ describe('StripeAdapter (stub)', () => {
     expect(adapter.getSupportedCurrencies()).toEqual(['USD', 'MXN']);
   });
 
-  it('isConfigured() is false (no real credentials in PR1)', () => {
+  it('isConfigured() is false with no injected client and no environment key', () => {
     expect(adapter.isConfigured()).toBe(false);
   });
 
@@ -57,7 +66,11 @@ describe('StripeAdapter (stub)', () => {
   it('no capability throws NOT_IMPLEMENTED (all are overridden)', () => {
     CAPABILITIES.forEach((cap) => {
       try {
-        adapter[cap]();
+        const out = adapter[cap]();
+        // createCharge is async (real Checkout path): swallow its rejection so it never leaks as
+        // an unhandled promise rejection. Its NOT_IMPLEMENTED-vs-real behavior is covered by
+        // StripeAdapter.buildCheckout.test.js.
+        if (out && typeof out.then === 'function') out.catch(() => {});
       } catch (e) {
         expect(e.code).not.toBe(PaymentGatewayError.CODES.NOT_IMPLEMENTED);
       }
@@ -104,11 +117,11 @@ describe('StripeAdapter (stub)', () => {
       });
     });
 
-    it('behaves identically across repeated calls', () => {
+    it('behaves identically across repeated calls (deferred capability stays NOT_CONFIGURED)', () => {
       const codes = [];
       for (let i = 0; i < 5; i += 1) {
         try {
-          adapter.createCharge({ amount: i });
+          adapter.refund({ chargeId: `ch_${i}` });
         } catch (e) {
           codes.push(e.code);
         }
