@@ -8,6 +8,8 @@
 //      breakdown "N entrada(s) × $unit = $total" con recargo por forma de pago (pricesByType).
 //   2. Entradas en experiencia: lista editable (incluir/precio/cantidad), costo por persona
 //      Σ(precio×cantidad) con el toggle ON/OFF, y la línea "Entradas: N × $Y = $Z" en el desglose.
+//   3. Entradas en tour (walking/vehículo, uno o más destinos): resolución de entradas POR destino
+//      (principal + adicionales, señuelo de otro destino excluido), render y costo con el toggle.
 //
 // Requiere: E2E_EMAIL, E2E_PASSWORD, E2E_QUOTE_ID, E2E_ROLE=admin, E2E_BASE_URL.
 const { test, expect } = require('@playwright/test');
@@ -150,6 +152,71 @@ test.describe('Entradas — smoke (tipo de servicio + entradas en experiencia)',
       expect(r.costOn, 'toggle ON → Σ(precio×cantidad) = 100 + 50 = 150').toBeCloseTo(150, 2);
       expect(r.perPersonFlag, 'flag del toggle = true con ON').toBe(true);
       expect(r.devEfectivo, 'desglose incluye la línea "Entradas: $150..."').toMatch(/Entradas:.*\$150/i);
+    });
+
+    await test.step('entradas en tour: resolución por destino (principal + adicional), render y costo (toggle)', async () => {
+      const r = await page.evaluate(() => {
+        const b = window.itineraryBuilder;
+        if (typeof b.renderTourEntradas !== 'function'
+          || typeof b.getTourEntradasCostMXN !== 'function'
+          || typeof b.getTourEntradas !== 'function') {
+          return { skip: true };
+        }
+        const out = {};
+        // Dos tours walking fake, cada uno con su destino (POI).
+        b.toursCache.set('all', [
+          { id: 'E2E_TOUR', objectId: 'E2E_TOUR', isWalkingTour: true, destinationPOI: { objectId: 'E2E_TD', name: 'Destino Tour' } },
+          { id: 'E2E_TOUR2', objectId: 'E2E_TOUR2', isWalkingTour: true, destinationPOI: { objectId: 'E2E_TD2', name: 'Destino Tour 2' } },
+        ]);
+        // Entradas: 1 del destino principal + 1 del destino adicional + 1 señuelo de OTRO destino
+        // (no debe aparecer: la resolución es POR destino del/los tour(s)).
+        b.entradasCache.set('all', [
+          { id: 'TE1', name: 'Entrada Tour A', price: 120, destinoId: 'E2E_TD', destinoName: 'Destino Tour' },
+          { id: 'TE2', name: 'Entrada Tour B', price: 80, destinoId: 'E2E_TD2', destinoName: 'Destino Tour 2' },
+          { id: 'DECOY', name: 'No debe salir', price: 999, destinoId: 'OTRO_DESTINO', destinoName: 'Otro' },
+        ]);
+        // Selecciona el tipo tour y el tour principal (asegura la opción en el dropdown).
+        const radio = document.getElementById('typeTour');
+        if (radio) { radio.checked = true; b.handleServiceTypeChange('tour'); }
+        const tsel = document.getElementById('tourSelect');
+        if (tsel) {
+          if (!tsel.querySelector('option[value="E2E_TOUR"]')) {
+            const o = document.createElement('option'); o.value = 'E2E_TOUR'; o.textContent = 'E2E Tour'; tsel.appendChild(o);
+          }
+          tsel.value = 'E2E_TOUR';
+        }
+        // Combina un destino adicional → sus entradas también entran.
+        b.additionalTourIds = ['E2E_TOUR2'];
+
+        out.destinoIds = b.getTourDestinoIds().slice().sort();
+        const ent = b.getTourEntradas();
+        out.entradaIds = ent.map((e) => e.id).sort();
+
+        // Render de la lista editable.
+        b.renderTourEntradas(ent);
+        const section = document.getElementById('tourEntradasSection');
+        out.sectionVisible = !!(section && !section.classList.contains('d-none'));
+        out.rows = document.querySelectorAll('#tourEntradasList .tour-entrada-row').length;
+
+        // Cantidad 1 c/u para un costo determinista.
+        document.querySelectorAll('#tourEntradasList .tour-entrada-qty').forEach((el) => { el.value = '1'; });
+        const toggle = document.getElementById('tourEntradasPerPerson');
+        if (toggle) toggle.checked = false;
+        out.costOff = b.getTourEntradasCostMXN();
+        if (toggle) toggle.checked = true;
+        out.costOn = b.getTourEntradasCostMXN();
+        out.itemsCount = b.getTourEntradasState().items.length;
+        return out;
+      });
+
+      test.skip(!!r.skip, 'Entradas-en-tour no disponible en el builder (rama sin la feature)');
+      expect(r.destinoIds, 'destinos del tour = principal + adicional').toEqual(['E2E_TD', 'E2E_TD2']);
+      expect(r.entradaIds, 'entradas resueltas por destino (señuelo excluido)').toEqual(['TE1', 'TE2']);
+      expect(r.sectionVisible, 'la sección de entradas del tour se muestra').toBeTruthy();
+      expect(r.rows, 'render de 2 filas editables').toBe(2);
+      expect(r.itemsCount, 'getTourEntradasState devuelve 2 items').toBe(2);
+      expect(r.costOff, 'toggle OFF → costo = 0').toBe(0);
+      expect(r.costOn, 'toggle ON → Σ(precio×cantidad) = 120 + 80 = 200').toBeCloseTo(200, 2);
     });
   });
 });

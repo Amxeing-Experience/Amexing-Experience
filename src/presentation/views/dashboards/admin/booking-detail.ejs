@@ -945,6 +945,19 @@ document.addEventListener('DOMContentLoaded', async function() {
                 servicioItems.push(detailLine('ticket', `Entradas: ${listEnt}`));
             }
         }
+        // Entradas asociadas al/los destino(s) del tour (boletos de acceso): nombre + ×cantidad si > 1.
+        if (svc.type === 'tour' && Array.isArray(sub.tourEntradas)) {
+            const incEntradas = sub.tourEntradas.filter((e) => e && e.included !== false);
+            if (incEntradas.length > 0) {
+                const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+                }[ch]));
+                const listEnt = incEntradas
+                    .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+                    .join(', ');
+                servicioItems.push(detailLine('ticket', `Entradas: ${listEnt}`));
+            }
+        }
 
         // HORARIO — schedule / duration / suggested times.
         const horarioItems = [];
