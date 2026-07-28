@@ -366,7 +366,18 @@ class SettingsController {
       // Contract for PR4: read the toggle fresh per charge (new SettingsService()) OR, if the
       // charge path caches it on a long-lived shared SettingsService, invalidate THAT same
       // instance here on write -- a fresh instance cannot reach another instance's cache.
-      logger.info(`Active payment gateway updated to "${id}" by user ${req.userRole || 'unknown'}`);
+      // Audit log for a money-routing lever (PCI): record WHO, not just the role. Same
+      // performedBy pattern as PaymentController; req.user is an AmexingUser Parse object,
+      // guarded in case a future auth path sets a plain object or leaves it undefined.
+      const performedByEmail = typeof req.user?.get === 'function'
+        ? req.user.get('email')
+        : req.user?.email;
+      logger.info('Active payment gateway updated', {
+        gateway: id,
+        performedBy: req.userId,
+        email: performedByEmail,
+        role: req.userRole || 'unknown',
+      });
 
       return res.json({
         success: true,
