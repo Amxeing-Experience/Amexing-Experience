@@ -27,11 +27,15 @@ const { redactGatewayPayload } = require('../../../../infrastructure/payments/re
 
 const GATEWAY_ID = 'stripe';
 
-// Checkout Session lifetime. Stripe requires expires_at within [now+30min, now+24h]. The local pending
-// Payment lives PENDING_TTL_MS (30 min exactos en el controller); un colchón de 1 min sobre ese TTL
+// Checkout Session lifetime FALLBACK. Stripe requires expires_at within [now+30min, now+24h]. The local
+// pending Payment lives PENDING_TTL_MS (30 min exactos en el controller); un colchón de 1 min sobre ese TTL
 // mantiene la sesión y el pendiente local alineados (ambos ~30 min) sin caer bajo el mínimo de Stripe por
 // latencia. Antes NO se fijaba expires_at (Stripe la dejaba pagable ~24h) mientras el pendiente local
 // expiraba a 30 min: dos sesiones cobrables => doble-cobro (council BUG B).
+// OJO: el valor REAL de producción viaja congelado por-Payment en chargeRequest.sessionExpiresAt (lo fija
+// el controller a partir del expiresAt del pendiente). Este SESSION_TTL_MS solo se usa como respaldo cuando
+// no llega ese anchor (p.ej. un test unitario aislado del adapter) — nunca en el flujo del controller, donde
+// derivar expires_at de Date.now() rompería la idempotencia del replay (council HIGH).
 const SESSION_TTL_MS = 31 * 60 * 1000;
 
 /**
@@ -100,6 +104,23 @@ function validateChargeRequest(req) {
 }
 
 /**
+ * Resolve the Checkout Session expires_at (Unix seconds). MUST be STABLE per-Payment: an idempotent replay
+ * (same idempotencyKey) has to re-send params IDENTICAL to the first call, or Stripe rejects it (typ. 400
+ * idempotency-key-in-use with different params). Since expires_at travels in the request BODY (not in
+ * requestOptions, where the idempotencyKey lives), deriving it from Date.now() at call time would make the
+ * reuse/winner replays drift and fail (council HIGH). The caller (StripeCheckoutController) therefore passes
+ * a FROZEN sessionExpiresAt (ms epoch, derived once from the pending's own expiresAt); only a direct adapter
+ * call without that anchor (e.g. an isolated unit test) falls back to a fresh window from now.
+ * @param {object} req - The ChargeRequest.
+ * @returns {number} expires_at in Unix seconds.
+ */
+function resolveExpiresAtSeconds(req) {
+  const frozenMs = Number(req.sessionExpiresAt);
+  if (Number.isFinite(frozenMs) && frozenMs > 0) return Math.floor(frozenMs / 1000);
+  return Math.floor((Date.now() + SESSION_TTL_MS) / 1000);
+}
+
+/**
  * Build the Checkout Session params for a validated request (minor unit, no surcharge, card only,
  * metadata on session AND intent).
  * @param {object} req - The ChargeRequest.
@@ -129,9 +150,11 @@ function buildSessionParams(req, amount, currency) {
     }],
     metadata,
     payment_intent_data: { metadata },
-    // Unix seconds, alineado al TTL del pendiente local (+1 min de colchón sobre el mínimo de Stripe) para
-    // que la sesión no siga cobrable horas después de que el pendiente local expiró (council BUG B).
-    expires_at: Math.floor((Date.now() + SESSION_TTL_MS) / 1000),
+    // Unix seconds. CONGELADO por-Payment (sessionExpiresAt del controller), NUNCA Date.now() al momento de
+    // la llamada: así un replay idempotente (reuso/winner) manda params idénticos y Stripe devuelve la sesión
+    // cacheada en vez de un 400 por idempotency-key con params distintos (council HIGH). Sigue alineado al TTL
+    // del pendiente local (+1 min de colchón) para que la sesión no quede cobrable horas después (council BUG B).
+    expires_at: resolveExpiresAtSeconds(req),
     success_url: req.successUrl,
     cancel_url: req.cancelUrl,
   };
@@ -222,6 +245,8 @@ class StripeAdapter extends PaymentGatewayService {
    * @param {string} chargeRequest.reservationId - Reservation the charge is tied to.
    * @param {string} chargeRequest.paymentId - The pending Payment id (metadata + idempotency anchor).
    * @param {string} chargeRequest.idempotencyKey - Per-attempt idempotency key (usually paymentId).
+   * @param {number} [chargeRequest.sessionExpiresAt] - FROZEN session expiry (ms epoch) so an idempotent
+   * replay re-sends identical params (council HIGH); when absent, a fresh now-based window is used.
    * @param {string} [chargeRequest.description] - Receipt description.
    * @param {object} [chargeRequest.customer] - { email } for the provider receipt.
    * @param {object} [chargeRequest.metadata] - reservationId/paymentId to recover provider-side.

@@ -415,6 +415,11 @@ const PaymentBreakdownHelpers = (() => {
     if (s.paymentStatus === 'paid') return '';
     const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
     if (!methods.length) return '';
+    // council LOW (display-only, no money): un método MÁS BARATO que el ancla puede llegar clampado a $0.00
+    // en montoParaSaldar (por el clamp final del fix Bug A) mientras remainingPercent>0, y aquí se pintaría
+    // "$0.00" para ese método. No afecta al checkout, que solo cobra 'tarjeta' (la tier más cara, nunca por
+    // debajo del ancla), así que en la práctica no aplica al flujo de pasarela; queda anotado por si a futuro
+    // se habilita cobrar en línea un método más barato que el cotizado.
     const mps = s.montoParaSaldar || {};
     const rows = methods.map((m) => `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
         <span class="fw-semibold">${escapeHtml(methodLabel(m))}</span>

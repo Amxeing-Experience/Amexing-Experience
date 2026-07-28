@@ -191,6 +191,43 @@ describe('StripeAdapter.buildCheckout (mock client)', () => {
     });
   });
 
+  describe('HIGH — expires_at is FROZEN from sessionExpiresAt (idempotency-safe, not Date.now())', () => {
+    it('stamps expires_at = floor(sessionExpiresAt/1000) verbatim, independent of Date.now()', async () => {
+      const { client, create } = makeMock();
+      const adapter = new StripeAdapter({ client });
+      const frozenMs = 1_900_000_000_000; // a fixed epoch ms, unrelated to the current clock
+      await adapter.buildCheckout({ ...baseReq(), sessionExpiresAt: frozenMs });
+      expect(create.mock.calls[0][0].expires_at).toBe(Math.floor(frozenMs / 1000));
+    });
+
+    it('two calls with the SAME frozen sessionExpiresAt send the SAME expires_at even as the clock advances', async () => {
+      const { client, create } = makeMock();
+      const adapter = new StripeAdapter({ client });
+      const frozenMs = Date.now() + 31 * 60 * 1000;
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000_000_000_000);
+      try {
+        await adapter.buildCheckout({ ...baseReq(), sessionExpiresAt: frozenMs });
+        nowSpy.mockReturnValue(1_000_000_000_000 + 10 * 60 * 1000); // +10 min later
+        await adapter.buildCheckout({ ...baseReq(), sessionExpiresAt: frozenMs });
+      } finally {
+        nowSpy.mockRestore();
+      }
+      expect(create.mock.calls[0][0].expires_at).toBe(create.mock.calls[1][0].expires_at);
+      expect(create.mock.calls[0][0].expires_at).toBe(Math.floor(frozenMs / 1000));
+    });
+
+    it('falls back to a now-based window when no sessionExpiresAt is provided', async () => {
+      const { client, create } = makeMock();
+      const adapter = new StripeAdapter({ client });
+      const before = Date.now();
+      await adapter.buildCheckout(baseReq()); // no sessionExpiresAt
+      const after = Date.now();
+      const { expires_at: expiresAt } = create.mock.calls[0][0];
+      expect(expiresAt).toBeGreaterThanOrEqual(Math.floor((before + 30 * 60 * 1000) / 1000));
+      expect(expiresAt).toBeLessThanOrEqual(Math.floor((after + 32 * 60 * 1000) / 1000));
+    });
+  });
+
   describe('BUG B — expireCheckout closes an old session', () => {
     it('calls client.checkout.sessions.expire with the session id and returns the SDK result', async () => {
       const expire = jest.fn().mockResolvedValue({ id: 'cs_old', status: 'expired' });

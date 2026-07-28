@@ -34,6 +34,11 @@ const { withReservationLock } = require('../../../infrastructure/concurrency/res
 
 // A pending online Payment lives 30 min (aligned with a Checkout Session; the TTL sweep is PR6).
 const PENDING_TTL_MS = 30 * 60 * 1000;
+// The Checkout Session outlives the local pending by a 1-min cushion so that, at CREATION, its expires_at
+// clears Stripe's now+30min hard minimum (createdAt≈now => pending expiresAt=now+30min => session=now+31min).
+// This session expiry is FROZEN per-Payment (see frozenSessionExpiresAt), never Date.now(), so an idempotent
+// replay re-sends identical params and Stripe returns the cached session (council HIGH).
+const SESSION_EXPIRY_CUSHION_MS = 60 * 1000;
 // The toggle Setting stores a numeric code; 0 = 'stripe' is the safe default.
 const GATEWAY_SETTING_KEY = 'activePaymentGateway';
 
@@ -107,13 +112,20 @@ class StripeCheckoutController {
   static async retirePending(payment, adapter, req) {
     const sessionId = payment.getGatewaySessionId && payment.getGatewaySessionId();
     if (sessionId && adapter && typeof adapter.expireCheckout === 'function') {
+      // Best-effort: one bounded retry absorbs a transient provider blip (never a loop). If it still fails,
+      // the residual is small and self-healing: the FROZEN expires_at (council HIGH) auto-expires the orphan
+      // Stripe session in ~31 min, and no money moves until the webhook (PR5); the definitive sweep is PR6.
       try {
         await adapter.expireCheckout(sessionId);
-      } catch (expireErr) {
-        // Already expired/consumed in Stripe, or a transient provider error: never block the retirement.
-        logger.warn('Could not expire old Stripe checkout session on retirement (non-fatal)', {
-          sessionId, error: expireErr && expireErr.message,
-        });
+      } catch (firstErr) {
+        try {
+          await adapter.expireCheckout(sessionId);
+        } catch (expireErr) {
+          // Already expired/consumed in Stripe, or a persistent provider error: never block the retirement.
+          logger.warn('Could not expire old Stripe checkout session on retirement after one retry (non-fatal, session auto-expires in ~31 min)', {
+            sessionId, error: expireErr && expireErr.message,
+          });
+        }
       }
     }
     payment.setGatewayStatus('expired');
@@ -144,6 +156,27 @@ class StripeCheckoutController {
   }
 
   /**
+   * The FROZEN Checkout Session expires_at (ms epoch) for a pending, derived from its OWN expiresAt (set
+   * once in buildPendingPayment), NEVER from Date.now(). Passing this to buildCheckout keeps an idempotent
+   * replay's params byte-identical so Stripe returns the cached session instead of a 400 idempotency
+   * mismatch (council HIGH). On a reuse ~29 min after creation the value can sit only ~1-2 min ahead of now;
+   * that is CORRECT — for a matching idempotencyKey Stripe returns the cached session WITHOUT re-checking its
+   * now+30min minimum, it only compares params. A legacy pending without expiresAt anchors on createdAt so
+   * the value is still stable per-Payment.
+   * @param {object} payment - The pending Payment (carries expiresAt/createdAt).
+   * @returns {number} The frozen session expiry, ms epoch.
+   * @example
+   * StripeCheckoutController.frozenSessionExpiresAt(pending);
+   */
+  static frozenSessionExpiresAt(payment) {
+    const exp = payment.getExpiresAt && payment.getExpiresAt();
+    const expMs = exp ? new Date(exp).getTime() : NaN;
+    if (Number.isFinite(expMs)) return expMs + SESSION_EXPIRY_CUSHION_MS;
+    const createdMs = payment.createdAt ? new Date(payment.createdAt).getTime() : Date.now();
+    return createdMs + PENDING_TTL_MS + SESSION_EXPIRY_CUSHION_MS;
+  }
+
+  /**
    * Build (or, via idempotency, re-fetch) the Checkout Session for a pending Payment and persist
    * the session/intent ids on it. Uses the payment id as the idempotency key so a retry returns
    * the SAME session (no double session, no double charge).
@@ -164,6 +197,8 @@ class StripeCheckoutController {
       reservationId,
       paymentId: payment.id,
       idempotencyKey: payment.id,
+      // FROZEN per-Payment (never Date.now()) so the reuse/winner replays send identical params (council HIGH).
+      sessionExpiresAt: StripeCheckoutController.frozenSessionExpiresAt(payment),
       description: `Reservación ${reservation.get('folio') || reservationId}`,
       metadata,
       // Redirect targets are UX only (the webhook is the source of truth) and are derived from
@@ -262,13 +297,9 @@ class StripeCheckoutController {
     try {
       await payment.save(null, { useMasterKey: true });
     } catch (saveErr) {
-      // Cross-process race: another worker won the unique-index create. Reuse the winner.
+      // Cross-process race: another worker won the unique-index create. Reuse/re-price the winner.
       if (saveErr && saveErr.code === Parse.Error.DUPLICATE_VALUE) {
-        const winner = await StripeCheckoutController.findPendingOnline(reservationId);
-        if (winner) {
-          const r = await StripeCheckoutController.buildChargeAndSave(winner, reservation, adapter);
-          return { checkoutUrl: r.checkoutUrl, paymentId: winner.id, reused: true };
-        }
+        return StripeCheckoutController.resolveWinner(ctx);
       }
       throw saveErr;
     }
@@ -283,6 +314,68 @@ class StripeCheckoutController {
       await StripeCheckoutController.retirePending(payment, adapter, req).catch(() => {});
       throw providerErr;
     }
+  }
+
+  /**
+   * A retryable conflict: the anti-double-submit unique index blocked us and, after a single bounded
+   * retry, no correctly-priced pending could be established (sustained cross-worker contention). Surfaced
+   * as a 409 the caller can simply retry (it will then find/reuse the settled pending), never an infinite
+   * loop against the index.
+   * @returns {Error} The tagged conflict error.
+   */
+  static checkoutConflict() {
+    const err = new Error('Concurrent online checkout creation conflict for this reservation');
+    err.checkoutConflict = true;
+    return err;
+  }
+
+  /**
+   * Resolve the cross-worker winner of the unique-index race (reached only from a DUPLICATE_VALUE on our
+   * own create). The winner is reused ONLY if its FROZEN amount/currency still matches the current charge
+   * (council MEDIUM: a manual payment could have landed between our balance read and the winner's create,
+   * leaving it over-priced) — the SAME pendingMatchesCharge gate the normal reuse path applies. A stale
+   * winner is retired (freeing the index) and a fresh, correctly-priced pending is created, bounded to a
+   * SINGLE re-create retry: a second DUPLICATE_VALUE reuses a matching contender or, failing that, returns
+   * a clear 409 — never a loop against the index.
+   * @param {object} ctx - Same build context as createOrReusePending ({ reservation, adapter, req, charge, ... }).
+   * @returns {Promise<object>} { checkoutUrl, paymentId, reused }.
+   * @example
+   * await StripeCheckoutController.resolveWinner(ctx);
+   */
+  static async resolveWinner(ctx) {
+    const {
+      reservation, adapter, req, charge,
+    } = ctx;
+    const reservationId = reservation.id;
+
+    const winner = await StripeCheckoutController.findPendingOnline(reservationId);
+    if (!winner) throw StripeCheckoutController.checkoutConflict();
+
+    if (StripeCheckoutController.pendingMatchesCharge(winner, charge)) {
+      const r = await StripeCheckoutController.buildChargeAndSave(winner, reservation, adapter);
+      return { checkoutUrl: r.checkoutUrl, paymentId: winner.id, reused: true };
+    }
+
+    // Stale winner (balance drifted): retire it (frees the unique index) and re-price a fresh pending.
+    await StripeCheckoutController.retirePending(winner, adapter, req);
+    const fresh = StripeCheckoutController.buildPendingPayment(ctx);
+    try {
+      await fresh.save(null, { useMasterKey: true });
+    } catch (retryErr) {
+      if (retryErr && retryErr.code === Parse.Error.DUPLICATE_VALUE) {
+        // Another worker slipped a pending in after our retire. Reuse it if correctly priced; otherwise a
+        // clear 409 (NO further retry -> no unbounded loop against the index).
+        const contender = await StripeCheckoutController.findPendingOnline(reservationId);
+        if (contender && StripeCheckoutController.pendingMatchesCharge(contender, charge)) {
+          const r = await StripeCheckoutController.buildChargeAndSave(contender, reservation, adapter);
+          return { checkoutUrl: r.checkoutUrl, paymentId: contender.id, reused: true };
+        }
+        throw StripeCheckoutController.checkoutConflict();
+      }
+      throw retryErr;
+    }
+    const r = await StripeCheckoutController.buildChargeAndSave(fresh, reservation, adapter);
+    return { checkoutUrl: r.checkoutUrl, paymentId: fresh.id, reused: false };
   }
 
   /**
@@ -362,6 +455,12 @@ class StripeCheckoutController {
 
       return res.json({ success: true, data: { checkoutUrl: outcome.checkoutUrl } });
     } catch (error) {
+      // Bounded cross-worker contention on the anti-double-submit index (council MEDIUM): retryable, no money
+      // moved. 409 so the client just retries and reuses the settled pending — never an index loop.
+      if (error && error.checkoutConflict) {
+        logger.warn('Online checkout conflict after bounded retry', { reservationId: id, performedBy: req.userId });
+        return res.status(409).json({ success: false, error: 'Otro cobro en línea se está creando para esta reservación. Intenta de nuevo.' });
+      }
       if (error instanceof PaymentGatewayError) {
         if (error.code === PaymentGatewayError.CODES.NOT_CONFIGURED) {
           return res.status(503).json({ success: false, error: 'El cobro en línea no está disponible en este momento.' });
