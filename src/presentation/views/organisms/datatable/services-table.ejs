@@ -296,14 +296,9 @@ table.dataTable thead th:nth-child(2) select {
             </div>
             <div class="exp-field exp-field--select">
                 <select id="paymentTypeFilter-<%= dtTableId %>">
-                    <% if (isDepartmentManager || isClient) { %>
-                        <option value="efectivo">Efectivo</option>
-                        <option value="transferencia" selected>Transferencia</option>
-                    <% } else { %>
-                        <option value="efectivo" selected>Efectivo</option>
-                        <option value="transferencia">Transferencia</option>
-                    <% } %>
-                    <option value="tarjeta">Tarjeta Débito/Crédito</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="tarjeta" selected>Tarjeta Débito/Crédito</option>
                 </select>
                 <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
@@ -5228,7 +5223,7 @@ table.dataTable thead th:nth-child(2) select {
         PricingUtils.loadCurrentRates().then(function (r) { if (r) _atqRates = r; }).catch(function () {});
     }
     function catalogSurchargedMXN(baseTotal) {
-        const pt = (document.getElementById('paymentTypeFilter-<%= dtTableId %>') || {}).value || 'efectivo';
+        const pt = (document.getElementById('paymentTypeFilter-<%= dtTableId %>') || {}).value || 'tarjeta';
         if (window.PricingUtils && typeof PricingUtils.applyPaymentRate === 'function') {
             return PricingUtils.applyPaymentRate(Number(baseTotal) || 0, pt, _atqRates.transferRate, _atqRates.agencyRate);
         }

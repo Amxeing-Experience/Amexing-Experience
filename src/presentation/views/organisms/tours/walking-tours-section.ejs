@@ -50,8 +50,8 @@ const apiEndpoint = typeof walkingApiEndpoint !== 'undefined' ? walkingApiEndpoi
                     <label for="walkingPaymentFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Pago:</label>
                     <select class="form-select form-select-sm" id="walkingPaymentFilter-<%= sectionId %>" style="min-width: 180px;">
                         <option value="efectivo"<%= (typeof defaultPaymentType !== 'undefined' && defaultPaymentType === 'efectivo') ? ' selected' : '' %>>Efectivo</option>
-                        <option value="transferencia"<%= (typeof defaultPaymentType === 'undefined' || defaultPaymentType === 'transferencia') ? ' selected' : '' %>>Transferencia</option>
-                        <option value="tarjeta"<%= (typeof defaultPaymentType !== 'undefined' && defaultPaymentType === 'tarjeta') ? ' selected' : '' %>>Tarjeta de Crédito/Débito</option>
+                        <option value="transferencia"<%= (typeof defaultPaymentType !== 'undefined' && defaultPaymentType === 'transferencia') ? ' selected' : '' %>>Transferencia</option>
+                        <option value="tarjeta"<%= (typeof defaultPaymentType === 'undefined' || defaultPaymentType === 'tarjeta') ? ' selected' : '' %>>Tarjeta de Crédito/Débito</option>
                     </select>
                 </div>
             </div>

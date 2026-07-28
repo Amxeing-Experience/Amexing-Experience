@@ -253,14 +253,9 @@ table.dataTable tbody tr.hover {
                 <div class="d-flex align-items-center gap-1">
                     <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
                     <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
-                        <% if (isDepartmentManager || isClient) { %>
-                            <option value="efectivo">Efectivo</option>
-                            <option value="transferencia" selected>Transferencia</option>
-                        <% } else { %>
-                            <option value="efectivo" selected>Efectivo</option>
-                            <option value="transferencia">Transferencia</option>
-                        <% } %>
-                        <option value="tarjeta">Tarjeta Débito/Crédito</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="tarjeta" selected>Tarjeta Débito/Crédito</option>
                     </select>
                 </div>
             </div>
@@ -1341,7 +1336,7 @@ async function getAccessToken() {
                 
                 // Re-apply filters after table redraw (including driver mode)
                 setTimeout(async () => {
-                    const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'efectivo';
+                    const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'tarjeta';
                     const currentCurrency = $(`#currencyFilter-${tableId}`).val() || 'MXN';
                     const includeDriver = isDriverModeActive();
                     
@@ -1803,7 +1798,7 @@ async function getAccessToken() {
                         
                         // Apply current filters to the new data (including driver mode)
                         setTimeout(async () => {
-                            const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'efectivo';
+                            const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'tarjeta';
                             const currentCurrency = $(`#currencyFilter-${tableId}`).val() || 'MXN';
                             const includeDriver = isDriverModeActive();
 
@@ -1834,7 +1829,7 @@ async function getAccessToken() {
                     
                     // Apply current filters even on error fallback
                     setTimeout(async () => {
-                        const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'efectivo';
+                        const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'tarjeta';
                         const currentCurrency = $(`#currencyFilter-${tableId}`).val() || 'MXN';
                         const includeDriver = isDriverModeActive();
                         
@@ -1859,7 +1854,7 @@ async function getAccessToken() {
                 
                 // Apply current filters even when no category is selected
                 setTimeout(async () => {
-                    const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'efectivo';
+                    const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'tarjeta';
                     const currentCurrency = $(`#currencyFilter-${tableId}`).val() || 'MXN';
                     const includeDriver = isDriverModeActive();
                     
@@ -2009,7 +2004,7 @@ async function getAccessToken() {
                             
                             // Apply filters to expanded prices (including driver mode)
                             setTimeout(async () => {
-                                const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'efectivo';
+                                const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'tarjeta';
                                 const currentCurrency = $(`#currencyFilter-${tableId}`).val() || 'MXN';
                                 const includeDriver = isDriverModeActive();
                                 
@@ -5000,7 +4995,7 @@ function applyDriverRate(basePrice) {
  * @param {string} currency - Currency
  * @param {boolean} includeDriver - Include driver rate
  */
-function updatePricesVanilla(paymentType = 'efectivo', currency = 'MXN', includeDriver = false) {
+function updatePricesVanilla(paymentType = 'tarjeta', currency = 'MXN', includeDriver = false) {
 
     // Find all price containers using vanilla JavaScript
     const priceContainers = document.querySelectorAll('.price-container');
@@ -5117,7 +5112,7 @@ function updateCapacityDisplays(includeDriver) {
  * @param {string} currency - Currency  
  * @param {boolean} includeDriver - Whether to include driver
  */
-function updateToursDisplay(paymentType = 'efectivo', currency = 'MXN', includeDriver = false) {
+function updateToursDisplay(paymentType = 'tarjeta', currency = 'MXN', includeDriver = false) {
 
     
     updateCapacityDisplays(includeDriver);
@@ -5131,7 +5126,7 @@ function updateToursDisplay(paymentType = 'efectivo', currency = 'MXN', includeD
  * @param {string} currency - Currency
  * @param {boolean} includeDriver - Include driver rate
  */
-function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', includeDriver = false) {
+function updateExpandedRowPrices(paymentType = 'tarjeta', currency = 'MXN', includeDriver = false) {
 
     // Find all price elements in expanded rows directly by looking for the expanded content structure
     // DataTables child rows contain our custom HTML with data-original-price attributes
@@ -5396,7 +5391,7 @@ function initPaymentDropdownHandler() {
                             break;
                         }
                     }
-                    const selectedPaymentType = paymentDropdown ? paymentDropdown.value : 'efectivo';
+                    const selectedPaymentType = paymentDropdown ? paymentDropdown.value : 'tarjeta';
                     const includeDriver = isDriverModeActive();
                     
                     // If USD is selected and exchange rate is not loaded, fetch it
@@ -5476,7 +5471,7 @@ function initFilterPills() {
                 for (let dropdown of allCurrencyDropdowns) {
                     if (dropdown.id.includes('tours')) { currencyEl = dropdown; break; }
                 }
-                const paymentType = paymentTypeEl ? paymentTypeEl.value : 'efectivo';
+                const paymentType = paymentTypeEl ? paymentTypeEl.value : 'tarjeta';
                 const currency = currencyEl ? currencyEl.value : 'MXN';
                 
                 // Update both capacity and prices for driver mode
@@ -5498,7 +5493,7 @@ function initFilterPills() {
                 for (let dropdown of allCurrencyDropdowns) {
                     if (dropdown.id.includes('tours')) { currencyEl = dropdown; break; }
                 }
-                const paymentType = paymentTypeEl ? paymentTypeEl.value : 'efectivo';
+                const paymentType = paymentTypeEl ? paymentTypeEl.value : 'tarjeta';
                 const currency = currencyEl ? currencyEl.value : 'MXN';
                 
                 // Update both capacity and prices for solo guide mode
@@ -5556,7 +5551,7 @@ function initDriverRateFunctionality() {
             if (dropdown.id.includes('tours')) { currencyEl = dropdown; break; }
         }
 
-        const paymentType = paymentTypeEl ? paymentTypeEl.value : 'efectivo';
+        const paymentType = paymentTypeEl ? paymentTypeEl.value : 'tarjeta';
         const currency = currencyEl ? currencyEl.value : 'MXN';
         
         updateToursDisplay(paymentType, currency, isDriverActive);

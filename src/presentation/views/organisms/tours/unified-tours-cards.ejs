@@ -67,14 +67,9 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
             </div>
             <div class="exp-field exp-field--select">
                 <select id="paymentTypeFilter-<%= dtTableId %>">
-                    <% if (isDepartmentManager || isClient) { %>
-                        <option value="efectivo">Efectivo</option>
-                        <option value="transferencia" selected>Transferencia</option>
-                    <% } else { %>
-                        <option value="efectivo" selected>Efectivo</option>
-                        <option value="transferencia">Transferencia</option>
-                    <% } %>
-                    <option value="tarjeta">Tarjeta Debito/Credito</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="tarjeta" selected>Tarjeta Debito/Credito</option>
                 </select>
                 <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
@@ -121,14 +116,9 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
             </div>
             <div class="exp-field exp-field--select">
                 <select id="paymentTypeFilterMobile-<%= dtTableId %>">
-                    <% if (isDepartmentManager || isClient) { %>
-                        <option value="efectivo">Efectivo</option>
-                        <option value="transferencia" selected>Transferencia</option>
-                    <% } else { %>
-                        <option value="efectivo" selected>Efectivo</option>
-                        <option value="transferencia">Transferencia</option>
-                    <% } %>
-                    <option value="tarjeta">Tarjeta Debito/Credito</option>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="tarjeta" selected>Tarjeta Debito/Credito</option>
                 </select>
                 <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
@@ -1826,7 +1816,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function applyFilters() {
         const searchTerm = (searchInputDesktop?.value || searchInputMobile?.value || '').toLowerCase().trim();
         const currency = currencyFilterDesktop?.value || currencyFilterMobile?.value || 'MXN';
-        const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'efectivo';
+        const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'tarjeta';
 
         filteredTours = allTours.filter(tour => {
             // Search filter
@@ -1868,7 +1858,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const currency = currencyFilterDesktop?.value || currencyFilterMobile?.value || 'MXN';
-        const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'efectivo';
+        const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'tarjeta';
         
         const buildTourCard = (tour) => {
             // Map API data to display format first
@@ -2476,7 +2466,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Solo display: lo GUARDADO sigue siendo base efectivo (pricesByType lo resuelve en la cotización).
         function catalogSurchargedMXN(baseTotal) {
             const pt = (document.getElementById('paymentTypeFilter-<%= dtTableId %>') || {}).value
-                || (document.getElementById('paymentTypeFilterMobile-<%= dtTableId %>') || {}).value || 'efectivo';
+                || (document.getElementById('paymentTypeFilterMobile-<%= dtTableId %>') || {}).value || 'tarjeta';
             if (window.PricingUtils && typeof PricingUtils.applyPaymentRate === 'function') {
                 return PricingUtils.applyPaymentRate(Number(baseTotal) || 0, pt, currentTransferRate, currentAgencyRate);
             }
@@ -3499,7 +3489,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const currencyFilter = document.getElementById('currencyFilter-<%= dtTableId %>') || document.getElementById('currencyFilterMobile-<%= dtTableId %>');
         const paymentFilter = document.getElementById('paymentTypeFilter-<%= dtTableId %>') || document.getElementById('paymentTypeFilterMobile-<%= dtTableId %>');
         const currency = currencyFilter ? currencyFilter.value : 'MXN';
-        const paymentType = paymentFilter ? paymentFilter.value : 'efectivo';
+        const paymentType = paymentFilter ? paymentFilter.value : 'tarjeta';
         const unit = `${currency} / HORA`;
         const perUnit = `${currency} / PERSONA`;
 
