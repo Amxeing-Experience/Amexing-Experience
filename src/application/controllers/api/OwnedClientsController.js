@@ -131,6 +131,26 @@ class OwnedClientsController {
     }
 
     await user.save(null, { useMasterKey: true });
+
+    // Si el admin definió contraseña, el cliente ya puede iniciar sesión: le enviamos el correo
+    // de bienvenida con sus credenciales de acceso (fire-and-forget; no bloquea el alta). Sin
+    // contraseña no hay credenciales que compartir, así que se omite. El envío se puede desactivar
+    // desde el alta (sendCredentials=false).
+    if (data.password && data.sendCredentials !== false) {
+      const emailService = require('../../services/EmailService');
+      const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim() || user.get('email');
+      emailService.sendWelcomeEmail({
+        email: user.get('email'),
+        name: fullName,
+        role: data.clientCategory || 'Cliente',
+        password: data.password,
+        recipientUser: user,
+      }).catch((err) => logger.error('Failed to send welcome email to end client', {
+        userId: user.id,
+        error: err.message,
+      }));
+    }
+
     return user;
   }
 
@@ -604,6 +624,7 @@ class OwnedClientsController {
           clientCategory: finalCategory,
           birthDate,
           password, // opcional: si viene, el cliente puede iniciar sesión de una vez
+          sendCredentials: req.body.sendCredentials, // opción del alta: enviar credenciales por correo
           createdBy: currentUser.id,
         });
         logger.info('End-client user created', { userId: created.id, category: finalCategory });
@@ -643,6 +664,7 @@ class OwnedClientsController {
         birthDate,
         // Contraseña opcional: si el DM/agencia la asigna (con email), el cliente puede entrar.
         password,
+        sendCredentials: req.body.sendCredentials, // opción del alta: enviar credenciales por correo
         clientCategory: 'agency_client',
         organizationId: agencyId,
         createdBy: currentUser.id,

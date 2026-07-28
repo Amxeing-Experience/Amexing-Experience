@@ -385,6 +385,17 @@ window.cffForms = (function () {
             })();
             </script>
 
+            <!-- Envío de credenciales por correo (opcional; activado por defecto; se reubica por JS arriba de notas) -->
+            <div class="alert alert-info mt-3" role="alert" style="font-size:.85rem;" id="sendCredentialsWrap">
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="sendCredentialsEmail" checked>
+                    <label class="form-check-label" for="sendCredentialsEmail">
+                        <i class="ti ti-mail me-1"></i>Enviar las credenciales de acceso al cliente por correo.
+                        <span class="text-muted">Si lo desmarcas, no se enviará ningún correo.</span>
+                    </label>
+                </div>
+            </div>
+
             <!-- Barra de acción fija al viewport -->
             <div class="cff-sticky">
                 <div class="cff-sticky-inner">
@@ -443,12 +454,30 @@ document.addEventListener('DOMContentLoaded', function () {
     function showFormError(msg) { if (errBox && errMsg) { errMsg.textContent = msg; errBox.style.display = ''; } }
     function clearFormError() { if (errBox) errBox.style.display = 'none'; }
 
+    // Reubica el checkbox de "enviar credenciales" en el form dado: en cliente directo, arriba de
+    // la fila de teléfono + fecha de nacimiento; en agencia, arriba del campo de notas.
+    function positionSendCredentials(form) {
+        var wrap = document.getElementById('sendCredentialsWrap');
+        if (!wrap || !form) return;
+        var anchor = null;
+        var phone = form.querySelector('#directClientPhone');
+        if (phone) {
+            anchor = phone.closest('.row');
+        } else {
+            var notesField = form.querySelector('#agencyNotes, [name="notes"]');
+            anchor = notesField ? (notesField.closest('.mb-3') || notesField.closest('.row') || notesField.parentElement) : null;
+        }
+        if (anchor && anchor.parentElement) anchor.parentElement.insertBefore(wrap, anchor);
+    }
+
     // ---------- Toggle ----------
     function applyMode() {
         var ag = isAgencyMode();
         agencyForm.style.display = ag ? '' : 'none';
         clientForm.style.display = ag ? 'none' : '';
         if (btnText) btnText.textContent = ag ? submitBtn.dataset.labelAgency : submitBtn.dataset.labelClient;
+        // Mueve el checkbox al form visible (cada form tiene su propio campo de notas).
+        positionSendCredentials(ag ? agencyForm : clientForm);
         clearFormError();
     }
     document.querySelectorAll('input[name="pageClientType"]').forEach(function (r) { r.addEventListener('change', applyMode); });
@@ -469,6 +498,10 @@ document.addEventListener('DOMContentLoaded', function () {
         setLoading(true);
         clearFormError();
         allowLeave = true; // el submit navega al detalle; no dispares la guardia
+        // Checkbox opcional (default checked): si se desmarca, no se envía el correo de credenciales.
+        var sendCredChk = document.getElementById('sendCredentialsEmail');
+        var sendCredentials = sendCredChk ? sendCredChk.checked : true;
+        payload.sendCredentials = sendCredentials;
         try {
             var resp = await fetch(endpoint, {
                 method: 'POST',
@@ -492,7 +525,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         });
                     } catch (e) { /* best-effort: no bloquea la navegación */ }
                 }
-                window.location.href = id ? ('/dashboard/admin/clients/' + id) : '/dashboard/admin/clients';
+                // Confirmación en la ficha destino: agencia siempre lleva contraseña; el cliente
+                // directo solo si el admin la definió. Solo se envía si el checkbox está activo.
+                var mailed = sendCredentials
+                    && ((endpoint.indexOf('/api/clients') === 0) || !!(payload && payload.password));
+                var q = '?created=1' + (mailed ? '&mailed=1' : '');
+                window.location.href = id ? ('/dashboard/admin/clients/' + id + q) : ('/dashboard/admin/clients' + q);
                 return;
             }
             showFormError((data && (data.error || data.message)) || 'No se pudo crear el registro');
@@ -781,6 +819,15 @@ document.addEventListener('DOMContentLoaded', function () {
 <% } else { %>
                         <%- include('../../organisms/forms/client-form-fields', { client: clientData, showPassword: true, passwordHelp: 'Déjala vacía para conservar la contraseña actual.' }) %>
 <% } %>
+                        <!-- Reenviar credenciales por correo (se reubica por JS arriba del campo de notas) -->
+                        <div class="client-form-editorial" id="resendCredentialsWrap">
+                            <div class="mb-3">
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="resendCredentialsBtn">
+                                    <i class="ti ti-send me-1"></i>Reenviar credenciales por correo
+                                </button>
+                                <small class="text-muted d-block mt-1">Escribe la nueva contraseña en el campo de arriba y presiona reenviar para enviarla al cliente por correo.</small>
+                            </div>
+                        </div>
                         <div class="client-form-editorial">
                             <div class="mb-3">
                                 <%- include('../../atoms/form/select', {
@@ -3960,6 +4007,58 @@ function setupExperienceFilters() {
             if (editFormEl && window.cffForms) { window.__editGuard = cffForms.attachDirtyGuard([editFormEl]); }
         }
 
+        // Botón "Reenviar credenciales": usa la contraseña escrita en el form, la guarda vía
+        // reset-password y pide el envío del correo de credenciales (sendEmail=true).
+        var resendBtn = document.getElementById('resendCredentialsBtn');
+        if (resendBtn) {
+            // Reubica el botón justo arriba del campo de notas (que es el último del form).
+            var resendWrap = document.getElementById('resendCredentialsWrap');
+            var notesField = document.getElementById('agencyNotes') || document.getElementById('directClientNotes');
+            if (resendWrap && notesField) {
+                var notesGroup = notesField.closest('.mb-3') || notesField.closest('.row') || notesField.parentElement;
+                if (notesGroup && notesGroup.parentElement) {
+                    notesGroup.parentElement.insertBefore(resendWrap, notesGroup);
+                }
+            }
+            resendBtn.addEventListener('click', async function () {
+                var isAgencyEdit = !!document.getElementById('agencyFirstName');
+                var pwdField = document.getElementById(isAgencyEdit ? 'agencyPassword' : 'directClientPassword');
+                var pwd = pwdField ? pwdField.value.trim() : '';
+                if (!pwd) {
+                    if (pwdField) { pwdField.focus(); pwdField.classList.add('is-invalid'); }
+                    showSuccessMessage('Escribe la nueva contraseña que quieres enviar al cliente.');
+                    return;
+                }
+                var clientId = document.getElementById('editClientId').value;
+                var original = resendBtn.innerHTML;
+                resendBtn.disabled = true;
+                resendBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Enviando…';
+                try {
+                    var resp = await fetch('/api/clients/' + clientId + '/reset-password', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'include',
+                        body: JSON.stringify({ password: pwd, sendEmail: true })
+                    });
+                    var data = await resp.json().catch(function () { return {}; });
+                    if (resp.ok && data && data.success) {
+                        if (pwdField) { pwdField.classList.remove('is-invalid'); }
+                        showSuccessMessage(data.emailed
+                            ? 'Credenciales reenviadas al correo del cliente.'
+                            : 'Contraseña actualizada, pero no se pudo enviar el correo. Revisa la configuración de correo.');
+                        if (window.__editGuard) window.__editGuard.leave = true;
+                    } else {
+                        showSuccessMessage((data && (data.error || data.message)) || 'No se pudieron reenviar las credenciales.');
+                    }
+                } catch (e) {
+                    showSuccessMessage('Error de conexión al reenviar las credenciales.');
+                } finally {
+                    resendBtn.disabled = false;
+                    resendBtn.innerHTML = original;
+                }
+            });
+        }
+
         // Initialize validation cleanup for employee modal
         const editEmployeeModal = document.getElementById('editEmployeeModal');
         if (editEmployeeModal) {
@@ -4582,8 +4681,19 @@ function setupExperienceFilters() {
 
     // New Sidebar Bulk Pricing Functionality
     document.addEventListener('DOMContentLoaded', function() {
+        // Confirmación tras crear un cliente desde el alta (redirige aquí con ?created=1).
+        // mailed=1 indica que se enviaron las credenciales por correo.
+        try {
+            const qp = new URLSearchParams(window.location.search);
+            if (qp.get('created') === '1' && typeof showSuccessMessage === 'function') {
+                showSuccessMessage(qp.get('mailed') === '1'
+                    ? 'Cliente creado. Se enviaron las credenciales de acceso a su correo.'
+                    : 'Cliente creado correctamente.');
+            }
+        } catch (e) { /* noop */ }
+
         const applyBulkPricingBtn = document.getElementById('apply-bulk-pricing');
-        
+
         if (applyBulkPricingBtn) {
             applyBulkPricingBtn.addEventListener('click', async function() {
                 console.log('Button clicked!'); // Debug log
