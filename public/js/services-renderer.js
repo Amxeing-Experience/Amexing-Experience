@@ -2225,9 +2225,10 @@
         }
 
         // Helper: propina por servicio (Fase 2) en la forma de pago actual. Aditiva, línea aparte.
-        // Porcentaje: sobre el precio neto (con descuento). Monto fijo: literal, NUNCA escala por la
-        // forma de pago (paridad con el servidor: PaymentService.sumServiceTips y
-        // QuoteService.sumServiceTipsFromDays suman tipAmount tal cual, sin factor de recargo).
+        // ESCALA por forma de pago igual que el servicio (paridad con el servidor: scaleTipToMethod /
+        // sumServiceTipsFromDays escalan tipAmount por pricesByType[método]/efectivo):
+        //  - Porcentaje: sobre el precio neto EN EL MÉTODO (getServicePrice ya escala) → 10% del total recargado.
+        //  - Monto fijo: se escala por el factor del servicio pricesByType[método]/efectivo (== descuento).
         getServiceTip(service) {
             const type = service.tipType;
             const val = Number(service.tipValue) || 0;
@@ -2235,8 +2236,13 @@
             if (type === 'percent') {
                 return Math.round(this.getServicePrice(service) * (val / 100) * 100) / 100;
             }
-            // Monto fijo: se muestra y se cobra literal, sin escalar por método de pago.
-            return Math.round(val * 100) / 100;
+            // Monto fijo: escala al método por el factor del servicio (en efectivo el factor es 1).
+            const pbt = service.pricesByType;
+            const pt = this.paymentType || 'efectivo';
+            const tip = (pbt && Number(pbt.efectivo) > 0 && pbt[pt] != null)
+                ? val * (Number(pbt[pt]) / Number(pbt.efectivo))
+                : val;
+            return Math.round(tip * 100) / 100;
         }
 
         // Helper: Calculate day total

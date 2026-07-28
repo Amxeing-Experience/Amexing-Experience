@@ -12999,6 +12999,8 @@ class ItineraryBuilder {
     // Fase 2b: subtotal NETO (precios con descuento, SIN propinas por servicio) — base de la
     // propina global (para no cobrar propina sobre propina).
     let netSubtotalMXN = 0;
+    // Base NETA en EFECTIVO (para el factor agregado de la propina global fija: método/efectivo).
+    let netSubtotalEfectivoMXN = 0;
     // Fase 2c: suma de propinas por servicio (para saber si ya hay alguna propina → nota sugerida).
     let serviceTipsTotalMXN = 0;
     // Parte D: contar servicios con "precio pendiente" (ruta de transporte sin precio de catálogo).
@@ -13014,6 +13016,12 @@ class ItineraryBuilder {
           // Fase 2: la propina por servicio es aditiva → se suma al total (línea aparte en la tarjeta).
           const serviceTipAmount = this.getServiceTipInPaymentType ? this.getServiceTipInPaymentType(service) : 0;
           netSubtotalMXN += serviceDisplayPrice;
+          // Neto en efectivo del servicio (precio efectivo − descuento efectivo), para el factor agregado.
+          const efBase = (service.pricesByType && service.pricesByType.efectivo != null)
+            ? Number(service.pricesByType.efectivo) : (Number(service.price) || 0);
+          const efDisc = this.getServiceDiscountInPaymentType
+            ? this.getServiceDiscountInPaymentType(service, 'efectivo') : (Number(service.discountAmount) || 0);
+          netSubtotalEfectivoMXN += Math.max(0, efBase - efDisc);
           serviceTipsTotalMXN += serviceTipAmount;
           totalMXN += serviceDisplayPrice + serviceTipAmount;
           if (service.priceePending) pendingPriceCount += 1;
@@ -13024,7 +13032,7 @@ class ItineraryBuilder {
     // Fase 2b: propina global de la cotización (sobre el subtotal neto). Se suma al total y se
     // muestra en su propia línea. Aplica también a no-admins (se lee de this.globalTip).
     const paymentType = document.getElementById('priceTypeSelect')?.value || 'efectivo';
-    const globalTipAmount = this.getGlobalTipAmount ? this.getGlobalTipAmount(netSubtotalMXN, paymentType) : 0;
+    const globalTipAmount = this.getGlobalTipAmount ? this.getGlobalTipAmount(netSubtotalMXN, paymentType, netSubtotalEfectivoMXN) : 0;
     const globalTipRow = document.getElementById('globalTipRow');
     const globalTipAmountEl = document.getElementById('globalTipAmount');
     if (globalTipRow && globalTipAmountEl) {

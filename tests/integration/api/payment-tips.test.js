@@ -2,8 +2,9 @@
  * Propina cobrada (Fase 2) — integration tests (Parse + mongodb-memory-server).
  *
  * Verifica que la PROPINA (general de la reservación + por servicio) se COBRA de verdad: se suma al
- * total y al saldo, es un monto FIJO en pesos que NUNCA escala con el método de pago, y el motor de
- * pagos la deriva de fuentes crudas (reservation.tip + subconcept.tipAmount de los servicios activos),
+ * total y al saldo, y ESCALA por método de pago igual que el servicio (factor pricesByType[método]/
+ * efectivo; la general se persiste ya escalada en reservation.tip). El motor de pagos la deriva de
+ * fuentes crudas (reservation.tip + subconcept.tipAmount de los servicios activos),
  * IGNORANDO los campos legacy totalAmount/servicesSubtotal. Cubre también el recálculo de la propina
  * general en QuoteService (create/sync) y el fix del "tercer total" (recalculateTotal == summary.total).
  */
@@ -199,16 +200,18 @@ describe('Propina cobrada (Fase 2, integration)', () => {
       expect(s.total).toBe(1100);
     });
 
-    it('la propina es plana: mismo monto en efectivo y en tarjeta (no escala con el recargo)', async () => {
+    it('la propina general PERSISTIDA (reservation.tip) no se re-escala en la lectura: se toma tal cual', async () => {
+      // reservation.tip ya viene escalada al método por computeGeneralTip al persistir; loadAndCompute la
+      // suma tal cual (no la re-escala). Aquí se fija 300 directo en ambas para probar ese "no doble escalado".
       const items = [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 }, tipAmount: 0 }];
       const idEf = await createReservation(items, 'efectivo', { tip: 300 });
       const idTj = await createReservation(items, 'tarjeta', { tip: 300 });
       const sEf = await PaymentService.summarize(idEf);
       const sTj = await PaymentService.summarize(idTj);
       expect(sEf.tip).toBe(300);
-      expect(sTj.tip).toBe(300); // idéntica, no 300*1.21
+      expect(sTj.tip).toBe(300); // se toma el valor persistido tal cual, sin re-escalar en la lectura
       expect(sEf.total).toBe(10300); // 10000 + 300
-      expect(sTj.total).toBe(12400); // 12100 + 300 (propina plana)
+      expect(sTj.total).toBe(12400); // 12100 + 300 (tip persistido, no re-escalado)
     });
 
     it('reservación USD: la propina ya está en USD, sin conversión extra por el tipo de cambio', async () => {
@@ -437,13 +440,14 @@ describe('Propina cobrada (Fase 2, integration)', () => {
     });
   });
 
-  describe('FIX 4 — propina fija por servicio: paridad server-side entre paymentType (regresión)', () => {
-    // El monto que se persiste (subconcept.tipAmount) y factura (PaymentService.sumServiceTips) es
-    // PLANO: no escala con el método de pago. El bug era solo de display; estas pruebas blindan que el
-    // motor de dinero nunca re-escale, en las 3 formas de pago.
+  describe('FIX 4 — propina por servicio: ESCALA por paymentType (factor del servicio)', () => {
+    // subconcept.tipAmount se persiste en EFECTIVO; al facturar (PaymentService.sumServiceTips) escala al
+    // método de la reservación por el factor del servicio pricesByType[método]/efectivo (== descuento),
+    // para que lo cobrado == lo mostrado. Factores de svc2000: transferencia 2320/2000=1.16, tarjeta
+    // 2420/2000=1.21.
     const svc2000 = { pricesByType: { efectivo: 2000, transferencia: 2320, tarjeta: 2420 } };
 
-    it('F4-I01: 3 reservaciones idénticas salvo paymentType, tipAmount:100 fijo -> serviceTipsTotal===100 en las 3', async () => {
+    it('F4-I01: 3 reservaciones idénticas salvo paymentType, tipAmount:100 fijo -> escala por método (100 / 116 / 121)', async () => {
       const items = (method) => [{ ...svc2000, total: svc2000.pricesByType[method], tipAmount: 100 }];
       const idEf = await createReservation(items('efectivo'), 'efectivo');
       const idTr = await createReservation(items('transferencia'), 'transferencia');
@@ -452,8 +456,8 @@ describe('Propina cobrada (Fase 2, integration)', () => {
         PaymentService.summarize(idEf), PaymentService.summarize(idTr), PaymentService.summarize(idTj),
       ]);
       expect(sEf.serviceTipsTotal).toBe(100);
-      expect(sTr.serviceTipsTotal).toBe(100); // nunca 116
-      expect(sTj.serviceTipsTotal).toBe(100); // nunca 121
+      expect(sTr.serviceTipsTotal).toBe(116); // 100 * 2320/2000
+      expect(sTj.serviceTipsTotal).toBe(121); // 100 * 2420/2000
     });
 
     it('F4-I02: PUT service-items paymentType tarjeta con tipType:amount,tipValue:100,tipAmount:100 -> 200; tipAmount persiste 100 (no recalcula)', async () => {
@@ -487,22 +491,23 @@ describe('Propina cobrada (Fase 2, integration)', () => {
       expect(savedSub.tipAmount).toBe(100); // literal: el server no lo re-escala a tarjeta (2420*5% etc.)
     });
 
-    it('F4-I03: propina percent (tipAmount:300 = 15% de 2000 efectivo) -> serviceTipsTotal===300 anclada a efectivo Y a tarjeta', async () => {
+    it('F4-I03: propina percent (tipAmount:300 = 15% de 2000 efectivo) -> escala a tarjeta (300 / 363)', async () => {
       const items = (method) => [{ ...svc2000, total: svc2000.pricesByType[method], tipAmount: 300 }];
       const idEf = await createReservation(items('efectivo'), 'efectivo');
       const idTj = await createReservation(items('tarjeta'), 'tarjeta');
       const [sEf, sTj] = await Promise.all([PaymentService.summarize(idEf), PaymentService.summarize(idTj)]);
       expect(sEf.serviceTipsTotal).toBe(300);
-      expect(sTj.serviceTipsTotal).toBe(300); // nunca 363
+      expect(sTj.serviceTipsTotal).toBe(363); // 300 * 2420/2000
     });
 
-    it('F4-I04: crear efectivo con tipAmount:100, cambiar reservation.paymentType a tarjeta -> serviceTipsTotal sigue 100 (congelado)', async () => {
+    it('F4-I04: crear efectivo con tipAmount:100, cambiar reservation.paymentType a tarjeta -> re-escala a 121', async () => {
       const id = await createReservation([{ ...svc2000, total: 2000, tipAmount: 100 }], 'efectivo');
       expect((await PaymentService.summarize(id)).serviceTipsTotal).toBe(100);
       const reservation = await fetchReservation(id);
       reservation.set('paymentType', 'tarjeta');
       await reservation.save(null, { useMasterKey: true });
-      expect((await PaymentService.summarize(id)).serviceTipsTotal).toBe(100); // no re-escala al cambiar el ancla
+      // Re-escala al método vigente de la reservación (la propina refleja la forma de pago actual).
+      expect((await PaymentService.summarize(id)).serviceTipsTotal).toBe(121); // 100 * 2420/2000
     });
   });
 
@@ -578,8 +583,8 @@ describe('Propina cobrada (Fase 2, integration)', () => {
     });
   });
 
-  describe('H10 — pago parcial en método NO-ancla: la propina plana se suma igual en los 3 métodos', () => {
-    it('H10-I01: base efectivo 10000, tip 300, pago 6050 tarjeta -> montoParaSaldar.tarjeta === 6350 (servicios escalan, propina NO)', async () => {
+  describe('H10 — pago parcial en método NO-ancla: la propina anclada se suma igual en los 3 métodos', () => {
+    it('H10-I01: base efectivo 10000, tip 300 (anclado), pago 6050 tarjeta -> montoParaSaldar.tarjeta === 6350', async () => {
       const id = await createReservation(
         [{ pricesByType: { efectivo: 10000, transferencia: 11600, tarjeta: 12100 }, total: 10000, tipAmount: 0 }],
         'efectivo',
@@ -588,11 +593,12 @@ describe('Propina cobrada (Fase 2, integration)', () => {
       const pay = await postPayment(id, { amount: 6050, currency: 'MXN', method: 'tarjeta' });
       expect(pay.status).toBe(200);
       const s = await PaymentService.summarize(id);
-      // Cobertura equivalente-ancla del pago tarjeta 6050 = 5000 efectivo; restante servicios 5000.
-      // El restante de servicios escala por método; la propina de 300 se suma PLANA en los 3.
+      // Cobertura equivalente-ancla del pago tarjeta 6050 = 5000 efectivo; restante servicios 5000. El
+      // restante de servicios escala por método; la propina (ya anclada al método de la reservación,
+      // efectivo=300) se suma sin re-escalar en el desglose de saldo restante (remainingBreakdown).
       expect(s.montoParaSaldar.efectivo).toBe(5300); // 5000 + 300
       expect(s.montoParaSaldar.transferencia).toBe(6100); // 5800 + 300
-      expect(s.montoParaSaldar.tarjeta).toBe(6350); // 6050 + 300 (nunca 300*1.21)
+      expect(s.montoParaSaldar.tarjeta).toBe(6350); // 6050 + 300 (parte plana no re-escala aquí)
     });
   });
 

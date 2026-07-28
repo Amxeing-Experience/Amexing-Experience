@@ -135,10 +135,10 @@ class PaymentService {
 
     // Ajustes (cargos/descuentos) se suman como pesos finales (sin factor).
     const adjustments = round2(Number(adjustmentsNet) || 0);
-    // Propina = pesos FIJOS que NUNCA escalan por método de pago (mismo criterio que los ajustes). Se
-    // suma DESPUÉS del redondeo a efectivo de los servicios y DESPUÉS de los ajustes, dentro del clamp
-    // final; NO se re-redondea a múltiplo de 5, NO afecta servicesTotal (base de conversión entre
-    // métodos) ni surcharge. Guarda: solo un número finito y positivo cuenta (NaN/Infinity/negativo -> 0).
+    // Propina = pesos que el LLAMADOR ya escaló al método (scaleTipToMethod / computeGeneralTip); aquí
+    // solo se suman, sin re-escalar. Se suma DESPUÉS del redondeo a efectivo de los servicios y DESPUÉS
+    // de los ajustes, dentro del clamp final; NO se re-redondea a múltiplo de 5, NO afecta servicesTotal
+    // (base de conversión entre métodos) ni surcharge. Guarda: solo un número finito y positivo cuenta.
     const rawTip = Number(reservationTip);
     const tip = Number.isFinite(rawTip) && rawTip > 0 ? round2(rawTip) : 0;
     // El total nunca es negativo: un descuento mayor a servicios+propina lo deja en 0 (no "menos que nada").
@@ -333,22 +333,45 @@ class PaymentService {
   }
 
   /**
-   * Suma la propina por servicio (subconcept.tipAmount, ya en pesos fijos) de los servicios ACTIVOS.
-   * Un servicio excluido del total (includeInTotal === false) aporta $0 igual que su precio; los
-   * soft-eliminados ya los filtró queryExisting antes de llegar aquí. Solo un tipAmount finito y positivo
-   * cuenta (NaN/Infinity/negativo -> 0). No recalcula porcentajes ni montos: el valor final ya está resuelto.
-   * @param {Array<object>} items - Plain items { includeInTotal, tipAmount } (de toServiceItems).
-   * @returns {number} Suma de propinas por servicio, a 2 decimales.
+   * Escala una propina en EFECTIVO (subconcept.tipAmount) a una forma de pago por el factor del servicio
+   * pricesByType[método]/efectivo — el MISMO factor multiplicativo que el descuento (getServiceDiscountInPaymentType
+   * en el front). Así la propina sube con el precio real del servicio en esa forma de pago (10% sobre el
+   * total ya recargado; el monto fijo sube igual que el servicio). Sin pricesByType válido, factor = 1
+   * (se asume efectivo). Solo un tip finito y positivo aporta.
+   * @param {number} tipEfectivo - Propina por servicio en efectivo (subconcept.tipAmount).
+   * @param {object} pricesByType - Precios del servicio por método { efectivo, transferencia, tarjeta }.
+   * @param {string} method - Método de pago destino (efectivo|transferencia|tarjeta).
+   * @returns {number} Propina escalada al método, a 2 decimales.
    * @example
-   * PaymentService.sumServiceTips([{ tipAmount: 100 }, { tipAmount: 300 }]) // 400
+   * PaymentService.scaleTipToMethod(20, { efectivo: 200, transferencia: 232 }, 'transferencia') // 23.2
    */
-  static sumServiceTips(items) {
+  static scaleTipToMethod(tipEfectivo, pricesByType, method) {
+    const tip = Number(tipEfectivo);
+    if (!Number.isFinite(tip) || tip <= 0) return 0;
+    const pbt = pricesByType || {};
+    const ef = Number(pbt.efectivo) || 0;
+    const mp = Number(pbt[method]);
+    const factor = (ef > 0 && pbt[method] != null && Number.isFinite(mp)) ? (mp / ef) : 1;
+    return round2(tip * factor);
+  }
+
+  /**
+   * Suma la propina por servicio (subconcept.tipAmount, en efectivo) de los servicios ACTIVOS, YA
+   * ESCALADA a la forma de pago por el factor del servicio (scaleTipToMethod). Un servicio excluido del
+   * total (includeInTotal === false) aporta $0 igual que su precio; los soft-eliminados ya los filtró
+   * queryExisting antes de llegar aquí.
+   * @param {Array<object>} items - Plain items { includeInTotal, tipAmount, pricesByType } (de toServiceItems).
+   * @param {string} [method] - Método de pago para escalar la propina (default 'efectivo' → sin escala).
+   * @returns {number} Suma de propinas por servicio en el método dado, a 2 decimales.
+   * @example
+   * PaymentService.sumServiceTips([{ tipAmount: 20, pricesByType: { efectivo: 200, tarjeta: 246.4 } }], 'tarjeta') // 24.64
+   */
+  static sumServiceTips(items, method = 'efectivo') {
     const list = Array.isArray(items) ? items : [];
     let total = 0;
     for (const item of list) {
       if (item && item.includeInTotal !== false) {
-        const tip = Number(item.tipAmount);
-        if (Number.isFinite(tip) && tip > 0) total += tip;
+        total += this.scaleTipToMethod(item.tipAmount, item.pricesByType, method);
       }
     }
     return round2(total);
@@ -497,11 +520,12 @@ class PaymentService {
       method: payment.get('method'),
     }));
 
-    // Propina cobrada (Fase 2) = general (recalculada y persistida en reservation.tip por QuoteService) +
-    // Σ propina por servicio en vivo (subconcept.tipAmount de los servicios activos). Pesos fijos que NO
-    // escalan por método; se congelan sólo en el sentido de que la general vive en la reservación, no aquí.
+    // Propina cobrada (Fase 2) = general (recalculada y persistida en reservation.tip por QuoteService,
+    // ya escalada al método de la reservación) + Σ propina por servicio, escalada AQUÍ al método por el
+    // factor del servicio (scaleTipToMethod), igual que el descuento. Ambas ya vienen en el método, así
+    // que computeTotals solo las suma (no re-escala).
     const generalTip = Number(reservation.get('tip')) || 0;
-    const serviceTipsTotal = this.sumServiceTips(serviceItems);
+    const serviceTipsTotal = this.sumServiceTips(serviceItems, paymentType);
     const reservationTip = round2(generalTip + serviceTipsTotal);
 
     const totals = this.computeTotals(serviceItems, paymentType, adjustmentsNet, currency, reservationTip);

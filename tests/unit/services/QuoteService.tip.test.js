@@ -4,7 +4,7 @@
  * Cubre las funciones puras computeGeneralTip / sumServiceTipsFromDays, que recomputan la propina
  * general desde serviceItems.globalTip (NO desde globalTip.amount persistido). type 'percent' escala
  * por el método de pago (base neta del método = pricesByType[método] − descuento escalado), para
- * cuadrar con el widget de la cotización; type 'amount' es literal (nunca escala). Suman también la
+ * cuadrar con el widget de la cotización; type 'amount' escala por el factor agregado (método/efectivo). Suman también la
  * propina por servicio del snapshot. Sin Parse ni DB: sólo la lógica de cálculo.
  */
 
@@ -48,9 +48,12 @@ describe('QuoteService.computeGeneralTip (propina general, pesos fijos en efecti
     expect(svc.computeGeneralTip(si)).toBe(200);
   });
 
-  it('amount: monto fijo LITERAL, no escala con método (anti-regresión directa del bug del wizard)', () => {
-    const si = { globalTip: { type: 'amount', value: 500 }, ...daysOf([2000]) };
-    expect(svc.computeGeneralTip(si)).toBe(500); // nunca 500 × 1.21
+  it('amount: monto fijo escala por el factor agregado de la cotización (método/efectivo)', () => {
+    // efectivo (sin método): factor 1 -> literal.
+    expect(svc.computeGeneralTip({ globalTip: { type: 'amount', value: 500 }, ...daysOf([2000]) })).toBe(500);
+    // tarjeta: base 2000 -> 2420 (factor 1.21); la propina fija de 500 escala a 605.
+    const si = { globalTip: { type: 'amount', value: 500 }, paymentType: 'tarjeta', ...daysOf([2000]) };
+    expect(svc.computeGeneralTip(si)).toBe(605); // 500 * 2420/2000
   });
 
   it('descuenta el discountAmount de cada servicio ANTES del %', () => {
@@ -112,6 +115,19 @@ describe('QuoteService.sumServiceTipsFromDays (propina por servicio del snapshot
       }],
     };
     expect(svc.sumServiceTipsFromDays(si)).toBe(400);
+  });
+
+  it('escala tipAmount al método por el factor del servicio pricesByType[método]/efectivo', () => {
+    const si = {
+      days: [{
+        subconcepts: [
+          { tipAmount: 100, includeInTotal: true, pricesByType: { efectivo: 2000, tarjeta: 2420 } },
+          { tipAmount: 300, includeInTotal: true, pricesByType: { efectivo: 2000, tarjeta: 2420 } },
+        ],
+      }],
+    };
+    expect(svc.sumServiceTipsFromDays(si, 'efectivo')).toBe(400); // factor 1
+    expect(svc.sumServiceTipsFromDays(si, 'tarjeta')).toBe(484); // (100 + 300) * 1.21
   });
 
   it('ignora tipAmount no finito/negativo; vacío/ausente -> 0', () => {

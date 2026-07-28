@@ -814,24 +814,28 @@ ItineraryBuilder.prototype.getServiceDisplayPrice = function (service) {
 };
 
 // Propina por servicio (Fase 2). Es ADITIVA (se suma al total) y se muestra como línea aparte; NO se
-// hornea en pricesByType. La propina es PLANA: se persiste (subconcept.tipAmount) y se factura
-// (PaymentService.sumServiceTips la lee literal) siempre sobre la base EFECTIVA, sin escalar por método
-// de pago. El display debe reflejar exactamente ese monto facturado, así que el cálculo ignora el
-// método (parámetro paymentType) y usa siempre la base efectivo: porcentaje sobre el precio neto en
-// efectivo (ya con descuento), monto fijo literal. Antes se escalaba con getDisplayPriceForType y el
-// preview/lista mostraba un monto (ej. $363 en tarjeta) distinto al facturado ($300).
-ItineraryBuilder.prototype.getServiceTipInPaymentType = function (service, _paymentType) {
+// hornea en pricesByType. La propina ESCALA por forma de pago igual que el precio del servicio: se
+// calcula en efectivo (porcentaje sobre el precio neto efectivo, o monto fijo literal) y luego se
+// multiplica por el factor del servicio pricesByType[método]/efectivo (el MISMO factor que usa el
+// descuento). Así el 10% se cobra sobre el total del servicio YA en la forma de pago (10% de $232, no
+// de $200) y el monto fijo sube igual que el servicio. En efectivo el factor es 1, por lo que
+// getServiceTipEfectivo (paymentType='efectivo') devuelve la propina base persistida en subconcept.tipAmount.
+// El backend escala ese tipAmount efectivo por el mismo factor al facturar (scaleTipToMethod), de modo
+// que lo mostrado == lo cobrado en cada método.
+ItineraryBuilder.prototype.getServiceTipInPaymentType = function (service, paymentType) {
     const type = service && service.tipType;
     const val = Number(service && service.tipValue) || 0;
     if (!type || val <= 0) return 0;
-    if (type === 'percent') {
-      const pbt = service.pricesByType;
-      const base = (pbt && pbt.efectivo !== undefined) ? (Number(pbt.efectivo) || 0) : (Number(service.price) || 0);
-      const net = Math.max(0, base - this.getServiceDiscountInPaymentType(service, 'efectivo'));
-      return Math.round(net * (val / 100) * 100) / 100;
-    }
-    // Monto fijo: literal en pesos (efectivo), sin escalar por método.
-    return Math.round(val * 100) / 100;
+    const method = paymentType || document.getElementById('priceTypeSelect')?.value || 'efectivo';
+    const pbt = service.pricesByType;
+    const ef = (pbt && pbt.efectivo !== undefined) ? (Number(pbt.efectivo) || 0) : (Number(service.price) || 0);
+    // Propina en EFECTIVO: % sobre el precio neto efectivo (ya con descuento), o el monto fijo literal.
+    const tipEf = type === 'percent'
+      ? Math.max(0, ef - this.getServiceDiscountInPaymentType(service, 'efectivo')) * (val / 100)
+      : val;
+    // Escala al método por el factor del servicio (== descuento). Sin pricesByType válido, factor = 1.
+    const factor = (ef > 0 && pbt && pbt[method] != null) ? (Number(pbt[method]) / ef) : 1;
+    return Math.round(tipEf * factor * 100) / 100;
 };
 
 // Propina por servicio en EFECTIVO (para persistir como metadata, análogo a discountAmount).
@@ -843,12 +847,20 @@ ItineraryBuilder.prototype.getServiceTipEfectivo = function (service) {
 // para que aplique también a no-admins (los controles son admin-only). Base: el subtotal NETO
 // (con descuentos, SIN las propinas por servicio → no se cobra propina sobre propina). El % escala
 // solo (netSubtotal ya está en la forma de pago); el monto fijo se escala con los recargos.
-ItineraryBuilder.prototype.getGlobalTipAmount = function (netSubtotal, paymentType) {
+ItineraryBuilder.prototype.getGlobalTipAmount = function (netSubtotal, paymentType, netSubtotalEfectivo) {
     const g = this.globalTip;
     if (!g || !g.type) return 0;
     const val = Number(g.value) || 0;
     if (val <= 0) return 0;
     if (g.type === 'percent') return Math.round((Number(netSubtotal) || 0) * (val / 100) * 100) / 100;
+    // Monto fijo: escala por el factor AGREGADO de la cotización (netSubtotal método / netSubtotal
+    // efectivo), idéntico al backend (computeGeneralTip), para que lo mostrado == lo cobrado. Sin la
+    // base efectivo (llamadores viejos) cae a la tasa pura del método (igual en cotizaciones sin
+    // recargo mixto).
+    const nEf = Number(netSubtotalEfectivo);
+    if (Number.isFinite(nEf) && nEf > 0) {
+      return Math.round(val * ((Number(netSubtotal) || 0) / nEf) * 100) / 100;
+    }
     const pt = paymentType || (document.getElementById('priceTypeSelect')?.value || 'efectivo');
     const scaled = this.getDisplayPriceForType ? this.getDisplayPriceForType(val, pt) : val;
     return Math.round(scaled * 100) / 100;

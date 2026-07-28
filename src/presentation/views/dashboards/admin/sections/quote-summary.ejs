@@ -1565,30 +1565,33 @@ const e = __isRes ? 'reservación' : 'cotización';
             const gtMeta = serviceItems.globalTip;
             let globalTipAmount = 0;
             if (gtMeta && Number(gtMeta.value) > 0) {
-                if (gtMeta.type === 'amount') {
-                    // Monto fijo: literal en pesos, sin escalar por método (igual que computeGeneralTip).
-                    globalTipAmount = Math.round((Number(gtMeta.value) || 0) * 100) / 100;
-                } else if (gtMeta.type === 'percent') {
-                    // Porcentaje: sobre la base NETA DEL MÉTODO de pago (pricesByType[método] menos su
-                    // descuento escalado) de los servicios activos — misma base, escalado y tope de 100%
-                    // que computeGeneralTip en el servidor, para que la línea cuadre con la propina ya
-                    // horneada en serviceItems.total (que escala por método). Fallback a efectivo si el
-                    // método no tiene precio propio.
-                    const method = savedPayment || 'efectivo';
-                    let netBaseMethod = 0;
-                    normalizedData.days.forEach(day => {
-                        (day.services || []).forEach(svc => {
-                            if (svc.includeInTotal === false) return;
-                            const pbt = svc.pricesByType || {};
-                            const ef = Number(pbt.efectivo) || 0;
-                            const mp = Number(pbt[method]);
-                            const hasMethod = Number.isFinite(mp) && pbt[method] != null;
-                            const base = hasMethod ? mp : ef;
-                            const discEf = Number(svc.discountAmount) || 0;
-                            const disc = (ef > 0 && hasMethod) ? discEf * (mp / ef) : discEf;
-                            netBaseMethod += Math.max(0, base - disc);
-                        });
+                // Base NETA de servicios activos, en el MÉTODO y en EFECTIVO (precio menos su descuento
+                // escalado) — misma regla que computeGeneralTip en el servidor. El % va sobre la base del
+                // método; el monto fijo escala por el factor agregado netBaseMethod/netBaseEfectivo, para
+                // que la línea cuadre con la propina ya horneada en serviceItems.total (que escala por
+                // método). Fallback a efectivo si el método no tiene precio propio.
+                const method = savedPayment || 'efectivo';
+                let netBaseMethod = 0;
+                let netBaseEfectivo = 0;
+                normalizedData.days.forEach(day => {
+                    (day.services || []).forEach(svc => {
+                        if (svc.includeInTotal === false) return;
+                        const pbt = svc.pricesByType || {};
+                        const ef = Number(pbt.efectivo) || 0;
+                        const mp = Number(pbt[method]);
+                        const hasMethod = Number.isFinite(mp) && pbt[method] != null;
+                        const base = hasMethod ? mp : ef;
+                        const discEf = Number(svc.discountAmount) || 0;
+                        const disc = (ef > 0 && hasMethod) ? discEf * (mp / ef) : discEf;
+                        netBaseMethod += Math.max(0, base - disc);
+                        netBaseEfectivo += Math.max(0, ef - discEf);
                     });
+                });
+                if (gtMeta.type === 'amount') {
+                    // Monto fijo: escala por el factor agregado (en efectivo el factor es 1).
+                    const factor = netBaseEfectivo > 0 ? (netBaseMethod / netBaseEfectivo) : 1;
+                    globalTipAmount = Math.round((Number(gtMeta.value) || 0) * factor * 100) / 100;
+                } else if (gtMeta.type === 'percent') {
                     const pct = Math.min(Number(gtMeta.value), 100);
                     globalTipAmount = Math.round(netBaseMethod * (pct / 100) * 100) / 100;
                 }

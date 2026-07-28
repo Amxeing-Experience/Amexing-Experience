@@ -947,11 +947,19 @@ class ReservationController {
           .filter((a) => a.type === 'discount')
           .reduce((s, a) => s + (Number(a.amount) || 0), 0);
         const fbGeneralTip = Number(reservation.get('tip')) || 0;
+        // La propina por servicio (subconcept.tipAmount, en efectivo) escala al método de la reservación
+        // por el factor del servicio pricesByType[método]/efectivo (== descuento / scaleTipToMethod).
+        const fbMethod = reservation.get('paymentType') || 'efectivo';
         const fbServiceTips = services.reduce((s, svc) => {
           const sub = svc.get('subconcept') || {};
           if (sub.includeInTotal === false) return s;
           const t = Number(sub.tipAmount);
-          return s + (Number.isFinite(t) && t > 0 ? t : 0);
+          if (!Number.isFinite(t) || t <= 0) return s;
+          const pbt = sub.pricesByType || {};
+          const ef = Number(pbt.efectivo) || 0;
+          const mp = Number(pbt[fbMethod]);
+          const factor = (ef > 0 && pbt[fbMethod] != null && Number.isFinite(mp)) ? (mp / ef) : 1;
+          return s + t * factor;
         }, 0);
         const fbTip = Math.round((fbGeneralTip + fbServiceTips + Number.EPSILON) * 100) / 100;
         const fbTotal = Math.round(
@@ -2019,11 +2027,19 @@ class ReservationController {
     svcQuery.equalTo('exists', true);
     svcQuery.limit(1000);
     const services = await svcQuery.find({ useMasterKey: true });
+    // La propina por servicio (subconcept.tipAmount, en efectivo) escala al método de la reservación por
+    // el factor del servicio pricesByType[método]/efectivo (== descuento / PaymentService.scaleTipToMethod).
+    const method = reservation.get('paymentType') || 'efectivo';
     const sum = services.reduce((s, svc) => {
       const sub = svc.get('subconcept') || {};
       if (sub.includeInTotal === false) return s;
       const tip = Number(sub.tipAmount);
-      return s + (Number.isFinite(tip) && tip > 0 ? tip : 0);
+      if (!Number.isFinite(tip) || tip <= 0) return s;
+      const pbt = sub.pricesByType || {};
+      const ef = Number(pbt.efectivo) || 0;
+      const mp = Number(pbt[method]);
+      const factor = (ef > 0 && pbt[method] != null && Number.isFinite(mp)) ? (mp / ef) : 1;
+      return s + tip * factor;
     }, 0);
     return Math.round((sum + Number.EPSILON) * 100) / 100;
   }

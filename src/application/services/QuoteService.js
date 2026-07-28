@@ -2034,16 +2034,16 @@ class QuoteService {
     if (!gt || (gt.type !== 'percent' && gt.type !== 'amount')) return 0;
     const value = Number(gt.value);
     if (!Number.isFinite(value) || value <= 0) return 0;
-    // Monto fijo: literal en pesos, sin escalar por método (anti-regresión del bug del wizard).
-    if (gt.type === 'amount') return round2(value);
-    // Porcentaje: sobre la base NETA DEL MÉTODO de pago (precio del método menos su descuento
-    // escalado) de servicios activos, para que la propina general ESCALE por método igual que el
-    // widget de la cotización (getGlobalTipAmount usa el subtotal ya expresado en el método). El
-    // descuento en efectivo se escala por pricesByType[método]/efectivo, idéntico a
-    // getServiceDiscountByType. Si falta el precio del método, cae a la base en efectivo.
+    // Base NETA de servicios activos, en el MÉTODO y en EFECTIVO (precio menos su descuento escalado).
+    // El % va sobre la base del método; el monto fijo escala por el factor AGREGADO netBaseMethod/
+    // netBaseEfectivo (cuánto creció el total real de la cotización en la forma de pago), de modo que
+    // la propina general fija sube con el método igual que la propina por servicio (scaleTipToMethod) y
+    // que lo mostrado (getGlobalTipAmount). El descuento en efectivo se escala por pricesByType[método]/
+    // efectivo, idéntico a getServiceDiscountByType. Si falta el precio del método, cae a la base efectivo.
     const days = Array.isArray(serviceItems.days) ? serviceItems.days : [];
     const method = serviceItems.paymentType || 'efectivo';
     let netBaseMethod = 0;
+    let netBaseEfectivo = 0;
     for (const day of days) {
       const subs = Array.isArray(day.subconcepts) ? day.subconcepts : [];
       for (const sub of subs) {
@@ -2056,8 +2056,14 @@ class QuoteService {
           const discEf = Number(sub.discountAmount) || 0;
           const disc = (ef > 0 && hasMethod) ? discEf * (mp / ef) : discEf;
           netBaseMethod += Math.max(0, base - disc);
+          netBaseEfectivo += Math.max(0, ef - discEf);
         }
       }
+    }
+    // Monto fijo: escala por el factor agregado de la cotización (en efectivo el factor es 1).
+    if (gt.type === 'amount') {
+      const factor = netBaseEfectivo > 0 ? (netBaseMethod / netBaseEfectivo) : 1;
+      return round2(value * factor);
     }
     // Tope de 100%: un porcentaje mayor se RECORTA aquí (no se rechaza) en la función pura, paralelo al
     // Math.min del descuento por servicio. El endpoint (updateServiceItems) sí rechaza >100 con 400.
@@ -2076,7 +2082,7 @@ class QuoteService {
    * @example
    * this.sumServiceTipsFromDays({ days: [{ subconcepts: [{ tipAmount: 100 }] }] }); // 100
    */
-  sumServiceTipsFromDays(serviceItems) {
+  sumServiceTipsFromDays(serviceItems, method = 'efectivo') {
     const days = (serviceItems && Array.isArray(serviceItems.days)) ? serviceItems.days : [];
     let total = 0;
     for (const day of days) {
@@ -2084,7 +2090,15 @@ class QuoteService {
       for (const sub of subs) {
         if (sub && sub.includeInTotal !== false) {
           const tip = Number(sub.tipAmount);
-          if (Number.isFinite(tip) && tip > 0) total += tip;
+          if (Number.isFinite(tip) && tip > 0) {
+            // Escala la propina efectivo al método por el factor del servicio pricesByType[método]/efectivo
+            // (== descuento / PaymentService.scaleTipToMethod), para que lo cobrado == lo mostrado.
+            const pbt = sub.pricesByType || {};
+            const ef = Number(pbt.efectivo) || 0;
+            const mp = Number(pbt[method]);
+            const factor = (ef > 0 && pbt[method] != null && Number.isFinite(mp)) ? (mp / ef) : 1;
+            total += tip * factor;
+          }
         }
       }
     }
@@ -2153,7 +2167,7 @@ class QuoteService {
       reservation.set('servicesSubtotal', serviceItems.subtotal || 0);
       // Propina POR SERVICIO recomputada desde el snapshot nuevo (los RS aún no se reconcilian en este
       // punto): se pasa a recalculateTotal para que el header (totalAmount) cuadre con el motor de pagos.
-      await ReservationController.recalculateTotal(reservation, this.sumServiceTipsFromDays(serviceItems));
+      await ReservationController.recalculateTotal(reservation, this.sumServiceTipsFromDays(serviceItems, serviceItems.paymentType || 'efectivo'));
       if (serviceItems.currency) reservation.set('currency', serviceItems.currency);
       // Tipo de cambio congelado: SOLO se fija si la reservación todavía no tiene snapshot. Una reservación
       // ya creada (posiblemente con pagos registrados) NUNCA cambia su tasa aunque la cotización de origen
@@ -2342,7 +2356,7 @@ class QuoteService {
           existing.set('servicesSubtotal', serviceItems.subtotal || 0);
           // eslint-disable-next-line global-require
           const ReservationController = require('../controllers/api/ReservationController');
-          await ReservationController.recalculateTotal(existing, this.sumServiceTipsFromDays(serviceItems));
+          await ReservationController.recalculateTotal(existing, this.sumServiceTipsFromDays(serviceItems, serviceItems.paymentType || 'efectivo'));
           await existing.save(null, { useMasterKey: true });
 
           // Reconcilia los ReservationService reales contra el snapshot VIGENTE (no solo voltea el status):
@@ -2408,7 +2422,7 @@ class QuoteService {
       // total". totalAmount (header) se fija ya con ambas propinas (cada una una sola vez) para no divergir
       // del motor de pagos desde el primer render (sin ajustes aún).
       const generalTip = this.computeGeneralTip(serviceItems);
-      const serviceTipsTotal = this.sumServiceTipsFromDays(serviceItems);
+      const serviceTipsTotal = this.sumServiceTipsFromDays(serviceItems, serviceItems.paymentType || 'efectivo');
       const cleanSubtotal = serviceItems.subtotal || 0;
 
       const reservation = new Reservation();
