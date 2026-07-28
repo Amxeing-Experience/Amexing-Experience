@@ -483,6 +483,114 @@ ${text ? `--- TEXT CONTENT ---\n${text.substring(0, 200)}...` : ''}
   }
 
   /**
+   * Send an "access credentials updated" email using the credentials_update template.
+   *
+   * Same layout/signature as the welcome email but framed as an update (not a first-time
+   * welcome). Used when an admin resends credentials after changing a client's password.
+   * @param {object} userData - User data.
+   * @param {string} userData.email - User email (login username).
+   * @param {string} userData.name - User display name.
+   * @param {string} userData.password - Plain-text password to include.
+   * @param {object} [userData.recipientUser] - AmexingUser pointer (optional).
+   * @returns {Promise<object>} Send result.
+   * @example
+   * await emailService.sendCredentialsEmail({ email: 'a@b.com', name: 'Ana', password: 'X*12345678' });
+   */
+  async sendCredentialsEmail(userData) {
+    try {
+      const {
+        email, name, password, recipientUser,
+      } = userData;
+
+      const credentials = this.buildWelcomeCredentialsBlocks(email, password);
+
+      const templateVariables = {
+        ...TemplateService.getCommonVariables(),
+        LOGO_URL_FIRMA: TemplateService.getLogoUrl('/img/amexing_logo_horizontal.png'),
+        NOMBRE_USUARIO: name,
+        EMAIL_USUARIO: email,
+        BLOQUE_CREDENCIALES: credentials.html,
+        BLOQUE_CREDENCIALES_TEXT: credentials.text,
+      };
+
+      const { html, text } = TemplateService.render('credentials_update', templateVariables, { includeText: true });
+
+      return await this.sendEmail({
+        to: email,
+        toName: name,
+        subject: 'Actualización de acceso | Sistema de Cotizaciones | Amexing Experience',
+        html,
+        text,
+        tags: ['credentials', 'access', 'update'],
+        notificationType: 'credentials_update',
+        recipientUser,
+        metadata: {
+          updatedAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to send credentials update email', {
+        error: error.message,
+        email: this.maskEmail(userData.email),
+      });
+
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Build the HTML and text credentials blocks for the welcome email.
+   *
+   * Returns empty strings when no password is provided (e.g. public self-registration),
+   * so the welcome email stays a simple greeting without an empty credentials section.
+   * @param {string} email - User email (login username).
+   * @param {string} [password] - Plain-text password captured by the admin at creation.
+   * @returns {{html: string, text: string}} Rendered credentials blocks.
+   * @example
+   * const { html, text } = this.buildWelcomeCredentialsBlocks('a@b.com', 'Secret*123');
+   */
+  buildWelcomeCredentialsBlocks(email, password) {
+    if (!password) {
+      return { html: '', text: '' };
+    }
+
+    const esc = (value) => String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const html = `
+                        <p style="color: #555555; font-family: Arial, sans-serif; font-size: 15px; line-height: 24px; margin: 0 0 15px 0;">
+                            A continuación, compartimos tus credenciales de acceso:
+                        </p>
+                        <div style="background-color: #f8f8f8; border-radius: 8px; padding: 20px 25px; margin: 0 0 25px 0;">
+                            <p style="margin: 0 0 10px 0; color: #333333; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px;">
+                                <strong>Usuario:</strong> <span style="color: #2e2e2d;">${esc(email)}</span>
+                            </p>
+                            <p style="margin: 0; color: #333333; font-family: Arial, sans-serif; font-size: 14px; line-height: 20px;">
+                                <strong>Contraseña temporal:</strong> <span style="color: #2e2e2d; font-family: 'Courier New', monospace;">${esc(password)}</span>
+                            </p>
+                        </div>
+                        <div style="background-color: #fff7e6; border-left: 4px solid #e0a800; border-radius: 5px; padding: 16px 20px; margin: 0 0 30px 0;">
+                            <p style="margin: 0; color: #555555; font-family: Arial, sans-serif; font-size: 14px; line-height: 22px;">
+                                <strong style="color: #1a1a1a;">Importante:</strong> Por seguridad, te recomendamos cambiar tu contraseña en cuanto ingreses por primera vez. Podrás hacerlo desde el apartado de <strong>Perfil / Configuración</strong> dentro del sistema.
+                            </p>
+                        </div>`;
+
+    const text = 'A continuación, compartimos tus credenciales de acceso:\n\n'
+      + `  Usuario: ${email}\n`
+      + `  Contraseña temporal: ${password}\n\n`
+      + 'Importante: Por seguridad, te recomendamos cambiar tu contraseña en cuanto ingreses '
+      + 'por primera vez. Podrás hacerlo desde el apartado de Perfil / Configuración dentro del sistema.\n\n';
+
+    return { html, text };
+  }
+
+  /**
    * Send welcome email to new users using template.
    * @param {object} userData - User data.
    * @param {string} userData.email - User email.
@@ -490,6 +598,7 @@ ${text ? `--- TEXT CONTENT ---\n${text.substring(0, 200)}...` : ''}
    * @param {string} userData.role - User role (optional).
    * @param {object} userData.recipientUser - AmexingUser pointer (optional).
    * @param {string} userData.dashboardUrl - Dashboard URL (optional).
+   * @param {string} userData.password - Plain-text password captured by the admin (optional).
    * @returns {Promise<object>} Send result.
    * @example
    * await emailService.sendWelcomeEmail({
@@ -502,16 +611,24 @@ ${text ? `--- TEXT CONTENT ---\n${text.substring(0, 200)}...` : ''}
   async sendWelcomeEmail(userData) {
     try {
       const {
-        email, name, role, recipientUser, dashboardUrl,
+        email, name, role, recipientUser, dashboardUrl, password,
       } = userData;
+
+      // Bloque de credenciales: solo se incluye cuando el alta la hace un administrador
+      // (envía la contraseña que capturó). En el registro público no llega `password`, así
+      // que el bloque queda vacío y el correo es una bienvenida simple.
+      const credentials = this.buildWelcomeCredentialsBlocks(email, password);
 
       // Prepare template variables
       const templateVariables = {
         ...TemplateService.getCommonVariables(),
+        LOGO_URL_FIRMA: TemplateService.getLogoUrl('/img/amexing_logo_horizontal.png'),
         NOMBRE_USUARIO: name,
         EMAIL_USUARIO: email,
         TIPO_CUENTA: role || 'Cliente',
         URL_DASHBOARD: dashboardUrl || process.env.APP_BASE_URL || 'http://localhost:1337',
+        BLOQUE_CREDENCIALES: credentials.html,
+        BLOQUE_CREDENCIALES_TEXT: credentials.text,
       };
 
       // Render template
@@ -521,7 +638,7 @@ ${text ? `--- TEXT CONTENT ---\n${text.substring(0, 200)}...` : ''}
       return await this.sendEmail({
         to: email,
         toName: name,
-        subject: '¡Bienvenido a Amexing Experience!',
+        subject: 'Acceso a Sistema de Cotizaciones | Amexing Experience',
         html,
         text,
         tags: ['welcome', 'onboarding', 'registration'],

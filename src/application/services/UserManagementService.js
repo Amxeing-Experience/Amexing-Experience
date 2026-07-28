@@ -2337,6 +2337,15 @@ class UserManagementService {
    */
   async sendWelcomeEmailToNewUser(user, userData) {
     try {
+      // Opción del alta: el admin puede desmarcar el envío de credenciales por correo.
+      if (userData.sendCredentials === false) {
+        logger.info('Welcome email skipped by request (sendCredentials=false)', {
+          userId: user.id,
+          email: userData.email,
+        });
+        return;
+      }
+
       if (!emailService.isAvailable()) {
         logger.warn('Email service not available, skipping welcome email', {
           userId: user.id,
@@ -2351,6 +2360,10 @@ class UserManagementService {
           ? `${userData.firstName} ${userData.lastName || ''}`.trim()
           : userData.username || userData.email.split('@')[0],
         role: userData.role || 'user',
+        // Contraseña capturada por el administrador al dar de alta: se envía como
+        // credenciales de acceso. En flujos sin password (p. ej. registro público) no llega
+        // y el correo omite el bloque de credenciales.
+        password: userData.password,
       };
 
       const result = await emailService.sendWelcomeEmail(emailData);
