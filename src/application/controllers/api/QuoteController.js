@@ -2203,7 +2203,11 @@ class QuoteController {
 
       const {
         days = [], subtotal = 0, iva = 0, total = 0,
-        currency = 'MXN', paymentType = 'efectivo',
+        // Categoría A: el default del método de pago cambia de 'efectivo' a 'tarjeta'. Aplica SOLO
+        // cuando el request OMITE la clave; un null/''/valor inválido lo rechaza el guard
+        // Payment.isValidMethod de abajo (el default de JS no reemplaza null). Este es el único punto
+        // de escritura de serviceItems.paymentType desde un request.
+        currency = 'MXN', paymentType = 'tarjeta',
         globalTip = null, // Fase 2b: propina global de la cotización (persistir tal cual).
         suggestedTipPct = null, // Fase 2c: % de propina sugerida (default 10 en el front).
       } = req.body;
