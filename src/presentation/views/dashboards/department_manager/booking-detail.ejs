@@ -1146,6 +1146,19 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (sub.hotelName) tags.push(tag('building', sub.hotelName, 'secondary'));
             if (sub.isWalkingTour) tags.push(tag('walk', `Walking tour (${sub.walkingTourPeopleCount || 0} pax)`, 'info'));
             if (sub.persons) tags.push(tag('users', `${sub.persons} persona${sub.persons > 1 ? 's' : ''}`, 'primary'));
+            // Entradas asociadas al/los destino(s) del tour (boletos de acceso): nombre + ×cantidad si > 1.
+            if (Array.isArray(sub.tourEntradas)) {
+                const incEntradas = sub.tourEntradas.filter((e) => e && e.included !== false);
+                if (incEntradas.length) {
+                    const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+                    }[ch]));
+                    const listEnt = incEntradas
+                        .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+                        .join(', ');
+                    tags.push(tag('ticket', `Entradas: ${listEnt}`, 'primary'));
+                }
+            }
         }
 
         // Experience-specific details
@@ -1156,6 +1169,19 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (sub.adultsNoAlcoholQuantity) tickets.push(`${sub.adultsNoAlcoholQuantity} sin alcohol`);
             if (tickets.length) tags.push(tag('ticket', tickets.join(', '), 'primary'));
             if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
+            // Entradas asociadas a la experiencia (boletos de acceso): nombre + ×cantidad si > 1.
+            if (Array.isArray(sub.experienceEntradas)) {
+                const incEntradas = sub.experienceEntradas.filter((e) => e && e.included !== false);
+                if (incEntradas.length) {
+                    const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+                    }[ch]));
+                    const listEnt = incEntradas
+                        .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+                        .join(', ');
+                    tags.push(tag('ticket', `Entradas: ${listEnt}`, 'primary'));
+                }
+            }
         }
 
         // A Disposición-specific details

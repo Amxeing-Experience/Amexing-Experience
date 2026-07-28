@@ -729,6 +729,38 @@
                 </div>`;
             }
 
+            // Entradas asociadas a la experiencia (informativas): nombre + ×cantidad si > 1.
+            if (service.type === 'experience' && Array.isArray(service.experienceEntradas)
+                && service.experienceEntradas.some((e) => e && e.included !== false)) {
+                const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+                }[ch]));
+                const entList = service.experienceEntradas
+                    .filter((e) => e && e.included !== false)
+                    .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+                    .join(', ');
+                html += `<div class="service-detail-item mt-1">
+                    <i class="ti ti-ticket me-1 text-primary"></i>
+                    <span class="text-muted me-1">Entradas:</span>${entList}
+                </div>`;
+            }
+
+            // Entradas asociadas al/los destino(s) del tour (informativas): nombre + ×cantidad si > 1.
+            if (service.type === 'tour' && Array.isArray(service.tourEntradas)
+                && service.tourEntradas.some((e) => e && e.included !== false)) {
+                const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+                }[ch]));
+                const entList = service.tourEntradas
+                    .filter((e) => e && e.included !== false)
+                    .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+                    .join(', ');
+                html += `<div class="service-detail-item mt-1">
+                    <i class="ti ti-ticket me-1 text-primary"></i>
+                    <span class="text-muted me-1">Entradas:</span>${entList}
+                </div>`;
+            }
+
             // Greeter (transporte, tours y a-disposición)
             if ((service.type === 'tour' || service.type === 'transport' || service.type === 'a-disposicion') && service.includeGreeter) {
                 const greeterLocation = service.greeterInVehicle ? ' (en vehículo)' : '';
