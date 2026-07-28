@@ -60,6 +60,7 @@ describe('POST /api/reservations/:id/pay/checkout (integration)', () => {
   let clientToken; // client = level 5 (below the level-6 guard)
   let employeeToken; // employee = level 3
   let stripeCreate;
+  let stripeExpire;
   let sessionCounter = 0;
   const savedFlag = process.env.PAYMENTS_ENABLED;
 
@@ -165,7 +166,8 @@ describe('POST /api/reservations/:id/pay/checkout (integration)', () => {
         status: 'open',
       };
     });
-    stripeClient.setClientForTests({ checkout: { sessions: { create: stripeCreate } } });
+    stripeExpire = jest.fn().mockImplementation(async (sessionId) => ({ id: sessionId, status: 'expired' }));
+    stripeClient.setClientForTests({ checkout: { sessions: { create: stripeCreate, expire: stripeExpire } } });
 
     process.env.PAYMENTS_ENABLED = 'true';
     await setGatewaySetting('stripe');
@@ -388,6 +390,110 @@ describe('POST /api/reservations/:id/pay/checkout (integration)', () => {
       const keys = stripeCreate.mock.calls.map((c) => c[1] && c[1].idempotencyKey);
       expect(new Set(keys).size).toBe(1); // identical key across both calls
       expect(keys[0]).toBe(pend[0].id);
+    });
+  });
+
+  describe('BUG B — session expires_at + old session expired on retirement (no double-chargeable session)', () => {
+    it('the created Checkout Session carries an expires_at inside Stripe\'s [now+30min, now+24h] window', async () => {
+      const id = await createReservation();
+      stripeCreate.mockClear();
+      const before = Date.now();
+      const r = await postCheckout(id);
+      const after = Date.now();
+      expect(r.status).toBe(200);
+      const params = stripeCreate.mock.calls[0][0];
+      expect(Number.isInteger(params.expires_at)).toBe(true);
+      expect(params.expires_at).toBeGreaterThanOrEqual(Math.floor((before + 30 * 60 * 1000) / 1000));
+      expect(params.expires_at).toBeLessThanOrEqual(Math.floor((after + 24 * 60 * 60 * 1000) / 1000));
+    });
+
+    it('retiring an EXPIRED pending expires its old Stripe session before creating a fresh one', async () => {
+      const id = await createReservation();
+      await postCheckout(id);
+      const [pending] = await onlinePayments(id);
+      const oldSessionId = pending.get('gatewaySessionId');
+      expect(oldSessionId).toMatch(/^cs_test_/);
+
+      pending.set('expiresAt', new Date(Date.now() - 60000)); // force expiry
+      await pending.save(null, { useMasterKey: true });
+
+      stripeExpire.mockClear();
+      const r = await postCheckout(id);
+      expect(r.status).toBe(200);
+
+      // The OLD session was explicitly closed in Stripe, so it can never be paid alongside the new one.
+      expect(stripeExpire).toHaveBeenCalledWith(oldSessionId);
+
+      const live = await onlinePayments(id);
+      expect(live).toHaveLength(1);
+      expect(live[0].get('gatewaySessionId')).not.toBe(oldSessionId);
+    });
+
+    it('LOW: a provider failure rolls the pending back to terminal "expired", not a blocking requires_payment', async () => {
+      const id = await createReservation();
+      // The session create fails AFTER the local pending was saved -> the rollback path must retire it.
+      stripeCreate.mockImplementationOnce(async () => { throw new Error('stripe boom'); });
+      const r = await postCheckout(id);
+      expect(r.status).toBe(502);
+
+      // No live pending blocks a retry, and the rolled-back one is terminal ('expired'), not the
+      // half-open 'requires_payment' the old rollback left behind.
+      expect(await onlinePayments(id)).toHaveLength(0);
+      const all = await onlinePayments(id, { includeDeleted: true });
+      expect(all).toHaveLength(1);
+      expect(all[0].get('exists')).toBe(false);
+      expect(all[0].get('gatewayStatus')).toBe('expired');
+    });
+  });
+
+  describe('BUG C — a non-expired pending whose FROZEN amount drifted is NOT reused', () => {
+    it('after a manual payment lowers the balance, re-opening retires the stale pending and re-prices it', async () => {
+      // Tarjeta anchor, card total 12100 -> first checkout freezes a pending at 12100.
+      const id = await createReservation(CLEAN, 'tarjeta');
+      await postCheckout(id);
+      const [firstPending] = await onlinePayments(id);
+      const oldSessionId = firstPending.get('gatewaySessionId');
+      const oldId = firstPending.id;
+      expect(firstPending.get('origAmount')).toBe(12100);
+
+      // A manual transferencia of 2320 counts in the rollup and drops the card remainder to 9680 (the
+      // canonical mixed-payment number). Reusing the frozen 12100 pending would OVER-charge by 2320.
+      await createManualPayment(id, 2320, 'transferencia');
+
+      stripeExpire.mockClear();
+      const r = await postCheckout(id);
+      expect(r.status).toBe(200);
+
+      // The stale pending is NOT reused: it is retired (its session expired) and a fresh, correctly-priced
+      // pending is created for the current balance.
+      expect(stripeExpire).toHaveBeenCalledWith(oldSessionId);
+
+      const live = await onlinePayments(id);
+      expect(live).toHaveLength(1);
+      expect(live[0].id).not.toBe(oldId);
+      expect(live[0].get('origAmount')).toBe(9680); // re-priced, not the frozen 12100
+
+      const all = await onlinePayments(id, { includeDeleted: true });
+      const retired = all.find((p) => p.id === oldId);
+      expect(retired.get('exists')).toBe(false);
+      expect(retired.get('gatewayStatus')).toBe('expired');
+    });
+
+    it('a non-expired pending with the SAME balance is still reused (no needless churn)', async () => {
+      const id = await createReservation(CLEAN, 'tarjeta');
+      const r1 = await postCheckout(id);
+      const [firstPending] = await onlinePayments(id);
+      const firstId = firstPending.id;
+
+      stripeExpire.mockClear();
+      const r2 = await postCheckout(id); // no balance change between the two calls
+      expect(r1.status).toBe(200);
+      expect(r2.status).toBe(200);
+
+      const live = await onlinePayments(id);
+      expect(live).toHaveLength(1);
+      expect(live[0].id).toBe(firstId); // same pending reused
+      expect(stripeExpire).not.toHaveBeenCalled(); // nothing retired
     });
   });
 

@@ -114,7 +114,7 @@ describe('StripeAdapter.buildCheckout (mock client)', () => {
     expect(r.gatewayIntentId).toBe('pi_expanded');
   });
 
-  it('U21 wraps a raw SDK error in PaymentGatewayError (PROVIDER_ERROR); raw payload never serialized', async () => {
+  it('U21 wraps a raw SDK error in PaymentGatewayError (PROVIDER_ERROR); raw SDK object NEVER embedded (PCI)', async () => {
     // The raw SDK error carries card-adjacent junk (last4/PAN) that must NEVER leak through logging.
     const rawErr = Object.assign(new Error('card_declined'), { last4: '4242', pan: '4111111111111111' });
     const create = jest.fn().mockRejectedValue(rawErr);
@@ -127,13 +127,14 @@ describe('StripeAdapter.buildCheckout (mock client)', () => {
     }
     expect(error).toBeInstanceOf(PaymentGatewayError);
     expect(error.code).toBe(PaymentGatewayError.CODES.PROVIDER_ERROR);
-    // The raw provider payload is retained for internal audit (accessible by property)...
-    expect(error.providerError).toBe(rawErr);
-    // ...but is non-enumerable, so JSON/structured logging can never emit last4/PAN.
-    expect(Object.keys(error)).not.toContain('providerError');
-    const serialized = JSON.stringify(error);
-    expect(serialized).not.toContain('4242');
-    expect(serialized).not.toContain('4111111111111111');
+    // council PCI: the raw SDK object is NOT attached at all (providerError stays null). A non-enumerable
+    // property was still reachable via getOwnPropertyNames, so the only safe design is to never embed it.
+    expect(error.providerError).toBeNull();
+    // Neither a plain stringify NOR the adversarial own-property-name walk can surface last4/PAN.
+    expect(JSON.stringify(error)).not.toContain('4242');
+    const adversarial = JSON.stringify(error, Object.getOwnPropertyNames(error));
+    expect(adversarial).not.toContain('4242');
+    expect(adversarial).not.toContain('4111111111111111');
   });
 
   describe('U23 invalid amount / currency rejected BEFORE the SDK is called', () => {
@@ -169,5 +170,52 @@ describe('StripeAdapter.buildCheckout (mock client)', () => {
   it('isConfigured() is true when a client is injected', () => {
     const { client } = makeMock();
     expect(new StripeAdapter({ client }).isConfigured()).toBe(true);
+  });
+
+  describe('BUG B — expires_at aligned to the local pending TTL (no 24h-vs-30min double session)', () => {
+    it('sets expires_at (Unix seconds) inside Stripe\'s [now+30min, now+24h] window', async () => {
+      const { client, create } = makeMock();
+      const adapter = new StripeAdapter({ client });
+      const before = Date.now();
+      await adapter.buildCheckout(baseReq());
+      const after = Date.now();
+      const { expires_at: expiresAt } = create.mock.calls[0][0];
+      expect(Number.isInteger(expiresAt)).toBe(true);
+      // Must be >= now+30min (Stripe's hard minimum) and <= now+24h (its hard maximum), in seconds.
+      const minSec = Math.floor((before + 30 * 60 * 1000) / 1000);
+      const maxSec = Math.floor((after + 24 * 60 * 60 * 1000) / 1000);
+      expect(expiresAt).toBeGreaterThanOrEqual(minSec);
+      expect(expiresAt).toBeLessThanOrEqual(maxSec);
+      // And close to the 31-min cushion (aligned with the 30-min local pending), not Stripe's 24h default.
+      expect(expiresAt).toBeLessThanOrEqual(Math.floor((after + 32 * 60 * 1000) / 1000));
+    });
+  });
+
+  describe('BUG B — expireCheckout closes an old session', () => {
+    it('calls client.checkout.sessions.expire with the session id and returns the SDK result', async () => {
+      const expire = jest.fn().mockResolvedValue({ id: 'cs_old', status: 'expired' });
+      const adapter = new StripeAdapter({ client: { checkout: { sessions: { expire } } } });
+      const out = await adapter.expireCheckout('cs_old');
+      expect(expire).toHaveBeenCalledWith('cs_old');
+      expect(out).toEqual({ id: 'cs_old', status: 'expired' });
+    });
+
+    it('wraps an SDK failure in PROVIDER_ERROR and never embeds the raw SDK object (PCI)', async () => {
+      const rawErr = Object.assign(new Error('already expired'), { last4: '4242', pan: '4111111111111111' });
+      const expire = jest.fn().mockRejectedValue(rawErr);
+      const adapter = new StripeAdapter({ client: { checkout: { sessions: { expire } } } });
+      let error;
+      try {
+        await adapter.expireCheckout('cs_old');
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(PaymentGatewayError);
+      expect(error.code).toBe(PaymentGatewayError.CODES.PROVIDER_ERROR);
+      expect(error.providerError).toBeNull();
+      const adversarial = JSON.stringify(error, Object.getOwnPropertyNames(error));
+      expect(adversarial).not.toContain('4242');
+      expect(adversarial).not.toContain('4111111111111111');
+    });
   });
 });

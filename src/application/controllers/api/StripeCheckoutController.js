@@ -70,6 +70,80 @@ class StripeCheckoutController {
   }
 
   /**
+   * Whether a pending's FROZEN amount/currency still matches the freshly computed charge (council BUG C).
+   * A pending is safe to reuse only if its origAmount/origCurrency (snapshotted when it was created) still
+   * equals the current balance; otherwise (e.g. a manual payment landed in the 30-min window and lowered
+   * the balance) reusing it would charge the stale, higher amount. Cent tolerance on the amount; exact
+   * currency match.
+   * @param {object} payment - The existing pending Payment.
+   * @param {object} charge - The freshly resolved charge ({ origAmount, currency }).
+   * @returns {boolean} True when the pending may be reused as-is.
+   * @example
+   * StripeCheckoutController.pendingMatchesCharge(pending, { origAmount: 9680, currency: 'MXN' });
+   */
+  static pendingMatchesCharge(payment, charge) {
+    // No charge context (defensive): preserve the prior reuse behavior rather than force a needless churn.
+    if (!charge) return true;
+    const prevAmount = Number(payment.getOrigAmount());
+    const nextAmount = Number(charge.origAmount);
+    if (!Number.isFinite(prevAmount) || !Number.isFinite(nextAmount)) return false;
+    const prevCurrency = String(payment.getOrigCurrency() || '').toUpperCase();
+    const nextCurrency = String(charge.currency || '').toUpperCase();
+    return prevCurrency === nextCurrency && Math.abs(prevAmount - nextAmount) <= 0.01;
+  }
+
+  /**
+   * Retire a pending online Payment: close its Stripe Checkout Session (so it can never be paid in
+   * parallel with a fresh one), mark it terminal ('expired'), and soft-delete it. Expiring the remote
+   * session is best-effort: if Stripe already expired/completed it, that is logged and NON-fatal (council
+   * BUG B). Reused both when replacing an expired/stale pending and when rolling back a provider failure.
+   * @param {object} payment - The pending Payment to retire.
+   * @param {object} adapter - The resolved gateway adapter (must expose expireCheckout).
+   * @param {object} req - Express request (for the deletedBy audit id).
+   * @returns {Promise<void>} Resolves once the local pending is retired.
+   * @example
+   * await StripeCheckoutController.retirePending(existing, adapter, req);
+   */
+  static async retirePending(payment, adapter, req) {
+    const sessionId = payment.getGatewaySessionId && payment.getGatewaySessionId();
+    if (sessionId && adapter && typeof adapter.expireCheckout === 'function') {
+      try {
+        await adapter.expireCheckout(sessionId);
+      } catch (expireErr) {
+        // Already expired/consumed in Stripe, or a transient provider error: never block the retirement.
+        logger.warn('Could not expire old Stripe checkout session on retirement (non-fatal)', {
+          sessionId, error: expireErr && expireErr.message,
+        });
+      }
+    }
+    payment.setGatewayStatus('expired');
+    await payment.softDelete(req.userId);
+  }
+
+  /**
+   * Resolve the MXN amount + FX rate for the pending, preferring the reservation's FROZEN
+   * exchangeRateSnapshot over the live rate (council LOW): the rest of the reservation's balance
+   * (PaymentService.loadAndCompute) is measured against that frozen snapshot, so the online pending's
+   * Payment.amount must use the same rate to stay consistent. Falls back to the live rate (PaymentController.toMXN)
+   * only for a missing/corrupt snapshot (legacy reservations), matching loadAndCompute's policy.
+   * @param {object} reservation - The reservation (carries exchangeRateSnapshot).
+   * @param {number} origAmount - Charge amount in the reservation currency.
+   * @param {string} origCurrency - Reservation currency (MXN|USD).
+   * @returns {Promise<{amountMXN:number, rate:number}>} MXN amount and the rate used.
+   * @example
+   * const { amountMXN, rate } = await StripeCheckoutController.resolveAmountMXN(reservation, 100, 'USD');
+   */
+  static async resolveAmountMXN(reservation, origAmount, origCurrency) {
+    if (String(origCurrency).toUpperCase() === 'MXN') return { amountMXN: origAmount, rate: 1 };
+    const snapshot = Number(reservation.get('exchangeRateSnapshot'));
+    if (Number.isFinite(snapshot) && snapshot > 0) {
+      return { amountMXN: Math.round(origAmount * snapshot * 100) / 100, rate: snapshot };
+    }
+    // Legacy/corrupt snapshot: same fallback as PaymentService.loadAndCompute (live rate).
+    return PaymentController.toMXN(origAmount, origCurrency);
+  }
+
+  /**
    * Build (or, via idempotency, re-fetch) the Checkout Session for a pending Payment and persist
    * the session/intent ids on it. Uses the payment id as the idempotency key so a retry returns
    * the SAME session (no double session, no double charge).
@@ -165,20 +239,23 @@ class StripeCheckoutController {
    */
   static async createOrReusePending(ctx) {
     const {
-      reservation, adapter, req,
+      reservation, adapter, req, charge,
     } = ctx;
     const reservationId = reservation.id;
 
-    // Fast-path: reuse a non-expired pending; retire an expired one so the unique index frees up.
+    // Fast-path: reuse a non-expired pending ONLY if its frozen amount/currency still matches the current
+    // charge; otherwise (expired, OR the balance drifted in the 30-min window) retire it — expiring its
+    // Stripe session so two sessions are never chargeable at once (council BUG B) — and create a fresh,
+    // correctly-priced pending (council BUG C). Retiring also frees the partial unique index.
     const existing = await StripeCheckoutController.findPendingOnline(reservationId);
     if (existing) {
-      if (!StripeCheckoutController.isExpired(existing)) {
+      if (!StripeCheckoutController.isExpired(existing)
+        && StripeCheckoutController.pendingMatchesCharge(existing, charge)) {
         const r = await StripeCheckoutController.buildChargeAndSave(existing, reservation, adapter);
         return { checkoutUrl: r.checkoutUrl, paymentId: existing.id, reused: true };
       }
-      // Expired pending never counted in the rollup -> no recalculate needed on retirement.
-      existing.setGatewayStatus('expired');
-      await existing.softDelete(req.userId);
+      // Never counted in the rollup -> no recalculate needed on retirement.
+      await StripeCheckoutController.retirePending(existing, adapter, req);
     }
 
     const payment = StripeCheckoutController.buildPendingPayment(ctx);
@@ -200,8 +277,10 @@ class StripeCheckoutController {
       const r = await StripeCheckoutController.buildChargeAndSave(payment, reservation, adapter);
       return { checkoutUrl: r.checkoutUrl, paymentId: payment.id, reused: false };
     } catch (providerErr) {
-      // Roll back the just-created pending so it never blocks a retry (TTL sweep is PR6).
-      await payment.softDelete(req.userId).catch(() => {});
+      // Roll back the just-created pending so it never blocks a retry (TTL sweep is PR6): expire any
+      // session that WAS created before the failure and leave it terminal ('expired'), not the
+      // half-open 'requires_payment' the old rollback left behind (council BUG B + LOW consistency).
+      await StripeCheckoutController.retirePending(payment, adapter, req).catch(() => {});
       throw providerErr;
     }
   }
@@ -245,8 +324,14 @@ class StripeCheckoutController {
       }
 
       const origCurrency = charge.currency;
-      // Reuse the exact FX snapshot mechanism of the manual flow (no reimplementation).
-      const { amountMXN, rate } = await PaymentController.toMXN(charge.origAmount, origCurrency);
+      // FX consistency (council LOW): use the reservation's FROZEN exchangeRateSnapshot (the same rate the
+      // rest of its balance is measured against), falling back to the live rate only for a missing/corrupt
+      // snapshot — so the online pending's Payment.amount never drifts from the reservation balance.
+      const { amountMXN, rate } = await StripeCheckoutController.resolveAmountMXN(
+        reservation,
+        charge.origAmount,
+        origCurrency
+      );
 
       const adapter = await StripeCheckoutController.resolveGateway(origCurrency);
       const gatewayId = adapter.getId();

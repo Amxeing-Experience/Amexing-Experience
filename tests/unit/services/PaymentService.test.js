@@ -671,6 +671,51 @@ describe('PaymentService pure helpers', () => {
       // Antes: { efectivo: 0, transferencia: 0, tarjeta: 0 } contradiciendo el 100% mostrado.
       expect(b.montoParaSaldar).toEqual({ efectivo: 400, transferencia: 400, tarjeta: 400 });
     });
+
+    it('BUG A council: parte plana NEGATIVA (descuento > propina) reduce el monto por método, sin sobre-cobro', () => {
+      // Repro exacto del council: ancla tarjeta, tier tarjeta 1210, un descuento manual de $100 (mayor que
+      // la propina inexistente) => flatDue = -100. Antes, Math.max(0, remainingFlat) descartaba el descuento
+      // del montoParaSaldar mientras remainingBase SÍ lo incluía: montoParaSaldar.tarjeta salía 1210 (= el
+      // servicio SIN el descuento) contra remainingBase 1110 -> Stripe cobraba $100 de más en silencio.
+      const svc = [{ pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } }];
+      const b = PaymentService.remainingBreakdown(
+        [],
+        { serviceItems: svc, anchoredMethod: 'tarjeta', adjustmentsNet: -100 }
+      );
+      expect(b.totalDue).toBe(1110);
+      expect(b.remainingBase).toBe(1110);
+      // Fix: el descuento plano se resta del monto por método (solo los servicios escalan por tier).
+      expect(b.montoParaSaldar.tarjeta).toBe(1110); // antes 1210 (sobre-cobro de $100)
+      expect(b.montoParaSaldar.efectivo).toBe(900); // 1000 - 100
+      expect(b.montoParaSaldar.transferencia).toBe(1060); // 1160 - 100
+    });
+
+    it('BUG A invariante: propina POSITIVA sigue sumándose PLANA (sin escalar por método, sin cambio)', () => {
+      // El clamp final (Math.max(0, ...)) NO altera el caso plano positivo: la propina de $300 se suma
+      // nominal, no escalada por el recargo de tarjeta (invariante U5 / council L0F0/L5F0).
+      const svc = [{ pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } }];
+      const b = PaymentService.remainingBreakdown(
+        [],
+        { serviceItems: svc, anchoredMethod: 'efectivo', reservationTip: 300 }
+      );
+      expect(b.montoParaSaldar.tarjeta).toBe(1510); // 1000×1.21 + 300 (la propina no escala a 363)
+      expect(b.montoParaSaldar.efectivo).toBe(1300); // 1000 + 300
+    });
+
+    it('BUG A clamp final: un descuento mayor al costo de servicios de un método nunca da monto negativo', () => {
+      // Ancla tarjeta (tier 1210); saldar por efectivo cuesta solo 1000 de servicios, pero el descuento
+      // plano de 1150 lo supera -> el monto por efectivo se clampa a 0 (no -150), mientras el ancla tarjeta
+      // (60 restante) sigue positivo. El clamp es SOBRE EL RESULTADO FINAL, no sobre la parte plana.
+      const svc = [{ pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } }];
+      const b = PaymentService.remainingBreakdown(
+        [],
+        { serviceItems: svc, anchoredMethod: 'tarjeta', adjustmentsNet: -1150 }
+      );
+      expect(b.totalDue).toBe(60); // 1210 - 1150
+      expect(b.remainingBase).toBe(60);
+      expect(b.montoParaSaldar.tarjeta).toBe(60); // 1210 - 1150
+      expect(b.montoParaSaldar.efectivo).toBe(0); // 1000 - 1150 = -150 -> clamp a 0, nunca negativo
+    });
   });
 
   describe('sumPayments', () => {

@@ -74,4 +74,35 @@ describe('stripeClient (lazy require + guards)', () => {
     // NODE_ENV=test (non-prod): a live-looking key must fail the env guard BEFORE requiring the SDK.
     expect(() => stripeClient.getStripeClient()).toThrow(/LIVE secret key/);
   });
+
+  describe('MEDIUM — env guard also gates RESTRICTED (rk_) keys by mode, rejects unknown prefixes', () => {
+    it('rejects a RESTRICTED LIVE key (rk_live_) outside production', () => {
+      process.env.STRIPE_SECRET_KEY_TEST = 'rk_live_restricted_should_not_be_here';
+      // A restricted live key moves real money exactly like sk_live_; it must be blocked in non-prod too.
+      expect(() => stripeClient.getStripeClient()).toThrow(/LIVE secret key/);
+    });
+
+    it('accepts a RESTRICTED TEST key (rk_test_) in non-production (reaches the lazy require)', () => {
+      process.env.STRIPE_SECRET_KEY_TEST = 'rk_test_restricted_ok';
+      // Mode matches the env -> passes the guard and only then hits require('stripe') (virtual throw).
+      expect(() => stripeClient.getStripeClient()).toThrow(/Cannot find module "stripe"/);
+    });
+
+    it('rejects an unknown key prefix (never assumed to be a test key)', () => {
+      process.env.STRIPE_SECRET_KEY_TEST = 'pk_test_publishable_is_wrong_here';
+      expect(() => stripeClient.getStripeClient()).toThrow(/unrecognized prefix/);
+    });
+  });
+
+  describe('LOW — isStripeConfigured requires a valid key prefix, not just a non-empty string', () => {
+    it('a junk non-empty key is NOT considered configured', () => {
+      process.env.STRIPE_SECRET_KEY_TEST = 'garbage-not-a-real-key';
+      expect(stripeClient.isStripeConfigured()).toBe(false);
+    });
+
+    it('a restricted (rk_test_) key IS considered configured', () => {
+      process.env.STRIPE_SECRET_KEY_TEST = 'rk_test_abc';
+      expect(stripeClient.isStripeConfigured()).toBe(true);
+    });
+  });
 });

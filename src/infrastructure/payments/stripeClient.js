@@ -26,6 +26,12 @@ const STRIPE_API_VERSION = '2024-06-20';
 const MAX_NETWORK_RETRIES = 2;
 const REQUEST_TIMEOUT_MS = 20000;
 
+// Recognized Stripe secret-key shapes: standard (sk_) AND restricted (rk_) keys, each in live/test mode.
+// A restricted LIVE key (rk_live_...) moves real money exactly like sk_live_, so the environment guard
+// must gate BOTH families by mode (council MEDIUM). Capturing the mode lets isStripeConfigured() and
+// assertKeyMatchesEnv() share one source of truth; an unrecognized prefix is rejected (never assumed test).
+const KEY_PREFIX_PATTERN = /^(sk|rk)_(live|test)_/;
+
 // Test-injected client (set by __setClientForTests). When present, getStripeClient() returns
 // it verbatim and the real require('stripe') is never reached.
 let injectedClient = null;
@@ -53,11 +59,19 @@ function resolveSecretKey() {
  */
 function assertKeyMatchesEnv(key) {
   const isProd = process.env.NODE_ENV === 'production';
-  if (isProd && key.startsWith('sk_test_')) {
-    throw new Error('Stripe: production environment is configured with a TEST secret key (sk_test_...)');
+  const parsed = KEY_PREFIX_PATTERN.exec(key);
+  // Reject an unknown prefix outright: a key that is neither sk_/rk_ live/test is a misconfiguration we
+  // must never wave through as "probably test" (council MEDIUM).
+  if (!parsed) {
+    throw new Error('Stripe: secret key has an unrecognized prefix (expected sk_live_/sk_test_/rk_live_/rk_test_)');
   }
-  if (!isProd && key.startsWith('sk_live_')) {
-    throw new Error('Stripe: non-production environment is configured with a LIVE secret key (sk_live_...)');
+  const mode = parsed[2]; // 'live' | 'test'
+  if (isProd && mode === 'test') {
+    throw new Error('Stripe: production environment is configured with a TEST secret key');
+  }
+  if (!isProd && mode === 'live') {
+    // Covers sk_live_ AND rk_live_ (a restricted live key is just as dangerous outside production).
+    throw new Error('Stripe: non-production environment is configured with a LIVE secret key');
   }
 }
 
@@ -68,7 +82,10 @@ function assertKeyMatchesEnv(key) {
  * @returns {boolean} True when getStripeClient() would succeed.
  */
 function isStripeConfigured() {
-  return injectedClient !== null || resolveSecretKey().length > 0;
+  // Require a recognized key PREFIX, not merely a non-empty string (council LOW): otherwise a junk value
+  // reports "configured" and the failure is deferred until the first real checkout, instead of surfacing
+  // as a plain unconfigured state up front.
+  return injectedClient !== null || KEY_PREFIX_PATTERN.test(resolveSecretKey());
 }
 
 /**

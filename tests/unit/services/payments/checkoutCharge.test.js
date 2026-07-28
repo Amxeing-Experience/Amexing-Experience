@@ -125,4 +125,23 @@ describe('resolveCheckoutCharge (pure money + rejection)', () => {
       expect(r.httpStatus).toBe(422);
     });
   });
+
+  describe('BUG A — a net-negative flat part (discount > tip) is NOT over-charged by card', () => {
+    // The money path that Stripe actually collects is montoParaSaldar.tarjeta. A manual discount of 100
+    // (larger than the 0 tip) must REDUCE the card charge, not be dropped. Before the fix this returned
+    // 1210 (the service tier with the discount silently ignored), over-charging the client by 100.
+    const DISCOUNT_SVC = [{ pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } }];
+
+    it('tarjeta anchor, adjustmentsNet -100, no prior payments => card charge 1110 (not 1210)', () => {
+      const r = resolveCheckoutCharge({
+        paymentType: 'tarjeta',
+        serviceItems: DISCOUNT_SVC,
+        paymentRows: [],
+        adjustmentsNet: -100,
+      });
+      expect(r.ok).toBe(true);
+      expect(r.origAmount).toBe(1110); // remainingBase 1110, no longer the over-charged 1210
+      expect(r.remainingBase).toBe(1110);
+    });
+  });
 });

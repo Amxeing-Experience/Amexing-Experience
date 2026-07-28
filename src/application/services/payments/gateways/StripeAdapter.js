@@ -27,6 +27,13 @@ const { redactGatewayPayload } = require('../../../../infrastructure/payments/re
 
 const GATEWAY_ID = 'stripe';
 
+// Checkout Session lifetime. Stripe requires expires_at within [now+30min, now+24h]. The local pending
+// Payment lives PENDING_TTL_MS (30 min exactos en el controller); un colchón de 1 min sobre ese TTL
+// mantiene la sesión y el pendiente local alineados (ambos ~30 min) sin caer bajo el mínimo de Stripe por
+// latencia. Antes NO se fijaba expires_at (Stripe la dejaba pagable ~24h) mientras el pendiente local
+// expiraba a 30 min: dos sesiones cobrables => doble-cobro (council BUG B).
+const SESSION_TTL_MS = 31 * 60 * 1000;
+
 /**
  * Stripe processes USD and, as the MXN fallback in the router, declares MXN too
  * (plan seccion 4.5: Stripe is the deterministic fallback for MXN when the mexican gateway is
@@ -122,6 +129,9 @@ function buildSessionParams(req, amount, currency) {
     }],
     metadata,
     payment_intent_data: { metadata },
+    // Unix seconds, alineado al TTL del pendiente local (+1 min de colchón sobre el mínimo de Stripe) para
+    // que la sesión no siga cobrable horas después de que el pendiente local expiró (council BUG B).
+    expires_at: Math.floor((Date.now() + SESSION_TTL_MS) / 1000),
     success_url: req.successUrl,
     cancel_url: req.cancelUrl,
   };
@@ -234,15 +244,41 @@ class StripeAdapter extends PaymentGatewayService {
     try {
       session = await this.client().checkout.sessions.create(params, requestOptions);
     } catch (err) {
-      // Never surface a raw SDK error: wrap it, keep the raw payload non-enumerable for audit.
+      // Never surface a raw SDK error. Wrap ONLY the redacted message; do NOT attach the raw SDK object
+      // as providerError (council PCI): a non-enumerable property is still reachable via
+      // JSON.stringify(err, Object.getOwnPropertyNames(err)), which would leak last4/brand/PAN-adjacent
+      // fields (charge/payment_method_details) that the SDK error may carry.
       throw new PaymentGatewayError(
         PaymentGatewayError.CODES.PROVIDER_ERROR,
         `Stripe checkout session creation failed: ${err && err.message ? err.message : 'unknown error'}`,
-        { gateway: GATEWAY_ID, providerError: err }
+        { gateway: GATEWAY_ID }
       );
     }
 
     return mapSession(session, amount, String(req.currency || '').toUpperCase());
+  }
+
+  /**
+   * Expire (cancel) a still-open Checkout Session so it can never be paid in parallel with a newer one
+   * (council BUG B). Idempotent from the caller's view: if Stripe already expired/completed it, the SDK
+   * rejects and this surfaces a PROVIDER_ERROR the caller treats as non-fatal. As with buildCheckout, the
+   * raw SDK error is NEVER attached (only the redacted message) so no card-adjacent field can leak.
+   * @param {string} sessionId - The Stripe Checkout Session id to expire.
+   * @returns {Promise<object>} The expired session object from the SDK.
+   * @throws {PaymentGatewayError} PROVIDER_ERROR when the SDK call fails.
+   * @example
+   * await adapter.expireCheckout('cs_test_123');
+   */
+  async expireCheckout(sessionId) {
+    try {
+      return await this.client().checkout.sessions.expire(String(sessionId));
+    } catch (err) {
+      throw new PaymentGatewayError(
+        PaymentGatewayError.CODES.PROVIDER_ERROR,
+        `Stripe checkout session expire failed: ${err && err.message ? err.message : 'unknown error'}`,
+        { gateway: GATEWAY_ID }
+      );
+    }
   }
 
   /**
