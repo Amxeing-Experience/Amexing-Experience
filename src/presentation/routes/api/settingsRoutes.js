@@ -82,6 +82,22 @@ router.put(
   }
 );
 
+// GET /api/settings/active-gateway - Get active payment gateway toggle (MXN)
+router.get(
+  '/active-gateway',
+  readRateLimit,
+  jwtMiddleware.requireRoleLevel(6), // Treasury-global lever: admin level and above
+  (req, res) => settingsController.getActivePaymentGateway(req, res)
+);
+
+// PUT /api/settings/active-gateway - Update active payment gateway toggle (MXN)
+router.put(
+  '/active-gateway',
+  writeRateLimit,
+  jwtMiddleware.requireRoleLevel(6), // Treasury-global lever: admin level and above
+  (req, res) => settingsController.updateActivePaymentGateway(req, res)
+);
+
 // GET /api/settings/pricing - Get all pricing-related settings
 router.get(
   '/pricing',
