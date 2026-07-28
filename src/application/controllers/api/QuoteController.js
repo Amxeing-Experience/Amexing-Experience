@@ -1831,7 +1831,15 @@ class QuoteController {
       const originalServiceItems = originalQuote.get('serviceItems');
       if (originalServiceItems) {
         // Deep clone serviceItems to avoid reference issues
-        newQuote.set('serviceItems', JSON.parse(JSON.stringify(originalServiceItems)));
+        const clonedServiceItems = JSON.parse(JSON.stringify(originalServiceItems));
+        // El duplicado es un registro NUEVO: si el original no trae un método de pago válido (borrador
+        // legacy con paymentType null/ausente), aplica el default de registro nuevo ('tarjeta') en vez de
+        // heredar un null que aguas abajo se lee como efectivo. Un método explícito y válido se conserva
+        // tal cual (copia fiel de la elección del usuario).
+        if (!Payment.isValidMethod(clonedServiceItems.paymentType)) {
+          clonedServiceItems.paymentType = 'tarjeta';
+        }
+        newQuote.set('serviceItems', clonedServiceItems);
       } else {
         newQuote.set('serviceItems', {
           days: [],

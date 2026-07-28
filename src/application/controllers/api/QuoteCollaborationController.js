@@ -405,6 +405,27 @@ class QuoteCollaborationController {
       });
     }
 
+    // SEGURIDAD (mass-assignment): este endpoint HTTP toma `changes` del body tal cual y el servicio hace
+    // quote.set(field, value) por cada campo (QuoteVersioningService.applyChanges). Sin filtro, un usuario
+    // con permiso de edición podría fijar campos arbitrarios (total/subtotal/iva/serviceItems/paymentType,
+    // owner/client y demás pointers de dueño, status/approvalStatus/folio/currency...). El frontend NO usa
+    // este POST (solo /edits/pending, /approve, /reject), así que lo restringimos a un allowlist conservador
+    // de campos descriptivos/de contacto no sensibles. serviceItems y el método de pago se editan por su
+    // endpoint dedicado y validado (PUT /:id/service-items); NO por esta vía genérica. Este allowlist se
+    // puede expandir si la edición colaborativa se cablea a la UI a futuro. Se RECHAZA (400) el request
+    // completo si trae cualquier campo fuera del allowlist, en vez de stripear en silencio.
+    const EDITABLE_FIELDS = ['contactPerson', 'contactEmail', 'contactPhone', 'notes', 'eventType'];
+    const disallowedFields = Object.keys(changes).filter(
+      (field) => !EDITABLE_FIELDS.includes(field)
+    );
+    if (disallowedFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Campo no editable por este endpoint: ${disallowedFields.join(', ')}. `
+          + `Campos permitidos: ${EDITABLE_FIELDS.join(', ')}.`,
+      });
+    }
+
     try {
       logger.info('Record edit request', {
         quoteId,
