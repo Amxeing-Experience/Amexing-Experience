@@ -7,6 +7,9 @@
  *
  * Initial Settings:
  * - paymentSurchargePercentage (21.09%): Surcharge for non-cash payment methods
+ * - activePaymentGateway (0): MXN online-charge gateway toggle, stored as a numeric code
+ *   (0 = Stripe, 1 = mexican/Openpay) because the Setting.value column is fixed to Number;
+ *   USD always charges through Stripe regardless of this toggle.
  *
  * This seed is idempotent - creates settings if they don't exist,
  * updates descriptions if they do (preserves existing values).
@@ -55,6 +58,18 @@ const SYSTEM_SETTINGS = [
       min: 0,
       max: 100
     }
+  },
+  {
+    key: 'activePaymentGateway',
+    // Stored as a numeric code (not the string id) because the Setting.value column is
+    // fixed to Number in Parse. 0 = 'stripe', 1 = 'mexican'. The API translates this code
+    // to/from the string ids at its boundary; the number never leaves the API.
+    value: 0,
+    valueType: 'number',
+    category: 'payments',
+    description: 'Pasarela que procesa los cobros en línea en MXN. Se almacena como número: 0 = Stripe, 1 = pasarela mexicana (Openpay). El API traduce ese código a los identificadores "stripe"/"mexican"; el número nunca se expone por el API. Los cobros en USD siempre se procesan por Stripe, sin importar este ajuste.',
+    displayName: 'Pasarela de Pago Activa',
+    editable: true
   }
 ];
 
