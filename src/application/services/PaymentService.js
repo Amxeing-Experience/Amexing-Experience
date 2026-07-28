@@ -451,6 +451,46 @@ class PaymentService {
   }
 
   /**
+   * Whether a payment counts toward the rollup (paidGlobal), based on its gateway status.
+   *
+   * ALLOWLIST, fail-safe (plan seccion 6.5): a manual payment (no gatewayStatus) always counts;
+   * an online payment counts only if its gateway status is in the "counts" allowlist. A new/unknown
+   * status defaults to NOT counting, so an unmodeled state never inflates the balance (money-side
+   * fail-safe).
+   *
+   * "Manual" here means falsy gatewayStatus — null, undefined OR '' (a String field commonly persists
+   * as an empty string). All three must count: dropping a legit manual payment from the rollup would
+   * inflate the balance and OVERCHARGE the client, the opposite of the fail-safe intent.
+   *
+   * 'disputed' DOES count — but by the plan's design decision (seccion 6.5), because the charge has not
+   * yet been reversed accounting-wise, NOT because the funds are guaranteed available. NOTE: "counts in
+   * the rollup" is NOT the same as "funds available" — on card networks the acquirer typically debits
+   * the merchant provisionally when a dispute opens, so with an open dispute the merchant usually does
+   * NOT hold the money. Modeling available vs. held funds (plan seccion 8.3) is a separate future-PR
+   * concern. 'dispute_lost' does NOT count — the only terminal dispute state that stops counting, same
+   * as 'refunded'.
+   *
+   * Case-sensitive by design: 'SUCCEEDED' or ' succeeded ' do NOT count (statuses are stored verbatim
+   * from the provider mapping, never normalized here).
+   *
+   * KNOWN PLAN GAP (not resolved in this PR): plan seccion 5.7 models a refund as a NEGATIVE Payment
+   * with gatewayStatus='refunded', but seccion 6.5 (implemented here) excludes 'refunded' — so such a
+   * negative Payment would never subtract from paidGlobal. Reconciling the refund semantics (mutate the
+   * original vs. a negative Payment) is deferred to the refunds PR; PR 2 implements 6.5 literally.
+   * @param {string|null|undefined} gatewayStatus - Payment.gatewayStatus (falsy = manual).
+   * @returns {boolean} True if the payment counts toward paidGlobal.
+   * @example
+   * PaymentService.countsInRollup(undefined) // true (manual)
+   * PaymentService.countsInRollup('succeeded') // true
+   * PaymentService.countsInRollup('refunded') // false
+   */
+  static countsInRollup(gatewayStatus) {
+    const COUNTS = new Set(['succeeded', 'disputed']);
+    // !gatewayStatus cubre null, undefined y '' (todos = manual, cuentan; nunca sobrecobrar).
+    return !gatewayStatus || COUNTS.has(gatewayStatus);
+  }
+
+  /**
    * Expresa un pago (siempre almacenado en `amount` MXN) en la MONEDA DE LA RESERVACIÓN, para que el
    * motor de cobertura (baseEquivalente/remainingBreakdown/paidAmount) compare contra pricesByType y
    * totalDue, que ya vienen en esa moneda, sin mezclar unidades. Reservación MXN: se usa `amount` tal
@@ -524,7 +564,13 @@ class PaymentService {
       usdRate = Number.isFinite(snapshot) && snapshot > 0 ? snapshot : await ExchangeRate.getCurrentValue();
     }
 
-    const paymentRows = payments.map((payment) => ({
+    // Ruta de dinero: solo los pagos que cuentan en el rollup alimentan el paidGlobal. Un pendiente
+    // online (requires_payment/processing), un fallido/expirado, un reembolsado o una disputa perdida
+    // NO deben sumar; los manuales (sin gatewayStatus) y los online succeeded/disputed sí. El predicado
+    // vive en countsInRollup() (fail-safe por allowlist) para ser unit-testeable sin DB (plan 6.5).
+    const countingPayments = payments.filter((p) => PaymentService.countsInRollup(p.get('gatewayStatus')));
+
+    const paymentRows = countingPayments.map((payment) => ({
       amount: this.paymentAmountInCurrency({
         amount: payment.get('amount'),
         origAmount: payment.get('origAmount'),

@@ -475,6 +475,21 @@
       "dependencies": [],
       "idempotent": true,
       "order": 25
+    },
+    {
+      "name": "026-create-gatewayevent-class",
+      "file": "026-create-gatewayevent-class.js",
+      "description": "Create GatewayEvent class with unique (gateway,eventId) index and add gateway fields to Payment",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": [
+        "development",
+        "staging",
+        "production"
+      ],
+      "dependencies": [],
+      "idempotent": true,
+      "order": 26
     }
   ],
   "notes": [
