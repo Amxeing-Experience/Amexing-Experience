@@ -31,6 +31,7 @@ require('dotenv').config({
 
 const express = require('express');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const methodOverride = require('method-override');
@@ -55,6 +56,9 @@ const docsRoutes = require('./presentation/routes/docsRoutes');
 const dashboardRoutes = require('./presentation/routes/dashboardRoutes');
 const atomicRoutes = require('./presentation/routes/atomicRoutes');
 const publicRoutes = require('./presentation/routes/publicRoutes');
+
+// Mounted directly on `app` (not through a router) — see the /api/webhooks/stripe block below.
+const StripeWebhookController = require('./application/controllers/api/StripeWebhookController');
 
 // Middleware
 const errorHandler = require('./application/middleware/errorHandler');
@@ -121,6 +125,32 @@ app.post(
       res.status(204).end();
     }
   }
+);
+
+// Stripe webhook (pasarela de pagos). DELIBERATELY registered HERE, on `app`, in this synchronous
+// block — NOT in apiRoutes.js and NOT inside initPromise.then() below — for two reasons:
+//   1) Signature verification needs the body as the RAW Buffer Stripe signed. The global
+//      express.json({ limit: '250mb' }) a few lines below would consume and parse it first, and
+//      stripe.webhooks.constructEvent would then fail EVERY delivery with "invalid signature" —
+//      indistinguishable from a wrong secret or an attack. express.raw must win the body.
+//   2) The URL starts with /api/ only as a public naming convention (Stripe CLI, docs). It does NOT
+//      belong to the /api router: that router applies JWT auth, and this endpoint is authenticated by
+//      the Stripe signature instead. Moving it into apiRoutes.js would break both the raw body and the
+//      auth model. Please do not "fix" it there.
+// The route gets its OWN rate limiter (it inherits none out here): 100 req/min per IP, isolated from
+// the reservation limiters so a webhook burst can never lock staff out of the CRM, or vice versa.
+const stripeWebhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  message: { success: false, error: 'Demasiadas solicitudes' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.post(
+  '/api/webhooks/stripe',
+  stripeWebhookLimiter,
+  express.raw({ type: 'application/json', limit: '2mb' }),
+  (req, res) => StripeWebhookController.handle(req, res)
 );
 
 // Client/agent document uploads are base64-in-JSON (≤10MB binary ⇒ ~14MB encoded). Cap the body for
