@@ -307,193 +307,64 @@ const PaymentBreakdownHelpers = (() => {
   }
 
   /**
-   * Chips de método de pago (Requisito 3): un chip por método disponible con su total por método
-   * (gran total = servicios en ese método + ajustes netos) y una mini barra de cobertura. La barra y el
-   * % usan `coveragePercent` del backend TAL CUAL, idéntico en los 3 chips (correcto: `montoParaSaldar`
-   * excluye ajustes del denominador y `coveragePercent` los incluye, así que re-derivar en cliente daría
-   * un número distinto e incorrecto). El chip del método más barato lleva un badge verde "Más barato".
-   * @param {object} summary - Summary del backend.
-   * @param {Array<object>} services - Servicios de la reservación (para el total por método).
-   * @param {string} currency - Moneda.
-   * @returns {string} HTML de los chips (o un aviso si no hay métodos — H3).
-   * @example
-   * buildMethodChips(summary, services, 'MXN')
-   */
-  function buildMethodChips(summary, services, currency) {
-    const s = summary || {};
-    const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
-    if (!methods.length) {
-      return '<div class="text-muted small py-2">No hay métodos de pago disponibles para esta reservación.</div>';
-    }
-    const adjustments = round2(s.adjustments);
-    // Propina cobrada (Fase 2): pesos FIJOS iguales en los 3 chips (no escalan por método), igual que los
-    // ajustes. Como se suma la MISMA cantidad a cada chip, la DIFERENCIA entre chips de distinto método
-    // sigue siendo exactamente la diferencia de subtotales de servicios (property verificada en tests).
-    const tip = round2(s.tip);
-    const coverage = round2(s.coveragePercent);
-    const coverageWidth = Math.max(0, Math.min(100, coverage));
-    const anchor = s.anchoredMethod;
-    const cheapest = cheapestAvailableMethod(methods, services, currency);
-    const showCheaper = cheapest && anchor && cheapest !== anchor;
-    const chips = methods.map((m) => {
-      // Clamp a 0 igual que computeTotals del servidor (Math.max(0, ...)): un descuento/ajuste mayor al
-      // subtotal de servicios + propina no debe pintar un total negativo por método (council L4F1).
-      const methodTotal = Math.max(0, round2(computeServicesSubtotalByType(services, m, currency) + adjustments + tip));
-      // El badge "Cotizado" vive en la card de cobertura (junto a Total a pagar), no repetido aquí.
-      const cheaperTag = (showCheaper && m === cheapest)
-        ? `<span class="badge ms-1" style="background:${DISCOUNT_GREEN};color:#fff;">Más barato</span>` : '';
-      return `<div class="p-2 payment-chip-card">
-          <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-semibold">${escapeHtml(methodLabel(m))}${cheaperTag}</span>
-            <span>${formatMoney(methodTotal, currency)}</span>
-          </div>
-          <div class="progress" style="height:6px;" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar bg-success" style="width:${coverageWidth}%;"></div>
-          </div>
-          <div class="text-muted mt-1" style="font-size:0.7rem;">${coverage}% cubierto</div>
-        </div>`;
-    }).join('');
-    return `<div class="d-flex flex-column gap-2">${chips}</div>`;
-  }
-
-  /**
    * Card de cobertura: badge de estado, barra grande con `coveragePercent` (del backend, tal cual),
    * fila "Pagado" (monto físico `paidAmount`, sin cambio de fórmula) y fila "Saldo" (usa
    * resolveDisplayedBalance — 0 cuando está pagado — con la línea de ahorro cuando aplica).
+   * El hint de ahorro ("En efectivo ahorras…") se recibe ya construido porque depende de los totales
+   * por método, que se calculan desde los servicios de la reservación y este helper no los recibe.
    * @param {object} summary - Summary del backend.
    * @param {string} currency - Moneda.
+   * @param {string} [savingsHintHtml] - HTML opcional a insertar bajo "Total a pagar".
    * @returns {string} HTML de la card de cobertura.
    * @example
    * buildCoverageCard(summary, 'MXN')
    */
-  function buildCoverageCard(summary, currency) {
+  function buildCoverageCard(summary, currency, savingsHintHtml) {
     const s = summary || {};
     const coverage = round2(s.coveragePercent);
     const coverageWidth = Math.max(0, Math.min(100, coverage));
     const resolved = resolveDisplayedBalance(s);
-    const balanceCls = resolved.displayedBalance > 0 ? 'text-danger' : 'text-success';
+    const balanceColor = resolved.displayedBalance > 0 ? '#b8894a' : '#4b6b3f';
     const savingsHtml = resolved.savings
       ? `<div class="mt-2 p-2 rounded" style="background:#e8f5ee;">
           <div class="fw-semibold" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>${escapeHtml(resolved.savings.label)}</div>
           <div class="small" style="color:${DISCOUNT_GREEN};">${escapeHtml(resolved.savings.sublabel)}</div>
         </div>` : '';
-    return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-        <span class="text-muted fw-semibold"><i class="ti ti-receipt-2 me-1"></i>Total a pagar</span>
-        <span class="fw-bold fs-5">${formatMoney(round2(s.total), currency)}</span>
+    // Píldora de estado suavizada (paleta de marca), coherente con el hero del Resumen Financiero.
+    const softColors = {
+      'bg-secondary text-white': ['#f0eee7', '#6b6656', '#ded9cb'],
+      'bg-warning text-dark': ['#f6efe2', '#96682f', '#e7d6bd'],
+      'bg-success text-white': ['#e6efe1', '#3f5a34', '#cfe0c6'],
+      'bg-info text-white': ['#eaf1f0', '#3a6b63', '#cfe1dd'],
+    };
+    const sm = PAYMENT_STATUS_MAP[s.paymentStatus] || { label: s.paymentStatus, cls: 'bg-secondary text-white' };
+    const [bg, fg, bd] = softColors[sm.cls] || ['#f0eee7', '#6b6656', '#ded9cb'];
+    const statusPill = `<span style="display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;background:${bg};color:${fg};border:1px solid ${bd};border-radius:999px;padding:.44rem .85rem;white-space:nowrap;"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;"></span>${escapeHtml(sm.label)}</span>`;
+    // Método cotizado como CHIP a un lado de "Total a pagar" (como el hero del Resumen Financiero).
+    const methodChip = `<span style="display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#566040;background:#eef0e6;border:1px solid #dce2d0;border-radius:999px;padding:.26rem .66rem;" title="Método cotizado"><i class="ti ti-credit-card"></i>${escapeHtml(methodLabel(s.anchoredMethod))}</span>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;font-weight:700;color:#8a8f78;">Total a pagar ${methodChip}</div>
+          <div style="font-size:2.05rem;font-weight:700;color:#2b2b2b;line-height:1.1;margin-top:5px;">${formatMoney(round2(s.total), currency)}</div>
+          ${savingsHintHtml || ''}
+        </div>
+        ${statusPill}
       </div>
-      <div class="text-muted small mb-2">Cotizado: <span class="fw-semibold text-body">${escapeHtml(methodLabel(s.anchoredMethod))}</span></div>
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <span class="text-muted fw-semibold"><i class="ti ti-cash me-1"></i>Estado de pago</span>
-        ${getPaymentStatusBadge(s.paymentStatus)}
+      <div style="text-align:right;font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#8a8f78;margin-top:8px;">${coverage}% pagado</div>
+      <div style="height:11px;border-radius:999px;background:#f0e5d0;overflow:hidden;margin:7px 0 18px;" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
+        <div style="width:${coverageWidth}%;height:100%;border-radius:999px;background:#4b6b3f;"></div>
       </div>
-      <div class="progress mb-2" style="height:12px;" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
-        <div class="progress-bar bg-success" style="width:${coverageWidth}%;">${coverage}%</div>
-      </div>
-      <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-        <span class="text-muted fw-semibold"><i class="ti ti-check me-1"></i>Pagado</span>
-        <span class="fw-semibold text-success">${formatMoney(round2(s.paidAmount), currency)}</span>
-      </div>
-      <div class="d-flex justify-content-between align-items-center py-1">
-        <span class="text-muted fw-semibold"><i class="ti ti-wallet me-1"></i>Saldo</span>
-        <span class="fw-semibold ${balanceCls}">${formatMoney(resolved.displayedBalance, currency)}</span>
+      <div style="display:flex;justify-content:space-between;gap:12px;">
+        <div>
+          <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;">Pagado</div>
+          <div style="font-weight:700;font-size:1.55rem;color:#4b6b3f;">${formatMoney(round2(s.paidAmount), currency)}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;">Saldo</div>
+          <div style="font-weight:700;font-size:1.55rem;color:${balanceColor};">${formatMoney(resolved.displayedBalance, currency)}</div>
+        </div>
       </div>
       ${savingsHtml}`;
-  }
-
-  /**
-   * Desglose de saldo restante por método (Requisito 8): cuánto costaría saldar en cada método
-   * disponible, leyendo `montoParaSaldar` del backend tal cual. Vacío cuando ya está pagado o no hay
-   * métodos.
-   * @param {object} summary - Summary del backend.
-   * @param {string} currency - Moneda.
-   * @returns {string} HTML del desglose (o '' cuando no aplica).
-   * @example
-   * buildRemainingByMethod(summary, 'MXN')
-   */
-  function buildRemainingByMethod(summary, currency) {
-    const s = summary || {};
-    if (s.paymentStatus === 'paid') return '';
-    const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
-    if (!methods.length) return '';
-    const mps = s.montoParaSaldar || {};
-    const rows = methods.map((m) => `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
-        <span class="fw-semibold">${escapeHtml(methodLabel(m))}</span>
-        <span class="fw-semibold">${formatMoney(round2(mps[m]), currency)}</span>
-      </div>`).join('');
-    return `<div class="text-muted small mb-1">Para saldar el restante (${round2(s.remainingPercent)}%):</div>${rows}`;
-  }
-
-  /**
-   * Énfasis de descuento (Fase E): desglosa, UNO por método, el descuento de pagar en cada método
-   * disponible más barato que el ancla de la cotización (verde #146c43, no text-success) — no solo el
-   * más barato de todos, para que se vea "cotizado en tarjeta, descuento de $X en efectivo Y de $Y en
-   * transferencia" cuando aplique a más de un método. Ordenado de mayor a menor descuento. Vacío cuando
-   * ningún método disponible es más barato que el ancla (regla de dirección).
-   * @param {object} summary - Summary del backend.
-   * @param {Array<object>} services - Servicios de la reservación.
-   * @param {string} currency - Moneda.
-   * @returns {string} HTML del énfasis (o '' cuando no hay descuento).
-   * @example
-   * buildDiscountEmphasis(summary, services, 'MXN')
-   */
-  function buildDiscountEmphasis(summary, services, currency) {
-    const s = summary || {};
-    const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
-    const anchor = s.anchoredMethod;
-    if (methods.length < 2 || !anchor) return '';
-    const anchorTotal = computeServicesSubtotalByType(services, anchor, currency);
-    const rows = methods
-      .filter((m) => m !== anchor)
-      .map((m) => ({ m, savings: round2(anchorTotal - computeServicesSubtotalByType(services, m, currency)) }))
-      .filter(({ savings }) => savings > 0)
-      .sort((a, b) => b.savings - a.savings);
-    if (!rows.length) return '';
-    // methodLabel(m) sale de summary.anchoredMethod indirectamente (comparado, no interpolado como ancla)
-    // y de availableMethods (derivado, no de input libre) — igual se escapa por consistencia (council L3F0).
-    const lines = rows.map(({ m, savings }) => `<div class="d-flex justify-content-between align-items-center py-1">
-        <span class="small" style="color:${DISCOUNT_GREEN};">Descuento pagando en ${escapeHtml(methodLabel(m))}</span>
-        <span class="fw-semibold small" style="color:${DISCOUNT_GREEN};">${formatMoney(savings, currency)}</span>
-      </div>`).join('');
-    return `<div class="p-2 rounded" style="background:#e8f5ee;">
-        <div class="fw-semibold small mb-1" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>Descuentos disponibles</div>
-        ${lines}
-      </div>`;
-  }
-
-  /**
-   * Tabla de historial de pagos de SOLO LECTURA (agencia/agente): sin columna de acciones. El texto
-   * controlado por el usuario (referencia) se escapa (stored XSS). Admin usa su propia tabla interactiva.
-   * @param {Array<object>} payments - Pagos formateados (DTO de Payment.formatPayment).
-   * @param {string} currency - Moneda de la reservación.
-   * @returns {string} HTML de la tabla (o un vacío legible cuando no hay pagos).
-   * @example
-   * buildPaymentsHistoryTable(payments, 'MXN')
-   */
-  function buildPaymentsHistoryTable(payments, currency) {
-    const list = Array.isArray(payments) ? payments : [];
-    if (!list.length) return '<div class="text-center py-3 text-muted">Sin pagos registrados</div>';
-    const rows = list.map((p) => {
-      const ref = p.reference ? escapeHtml(p.reference) : '<span class="text-muted">&mdash;</span>';
-      // "Recibió" solo aplica al efectivo: en otros métodos es irrelevante y se muestra un guion.
-      const received = (p.method === 'efectivo' && p.receivedBy)
-        ? escapeHtml(p.receivedBy) : '<span class="text-muted">&mdash;</span>';
-      const receipt = p.receiptUrl
-        ? `<a href="${escapeHtml(p.receiptUrl)}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
-        : '<span class="text-muted">&mdash;</span>';
-      return `<tr>
-          <td>${formatDate(p.paidAt || p.createdAt)}</td>
-          <td><span class="badge bg-secondary-subtle text-secondary">${escapeHtml(methodLabel(p.method))}</span></td>
-          <td>${ref}</td>
-          <td>${received}</td>
-          <td class="text-end">${formatMoney(p.amount, currency)}</td>
-          <td>${escapeHtml(p.origCurrency || currency)}</td>
-          <td class="text-center">${receipt}</td>
-        </tr>`;
-    }).join('');
-    return `<div class="table-responsive"><table class="table table-sm table-hover align-middle mb-0 small">
-        <thead class="table-light"><tr>
-          <th>Fecha</th><th>Método</th><th>Referencia</th><th>Recibió</th><th class="text-end">Monto</th><th>Moneda</th><th class="text-center">Comprobante</th>
-        </tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
   return {
@@ -512,11 +383,7 @@ const PaymentBreakdownHelpers = (() => {
     formatDate,
     resolveDisplayedBalance,
     cheapestAvailableMethod,
-    buildMethodChips,
     buildCoverageCard,
-    buildRemainingByMethod,
-    buildDiscountEmphasis,
-    buildPaymentsHistoryTable,
   };
 })();
 
