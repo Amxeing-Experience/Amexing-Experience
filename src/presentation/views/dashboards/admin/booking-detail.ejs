@@ -41,6 +41,26 @@
 <div id="reservationContent" style="display: none;">
     <!-- Info Card -->
     <style>
+      /* Acciones del encabezado. Las dos EXPORTACIONES van en un control segmentado (mismo patrón que
+         las pestañas del carrito): se leen como una cosa con dos variantes en vez de dos botones que
+         compiten por empezar igual. Nada se esconde: todo sigue a un clic. */
+      .hdr-seg{display:inline-flex;gap:3px;background:#f1f2ec;border:1px solid #e6e4dd;border-radius:10px;padding:3px;}
+      .hdr-seg-btn{display:inline-flex;align-items:center;gap:.35rem;border:none;background:transparent;border-radius:7px;
+        font-size:.8rem;font-weight:600;color:#6b7256;padding:.35rem .75rem;line-height:1.2;white-space:nowrap;
+        text-decoration:none;font-family:inherit;transition:background .12s,color .12s;}
+      .hdr-seg-btn:hover{background:#fff;color:#4f5838;}
+      .hdr-seg-btn:disabled{color:#b3b7a5;cursor:not-allowed;}
+      .hdr-seg-btn:disabled:hover{background:transparent;color:#b3b7a5;}
+      /* Exportación suelta (cuando solo hay una): mismo peso visual que un elemento del segmento. */
+      .hdr-btn{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#6b7256;
+        background:#fff;border:1px solid #dcdccf;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
+        white-space:nowrap;text-decoration:none;font-family:inherit;transition:all .12s ease;}
+      .hdr-btn:hover{background:#f1f2ec;border-color:#c9cdbb;color:#4f5838;}
+      /* La única acción irreversible NO debe ser lo más llamativo: arranca discreta y se tiñe al hover. */
+      .hdr-danger{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#8a8f78;
+        background:transparent;border:1px solid transparent;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
+        white-space:nowrap;font-family:inherit;cursor:pointer;transition:all .12s ease;}
+      .hdr-danger:hover{background:#f7ecea;border-color:#e6c9c4;color:#a1443a;}
       .bkg-info{border:1px solid #ece8dd;border-radius:14px;overflow:hidden;background:#fff;}
       .bkg-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
         padding:20px 26px;background:linear-gradient(135deg,#f7f6f1 0%,#ffffff 60%);border-bottom:1px solid #ece8dd;}
@@ -281,18 +301,14 @@
     </div>
 
     <!-- Services by Day -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
-            <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-list-details me-2"></i>Servicios
-                </h5>
-                <a class="btn btn-sm btn-light d-none" id="exportItineraryBtn" href="#" target="_blank" rel="noopener" title="Abrir itinerario de viaje (exportable a PDF)">
-                    <i class="ti ti-file-export me-1"></i>Exportar itinerario
-                </a>
-            </div>
+    <div class="svc-wrap">
+        <div class="fin-section-head">
+            <h5 class="fin-section-title"><i class="ti ti-list-details me-2"></i>Servicios</h5>
+            <a class="btn btn-sm btn-outline-secondary d-none" id="exportItineraryBtn" href="#" target="_blank" rel="noopener" title="Abrir itinerario de viaje (exportable a PDF)">
+                <i class="ti ti-file-export me-1"></i>Exportar itinerario
+            </a>
         </div>
-        <div class="card-body p-0" id="servicesContainer">
+        <div id="servicesContainer">
             <!-- Services will be rendered here -->
         </div>
     </div>
@@ -836,6 +852,22 @@
 @media (prefers-reduced-motion: reduce) {
     #paymentsOffcanvas .pay-skel { animation: none; }
 }
+/* Panel de Servicios: mismo contenedor que el Resumen Financiero (fin-wrap + fin-section-head) en vez
+   del card-header con gradiente verde, que era el único bloque de la página fuera de la paleta. La
+   lista sangra hasta el borde con margen negativo para que las bandas de día y los separadores de fila
+   sigan corriendo a todo lo ancho, como cuando el card-body llevaba p-0; overflow:hidden recorta la
+   última fila contra la esquina redondeada. */
+.svc-wrap {
+    border: 1px solid #ece8dd;
+    border-radius: 14px;
+    background: #fff;
+    padding: 20px 22px 0;
+    overflow: hidden;
+}
+.svc-wrap #servicesContainer { margin: 0 -22px; }
+/* El botón de exportar venía en btn-light (pensado para el header de color): sobre blanco se perdía. */
+.svc-wrap .btn-outline-secondary { border-color: #dcdccf; color: #6b7256; }
+.svc-wrap .btn-outline-secondary:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
@@ -1419,12 +1451,19 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const actions = document.getElementById('headerActions');
         const folio = encodeURIComponent(d.folio || '');
-        const exportBtnHtml = folio
-            ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir la confirmación (vista pública, exportable a PDF)"><i class="ti ti-file-export me-1"></i>Exportar confirmación</a>`
-            : '';
-        // Placeholder: la vista/ruta del contrato aún no existe; se cablea después.
-        const contractBtnHtml = folio
-            ? `<button type="button" class="btn btn-sm btn-outline-secondary" id="exportContractBtn" title="Contrato de servicio (próximamente)" disabled><i class="ti ti-file-text me-1"></i>Exportar contrato de servicio</button>`
+        // Las dos exportaciones van juntas en un control segmentado: son la misma acción con dos
+        // variantes, así que "Exportar" queda implícito en el grupo y cada botón solo nombra el
+        // documento. El aria-label/title conserva la frase completa para lector de pantalla y hover.
+        // El contrato es un placeholder: la vista/ruta aún no existe; se cablea después.
+        const exportSegHtml = folio
+            ? `<span class="hdr-seg" role="group" aria-label="Exportar">
+                <a class="hdr-seg-btn" href="/reservations/${folio}" target="_blank" rel="noopener"
+                   title="Exportar confirmación — abre la vista pública, exportable a PDF"
+                   aria-label="Exportar confirmación"><i class="ti ti-file-export"></i>Confirmación</a>
+                <button type="button" class="hdr-seg-btn" id="exportContractBtn"
+                   title="Exportar contrato de servicio — próximamente"
+                   aria-label="Exportar contrato de servicio" disabled><i class="ti ti-file-text"></i>Contrato</button>
+              </span>`
             : '';
         // En vez del botón de cancelar: si ya está cancelada, mostrar etiqueta
         // "Cancelada"; si tiene una solicitud de cancelación pendiente, mostrar
@@ -1435,9 +1474,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         } else if (d.hasPendingCancellation) {
             cancelBtnHtml = `<span class="badge bg-warning text-dark border border-danger-subtle" title="Tiene una solicitud de cancelación pendiente de aprobación"><i class="ti ti-clock me-1"></i>Pendiente de cancelación</span>`;
         } else if (canAssign) {
-            cancelBtnHtml = `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>`;
+            cancelBtnHtml = `<button type="button" class="hdr-danger" id="cancelResBtn"><i class="ti ti-x"></i>Cancelar reservación</button>`;
         }
-        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${contractBtnHtml}${cancelBtnHtml}</div>`;
+        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportSegHtml}${cancelBtnHtml}</div>`;
         // Botón "Exportar itinerario" del header de Servicios → página de itinerario (exportable a PDF).
         const itinBtn = document.getElementById('exportItineraryBtn');
         if (itinBtn && folio) {

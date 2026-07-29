@@ -46,6 +46,17 @@
          · SIN bloque "Notas de la cotización": esta vista nunca ha mostrado d.notes y son notas
            internas; no se agrega. -->
     <style>
+      /* Acciones del encabezado. Aquí solo hay una exportación, así que va como botón suelto (en admin,
+         que tiene dos, van en un control segmentado). */
+      .hdr-btn{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#6b7256;
+        background:#fff;border:1px solid #dcdccf;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
+        white-space:nowrap;text-decoration:none;font-family:inherit;transition:all .12s ease;}
+      .hdr-btn:hover{background:#f1f2ec;border-color:#c9cdbb;color:#4f5838;}
+      /* La única acción irreversible NO debe ser lo más llamativo: arranca discreta y se tiñe al hover. */
+      .hdr-danger{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#8a8f78;
+        background:transparent;border:1px solid transparent;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
+        white-space:nowrap;font-family:inherit;cursor:pointer;transition:all .12s ease;}
+      .hdr-danger:hover{background:#f7ecea;border-color:#e6c9c4;color:#a1443a;}
       .bkg-info{border:1px solid #ece8dd;border-radius:14px;overflow:hidden;background:#fff;}
       .bkg-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
         padding:20px 26px;background:linear-gradient(135deg,#f7f6f1 0%,#ffffff 60%);border-bottom:1px solid #ece8dd;}
@@ -212,18 +223,14 @@
     </div>
 
     <!-- Services by Day -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
-            <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-list-details me-2"></i>Servicios
-                </h5>
-                <a class="btn btn-sm btn-light d-none" id="exportItineraryBtn" href="#" target="_blank" rel="noopener" title="Abrir itinerario de viaje (exportable a PDF)">
-                    <i class="ti ti-file-export me-1"></i>Exportar itinerario
-                </a>
-            </div>
+    <div class="svc-wrap">
+        <div class="fin-section-head">
+            <h5 class="fin-section-title"><i class="ti ti-list-details me-2"></i>Servicios</h5>
+            <a class="btn btn-sm btn-outline-secondary d-none" id="exportItineraryBtn" href="#" target="_blank" rel="noopener" title="Abrir itinerario de viaje (exportable a PDF)">
+                <i class="ti ti-file-export me-1"></i>Exportar itinerario
+            </a>
         </div>
-        <div class="card-body p-0" id="servicesContainer">
+        <div id="servicesContainer">
             <!-- Services will be rendered here -->
         </div>
     </div>
@@ -719,6 +726,22 @@
 @media (prefers-reduced-motion: reduce) {
     #paymentsOffcanvas .pay-skel { animation: none; }
 }
+/* Panel de Servicios: mismo contenedor que el Resumen Financiero (fin-wrap + fin-section-head) en vez
+   del card-header con gradiente verde, que era el único bloque de la página fuera de la paleta. La
+   lista sangra hasta el borde con margen negativo para que las bandas de día y los separadores de fila
+   sigan corriendo a todo lo ancho, como cuando el card-body llevaba p-0; overflow:hidden recorta la
+   última fila contra la esquina redondeada. */
+.svc-wrap {
+    border: 1px solid #ece8dd;
+    border-radius: 14px;
+    background: #fff;
+    padding: 20px 22px 0;
+    overflow: hidden;
+}
+.svc-wrap #servicesContainer { margin: 0 -22px; }
+/* El botón de exportar venía en btn-light (pensado para el header de color): sobre blanco se perdía. */
+.svc-wrap .btn-outline-secondary { border-color: #dcdccf; color: #6b7256; }
+.svc-wrap .btn-outline-secondary:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
@@ -971,11 +994,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         const actions = document.getElementById('headerActions');
         const folio = encodeURIComponent(d.folio || '');
         const canCancel = d.status !== 'cancelled' && d.status !== 'completed';
+        // Aquí solo existe UNA exportación (el contrato de servicio es admin-only), así que va como
+        // botón suelto: un control segmentado de un solo elemento no agruparía nada. Mismo peso visual
+        // que un elemento del segmento de admin.
         const exportBtnHtml = folio
-            ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir la confirmación (vista pública, exportable a PDF)"><i class="ti ti-file-export me-1"></i>Exportar confirmación</a>`
+            ? `<a class="hdr-btn" href="/reservations/${folio}" target="_blank" rel="noopener" title="Exportar confirmación — abre la vista pública, exportable a PDF"><i class="ti ti-file-export"></i>Exportar confirmación</a>`
             : '';
+        // La única acción irreversible no debe ser lo más llamativo: discreta, se tiñe al hover.
         const cancelBtnHtml = canCancel
-            ? `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservación</button>`
+            ? `<button type="button" class="hdr-danger" id="cancelResBtn"><i class="ti ti-x"></i>Cancelar reservación</button>`
             : '';
         actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
         // Botón "Exportar itinerario" del header de Servicios → página de itinerario (exportable a PDF).
