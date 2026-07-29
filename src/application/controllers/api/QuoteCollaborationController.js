@@ -419,10 +419,14 @@ class QuoteCollaborationController {
       (field) => !EDITABLE_FIELDS.includes(field)
     );
     if (disallowedFields.length > 0) {
+      // El detalle (qué campos y cuáles se permiten) se queda del lado servidor: devolverlo le entregaba
+      // al atacante el mapa exacto de campos que sí pasan el filtro.
+      logger.warn('recordEdit: campos fuera del allowlist rechazados', {
+        quoteId, userId: editorId, disallowedFields,
+      });
       return res.status(400).json({
         success: false,
-        error: `Campo no editable por este endpoint: ${disallowedFields.join(', ')}. `
-          + `Campos permitidos: ${EDITABLE_FIELDS.join(', ')}.`,
+        error: 'Campo no editable por este endpoint.',
       });
     }
 

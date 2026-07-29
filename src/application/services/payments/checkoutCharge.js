@@ -64,7 +64,11 @@ function resolveCheckoutCharge({
     return { ok: false, httpStatus: 422, error: 'La reservación ya está saldada; no hay saldo por cobrar.' };
   }
 
-  const hasCountingPayments = Array.isArray(paymentRows) && paymentRows.length > 0;
+  // A row only "counts" if it moved real money: a 0-amount row must never unlock liquidating the whole
+  // efectivo/transferencia total by card (loadAndCompute already filters, but this is a money rule and
+  // must be explicit here, not inherited from the caller).
+  const hasCountingPayments = Array.isArray(paymentRows)
+    && paymentRows.some((row) => Number(row && row.amount) > 0);
   // Tier guard (plan seccion 5.2bis): only the mixed-payment case (a prior counting payment in
   // another tier) may collect the remainder by card on an efectivo/transferencia reservation.
   if (DISCOUNT_TIERS.includes(paymentType) && !hasCountingPayments) {

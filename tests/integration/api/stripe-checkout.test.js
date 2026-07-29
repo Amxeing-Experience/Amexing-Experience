@@ -590,4 +590,56 @@ describe('POST /api/reservations/:id/pay/checkout (integration)', () => {
       expect(r.status).toBe(422);
     });
   });
+
+  // Los redirects de vuelta de Stripe existían solo como URL en la sesión: /pay/success y /pay/cancel no
+  // estaban ruteados, así que el pagador aterrizaba en 404 DESPUÉS de pagar de verdad (verificado por la
+  // revisora contra sandbox real). Ahora son placeholders públicos: 200 sin token, sin efectos de negocio.
+  describe('return URLs de Stripe (success/cancel) — sin 404 tras pagar', () => {
+    const pathOf = (absoluteUrl) => new URL(absoluteUrl).pathname;
+
+    it('la sesión creada apunta a rutas que EXISTEN: GET success/cancel responden 200 sin token', async () => {
+      const id = await createReservation();
+      const r = await postCheckout(id);
+      expect(r.status).toBe(200);
+
+      const params = stripeCreate.mock.calls[stripeCreate.mock.calls.length - 1][0];
+      // Sin Authorization: es exactamente lo que manda el navegador del pagador al volver de Stripe.
+      const success = await request(app).get(pathOf(params.success_url));
+      expect(success.status).toBe(200);
+      expect(success.body.success).toBe(true);
+      expect(success.body.message).toMatch(/confirmaci/i);
+
+      const cancel = await request(app).get(pathOf(params.cancel_url));
+      expect(cancel.status).toBe(200);
+      expect(cancel.body.message).toMatch(/cancelad/i);
+    });
+
+    it('el retorno NO marca nada como pagado: el pendiente sigue pendiente y el rollup en 0', async () => {
+      const id = await createReservation();
+      await postCheckout(id);
+      const params = stripeCreate.mock.calls[stripeCreate.mock.calls.length - 1][0];
+      await request(app).get(pathOf(params.success_url));
+
+      // La confirmación real es del webhook (PR5); este placeholder no toca dinero ni estado.
+      const [pending] = await onlinePayments(id);
+      expect(pending.get('gatewayStatus')).toBe('requires_payment');
+      const listing = await getPayments(id);
+      expect(listing.body.data.summary.paidAmount).toBe(0);
+    });
+
+    it('un session_id inventado en el query no cambia la respuesta (no se confía en él)', async () => {
+      const id = await createReservation();
+      const forged = await request(app).get(`/api/reservations/${id}/pay/success?session_id=cs_test_forjado`);
+      expect(forged.status).toBe(200);
+      expect(forged.body.success).toBe(true);
+      expect(await onlinePayments(id)).toHaveLength(0); // no creó ni tocó ningún Payment
+    });
+
+    it('el POST /pay/checkout hermano SIGUE protegido (el sub-router público no abrió nada más)', async () => {
+      const id = await createReservation();
+      const r = await request(app).post(`/api/reservations/${id}/pay/checkout`).send({});
+      expect(r.status).toBe(401);
+      expect((await request(app).get(`/api/reservations/${id}/payments`)).status).toBe(401);
+    });
+  });
 });

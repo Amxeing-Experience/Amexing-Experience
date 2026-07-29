@@ -93,6 +93,12 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
 
   const fetchQuote = (quoteId) => new Parse.Query('Quote').get(quoteId, { useMasterKey: true });
 
+  // El 400 del allowlist responde un mensaje GENÉRICO (review round 3, hallazgo F): nombrar el campo
+  // rechazado y listar los permitidos le entregaba al atacante el mapa exacto de campos editables. El
+  // detalle (disallowedFields + quoteId + userId) se queda en el log del servidor.
+  const GENERIC_REJECTION = 'Campo no editable por este endpoint.';
+  const expectGenericError = (res) => expect(res.body.error).toBe(GENERIC_REJECTION);
+
   const reservationsFor = async (quoteId) => {
     const quotePtr = new Parse.Object('Quote');
     quotePtr.id = quoteId;
@@ -232,6 +238,18 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
   // Seguridad: campos fuera del allowlist -> 400 y NO persisten
   // -------------------------------------------------------------------------
 
+  it('INT-05 (hallazgo F): el 400 NO revela el allowlist ni el campo rechazado (mensaje genérico)', async () => {
+    const quote = await makeQuote();
+    const res = await put(quote.id, { total: 1, owner: 'a'.repeat(24), folio: 'QTE-HACKED' });
+    expect(res.status).toBe(400);
+    expectGenericError(res);
+    // Ni la lista de campos permitidos ni los nombres rechazados viajan al caller.
+    const body = JSON.stringify(res.body);
+    expect(body).not.toMatch(/Campos permitidos/i);
+    expect(body).not.toMatch(/contactPerson|clientFinalId|leadGuestFirstName|validUntil/);
+    expect(body).not.toMatch(/folio|owner|total/);
+  });
+
   it('INT-06: rechaza serviceItems -> 400 y no muta serviceItems', async () => {
     const quote = await makeQuote();
     const before = quote.get('serviceItems');
@@ -242,7 +260,7 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
       },
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/serviceItems/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('serviceItems')).toEqual(before);
@@ -252,7 +270,7 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
     const quote = await makeQuote();
     const res = await put(quote.id, { total: 1, subtotal: 1, iva: 1 });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/total|subtotal|iva/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('total')).toBeUndefined();
@@ -265,7 +283,7 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
     const originalOwnerId = quote.get('owner').id;
     const res = await put(quote.id, { owner: 'a'.repeat(24) });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/owner/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('owner').id).toBe(originalOwnerId);
@@ -275,7 +293,7 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
     const quote = await makeQuote();
     const res = await put(quote.id, { approvalStatus: 'approved', requireApproval: false });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/approvalStatus|requireApproval/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('approvalStatus')).toBeUndefined();
@@ -286,7 +304,7 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
     const originalFolio = quote.get('folio');
     const res = await put(quote.id, { folio: 'QTE-HACKED-0001' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/folio/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('folio')).toBe(originalFolio);
@@ -298,7 +316,7 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
       paymentType: 'tarjeta', currency: 'USD', version: 99, collaborators: ['x'],
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/paymentType|currency|version|collaborators/);
+    expectGenericError(res);
   });
 
   it('INT-12: rechaza client como pointer crudo -> 400 y no reasigna el cliente dueño', async () => {
@@ -308,7 +326,7 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
       client: { __type: 'Pointer', className: 'AmexingUser', objectId: 'b'.repeat(24) },
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/client/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('client').id).toBe(originalClientId);
@@ -384,7 +402,7 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
     const quote = await makeQuote();
     const res = await put(quote.id, { constructor: 'x' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/constructor/);
+    expectGenericError(res);
     expect({}.polluted).toBeUndefined();
   });
 
@@ -392,7 +410,7 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
     const quote = await makeQuote({ status: 'quoted' });
     const res = await put(quote.id, { Status: 'scheduled' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/Status/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('status')).toBe('quoted');
@@ -402,6 +420,6 @@ describe('updateQuote HTTP — allowlist anti mass-assignment + fix bypass de st
     const quote = await makeQuote();
     const res = await put(quote.id, { days: [] });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/days/);
+    expectGenericError(res);
   });
 });

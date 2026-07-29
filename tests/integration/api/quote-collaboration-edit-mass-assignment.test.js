@@ -56,6 +56,12 @@ describe('recordEdit HTTP — allowlist anti mass-assignment (integration)', () 
 
   const fetchQuote = (quoteId) => new Parse.Query('Quote').get(quoteId, { useMasterKey: true });
 
+  // El 400 del allowlist responde un mensaje GENÉRICO (review round 3, hallazgo F): nombrar el campo
+  // rechazado y listar los permitidos le entregaba al atacante el mapa exacto de campos editables. El
+  // detalle (disallowedFields + quoteId + userId) se queda en el log del servidor.
+  const GENERIC_REJECTION = 'Campo no editable por este endpoint.';
+  const expectGenericError = (res) => expect(res.body.error).toBe(GENERIC_REJECTION);
+
   beforeAll(async () => {
     app = require('../../../src/index');
     await new Promise((resolve) => { setTimeout(resolve, 1000); });
@@ -99,6 +105,17 @@ describe('recordEdit HTTP — allowlist anti mass-assignment (integration)', () 
 
   // ---- Seguridad: campos fuera del allowlist -> 400 y NO persisten ----
 
+  it('SEGURIDAD (hallazgo F): el 400 NO revela el allowlist ni el campo rechazado', async () => {
+    const quote = await makeQuote();
+    const res = await postEdit(quote.id, { total: 1, owner: 'a'.repeat(24) });
+    expect(res.status).toBe(400);
+    expectGenericError(res);
+    const body = JSON.stringify(res.body);
+    expect(body).not.toMatch(/Campos permitidos/i);
+    expect(body).not.toMatch(/contactPerson|contactEmail|contactPhone|notes|eventType/);
+    expect(body).not.toMatch(/owner|total/);
+  });
+
   it('SEGURIDAD: rechaza serviceItems -> 400 y no muta serviceItems', async () => {
     const quote = await makeQuote();
     const before = quote.get('serviceItems');
@@ -111,7 +128,7 @@ describe('recordEdit HTTP — allowlist anti mass-assignment (integration)', () 
     });
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
-    expect(res.body.error).toMatch(/serviceItems/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('serviceItems')).toEqual(before); // intacto
@@ -121,7 +138,7 @@ describe('recordEdit HTTP — allowlist anti mass-assignment (integration)', () 
     const quote = await makeQuote();
     const res = await postEdit(quote.id, { total: 1 });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/total/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('total')).toBeUndefined(); // nunca se escribió
@@ -133,7 +150,7 @@ describe('recordEdit HTTP — allowlist anti mass-assignment (integration)', () 
 
     const res = await postEdit(quote.id, { owner: 'a'.repeat(24) });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/owner/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('owner').id).toBe(originalOwnerId); // dueño sin cambios
@@ -143,7 +160,7 @@ describe('recordEdit HTTP — allowlist anti mass-assignment (integration)', () 
     const quote = await makeQuote();
     const res = await postEdit(quote.id, { status: 'scheduled' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/status/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('status')).toBe('draft');
@@ -153,7 +170,7 @@ describe('recordEdit HTTP — allowlist anti mass-assignment (integration)', () 
     const quote = await makeQuote();
     const res = await postEdit(quote.id, { approvalStatus: 'pending_approval' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/approvalStatus/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     expect(updated.get('approvalStatus')).toBeUndefined();
@@ -163,14 +180,14 @@ describe('recordEdit HTTP — allowlist anti mass-assignment (integration)', () 
     const quote = await makeQuote();
     const res = await postEdit(quote.id, { paymentType: 'tarjeta' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/paymentType/);
+    expectGenericError(res);
   });
 
   it('SEGURIDAD: request mixto (permitido + prohibido) se rechaza COMPLETO -> 400 y ni el permitido se aplica', async () => {
     const quote = await makeQuote();
     const res = await postEdit(quote.id, { notes: 'no debe aplicarse', total: 5 });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/total/);
+    expectGenericError(res);
 
     const updated = await fetchQuote(quote.id);
     // El request completo se rechaza: el campo permitido tampoco se persiste.

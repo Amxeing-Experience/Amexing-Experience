@@ -196,6 +196,40 @@ router.post(
   (req, res) => StripeCheckoutController.createCheckout(req, res)
 );
 
+// Destinos de redirect de Stripe Checkout (los arma StripeCheckoutController.buildChargeAndSave a partir de
+// APP_BASE_URL). Van en un router APARTE porque deben ser PÚBLICOS: Stripe manda ahí al navegador del
+// pagador y ese navegador no trae Authorization header, así que apiRoutes.js los monta ANTES del
+// jwtMiddleware.authenticateToken global (mismo patrón que las rutas públicas de imágenes). Si vivieran en
+// el router de abajo, el usuario recibiría 401 tras pagar en vez del 404 de antes: igual de roto.
+// Son SOLO UX: no leen la reservación, no escriben nada, no marcan nada como pagado y NO confían en el
+// session_id del query. La confirmación real del dinero es del webhook de Stripe (PR5), única fuente de
+// verdad. Responden JSON, igual que el resto de este archivo (la página de UX definitiva llega con PR5+).
+const payReturnRouter = express.Router();
+
+/**
+ * GET /api/reservations/:id/pay/success — Retorno tras pagar (placeholder sin efectos, público).
+ */
+payReturnRouter.get(
+  '/:id/pay/success',
+  readOperationsLimiter,
+  (req, res) => res.json({
+    success: true,
+    message: 'Pago recibido, en confirmación. La reservación se actualiza automáticamente en cuanto la pasarela confirme el cobro.',
+  })
+);
+
+/**
+ * GET /api/reservations/:id/pay/cancel — Retorno al cancelar/abandonar el pago (placeholder, público).
+ */
+payReturnRouter.get(
+  '/:id/pay/cancel',
+  readOperationsLimiter,
+  (req, res) => res.json({
+    success: true,
+    message: 'Cobro cancelado. No se realizó ningún cargo; puedes intentarlo de nuevo cuando quieras.',
+  })
+);
+
 /**
  * PATCH /api/reservations/:id/services/:serviceId/status — Update service status.
  */
@@ -242,3 +276,5 @@ router.post(
 );
 
 module.exports = router;
+// Sub-router público de retornos de Stripe, montado por separado (y antes del auth global) en apiRoutes.js.
+module.exports.payReturnRouter = payReturnRouter;

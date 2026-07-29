@@ -126,6 +126,54 @@ describe('resolveCheckoutCharge (pure money + rejection)', () => {
     });
   });
 
+  describe('hallazgo E — la guarda 5.2bis exige un pago previo con IMPORTE real, no una fila vacía', () => {
+    it('efectivo + una fila de 0 (sin dinero movido) => sigue rechazado 422', () => {
+      // Antes bastaba con que existiera la FILA: un pago de 0 desbloqueaba liquidar el total con tarjeta
+      // en una reservación de efectivo/transferencia sin ningún pago real previo.
+      const r = resolveCheckoutCharge({
+        paymentType: 'efectivo',
+        serviceItems: CLEAN,
+        paymentRows: [{ amount: 0, method: 'transferencia' }],
+      });
+      expect(r.ok).toBe(false);
+      expect(r.httpStatus).toBe(422);
+      expect(r.error).toMatch(/efectivo\/transferencia/);
+    });
+
+    it.each([[null], [undefined], ['']])('efectivo + fila con amount %p (no numérico) => rechazado 422', (amount) => {
+      const r = resolveCheckoutCharge({
+        paymentType: 'efectivo',
+        serviceItems: CLEAN,
+        paymentRows: [{ amount, method: 'transferencia' }],
+      });
+      expect(r.ok).toBe(false);
+      expect(r.httpStatus).toBe(422);
+    });
+
+    it('efectivo + fila de 0 MÁS una fila con importe real => permitido (la real sí cuenta)', () => {
+      const r = resolveCheckoutCharge({
+        paymentType: 'efectivo',
+        serviceItems: CLEAN,
+        paymentRows: [
+          { amount: 0, method: 'transferencia' },
+          { amount: 2320, method: 'transferencia' },
+        ],
+      });
+      expect(r.ok).toBe(true);
+      expect(r.origAmount).toBe(9680);
+    });
+
+    it('tarjeta con una fila de 0 => sigue permitido (la guarda solo aplica a efectivo/transferencia)', () => {
+      const r = resolveCheckoutCharge({
+        paymentType: 'tarjeta',
+        serviceItems: CLEAN,
+        paymentRows: [{ amount: 0, method: 'tarjeta' }],
+      });
+      expect(r.ok).toBe(true);
+      expect(r.origAmount).toBe(12100);
+    });
+  });
+
   describe('BUG A — a net-negative flat part (discount > tip) is NOT over-charged by card', () => {
     // The money path that Stripe actually collects is montoParaSaldar.tarjeta. A manual discount of 100
     // (larger than the 0 tip) must REDUCE the card charge, not be dropped. Before the fix this returned

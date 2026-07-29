@@ -1,15 +1,16 @@
 /**
- * stripeClient — lazy-require + configuration guards (no real `stripe` package installed).
+ * stripeClient — lazy-require + configuration guards.
  *
- * The whole point: requiring this module must NEVER pull in the `stripe` package, so the app boots
- * without it. We prove that by making `stripe` a virtual mock that THROWS if it is ever required —
- * loading stripeClient stays green, and only a real getStripeClient() build (client not injected,
- * a key present) reaches the throwing require, confirming require('stripe') lives inside the
+ * The whole point: requiring this module must NEVER pull the `stripe` SDK into the process (it IS
+ * installed now, but must stay unloaded with PAYMENTS_ENABLED=false and under an injected test
+ * client). We prove that with a mock of `stripe` that THROWS if it is ever required — loading
+ * stripeClient stays green, and only a real getStripeClient() build (client not injected, a valid
+ * key present) reaches the throwing require, confirming require('stripe') lives inside the
  * function. An injected client short-circuits before the require entirely.
  */
 
-// Virtual mock: `stripe` is not installed. If anything ever require()s it, throw loudly so a
-// non-lazy require would fail this suite immediately.
+// Mock factory that throws: if anything ever require()s `stripe`, a non-lazy require would fail this
+// suite immediately. virtual:true keeps the mock independent of whether the package is on disk.
 jest.mock('stripe', () => { throw new Error('Cannot find module "stripe" (virtual mock)'); }, { virtual: true });
 
 const stripeClient = require('../../../../src/infrastructure/payments/stripeClient');
@@ -37,6 +38,12 @@ describe('stripeClient (lazy require + guards)', () => {
     // top-level require above; reaching here proves it did not.
     expect(typeof stripeClient.getStripeClient).toBe('function');
     expect(typeof stripeClient.isStripeConfigured).toBe('function');
+  });
+
+  it('the Stripe API version is PINNED to the installed SDK default (never floating)', () => {
+    // stripe@22.3.2 ships ApiVersion '2026-06-24.dahlia' (node_modules/stripe/cjs/apiVersion.js) and Stripe
+    // reported it as vigente in the sandbox check. Bumping it must be a conscious, reviewed change.
+    expect(stripeClient.STRIPE_API_VERSION).toBe('2026-06-24.dahlia');
   });
 
   it('U24 an injected mock client is returned WITHOUT ever requiring the real SDK', () => {
@@ -102,6 +109,45 @@ describe('stripeClient (lazy require + guards)', () => {
 
     it('a restricted (rk_test_) key IS considered configured', () => {
       process.env.STRIPE_SECRET_KEY_TEST = 'rk_test_abc';
+      expect(stripeClient.isStripeConfigured()).toBe(true);
+    });
+  });
+
+  // Regression (review round 3, hallazgo A): isStripeConfigured() used to accept ANY recognized prefix,
+  // so a mode/env mismatch (e.g. sk_live_ in staging) reported "configured", the controller guard passed,
+  // and assertKeyMatchesEnv then blew up INSIDE buildCheckout -> PROVIDER_ERROR/502 instead of the correct
+  // NOT_CONFIGURED/503. The pre-check must now apply the SAME rule as the guard, without throwing.
+  describe('isStripeConfigured() agrees with assertKeyMatchesEnv (mode must match the environment)', () => {
+    const savedNodeEnv = process.env.NODE_ENV;
+    afterEach(() => { process.env.NODE_ENV = savedNodeEnv; });
+
+    it('a LIVE key outside production is NOT configured (and getStripeClient would have thrown)', () => {
+      process.env.STRIPE_SECRET_KEY_TEST = 'sk_live_should_not_be_here';
+      expect(stripeClient.isStripeConfigured()).toBe(false);
+      expect(() => stripeClient.getStripeClient()).toThrow(/LIVE secret key/);
+    });
+
+    it('a RESTRICTED live key (rk_live_) outside production is NOT configured either', () => {
+      process.env.STRIPE_SECRET_KEY_TEST = 'rk_live_restricted';
+      expect(stripeClient.isStripeConfigured()).toBe(false);
+    });
+
+    it('a TEST key in production is NOT configured (would never move real money)', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.STRIPE_SECRET_KEY_LIVE = 'sk_test_wrong_mode_for_prod';
+      expect(stripeClient.isStripeConfigured()).toBe(false);
+      expect(() => stripeClient.getStripeClient()).toThrow(/TEST secret key/);
+    });
+
+    it('a LIVE key in production IS configured (the only combination prod accepts)', () => {
+      process.env.NODE_ENV = 'production';
+      process.env.STRIPE_SECRET_KEY_LIVE = 'sk_live_ok_for_prod';
+      expect(stripeClient.isStripeConfigured()).toBe(true);
+    });
+
+    it('an injected test client still reports configured without any key/mode check', () => {
+      process.env.STRIPE_SECRET_KEY_TEST = 'sk_live_would_be_rejected_on_its_own';
+      stripeClient.setClientForTests({ checkout: { sessions: {} } });
       expect(stripeClient.isStripeConfigured()).toBe(true);
     });
   });

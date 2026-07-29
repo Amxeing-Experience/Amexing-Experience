@@ -34,11 +34,17 @@ const { withReservationLock } = require('../../../infrastructure/concurrency/res
 
 // A pending online Payment lives 30 min (aligned with a Checkout Session; the TTL sweep is PR6).
 const PENDING_TTL_MS = 30 * 60 * 1000;
-// The Checkout Session outlives the local pending by a 1-min cushion so that, at CREATION, its expires_at
-// clears Stripe's now+30min hard minimum (createdAt≈now => pending expiresAt=now+30min => session=now+31min).
+// The Checkout Session outlives the local pending by this cushion so that, at CREATION, its expires_at
+// clears Stripe's now+30min hard minimum (createdAt≈now => pending expiresAt=now+30min => session=now+33min).
+// 3 min, not 1: the pending is stamped BEFORE the network work, and the worst case between the stamp and the
+// session create is payment.save() plus the SDK's own budget (MAX_NETWORK_RETRIES=2 => up to 3 attempts ×
+// REQUEST_TIMEOUT_MS=20s ≈ 60s), which would eat a 1-min cushion exactly when the retry should have saved the
+// call. The only cost of the wider cushion is that an orphan session (nobody reclaims it) auto-expires in
+// Stripe a couple of minutes later — still self-healing and far under Stripe's 24h default. It does NOT
+// reopen the double-session bug: retirePending still expires the old session in Stripe before a new one.
 // This session expiry is FROZEN per-Payment (see frozenSessionExpiresAt), never Date.now(), so an idempotent
 // replay re-sends identical params and Stripe returns the cached session (council HIGH).
-const SESSION_EXPIRY_CUSHION_MS = 60 * 1000;
+const SESSION_EXPIRY_CUSHION_MS = 3 * 60 * 1000;
 // The toggle Setting stores a numeric code; 0 = 'stripe' is the safe default.
 const GATEWAY_SETTING_KEY = 'activePaymentGateway';
 
@@ -87,8 +93,9 @@ class StripeCheckoutController {
    * StripeCheckoutController.pendingMatchesCharge(pending, { origAmount: 9680, currency: 'MXN' });
    */
   static pendingMatchesCharge(payment, charge) {
-    // No charge context (defensive): preserve the prior reuse behavior rather than force a needless churn.
-    if (!charge) return true;
+    // No charge context (unreachable today: both callers always pass one). Fail CLOSED — on a money path the
+    // safe default with no context is "do not reuse", never "reuse whatever is there".
+    if (!charge) return false;
     const prevAmount = Number(payment.getOrigAmount());
     const nextAmount = Number(charge.origAmount);
     if (!Number.isFinite(prevAmount) || !Number.isFinite(nextAmount)) return false;
@@ -311,7 +318,17 @@ class StripeCheckoutController {
       // Roll back the just-created pending so it never blocks a retry (TTL sweep is PR6): expire any
       // session that WAS created before the failure and leave it terminal ('expired'), not the
       // half-open 'requires_payment' the old rollback left behind (council BUG B + LOW consistency).
-      await StripeCheckoutController.retirePending(payment, adapter, req).catch(() => {});
+      // retirePending already swallows+logs its own expireCheckout failures, so the only thing that can
+      // escape here is a failed softDelete — which leaves the pending alive (requires_payment + exists:true)
+      // blocking the partial unique index until the PR6 sweep. Log it (never silence it); the flow is
+      // unchanged: the original providerErr is what propagates.
+      await StripeCheckoutController.retirePending(payment, adapter, req).catch((softDeleteErr) => {
+        logger.warn('Rollback of a just-created online pending failed; it may block new checkouts for this reservation until the TTL sweep', {
+          reservationId,
+          paymentId: payment.id,
+          error: softDeleteErr && softDeleteErr.message,
+        });
+      });
       throw providerErr;
     }
   }
@@ -322,6 +339,8 @@ class StripeCheckoutController {
    * as a 409 the caller can simply retry (it will then find/reuse the settled pending), never an infinite
    * loop against the index.
    * @returns {Error} The tagged conflict error.
+   * @example
+   * throw StripeCheckoutController.checkoutConflict();
    */
   static checkoutConflict() {
     const err = new Error('Concurrent online checkout creation conflict for this reservation');

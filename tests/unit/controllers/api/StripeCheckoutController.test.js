@@ -8,11 +8,19 @@
  * - retirePending (MEDIUM): a transient expireCheckout failure is retried exactly once and never blocks
  *   the local retirement (best-effort, session auto-expires via the frozen expires_at).
  * - frozenSessionExpiresAt (HIGH): the session expiry is derived from the pending's OWN expiresAt/createdAt,
- *   never Date.now(), so an idempotent replay sends identical params.
+ *   never Date.now(), so an idempotent replay sends identical params, with a cushion wide enough to survive
+ *   the SDK's worst-case network budget (review round 3, hallazgo B).
+ * - pendingMatchesCharge (hallazgo C): with no charge context the money path fails CLOSED (no reuse).
+ * - createOrReusePending rollback (hallazgo D): a failed rollback is logged, never swallowed silently.
  */
 
 const Parse = require('parse/node');
 const StripeCheckoutController = require('../../../../src/application/controllers/api/StripeCheckoutController');
+const logger = require('../../../../src/infrastructure/logger');
+
+// The session-expiry cushion over the pending TTL (kept in sync with the controller constant): 3 min, wide
+// enough to survive the SDK's worst-case network budget (3 attempts × 20s) plus the payment.save() round-trip.
+const CUSHION_MS = 3 * 60 * 1000;
 
 const duplicateError = () => {
   const err = new Error('E11000 duplicate key');
@@ -193,11 +201,22 @@ describe('StripeCheckoutController.retirePending (bounded expireCheckout retry, 
 });
 
 describe('StripeCheckoutController.frozenSessionExpiresAt (HIGH — stable, never Date.now())', () => {
-  it('derives from the pending expiresAt + a 1-min cushion (independent of the current clock)', () => {
+  it('derives from the pending expiresAt + the cushion (independent of the current clock)', () => {
     const expiresAt = new Date('2030-01-01T00:30:00.000Z');
     const payment = { getExpiresAt: () => expiresAt };
     expect(StripeCheckoutController.frozenSessionExpiresAt(payment))
-      .toBe(expiresAt.getTime() + 60 * 1000);
+      .toBe(expiresAt.getTime() + CUSHION_MS);
+  });
+
+  it('the cushion has real margin over the SDK network budget (>= 3 min, review round 3 hallazgo B)', () => {
+    // Worst case between stamping expiresAt and creating the session: payment.save() + up to 3 SDK attempts
+    // × REQUEST_TIMEOUT_MS 20s ≈ 60s. A 60s cushion left zero margin exactly when the retry should help.
+    const expiresAt = new Date('2030-01-01T00:30:00.000Z');
+    const cushion = StripeCheckoutController.frozenSessionExpiresAt({ getExpiresAt: () => expiresAt })
+      - expiresAt.getTime();
+    expect(cushion).toBeGreaterThanOrEqual(3 * 60 * 1000);
+    // Still far below Stripe's 24h maximum for expires_at (30min pending + cushion must fit the window).
+    expect(cushion + 30 * 60 * 1000).toBeLessThan(24 * 60 * 60 * 1000);
   });
 
   it('is identical no matter what Date.now() reports (idempotency-safe replay)', () => {
@@ -218,6 +237,73 @@ describe('StripeCheckoutController.frozenSessionExpiresAt (HIGH — stable, neve
     const createdAt = new Date('2030-01-01T00:00:00.000Z');
     const payment = { getExpiresAt: () => null, createdAt };
     expect(StripeCheckoutController.frozenSessionExpiresAt(payment))
-      .toBe(createdAt.getTime() + 30 * 60 * 1000 + 60 * 1000);
+      .toBe(createdAt.getTime() + 30 * 60 * 1000 + CUSHION_MS);
+  });
+});
+
+describe('StripeCheckoutController.pendingMatchesCharge (fail-closed default, review round 3 hallazgo C)', () => {
+  const pending = () => ({ getOrigAmount: () => 9680, getOrigCurrency: () => 'MXN' });
+
+  it.each([[undefined], [null]])('NO charge context (%p) => does NOT reuse (money path fails closed)', (charge) => {
+    // Both callers always pass a charge today; if a future caller does not, the safe answer is "create a
+    // fresh, correctly-priced pending", never "reuse whatever pending exists".
+    expect(StripeCheckoutController.pendingMatchesCharge(pending(), charge)).toBe(false);
+  });
+
+  it('an exact amount+currency match still reuses (no needless churn)', () => {
+    expect(StripeCheckoutController.pendingMatchesCharge(pending(), { origAmount: 9680, currency: 'mxn' }))
+      .toBe(true);
+  });
+
+  it('a sub-cent drift reuses; a real cent-level drift does not', () => {
+    // Tolerancia <= 0.01 (el == exacto en float sería frágil: 9680.01 - 9680 ya da 0.0100000000002).
+    expect(StripeCheckoutController.pendingMatchesCharge(pending(), { origAmount: 9680.005, currency: 'MXN' }))
+      .toBe(true);
+    expect(StripeCheckoutController.pendingMatchesCharge(pending(), { origAmount: 9680.5, currency: 'MXN' }))
+      .toBe(false);
+  });
+});
+
+describe('StripeCheckoutController.createOrReusePending rollback (review round 3 hallazgo D)', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const ctx = () => ({
+    reservation: { id: 'res1' },
+    adapter: {},
+    req: { userId: 'u1' },
+    charge: { origAmount: 9680, currency: 'MXN' },
+  });
+
+  it('a FAILED rollback (softDelete throws) is LOGGED, and the original provider error still propagates', async () => {
+    const providerErr = new Error('stripe down');
+    const softDeleteErr = new Error('mongo write failed');
+    const fresh = { id: 'p1', save: jest.fn().mockResolvedValue({}) };
+    jest.spyOn(StripeCheckoutController, 'findPendingOnline').mockResolvedValue(null);
+    jest.spyOn(StripeCheckoutController, 'buildPendingPayment').mockReturnValue(fresh);
+    jest.spyOn(StripeCheckoutController, 'buildChargeAndSave').mockRejectedValue(providerErr);
+    jest.spyOn(StripeCheckoutController, 'retirePending').mockRejectedValue(softDeleteErr);
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+    await expect(StripeCheckoutController.createOrReusePending(ctx())).rejects.toBe(providerErr);
+    // Before the fix this was .catch(() => {}): a pending left alive (requires_payment + exists:true) blocks
+    // the partial unique index for that reservation until the PR6 sweep, with zero trace in the logs.
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][1]).toMatchObject({
+      reservationId: 'res1', paymentId: 'p1', error: 'mongo write failed',
+    });
+  });
+
+  it('a successful rollback logs nothing and still propagates the provider error', async () => {
+    const providerErr = new Error('stripe down');
+    const fresh = { id: 'p2', save: jest.fn().mockResolvedValue({}) };
+    jest.spyOn(StripeCheckoutController, 'findPendingOnline').mockResolvedValue(null);
+    jest.spyOn(StripeCheckoutController, 'buildPendingPayment').mockReturnValue(fresh);
+    jest.spyOn(StripeCheckoutController, 'buildChargeAndSave').mockRejectedValue(providerErr);
+    const retire = jest.spyOn(StripeCheckoutController, 'retirePending').mockResolvedValue();
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+
+    await expect(StripeCheckoutController.createOrReusePending(ctx())).rejects.toBe(providerErr);
+    expect(retire).toHaveBeenCalledTimes(1);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
