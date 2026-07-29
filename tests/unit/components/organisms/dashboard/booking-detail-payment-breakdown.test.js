@@ -24,14 +24,26 @@ describe('Booking Detail Fase 3 — módulo compartido', () => {
   });
 });
 
-// council L0F0: el encabezado #infoTotal debe salir de la MISMA fuente en los 3 roles (d.totalAmount,
-// el valor persistido que ya incluye ajustes) para que una reservación con un ajuste muestre el mismo
-// número a admin, agencia y agente. El script embebido no se ejecuta en el cascarón, así que se
-// verifica el literal de la asignación en el HTML renderizado.
-describe('Booking Detail — #infoTotal consistente entre roles (council L0F0)', () => {
-  it.each(['admin', 'department_manager', 'client'])('%s: #infoTotal se llena desde d.totalAmount', async (role) => {
+// council L0F0: el total que se muestra debe salir de la MISMA fuente en los 3 roles, para que una
+// reservación con un ajuste muestre el mismo número a admin, agencia y agente.
+//
+// La fuente CAMBIÓ: antes era el tile #infoTotal de la tarjeta de info, llenado con d.totalAmount (el
+// valor persistido). Ese tile ya no existe en ninguna de las 3 vistas — el total se dejó de duplicar y
+// vive solo en el Resumen Financiero, que lo toma de pay.total (el summary del servidor, que ya incluye
+// ajustes y propinas). El invariante se conserva y se refuerza: pay.total lo calcula el backend, así
+// que ninguna vista puede derivar un número distinto.
+//
+// El script embebido no se ejecuta en el cascarón, así que se verifica el literal en el HTML renderizado.
+describe('Booking Detail — total consistente entre roles (council L0F0)', () => {
+  it.each(['admin', 'department_manager', 'client'])('%s: el total mostrado sale de pay.total (summary del servidor)', async (role) => {
     const html = await render(role);
-    expect(html).toContain("getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency)");
+    expect(html).toMatch(/formatCurrency\(pay\.total|Number\(pay\.total\)/);
+  });
+
+  it.each(['admin', 'department_manager', 'client'])('%s: el tile #infoTotal ya no duplica el total en la tarjeta de info', async (role) => {
+    const html = await render(role);
+    expect(html).not.toContain('id="infoTotal"');
+    expect(html).not.toContain("getElementById('infoTotal')");
   });
 
   it('admin: el encabezado ya NO recomputa el total sin ajustes (headerTotal eliminado)', async () => {
@@ -46,15 +58,22 @@ describe('Booking Detail Fase 3 — admin (nivel 6+)', () => {
 
   beforeAll(async () => { html = await render('admin'); });
 
-  it('tiene el bloque colapsable "Ver comparativo por método de pago"', () => {
+  // El comparativo dejó de tener un enlace propio ("Ver comparativo por método de pago"): ahora lo
+  // dispara el CHIP de método del hero, que queda pegado a lo que explica en vez de ser una sección
+  // suelta. Sigue siendo un collapse inline con el mismo id.
+  it('el chip de método del hero dispara el comparativo colapsable', () => {
     expect(html).toContain('id="paymentMethodComparison"');
-    expect(html).toContain('id="paymentMethodComparisonToggle"');
-    expect(html).toContain('Ver comparativo por método de pago');
+    expect(html).toContain('fin-hero-method');
+    expect(html).toContain('data-bs-target="#paymentMethodComparison"');
+    expect(html).not.toContain('id="paymentMethodComparisonToggle"');
   });
 
-  it('marca el método actual con ti-point-filled + "Método actual:"', () => {
-    expect(html).toContain('ti-point-filled');
-    expect(html).toContain('Método actual:');
+  // El método actual se marca con un badge "Actual" en su fila del comparativo (antes: un punto
+  // ti-point-filled + el texto "Método actual:" fuera de la tabla).
+  it('marca el método actual con el badge "Actual" en su fila del comparativo', () => {
+    expect(html).toContain('fin-cmp-badge');
+    expect(html).toContain('>Actual<');
+    expect(html).toContain('fin-cmp-row');
   });
 
   it('N2: la propina salió de scope — ni la fila resumen ni el toggle "Ver propina por servicio" están en el DOM', () => {
@@ -95,10 +114,15 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).toContain('ti-minus text-success');
   });
 
-  it.each(AGENCY_ROLES)('%s: SIN comparativo de 3 métodos (fuera de alcance)', async (role) => {
+  // El comparativo de 3 métodos DEJÓ de ser admin-only: agencia/agente también lo ven, desplegable
+  // desde el chip de método del hero. Es informativo (compara el mismo total en cada método, con datos
+  // que ya tienen en pantalla) y no expone ninguna acción ni dato nuevo — a diferencia de los AJUSTES,
+  // que siguen siendo admin-only porque su endpoint lo es.
+  it.each(['admin', ...AGENCY_ROLES])('%s: comparativo de 3 métodos desplegable desde el chip', async (role) => {
     const html = await render(role);
-    expect(html).not.toContain('id="paymentMethodComparison"');
-    expect(html).not.toContain('Ver comparativo por método de pago');
+    expect(html).toContain('id="paymentMethodComparison"');
+    expect(html).toContain('Total a pagar según el método de pago:');
+    expect(html).toContain('fin-cmp-badge');
   });
 
   // RBAC — /adjustments es requireRole(['admin','superadmin']); la agencia NO debe ni ver el control.
@@ -131,18 +155,34 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).not.toContain('id="paymentsCard"');
   });
 
-  it.each(AGENCY_ROLES)('%s: Offcanvas con chips/cobertura/saldo restante/descuento + botón "Agregar pago" (ya no "Ver pagos")', async (role) => {
+  // El carrito pasó a PESTAÑAS (Pago / Historial), igual que admin. Los chips de progreso + la sección
+  // "saldo restante por método" + el bloque de descuento se fusionaron en una sola tabla "Por método de
+  // pago" (Método · Total · Cubierto · Restante): antes las mismas barras se dibujaban dos veces.
+  it.each(['admin', ...AGENCY_ROLES])('%s: Offcanvas con pestañas Pago/Historial y tabla por método', async (role) => {
     const html = await render(role);
     expect(html).toContain('id="paymentsOffcanvas"');
     expect(html).toContain('offcanvas offcanvas-end');
-    expect(html).toContain('id="paymentChips"');
+    expect(html).toContain('id="paymentsTabs"');
+    expect(html).toContain('id="tabPago"');
+    expect(html).toContain('id="tabHistorial"');
     expect(html).toContain('id="paymentCoverageCard"');
-    expect(html).toContain('id="paymentRemainingByMethod"');
-    expect(html).toContain('id="paymentDiscountEmphasis"');
-    expect(html).toContain('id="addPaymentBtn"');
+    expect(html).toContain('id="paymentMethodTable"');
+    expect(html).toContain('Por método de pago');
     expect(html).not.toContain('id="viewPaymentsBtn"');
     // Consume el endpoint AMPLIO (GET .../payments), no el objeto angosto de getReservationById.
     expect(html).toContain('/payments');
+  });
+
+  it.each(['admin', ...AGENCY_ROLES])('%s: los contenedores viejos del carrito ya no existen', async (role) => {
+    const html = await render(role);
+    expect(html).not.toContain('id="paymentChips"');
+    expect(html).not.toContain('id="paymentRemainingByMethod"');
+    expect(html).not.toContain('id="paymentDiscountEmphasis"');
+  });
+
+  it.each(AGENCY_ROLES)('%s: "Agregar pago" sigue siendo la única puerta de entrada al carrito', async (role) => {
+    const html = await render(role);
+    expect(html).toContain('id="addPaymentBtn"');
   });
 });
 
