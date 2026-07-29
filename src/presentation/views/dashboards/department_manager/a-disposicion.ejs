@@ -63,8 +63,8 @@ const isAdminRole = (currentUserRole === 'admin' || currentUserRole === 'superad
             <label class="field-lb" for="disposicion-payment">Método de pago</label>
             <select class="field-select" id="disposicion-payment">
                 <option value="efectivo">Efectivo</option>
-                <option value="transferencia" selected>Transferencia</option>
-                <option value="tarjeta">Tarjeta de Débito/Crédito</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="tarjeta" selected>Tarjeta de Débito/Crédito</option>
             </select>
         </div>
     </div>
@@ -902,7 +902,7 @@ const isAdminRole = (currentUserRole === 'admin' || currentUserRole === 'superad
         const selectedVehicle = $('#disposicion-vehicle-type').val();
         const selectedRate = $('#disposicion-rate').val();
         const selectedCurrency = $('#disposicion-currency').val() || 'MXN';
-        const selectedPayment = $('#disposicion-payment').val() || 'efectivo';
+        const selectedPayment = $('#disposicion-payment').val() || 'tarjeta';
 
         let currentHourlyRate = defaultHourlyRate;
 

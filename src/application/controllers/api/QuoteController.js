@@ -1409,6 +1409,40 @@ class QuoteController {
       const quoteId = req.params.id;
       const updates = req.body;
 
+      // SEGURIDAD (mass-assignment): este es el endpoint PRIMARIO que el front usa para editar una
+      // cotización. `updates` (el body crudo) se pasa tal cual a versioningService.recordEdit ->
+      // applyChanges, que hace quote.set(field, value) por CADA campo SIN filtro. Sin allowlist un usuario
+      // con permiso de edición podría fijar campos arbitrarios y sensibles (total/subtotal/iva,
+      // serviceItems, paymentType/currency, owner/client y demás pointers de dueño,
+      // approvalStatus/requireApproval, folio, version, collaborators...). Restringimos a los campos
+      // descriptivos/de contacto/estado legítimos que el front realmente manda (quote-information.ejs) mas
+      // los que valida QuoteService.allowedFields. status/reason se incluyen porque el cambio de estado es
+      // legítimo por su camino dedicado (updateQuoteStatus, que sí valida el permiso admin-only); validUntil
+      // es campo legítimo de allowedFields aunque hoy no tenga caller de UI. serviceItems y el método de
+      // pago se editan por su endpoint dedicado y validado (PUT /:id/service-items), NUNCA por esta vía.
+      // El cliente dueño se reasigna con `clientId` (string, DB-resuelto por QuoteService.updateQuote); el
+      // pointer `client` crudo NO se admite (se fijaría verbatim vía applyChanges = secuestro de dueño). Se
+      // RECHAZA (400) el request completo ante cualquier campo fuera del allowlist, en vez de stripear en
+      // silencio. Comparación exacta y case-sensitive (una key 'Status'/'Total'/'constructor' cae fuera).
+      const EDITABLE_FIELDS = [
+        'clientId', 'eventType', 'numberOfPeople', 'numberOfAdults', 'numberOfChildren',
+        'numberOfInfants', 'preferredLanguage', 'contactPerson', 'contactFirstName',
+        'contactLastName', 'contactEmail', 'contactPhone', 'leadGuestFirstName',
+        'leadGuestLastName', 'lodging', 'notes', 'clientFinalId', 'clientFinalName',
+        'clientType', 'validUntil', 'status', 'reason',
+      ];
+      const disallowedFields = Object.keys(updates || {}).filter(
+        (field) => !EDITABLE_FIELDS.includes(field)
+      );
+      if (disallowedFields.length > 0) {
+        // El detalle (qué campos y cuáles se permiten) se queda del lado servidor: devolverlo le
+        // entregaba al atacante el mapa exacto de campos que sí pasan el filtro.
+        logger.warn('updateQuote: campos fuera del allowlist rechazados', {
+          quoteId, userId: currentUser.id, disallowedFields,
+        });
+        return this.sendError(res, 'Campo no editable por este endpoint.', 400);
+      }
+
       // Debug current user information
       logger.info('🔍 QuoteController.updateQuote - User check', {
         userId: currentUser.id,
@@ -1500,10 +1534,20 @@ class QuoteController {
       // Track the edit with versioning service (skip for status-only updates)
       let editRecord = null;
       if (!isStatusOnlyUpdate) {
+        // FIX bypass de RBAC de status: recordEdit -> applyChanges fija cada campo con quote.set() ANTES de
+        // que updateQuoteStatus valide el permiso admin-only. Quitamos status/reason/approvalStatus de lo
+        // que ve applyChanges para que el ÚNICO camino que persiste el status siga siendo
+        // quoteService.updateQuoteStatus (que valida adminOnlyStatuses contra admin/superadmin). reason es
+        // metadato de auditoría (no es campo de la cotización) y approvalStatus es defensa en profundidad
+        // por si el allowlist cambiara a futuro. El resto del flujo sigue leyendo el `updates` original.
+        const changesForRecordEdit = { ...updates };
+        delete changesForRecordEdit.status;
+        delete changesForRecordEdit.reason;
+        delete changesForRecordEdit.approvalStatus;
         editRecord = await this.versioningService.recordEdit(
           quoteId,
           currentUser.id,
-          updates,
+          changesForRecordEdit,
           {
             description: updates.reason || 'Quote updated',
           }
@@ -1830,8 +1874,12 @@ class QuoteController {
       // 8. Copy serviceItems (complete itinerary)
       const originalServiceItems = originalQuote.get('serviceItems');
       if (originalServiceItems) {
-        // Deep clone serviceItems to avoid reference issues
-        newQuote.set('serviceItems', JSON.parse(JSON.stringify(originalServiceItems)));
+        // Copia FIEL del itinerario original (deep clone tal cual). NO se normaliza el paymentType: un
+        // método explícito se conserva; un borrador legacy con paymentType null se conserva null (se lee
+        // como efectivo, igual que el original), de modo que subtotal/iva/total del clon queden consistentes
+        // con su método — sin el mismatch de "header con método tarjeta pero totales de efectivo".
+        const clonedServiceItems = JSON.parse(JSON.stringify(originalServiceItems));
+        newQuote.set('serviceItems', clonedServiceItems);
       } else {
         newQuote.set('serviceItems', {
           days: [],
@@ -2203,7 +2251,11 @@ class QuoteController {
 
       const {
         days = [], subtotal = 0, iva = 0, total = 0,
-        currency = 'MXN', paymentType = 'efectivo',
+        // Categoría A: el default del método de pago cambia de 'efectivo' a 'tarjeta'. Aplica SOLO
+        // cuando el request OMITE la clave; un null/''/valor inválido lo rechaza el guard
+        // Payment.isValidMethod de abajo (el default de JS no reemplaza null). Este es el único punto
+        // de escritura de serviceItems.paymentType desde un request.
+        currency = 'MXN', paymentType = 'tarjeta',
         globalTip = null, // Fase 2b: propina global de la cotización (persistir tal cual).
         suggestedTipPct = null, // Fase 2c: % de propina sugerida (default 10 en el front).
       } = req.body;

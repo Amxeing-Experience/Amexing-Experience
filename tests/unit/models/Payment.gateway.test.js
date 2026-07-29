@@ -138,5 +138,16 @@ describe('Payment gateway fields', () => {
       expect(Payment.isValidMethod('transferencia')).toBe(true);
       expect(Payment.isValidMethod('tarjeta')).toBe(true);
     });
+
+    // U-3: frontera del guard que respalda el cambio de default (Categoría A). El default de JS
+    // 'tarjeta' SOLO aplica cuando la clave se omite; cualquier null/''/mayúsculas debe seguir siendo
+    // inválido (match exacto contra los 3 tiers) para no habilitar stored XSS ni corromper el ancla.
+    it('U-3: rejects undefined/null/empty/uppercase and accepts exact lowercase tarjeta', () => {
+      expect(Payment.isValidMethod(undefined)).toBe(false);
+      expect(Payment.isValidMethod(null)).toBe(false);
+      expect(Payment.isValidMethod('')).toBe(false);
+      expect(Payment.isValidMethod('TARJETA')).toBe(false);
+      expect(Payment.isValidMethod('tarjeta')).toBe(true);
+    });
   });
 });

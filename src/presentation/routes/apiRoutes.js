@@ -489,6 +489,16 @@ try {
   console.warn('⚠️ Public employee photo route not enabled:', error.message);
 }
 
+/**
+ * Public Stripe Checkout return URLs
+ * GET /api/reservations/:id/pay/success and /pay/cancel
+ * Stripe redirects the payer's browser to these after a hosted Checkout, and a browser redirect
+ * carries no Authorization header — so they must be mounted BEFORE authenticateToken (otherwise the
+ * payer gets a 401 right after paying). They are UX-only placeholders: they read nothing and write
+ * nothing; the Stripe webhook (PR5) is the only source of truth that confirms the money.
+ */
+router.use('/reservations', require('./api/reservationRoutes').payReturnRouter);
+
 // Protected API endpoints - use JWT authentication for API routes
 router.use(jwtMiddleware.authenticateToken);
 

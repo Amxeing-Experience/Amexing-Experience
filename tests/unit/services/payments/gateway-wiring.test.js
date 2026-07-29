@@ -82,11 +82,15 @@ describe('gateway wiring (registry + router + real stub adapters)', () => {
 
     expect(resolved.getId()).toBe('stripe');
     expect(resolved.getSupportedCurrencies()).toEqual(['USD', 'MXN']);
+    // No injected client / no key in this unit context -> the adapter reads unconfigured.
     expect(resolved.isConfigured()).toBe(false);
 
+    // As of PR4 createCharge/buildCheckout are the REAL (async) Checkout path; a still-deferred
+    // capability (refund, PR11) is what proves the resolved instance OVERRIDES the abstract stub
+    // (NOT_CONFIGURED) rather than inheriting it (NOT_IMPLEMENTED).
     let error;
     try {
-      resolved.createCharge({ amount: 100, currency: 'MXN' });
+      resolved.refund({ chargeId: 'ch_1' });
     } catch (e) {
       error = e;
     }

@@ -39,8 +39,8 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
                 <div class="exp-field exp-field--select">
                     <select id="filterPayment">
                         <option value="efectivo">Efectivo</option>
-                        <option value="transferencia" selected>Transferencia</option>
-                        <option value="tarjeta">Tarjeta Crédito/Débito</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="tarjeta" selected>Tarjeta Crédito/Débito</option>
                     </select>
                     <i class="ti ti-chevron-down exp-field__caret"></i>
                 </div>
@@ -1252,7 +1252,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const ch = (Number(counts.children) || 0) + (Number(counts.infants) || 0);
                         const base = a * adultPrice + ch * childPrice;
                         // Display con recargo del método de pago del catálogo (lo GUARDADO es base).
-                        const pt = (document.getElementById('filterPayment') || {}).value || 'efectivo';
+                        const pt = (document.getElementById('filterPayment') || {}).value || 'tarjeta';
                         return (window.PricingUtils && typeof PricingUtils.applyPaymentRate === 'function')
                             ? PricingUtils.applyPaymentRate(base, pt, currentTransferRate, currentAgencyRate)
                             : base;

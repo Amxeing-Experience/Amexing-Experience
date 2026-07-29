@@ -163,14 +163,9 @@ const isClient = dtUserRole === 'client';
                 <div class="d-flex align-items-center gap-1">
                     <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
                     <select class="form-select mobile-filter-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
-                        <% if (isDepartmentManager || isClient) { %>
-                            <option value="efectivo">Efectivo</option>
-                            <option value="transferencia" selected>Transferencia</option>
-                        <% } else { %>
-                            <option value="efectivo" selected>Efectivo</option>
-                            <option value="transferencia">Transferencia</option>
-                        <% } %>
-                        <option value="tarjeta">Tarjeta Crédito/Débito</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="tarjeta" selected>Tarjeta Crédito/Débito</option>
                     </select>
                 </div>
             </div>

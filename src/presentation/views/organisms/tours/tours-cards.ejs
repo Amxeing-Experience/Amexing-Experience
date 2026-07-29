@@ -88,14 +88,9 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
                             <div class="d-flex align-items-center gap-1">
                                 <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
                                 <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
-                                    <% if (isDepartmentManager || isClient) { %>
-                                        <option value="efectivo">Efectivo</option>
-                                        <option value="transferencia" selected>Transferencia</option>
-                                    <% } else { %>
-                                        <option value="efectivo" selected>Efectivo</option>
-                                        <option value="transferencia">Transferencia</option>
-                                    <% } %>
-                                    <option value="tarjeta">Tarjeta Débito/Crédito</option>
+                                    <option value="efectivo">Efectivo</option>
+                                    <option value="transferencia">Transferencia</option>
+                                    <option value="tarjeta" selected>Tarjeta Débito/Crédito</option>
                                 </select>
                             </div>
                         </div>
@@ -163,14 +158,9 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-cards';
                         <i class="ti ti-credit-card me-1"></i>Pago
                     </label>
                     <select class="form-select payment-filter" id="paymentTypeFilterMobile-<%= dtTableId %>">
-                        <% if (isDepartmentManager || isClient) { %>
-                            <option value="efectivo">Efectivo</option>
-                            <option value="transferencia" selected>Transferencia</option>
-                        <% } else { %>
-                            <option value="efectivo" selected>Efectivo</option>
-                            <option value="transferencia">Transferencia</option>
-                        <% } %>
-                        <option value="tarjeta">Tarjeta Débito/Crédito</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="tarjeta" selected>Tarjeta Débito/Crédito</option>
                     </select>
                 </div>
             </div>
@@ -1676,7 +1666,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const currency = currencyFilterDesktop?.value || currencyFilterMobile?.value || 'MXN';
         
         // Get payment type from active filter (desktop or mobile)
-        const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'efectivo';
+        const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'tarjeta';
         
         filteredTours = allTours.filter(tour => {
             // Search filter - use actual API field names
@@ -1711,7 +1701,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const currency = currencyFilterDesktop?.value || currencyFilterMobile?.value || 'MXN';
-        const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'efectivo';
+        const paymentType = paymentFilterDesktop?.value || paymentFilterMobile?.value || 'tarjeta';
         
         const cardsHTML = filteredTours.map(tour => {
             // Map API data to display format

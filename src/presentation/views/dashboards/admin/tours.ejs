@@ -43,7 +43,7 @@ const currentPath = '/dashboard/admin/tours';
         <%- include('../../organisms/tours/walking-tours-section', {
             walkingToursId: 'admin-walking-tours',
             walkingApiEndpoint: '/api/tours?includeInactive=true&tourType=walking',
-            defaultPaymentType: 'efectivo',
+            defaultPaymentType: 'tarjeta',
             userRole: currentUserRole
         }) %>
     </div>

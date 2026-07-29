@@ -29,9 +29,9 @@ const apiEndpoint = typeof vehicleRatesEndpoint !== 'undefined' ? vehicleRatesEn
             </div>
             <div class="exp-field exp-field--select">
                 <select id="vehicleRatesPaymentFilter-<%= sectionId %>">
-                    <option value="efectivo" selected>Efectivo</option>
+                    <option value="efectivo">Efectivo</option>
                     <option value="transferencia">Transferencia</option>
-                    <option value="tarjeta">Tarjeta de Crédito/Débito</option>
+                    <option value="tarjeta" selected>Tarjeta de Crédito/Débito</option>
                 </select>
                 <i class="ti ti-chevron-down exp-field__caret"></i>
             </div>
@@ -280,7 +280,7 @@ function displayOrganizedVehicleRates(organizedData) {
     
     // Apply initial pricing based on current filter selections
     const sectionId = '<%= sectionId %>';
-    const initialPayment = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`)?.value || 'efectivo';
+    const initialPayment = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`)?.value || 'tarjeta';
     const initialCurrency = document.querySelector(`#vehicleRatesCurrencyFilter-${sectionId}`)?.value || 'MXN';
     
     // Update prices immediately to remove loaders (small delay to ensure DOM is ready)
@@ -315,7 +315,7 @@ function switchToRate(rateName) {
     
     // Update pricing with current filters immediately after switching
     const sectionId = '<%= sectionId %>';
-    const currentPayment = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`)?.value || 'efectivo';
+    const currentPayment = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`)?.value || 'tarjeta';
     const currentCurrency = document.querySelector(`#vehicleRatesCurrencyFilter-${sectionId}`)?.value || 'MXN';
     updateVehicleRatesPrices(currentPayment, currentCurrency);
 }

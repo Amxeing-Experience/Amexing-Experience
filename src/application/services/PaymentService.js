@@ -301,12 +301,17 @@ class PaymentService {
       const coverageTowardServices = Math.min(coverageAmount, baseTotal);
       const remainingServices = Math.max(0, round2(baseTotal - coverageTowardServices));
       const coverageTowardFlat = Math.max(0, round2(coverageAmount - baseTotal));
-      const remainingFlat = Math.max(0, round2(flatDue - coverageTowardFlat));
+      // La parte plana puede ser NEGATIVA cuando un descuento manual supera a la propina (flatDue < 0).
+      // NO se clampa aquí (council BUG A): clampear remainingFlat a 0 descartaba el descuento del cobro por
+      // método mientras remainingBase SÍ lo incluía, sobre-cobrando |flatDue| (el descuento) en silencio via
+      // checkoutCharge -> Stripe. Se deja pasar el negativo para que REDUZCA el monto por método y solo el
+      // RESULTADO FINAL se clampa a >=0 (un descuento mayor al costo de servicios nunca da un cobro negativo).
+      const remainingFlat = round2(flatDue - coverageTowardFlat);
       validMethods.forEach((m) => {
         if (baseTotal > 0) {
-          montoParaSaldar[m] = round2(
+          montoParaSaldar[m] = Math.max(0, round2(
             remainingServices * (this.totalForMethod(serviceItems, m, currency) / baseTotal) + remainingFlat
-          );
+          ));
         } else {
           // Sin base de servicios (baseTotal<=0) el saldo proviene solo de ajustes/cargos manuales: pesos
           // fijos sin tarifa por método, no hay "regla de tres" que aplicar — el monto a saldar en cualquier
