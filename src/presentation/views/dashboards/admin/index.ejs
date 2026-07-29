@@ -1,46 +1,274 @@
 <%
 /**
- * Admin Dashboard Page
- * Admin dashboard home page
- * Status: Coming Soon
+ * Dashboard de inicio — Admin
+ * KPIs (segmentos + conteos), cotizaciones recientemente modificadas, reservaciones pendientes de
+ * pago, próximas reservaciones, actividad reciente y accesos rápidos.
+ * Created by Denisse Maldonado
  */
+const d = (typeof dashboardData !== 'undefined' && dashboardData) ? dashboardData : {};
+const bp = d.basePath || 'admin';
+const seg = d.segments || { quoted: 0, hold: 0, scheduled: 0 };
+const counts = d.counts || { agencies: 0, directClients: 0, pendingRequests: 0 };
+const pendingPayments = d.pendingPayments || [];
+const recentQuotes = d.recentQuotes || [];
+const upcoming = d.upcoming || [];
+const activity = d.activity || [];
+const ACTION_LABELS = { CREATE: 'creó', UPDATE: 'editó', DELETE: 'eliminó', READ: 'consultó', LOGIN: 'inició sesión', LOGOUT: 'cerró sesión' };
 %>
 
-<!-- Page Header -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h2 class="mb-1 fw-bold">
-                    <i class="ti ti-dashboard me-2 text-primary"></i>
-                    Tablero de Control
-                </h2>
-                <p class="text-muted mb-0">
-                    Panel principal de administración del sistema
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
+<style>
+  .dash-wrap{--olive:#6E7A50;--olive-d:#566040;--line:#ded9cb;--ink:#2b2b2b;--muted:#8a8f78;--amber:#b8894a;--amber-bg:#f6efe2;}
 
-<!-- Page Content -->
-<div class="page-content">
-    <div class="row">
-        <div class="col-12">
-            <!-- Coming Soon Card -->
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="mb-0">
-                        <i class="ti ti-dashboard me-2 text-primary"></i>
-                        Dashboard
-                    </h5>
-                </div>
-                <div class="card-body text-center py-5">
-                    <i class="ti ti-dashboard" style="font-size: 4rem; color: #d1d5db;"></i>
-                    <h5 class="mt-3 text-muted">Próximamente</h5>
-                    <p class="text-muted">Tablero de control disponible próximamente.</p>
-                </div>
-            </div>
-        </div>
+  .dash-wrap .eyebrow{text-transform:uppercase;letter-spacing:.34em;font-size:.7rem;color:var(--olive);font-weight:600;}
+  .dash-wrap .dash-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:26px;}
+  .dash-wrap .dash-head h1{margin:.15rem 0 0;font-weight:400;letter-spacing:.06em;font-size:1.9rem;color:var(--ink);}
+  .dash-wrap .head-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .dash-wrap .btn-reservar{display:inline-flex;align-items:center;gap:7px;background:var(--olive);color:#fff;border:1px solid var(--olive);
+    border-radius:11px;padding:.72rem 1.35rem;font-size:.88rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;text-decoration:none;}
+  .dash-wrap .btn-reservar:hover{background:var(--olive-d);color:#fff;}
+
+  .dash-wrap .section-title{text-transform:uppercase;letter-spacing:.2em;font-size:.82rem;font-weight:700;color:var(--olive-d);
+    margin:36px 0 16px;display:flex;align-items:center;gap:12px;}
+  .dash-wrap .section-title .rule{flex:1;height:1px;background:var(--line);}
+
+  /* Segmentos por estatus */
+  .dash-wrap .segments{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .dash-wrap .seg{display:block;background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px 24px;position:relative;
+    overflow:hidden;text-decoration:none;color:inherit;transition:box-shadow .15s;}
+  .dash-wrap .seg:hover{box-shadow:0 .4rem 1rem rgba(0,0,0,.06);}
+  .dash-wrap .seg::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;}
+  .dash-wrap .seg.cot::before{background:var(--olive);}
+  .dash-wrap .seg.blo::before{background:var(--amber);}
+  .dash-wrap .seg.con::before{background:#4b6b3f;}
+  .dash-wrap .seg .lbl{text-transform:uppercase;letter-spacing:.1em;font-size:.7rem;font-weight:700;color:var(--muted);}
+  .dash-wrap .seg .num{font-size:2.6rem;font-weight:700;line-height:1;margin:14px 0 4px;color:var(--ink);}
+  .dash-wrap .seg .foot{display:flex;justify-content:flex-end;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--line);}
+  .dash-wrap .seg .ver{color:var(--olive-d);font-weight:600;font-size:.82rem;}
+  .dash-wrap .seg.blo .ver{color:var(--amber);}
+
+  /* KPIs pequeños */
+  .dash-wrap .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:18px;}
+  .dash-wrap .kpi{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 20px;
+    text-decoration:none;color:inherit;transition:border-color .15s;}
+  .dash-wrap .kpi:hover{border-color:var(--olive);}
+  .dash-wrap .kpi .ic{width:46px;height:46px;border-radius:11px;background:#eef0e6;color:var(--olive-d);display:flex;align-items:center;
+    justify-content:center;font-size:1.5rem;flex-shrink:0;}
+  .dash-wrap .kpi.warn .ic{background:var(--amber-bg);color:var(--amber);}
+  .dash-wrap .kpi .num{font-size:1.7rem;font-weight:700;line-height:1;color:var(--ink);}
+  .dash-wrap .kpi .lbl{font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-top:3px;}
+
+  /* Tablas / tarjetas */
+  .dash-wrap .card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  .dash-wrap table{width:100%;border-collapse:collapse;}
+  .dash-wrap thead th{background:#faf9f5;color:#6b6656;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+    text-align:left;padding:12px 18px;border-bottom:1px solid var(--line);}
+  .dash-wrap tbody td{padding:14px 18px;border-bottom:1px solid #f1efe8;font-size:.9rem;vertical-align:middle;}
+  .dash-wrap tbody tr:last-child td{border-bottom:0;}
+  .dash-wrap .folio{font-weight:600;color:var(--olive-d);}
+  .dash-wrap .badge{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;font-weight:700;text-transform:uppercase;
+    letter-spacing:.04em;border-radius:6px;padding:.22rem .55rem;}
+  .dash-wrap .badge.pend{background:var(--amber-bg);color:var(--amber);border:1px solid #e7d6bd;}
+  .dash-wrap .badge.part{background:#eef0e6;color:var(--olive-d);border:1px solid var(--line);}
+  .dash-wrap .badge.st-quoted{background:#eef0e6;color:var(--olive-d);border:1px solid var(--line);}
+  .dash-wrap .badge.st-hold{background:var(--amber-bg);color:var(--amber);border:1px solid #e7d6bd;}
+  .dash-wrap .badge.st-scheduled{background:#e6efe1;color:#4b6b3f;border:1px solid #cfe0c6;}
+  .dash-wrap .badge.st-other{background:#f0eee7;color:#6b6656;border:1px solid var(--line);}
+  .dash-wrap .saldo{font-weight:700;}
+  .dash-wrap .link-btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:.35rem .8rem;font-size:.78rem;font-weight:600;
+    color:var(--olive-d);text-decoration:none;}
+  .dash-wrap .link-btn:hover{border-color:var(--olive);background:#eef0e6;}
+  .dash-wrap .card-foot{padding:12px 18px;text-align:center;border-top:1px solid var(--line);}
+  .dash-wrap .card-foot a{color:var(--olive-d);font-weight:600;font-size:.82rem;text-decoration:none;}
+  .dash-wrap .empty{padding:34px 18px;text-align:center;color:var(--muted);font-size:.9rem;}
+
+  /* Grid de 2 columnas (próximas + actividad) */
+  .dash-wrap .cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;}
+
+  /* Actividad reciente */
+  .dash-wrap .activity{list-style:none;margin:0;padding:0;}
+  .dash-wrap .activity li{display:flex;gap:12px;align-items:flex-start;padding:13px 18px;border-bottom:1px solid #f1efe8;font-size:.86rem;}
+  .dash-wrap .activity li:last-child{border-bottom:0;}
+  .dash-wrap .activity .dot{width:9px;height:9px;border-radius:50%;background:var(--olive);margin-top:6px;flex-shrink:0;}
+  .dash-wrap .activity .who{font-weight:600;color:var(--ink);}
+  .dash-wrap .activity .ago{color:var(--muted);font-size:.72rem;margin-left:auto;white-space:nowrap;padding-left:10px;}
+
+  /* Accesos rápidos */
+  .dash-wrap .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .dash-wrap .qa{position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 14px;text-align:center;
+    text-decoration:none;color:var(--ink);transition:border-color .15s,background .15s;}
+  .dash-wrap .qa:hover{border-color:var(--olive);background:#faf9f5;}
+  .dash-wrap .qa .ic{width:44px;height:44px;border-radius:10px;background:#eef0e6;color:var(--olive-d);display:flex;align-items:center;
+    justify-content:center;margin:0 auto 10px;font-size:1.5rem;}
+  .dash-wrap .qa .t{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;}
+  .dash-wrap .qa .cnt{position:absolute;top:12px;right:12px;background:var(--amber);color:#fff;font-size:.66rem;font-weight:700;
+    border-radius:999px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;padding:0 5px;}
+
+  @media(max-width:900px){.dash-wrap .segments,.dash-wrap .kpis{grid-template-columns:1fr;}.dash-wrap .cols2{grid-template-columns:1fr;}.dash-wrap .quick{grid-template-columns:repeat(2,1fr);}}
+</style>
+
+<div class="dash-wrap">
+
+  <!-- Encabezado -->
+  <div class="dash-head">
+    <div>
+      <div class="eyebrow">Inicio</div>
+      <h1>Tablero de Control</h1>
     </div>
+    <div class="head-actions">
+      <a class="btn-reservar" href="/dashboard/<%= bp %>/quotes/new"><i class="ti ti-plus"></i> Nueva cotización</a>
+    </div>
+  </div>
+
+  <!-- Segmentos por estatus -->
+  <div class="segments">
+    <a class="seg cot" href="/dashboard/<%= bp %>/quotes">
+      <div class="lbl">Cotizado</div>
+      <div class="num"><%= seg.quoted %></div>
+      <div class="foot"><span class="ver">Ver todas &rarr;</span></div>
+    </a>
+    <a class="seg blo" href="/dashboard/<%= bp %>/bookings?dateFilter=pending_completion">
+      <div class="lbl">Bloqueadas</div>
+      <div class="num"><%= seg.hold %></div>
+      <div class="foot"><span class="ver">Completar &rarr;</span></div>
+    </a>
+    <a class="seg con" href="/dashboard/<%= bp %>/bookings">
+      <div class="lbl">Confirmado</div>
+      <div class="num"><%= seg.scheduled %></div>
+      <div class="foot"><span class="ver">Ver todas &rarr;</span></div>
+    </a>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpis">
+    <a class="kpi" href="/dashboard/<%= bp %>/clients">
+      <div class="ic"><i class="ti ti-building"></i></div>
+      <div><div class="num"><%= counts.agencies %></div><div class="lbl">Agencias</div></div>
+    </a>
+    <a class="kpi" href="/dashboard/<%= bp %>/clients">
+      <div class="ic"><i class="ti ti-user-circle"></i></div>
+      <div><div class="num"><%= counts.directClients %></div><div class="lbl">Clientes directos</div></div>
+    </a>
+    <a class="kpi <%= counts.pendingRequests > 0 ? 'warn' : '' %>" href="/dashboard/<%= bp %>/clients">
+      <div class="ic"><i class="ti ti-user-plus"></i></div>
+      <div><div class="num"><%= counts.pendingRequests %></div><div class="lbl">Solicitudes pendientes</div></div>
+    </a>
+  </div>
+
+  <!-- Cotizaciones recientemente modificadas -->
+  <div class="section-title">Cotizaciones recientemente modificadas <span class="rule"></span></div>
+  <div class="card">
+    <% if (recentQuotes.length > 0) { %>
+    <table>
+      <thead>
+        <tr><th>Folio</th><th>Cliente</th><th>Estatus</th><th>Personas</th><th>Modificada</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% recentQuotes.forEach(function(q) {
+          var stClass = q.status === 'quoted' || q.status === 'requested' ? 'st-quoted'
+            : q.status === 'hold' ? 'st-hold'
+            : q.status === 'scheduled' ? 'st-scheduled' : 'st-other'; %>
+        <tr>
+          <td class="folio"><%= q.folio %></td>
+          <td><%= q.client %></td>
+          <td><span class="badge <%= stClass %>"><%= q.statusLabel %></span></td>
+          <td><%= q.people %></td>
+          <td><%= q.updated %></td>
+          <td><a class="link-btn" href="/dashboard/<%= bp %>/quotes/<%= q.id %>">Abrir</a></td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <div class="card-foot"><a href="/dashboard/<%= bp %>/quotes">Ver todas las cotizaciones &rarr;</a></div>
+    <% } else { %>
+    <div class="empty">No hay cotizaciones recientes.</div>
+    <% } %>
+  </div>
+
+  <!-- Reservaciones pendientes de pago -->
+  <div class="section-title">Reservaciones pendientes de pago <span class="rule"></span></div>
+  <div class="card">
+    <% if (pendingPayments.length > 0) { %>
+    <table>
+      <thead>
+        <tr><th>Folio</th><th>Cliente final</th><th>Fecha inicio</th><th>Saldo</th><th>Pago</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% pendingPayments.forEach(function(p) { %>
+        <tr>
+          <td class="folio"><%= p.folio %></td>
+          <td><%= p.client %></td>
+          <td><%= p.date %></td>
+          <td class="saldo"><%= p.balance %></td>
+          <td><span class="badge <%= p.status === 'partial' ? 'part' : 'pend' %>"><%= p.status === 'partial' ? 'Parcial' : 'Pendiente' %></span></td>
+          <td><a class="link-btn" href="/dashboard/<%= bp %>/bookings/<%= p.id %>">Ver</a></td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <div class="card-foot"><a href="/dashboard/<%= bp %>/bookings">Ver todas las reservaciones &rarr;</a></div>
+    <% } else { %>
+    <div class="empty">No hay reservaciones pendientes de pago.</div>
+    <% } %>
+  </div>
+
+  <!-- Próximas reservaciones + Actividad reciente -->
+  <div class="cols2">
+    <div>
+      <div class="section-title">Próximas reservaciones <span class="rule"></span></div>
+      <div class="card">
+        <% if (upcoming.length > 0) { %>
+        <table>
+          <thead><tr><th>Folio</th><th>Cliente</th><th>Fecha</th><th>Pax</th><th></th></tr></thead>
+          <tbody>
+            <% upcoming.forEach(function(u) { %>
+            <tr>
+              <td class="folio"><%= u.folio %></td>
+              <td><%= u.client %></td>
+              <td><%= u.date %></td>
+              <td><%= u.people %></td>
+              <td><a class="link-btn" href="/dashboard/<%= bp %>/bookings/<%= u.id %>">Ver</a></td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+        <% } else { %>
+        <div class="empty">No hay reservaciones próximas.</div>
+        <% } %>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">Actividad reciente <span class="rule"></span></div>
+      <div class="card">
+        <% if (activity.length > 0) { %>
+        <ul class="activity">
+          <% activity.forEach(function(a) {
+            var verb = ACTION_LABELS[a.action] || (a.action || '').toLowerCase();
+            var entity = a.entityName ? (a.entity + ' “' + a.entityName + '”') : a.entity; %>
+          <li>
+            <span class="dot"></span>
+            <div><span class="who"><%= a.user %></span> <%= verb %><%= entity ? ' ' + entity : '' %></div>
+            <span class="ago"><%= a.ago %></span>
+          </li>
+          <% }); %>
+        </ul>
+        <% } else { %>
+        <div class="empty">Sin actividad reciente.</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Accesos rápidos -->
+  <div class="section-title">Accesos rápidos <span class="rule"></span></div>
+  <div class="quick">
+    <a class="qa" href="/dashboard/<%= bp %>/quotes"><div class="ic"><i class="ti ti-file-invoice"></i></div><div class="t">Cotizaciones</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/bookings"><div class="ic"><i class="ti ti-clipboard-list"></i></div><div class="t">Reservaciones</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/clients"><div class="ic"><i class="ti ti-building"></i></div><div class="t">Clientes</div><% if (counts.pendingRequests > 0) { %><span class="cnt"><%= counts.pendingRequests %></span><% } %></a>
+    <a class="qa" href="/dashboard/<%= bp %>/experiences"><div class="ic"><i class="ti ti-star"></i></div><div class="t">Experiencias</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/tours"><div class="ic"><i class="ti ti-map"></i></div><div class="t">Tours</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/services"><div class="ic"><i class="ti ti-briefcase"></i></div><div class="t">Traslados</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/vehicles"><div class="ic"><i class="ti ti-car"></i></div><div class="t">Vehículos</div></a>
+    <a class="qa" href="/dashboard/<%= bp %>/price-settings"><div class="ic"><i class="ti ti-adjustments"></i></div><div class="t">Ajustes</div></a>
+  </div>
+
 </div>

@@ -24,27 +24,36 @@ describe('Booking Detail - Pagos Offcanvas (admin)', () => {
     expect(html).not.toContain('id="paymentsCountBadge"');
   });
 
-  test('existe el Offcanvas nativo de Bootstrap con ancho 760px y breakpoint sm (576px)', () => {
+  // 860px (antes 760): el historial pasó a 6 columnas con letra más grande y necesita el ancho.
+  test('existe el Offcanvas nativo de Bootstrap con ancho 860px y breakpoint sm (576px)', () => {
     expect(html).toContain('id="paymentsOffcanvas"');
     expect(html).toContain('offcanvas offcanvas-end');
-    expect(html).toContain('--bs-offcanvas-width: 760px');
+    expect(html).toContain('--bs-offcanvas-width: 860px');
     expect(html).toContain('@media (max-width: 576px)');
   });
 
-  test('el header del Resumen Financiero tiene "Agregar pago" ANTES de "+ Ajuste"', () => {
-    const summaryHeader = html.split('id="financialSummaryBody"')[0];
-    expect(summaryHeader).toContain('id="addPaymentBtn"');
-    expect(summaryHeader).toContain('id="addAdjustmentBtn"');
-    // "Agregar pago" aparece antes que el botón de "Ajuste" en el DOM del header.
-    expect(summaryHeader.indexOf('id="addPaymentBtn"')).toBeLessThan(summaryHeader.indexOf('id="addAdjustmentBtn"'));
+  // "Agregar pago" dejó el header del Resumen Financiero: ahora lo dibuja renderFinancialSummary
+  // DENTRO del hero (y solo si la reservación es editable), así que ya no hay un orden de DOM que
+  // verificar en el cascarón. Lo que sigue importando es que ambos controles existan y que el de
+  // AJUSTE siga siendo admin-only (su endpoint es requireRole(['admin','superadmin'])).
+  test('admin conserva "Agregar pago" (dentro del hero) y "+ Agregar ajuste"', () => {
+    expect(html).toContain('id="addPaymentBtn"');
+    expect(html).toContain('fin-pay-btn');
+    expect(html).toContain('id="addAdjustmentBtn"');
   });
 
-  test('el offcanvas contiene los contenedores clave: chips, cobertura, saldo restante, descuento, historial', () => {
-    expect(html).toContain('id="paymentChips"');
+  test('el offcanvas contiene los contenedores clave: pestañas, cobertura, tabla por método, historial', () => {
+    expect(html).toContain('id="paymentsTabs"');
+    expect(html).toContain('id="tabPago"');
+    expect(html).toContain('id="tabHistorial"');
     expect(html).toContain('id="paymentCoverageCard"');
-    expect(html).toContain('id="paymentRemainingByMethod"');
-    expect(html).toContain('id="paymentDiscountEmphasis"');
+    expect(html).toContain('id="paymentMethodTable"');
     expect(html).toContain('id="paymentsBody"');
+    // Los chips de progreso, el "saldo restante por método" y el bloque de descuento se fusionaron
+    // en la tabla por método: dibujaban las mismas barras dos veces.
+    expect(html).not.toContain('id="paymentChips"');
+    expect(html).not.toContain('id="paymentRemainingByMethod"');
+    expect(html).not.toContain('id="paymentDiscountEmphasis"');
   });
 
   test('solo admin: el formulario de registro y el botón "Registrar pago" viven dentro del offcanvas', () => {

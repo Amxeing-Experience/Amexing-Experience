@@ -286,7 +286,9 @@ class ClientsController {
         res,
         {
           client: result.user,
-          message: 'Cliente creado exitosamente. Podrá acceder al sistema con la contraseña proporcionada.',
+          message: clientData.sendCredentials === false
+            ? 'Cliente creado exitosamente.'
+            : 'Cliente creado exitosamente. Se enviaron las credenciales de acceso a su correo.',
         },
         'Cliente creado exitosamente',
         201
@@ -1670,10 +1672,28 @@ class ClientsController {
         userAgent: req.get('User-Agent'),
       });
 
+      // Reenvío opcional de credenciales por correo (botón "Reenviar credenciales" del editor).
+      // No genera contraseña temporal: envía la que se acaba de definir. Si falla el correo, el
+      // cambio de contraseña se mantiene y se reporta emailed=false.
+      let emailed = false;
+      if (req.body && req.body.sendEmail === true) {
+        const emailService = require('../../services/EmailService');
+        const fullName = `${user.get('firstName') || ''} ${user.get('lastName') || ''}`.trim()
+          || user.get('email');
+        const emailResult = await emailService.sendCredentialsEmail({
+          email: user.get('email'),
+          name: fullName,
+          password: newPassword,
+          recipientUser: user,
+        }).catch((err) => ({ success: false, error: err.message }));
+        emailed = !!(emailResult && emailResult.success);
+      }
+
       // Return the new password securely
       res.status(200).json({
         success: true,
         password: newPassword,
+        emailed,
         message: 'Password reset successfully',
         timestamp: new Date().toISOString(),
       });

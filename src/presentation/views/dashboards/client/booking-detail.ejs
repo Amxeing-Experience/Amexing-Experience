@@ -39,96 +39,189 @@
 
 <!-- Reservation Content -->
 <div id="reservationContent" style="display: none;">
-    <!-- Info Card -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Folio</small>
-                    <strong id="infoFolio">—</strong>
+    <!-- Info Card — mismo diseño que admin (bkg-*). Diferencias intencionales por permisos:
+         · SIN tile "Servicios asignados": la asignación de proveedores es admin-only (canAssign=false
+           más abajo), así que su avance no se expone aquí.
+         · SIN botón de cambiar Customer Support: reasignarlo es admin-only; aquí es de solo lectura.
+         · SIN bloque "Notas de la cotización": esta vista nunca ha mostrado d.notes y son notas
+           internas; no se agrega. -->
+    <style>
+      .bkg-info{border:1px solid #ece8dd;border-radius:14px;overflow:hidden;background:#fff;}
+      .bkg-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+        padding:20px 26px;background:linear-gradient(135deg,#f7f6f1 0%,#ffffff 60%);border-bottom:1px solid #ece8dd;}
+      .bkg-eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.64rem;font-weight:700;color:#8a8f78;margin-bottom:4px;}
+      .bkg-title{font-size:1.35rem;font-weight:700;color:#2b2b2b;line-height:1.2;word-break:break-word;}
+      .bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+      /* Badges de estado suavizados SOLO en la tarjeta de info (paleta de marca, sin tocar las
+         funciones compartidas getQuoteStatusBadge / getReservationStatusBadge). */
+      .bkg-status .badge{font-weight:700;font-size:.72rem;border:1px solid transparent;border-radius:999px;padding:.4rem .8rem;}
+      .bkg-status .badge.bg-success{background:#e6efe1 !important;color:#3f5a34 !important;border-color:#cfe0c6;}
+      .bkg-status .badge.bg-warning{background:#f6efe2 !important;color:#96682f !important;border-color:#e7d6bd;}
+      .bkg-status .badge.bg-primary{background:#eef0e6 !important;color:#566040 !important;border-color:#dce2d0;}
+      .bkg-status .badge.bg-info{background:#eaf1f0 !important;color:#3a6b63 !important;border-color:#cfe1dd;}
+      .bkg-status .badge.bg-secondary{background:#f0eee7 !important;color:#6b6656 !important;border-color:#ded9cb;}
+      .bkg-status .badge.bg-danger{background:#f7ecea !important;color:#a1443a !important;border-color:#e6c9c4;}
+      .bkg-top-left{display:flex;align-items:center;gap:26px;flex-wrap:wrap;}
+      .bkg-cs{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding-left:26px;border-left:1px solid #e6e1d5;}
+      .bkg-cs-lbl{text-transform:uppercase;letter-spacing:.07em;font-size:.62rem;font-weight:700;color:#8a8f78;}
+      .bkg-cs #infoServiceCustomer{font-weight:600;color:#2b2b2b;font-size:.9rem;}
+      .bkg-grid{display:grid;grid-template-columns:repeat(4,1fr);background:#fff;}
+      /* Hairlines con inset box-shadow: solo aparecen en tiles reales, así una fila
+         incompleta queda en blanco (no muestra el fondo de la rejilla). */
+      .bkg-tile{background:#fff;padding:16px 22px;min-width:0;box-shadow:inset -1px -1px 0 #efeadf;}
+      /* Celda sin dato (hoy solo Lead Guest): se oculta el CONTENIDO, no la celda. Con d-none la celda
+         salia del flujo del grid y todo lo de atras se recorria una posicion, cambiando el orden de las
+         demas. Asi conserva su lugar y sus lineas de rejilla, y visibility:hidden ademas la saca del
+         arbol de accesibilidad (el lector no anuncia "Lead Guest —"). */
+      .bkg-tile.is-empty > *{visibility:hidden;}
+      @media(max-width:992px){.bkg-grid{grid-template-columns:repeat(2,1fr);}}
+      @media(max-width:576px){.bkg-grid{grid-template-columns:1fr;}}
+      .bkg-lbl{display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.07em;font-size:.72rem;
+        font-weight:700;color:#8a8f78;margin-bottom:6px;}
+      .bkg-lbl i{font-size:1.05rem;color:#6E7A50;}
+      .bkg-val{font-size:1.08rem;font-weight:600;color:#2b2b2b;word-break:break-word;line-height:1.35;}
+      .bkg-link{color:#566040;text-decoration:none;}
+      .bkg-link:hover{text-decoration:underline;}
+      .bkg-dates{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+      .bkg-arrow{color:#8a8f78;font-weight:400;}
+      .bkg-sub{font-size:.72rem;color:#8a8f78;margin-top:5px;font-style:italic;}
+    </style>
+    <div class="bkg-info mb-4">
+        <!-- [Cliente | Customer Support] a la izquierda, Estado a la derecha; el folio ya está en el título -->
+        <div class="bkg-top">
+            <div class="bkg-top-left">
+                <div>
+                    <div class="bkg-eyebrow"><i class="ti ti-building me-1"></i>Cliente</div>
+                    <div class="bkg-title" id="infoClient">&mdash;</div>
                 </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Cotización</small>
-                    <a href="#" id="infoQuoteLink" class="fw-semibold text-decoration-none">—</a>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Estado</small>
-                    <span id="infoStatus">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Creación</small>
-                    <span id="infoCreatedAt">—</span>
+                <div class="bkg-cs">
+                    <span class="bkg-cs-lbl"><i class="ti ti-headset me-1"></i>Customer Support</span>
+                    <div id="infoServiceCustomer">&mdash;</div>
                 </div>
             </div>
-            <hr>
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Cliente</small>
-                    <strong id="infoClient">—</strong>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Contacto</small>
-                    <span id="infoContact">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Motivo de viaje</small>
-                    <span id="infoEventType">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Personas</small>
-                    <span id="infoPeople">—</span>
-                </div>
+            <div class="bkg-status" id="infoStatus">&mdash;</div>
+        </div>
+
+        <!-- Datos en tiles -->
+        <div class="bkg-grid">
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-file-invoice"></i> Cotización</div>
+                <a href="#" id="infoQuoteLink" class="bkg-val bkg-link">&mdash;</a>
             </div>
-            <hr>
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Inicio</small>
-                    <span id="infoStartDate">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Fin</small>
-                    <span id="infoEndDate">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Tipo de Pago</small>
-                    <span id="infoPaymentType">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Total</small>
-                    <strong id="infoTotal" class="text-success fs-5">—</strong>
-                </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-mail"></i> Contacto</div>
+                <div class="bkg-val" id="infoContact">&mdash;</div>
             </div>
-            <hr>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <small class="text-muted d-block">Seguidor de Servicio (Amexing)</small>
-                    <span id="infoServiceCustomer" class="fw-semibold">—</span>
-                </div>
+            <div class="bkg-tile is-empty" id="infoLeadGuestRow">
+                <div class="bkg-lbl"><i class="ti ti-user"></i> Lead Guest</div>
+                <div class="bkg-val" id="infoLeadGuest">&mdash;</div>
+            </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-calendar"></i> Fechas</div>
+                <div class="bkg-val bkg-dates" id="infoDates">&mdash;</div>
+                <div class="bkg-sub" id="infoNights"></div>
+            </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-users"></i> Personas</div>
+                <div class="bkg-val" id="infoPeople">&mdash;</div>
+            </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-plane"></i> Motivo de viaje</div>
+                <div class="bkg-val" id="infoEventType">&mdash;</div>
             </div>
         </div>
     </div>
 
-    <!-- Financial Summary Card (read-only) -->
-    <div class="card border-0 shadow-sm mb-4" id="financialSummaryCard" style="display:none;">
-        <div class="card-header" style="background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%); border: none;">
-            <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-calculator me-2"></i>Resumen Financiero
-                </h5>
-                <button class="btn btn-sm btn-light d-none" id="addPaymentBtn">
-                    <i class="ti ti-cash me-1"></i>Agregar pago
-                </button>
-            </div>
+    <!-- Resumen Financiero — mismo diseño que admin (fin-*). Diferencias intencionales por permisos:
+         · SIN comparativo por método de pago: fuera de alcance para agencia/agente, así que el chip de
+           método es estático (en admin es el disparador del colapsable).
+         · SIN "+ Agregar ajuste" ni botones de eliminar ajuste: /adjustments es admin-only, y el control
+           no debe ni existir en el DOM. Los ajustes YA creados sí se listan, con framing neutral
+           (cargo/ajuste, nunca "descuento").
+         · "Agregar pago" vive ahora dentro del hero, como en admin. -->
+    <style>
+      .fin-wrap{border:1px solid #ece8dd;border-radius:14px;background:#fff;padding:20px 22px;}
+      .fin-section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+        margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #ece8dd;}
+      .fin-section-title{margin:0;font-weight:700;color:#566040;font-size:1.1rem;display:flex;align-items:center;}
+      .fin-hero{padding-bottom:18px;margin-bottom:16px;border-bottom:1px solid #ece8dd;}
+      .fin-hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+      .fin-hero-lbl{text-transform:uppercase;letter-spacing:.12em;font-size:.64rem;font-weight:700;color:#8a8f78;
+        display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+      .fin-hero-total{font-size:1.9rem;font-weight:700;color:#2b2b2b;line-height:1.1;margin-top:2px;}
+      .fin-hero-pct{margin-top:15px;text-align:right;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;}
+      .fin-bar{margin:5px 0 12px;height:8px;border-radius:999px;background:#f0e5d0;overflow:hidden;}
+      .fin-bar > span{display:block;height:100%;width:0;border-radius:999px;background:#6E7A50;transition:width .35s ease;}
+      .fin-hero-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+      .fin-hero-meta .fin-status-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
+      /* Badge de estado suavizado SOLO en el hero (no toca getPaymentStatusBadge compartido) */
+      .fin-hero-meta .badge{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;padding:.4rem .8rem;border-radius:999px;border:1px solid transparent;}
+      .fin-hero-meta .badge::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;}
+      .fin-hero-meta .badge.bg-warning{background:#f6efe2 !important;color:#96682f !important;border-color:#e7d6bd;}
+      .fin-hero-meta .badge.bg-success{background:#e6efe1 !important;color:#3f5a34 !important;border-color:#cfe0c6;}
+      .fin-hero-meta .badge.bg-secondary{background:#f0eee7 !important;color:#6b6656 !important;border-color:#ded9cb;}
+      .fin-hero-meta .badge.bg-info{background:#eaf1f0 !important;color:#3a6b63 !important;border-color:#cfe1dd;}
+      /* Botón "Agregar pago": pastilla olivo sólida, limpia y on-brand */
+      .fin-pay-btn{display:inline-flex;align-items:center;gap:6px;background:#6E7A50;color:#fff;border:1px solid #6E7A50;
+        border-radius:999px;font-size:.8rem;font-weight:600;padding:.42rem .95rem;line-height:1.2;transition:background .12s,border-color .12s;}
+      .fin-pay-btn:hover{background:#566040;border-color:#566040;color:#fff;}
+      .fin-pay-btn:disabled{opacity:.6;}
+      /* Chip de método = disparador del comparativo (collapse INLINE, no dropdown flotante). */
+      .fin-hero-method{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;font-weight:700;text-transform:uppercase;
+        letter-spacing:.05em;color:#566040;background:#eef0e6;border:1px solid #dce2d0;border-radius:999px;padding:.2rem .6rem;
+        cursor:pointer;font-family:inherit;line-height:1.2;}
+      .fin-hero-method:hover{background:#e4e8d8;border-color:#c9d2b8;}
+      .fin-hero-method i{font-size:.9rem;}
+      .fin-chev{font-size:.9rem;margin-left:2px;}
+      .fin-hero-hint{display:inline-flex;align-items:center;gap:5px;margin-top:7px;font-size:.75rem;font-weight:600;color:#4b6b3f;}
+      .fin-hero-hint i{font-size:.95rem;}
+      /* Comparativo por método de pago */
+      .fin-cmp-inline{margin-top:14px;padding:14px;border:1px solid #e6e1d5;border-radius:12px;background:#fbfaf6;}
+      .fin-cmp-cap{font-size:.72rem;color:#8a8f78;margin-bottom:8px;}
+      .fin-cmp-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;
+        border:1px solid #f0ece2;border-radius:9px;margin-bottom:6px;}
+      .fin-cmp-row:last-child{margin-bottom:0;}
+      .fin-cmp-row.active{border-color:#c9d2b8;background:#f4f7ee;}
+      .fin-cmp-method{display:flex;align-items:center;gap:8px;color:#4a4a44;font-weight:600;}
+      .fin-cmp-method i{color:#8a8f78;}
+      .fin-cmp-right{display:flex;align-items:center;gap:10px;}
+      .fin-cmp-amount{font-weight:700;color:#2b2b2b;}
+      .fin-cmp-delta{font-weight:700;font-size:.82rem;white-space:nowrap;}
+      .fin-cmp-badge{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:#566040;
+        background:#e7ecdd;border-radius:6px;padding:.16rem .5rem;}
+      .fin-cmp-cheap{font-size:.58rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:#3f5a34;
+        background:#e6efe1;border:1px solid #cfe0c6;border-radius:6px;padding:.08rem .42rem;}
+      .fin-hero-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+      .fin-hero-foot .lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
+      .fin-hero-foot .val{font-weight:700;font-size:1.05rem;line-height:1.2;}
+      .fin-savings{margin-top:12px;padding-top:10px;border-top:1px dashed #d8cfb8;color:#4b6b3f;}
+      .fin-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1efe8;}
+      .fin-row:last-child{border-bottom:0;}
+      .fin-row .lbl{color:#6b6656;display:flex;align-items:center;gap:8px;min-width:0;}
+      .fin-row .lbl i{color:#8a8f78;flex-shrink:0;}
+      .fin-row .val{font-weight:600;color:#2b2b2b;white-space:nowrap;}
+      .fin-tip{color:#8a7d52 !important;}
+    </style>
+    <div class="fin-wrap mb-4" id="financialSummaryCard" style="display:none;">
+        <div class="fin-section-head">
+            <h5 class="fin-section-title"><i class="ti ti-calculator me-2"></i>Resumen Financiero</h5>
         </div>
-        <div class="card-body" id="financialSummaryBody"></div>
+        <div id="financialSummaryBody">
+            <!-- Resumen (totales + saldo) — rendered by JS -->
+        </div>
     </div>
 
     <!-- Services by Day -->
     <div class="card border-0 shadow-sm">
         <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
-            <h5 class="card-title mb-0 text-white">
-                <i class="ti ti-list-details me-2"></i>Servicios
-            </h5>
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-list-details me-2"></i>Servicios
+                </h5>
+                <a class="btn btn-sm btn-light d-none" id="exportItineraryBtn" href="#" target="_blank" rel="noopener" title="Abrir itinerario de viaje (exportable a PDF)">
+                    <i class="ti ti-file-export me-1"></i>Exportar itinerario
+                </a>
+            </div>
         </div>
         <div class="card-body p-0" id="servicesContainer">
             <!-- Services will be rendered here -->
@@ -188,52 +281,444 @@
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
     </div>
     <div class="offcanvas-body">
-        <div class="rounded p-3 mb-3 payment-coverage-highlight" id="paymentCoverageCard"></div>
-        <div class="mb-3" id="paymentDiscountEmphasis" style="display:none;"></div>
-        <div class="text-muted fw-semibold small mb-2"><i class="ti ti-credit-card me-1"></i>Progreso por método de pago</div>
-        <div class="mb-3" id="paymentChips"></div>
-        <div class="p-3 mb-3" id="paymentRemainingByMethod" style="display:none;"></div>
-        <!-- Historial de pagos (colapsado) + registro (agencia/agente) -->
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <button class="btn btn-sm btn-link text-decoration-none ps-0 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#paymentsHistoryCollapse" id="paymentsHistoryToggle">
-                <i class="ti ti-history me-1"></i>Historial de pagos <i class="ti ti-chevron-down ms-1" style="font-size:0.75rem;"></i>
-            </button>
-            <button class="btn btn-sm btn-primary d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
-        </div>
-        <!-- Formulario de pago inline (mismo patrón que admin: renderPaymentForm) -->
-        <div id="paymentFormWrap" class="p-3 mb-3" style="display:none;"></div>
-        <div class="collapse" id="paymentsHistoryCollapse">
-            <div class="p-2" id="paymentsBody"></div>
+        <!-- Tabs: Pago (resumen + registrar + por método) | Historial. Reemplazan la columna única con
+             chips + "saldo restante" + historial colapsado: el carrito crecía hacia abajo y obligaba a
+             desplazarse para llegar al historial. -->
+        <ul class="nav payments-seg mb-3" id="paymentsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tabPagoBtn" data-bs-toggle="tab" data-bs-target="#tabPago" type="button" role="tab" aria-selected="true"><i class="ti ti-cash me-1"></i>Pago</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tabHistorialBtn" data-bs-toggle="tab" data-bs-target="#tabHistorial" type="button" role="tab" aria-selected="false"><i class="ti ti-history me-1"></i>Historial <span id="historialCount" class="badge rounded-pill ms-1" style="background:#eef0e6;color:#566040;"></span></button>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <!-- TAB PAGO -->
+            <div class="tab-pane fade show active" id="tabPago" role="tabpanel" aria-labelledby="tabPagoBtn">
+                <!-- Card de cobertura (total + estado + barra + Pagado/Saldo) -->
+                <div class="rounded p-3 mb-3 payment-coverage-highlight" id="paymentCoverageCard"></div>
+                <!-- Acción principal: registrar pago -->
+                <button class="btn btn-primary w-100 mb-3 d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
+                <!-- Formulario de pago inline (renderPaymentForm) -->
+                <div id="paymentFormWrap" class="p-3 mb-3" style="display:none;"></div>
+                <!-- Por método de pago: total + cubierto + restante (reemplaza chips y saldo restante) -->
+                <div class="text-muted fw-semibold mb-2"><i class="ti ti-credit-card me-1"></i>Por método de pago</div>
+                <div class="p-3 mb-3" id="paymentMethodTable" style="display:none;"></div>
+            </div>
+            <!-- TAB HISTORIAL -->
+            <div class="tab-pane fade" id="tabHistorial" role="tabpanel" aria-labelledby="tabHistorialBtn">
+                <div id="paymentsBody">
+                    <!-- Payments table — rendered by JS -->
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <style>
-#paymentsOffcanvas { --bs-offcanvas-width: 760px; }
+/* 860px (antes 760): la tabla del historial pasó a 6 columnas con letra mas grande. */
+#paymentsOffcanvas { --bs-offcanvas-width: 860px; }
 @media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
 .offcanvas-backdrop.show { background-color: rgba(15,23,32,0.72) !important; opacity: 1 !important; }
-#paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 0.95rem; }
+#paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 1rem; }
 #paymentCoverageCard.payment-coverage-highlight,
-#paymentChips .payment-chip-card,
-#paymentRemainingByMethod,
-#paymentFormWrap,
-#paymentsBody {
+#paymentMethodTable,
+#paymentFormWrap {
     background: #fff;
     border: 1px solid #e0e6ed;
     border-radius: 0.5rem;
 }
-#paymentChips > div { background: transparent; border: none; }
 #paymentCoverageCard.payment-coverage-highlight { border-left: 4px solid #969b81; }
-#paymentChips .payment-chip-card,
-#paymentRemainingByMethod,
-#paymentFormWrap,
-#paymentsBody {
+#paymentMethodTable,
+#paymentFormWrap {
     border-left: 4px solid #c0c3b3;
 }
-#paymentsBody { overflow: hidden; }
-#paymentsOffcanvas #paymentsBody table { font-size: 0.8rem; }
-#paymentsOffcanvas #paymentsBody .badge { font-size: 0.75rem; }
-#paymentDiscountEmphasis > div, #paymentCoverageCard .rounded { border-radius: 0.5rem; }
+/* Tabs del drawer — control segmentado full-width (mismo estilo que el catálogo de servicios) */
+#paymentsTabs.payments-seg { flex-wrap: nowrap; gap: 4px; background: #f1f2ec; border: 1px solid #e6e4dd; border-radius: 12px; padding: 4px; }
+#paymentsTabs.payments-seg .nav-item { flex: 1 1 0; min-width: 0; }
+#paymentsTabs.payments-seg .nav-link { width: 100%; border: none; border-radius: 9px; font-size: 0.92rem; font-weight: 600; padding: 0.55rem 0.4rem; color: #6b7256; background: transparent; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; transition: all 0.12s ease; }
+#paymentsTabs.payments-seg .nav-link:hover { color: #4f5838; background: rgba(110,122,80,0.08); }
+#paymentsTabs.payments-seg .nav-link.active { background: #6E7A50; color: #fff; font-weight: 700; box-shadow: 0 1px 3px rgba(79,88,56,0.25); }
+#paymentsTabs.payments-seg .nav-link.active .badge { background: rgba(255,255,255,0.28) !important; color: #fff !important; }
+/* #paymentsBody NO lleva tarjeta: la tabla del historial ya tiene estructura propia (encabezado,
+   separadores, pie), asi que el panel blanco alrededor solo sumaba un marco de mas. Tampoco lleva
+   `overflow: hidden`: creaba un contenedor de scroll que anulaba el `position: sticky` del encabezado. */
+/* Mismo radio de borde explicito para el bloque de descuento/ahorro (fondo verde claro propio). */
+#paymentCoverageCard .rounded { border-radius: 0.5rem; }
+/* Hint de ahorro bajo "Total a pagar" (mismo estilo que el hint del Resumen Financiero). */
+#paymentsOffcanvas .pay-savings-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 7px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #4b6b3f;
+}
+#paymentsOffcanvas .pay-savings-hint i { font-size: 0.95rem; }
+/* Historial: tabla propia (.pay-hist) en vez de .table-sm.small de Bootstrap. La letra chica de antes
+   era la consecuencia de meter 8 columnas; al fusionar Moneda dentro de Monto, Recibio dentro de la
+   fecha de pago y Comprobante dentro de Acciones quedan 6 y la letra sube sin apretar nada. */
+#paymentsOffcanvas .pay-hist { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+/* Encabezado pegajoso: el contenedor de scroll es .offcanvas-body, asi que ni #paymentsBody ni un
+   wrapper .table-responsive pueden tener overflow propio. El ancho chico se resuelve con la vista de
+   tarjetas de abajo, no con scroll horizontal. */
+#paymentsOffcanvas .pay-hist thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: #8a8f78;
+    background: #f8f9fa;
+    padding: 0.5rem 0.55rem;
+    border-bottom: 1px solid #ddddd2;
+    white-space: nowrap;
+}
+/* Sin panel blanco detras, las filas son transparentes y los separadores pesan un poco mas; el blanco
+   se reserva para el hover y la fila en edicion. */
+#paymentsOffcanvas .pay-hist tbody td { padding: 0.6rem 0.55rem; vertical-align: top; border-top: 1px solid #e6e6da; }
+#paymentsOffcanvas .pay-hist tbody tr:first-child td { border-top: none; }
+#paymentsOffcanvas .pay-hist tbody tr:hover td { background: #fff; }
+/* Columnas PAGO y REGISTRO: mismo patron (fecha arriba, persona abajo). La de pago pesa mas porque es
+   el dato del negocio; la de registro es metadato de auditoria. */
+#paymentsOffcanvas .pay-hist-date { white-space: nowrap; font-weight: 600; color: #2b2b2b; }
+#paymentsOffcanvas .pay-hist-meta { white-space: nowrap; font-size: 0.85rem; color: #6b6656; }
+#paymentsOffcanvas .pay-hist-person {
+    display: flex;
+    align-items: flex-start;
+    gap: 3px;
+    font-size: 0.78rem;
+    color: #8a8f78;
+    margin-top: 3px;
+    white-space: normal;
+    line-height: 1.25;
+}
+#paymentsOffcanvas .pay-hist-person .ti { font-size: 0.85rem; flex: 0 0 auto; margin-top: 1px; }
+#paymentsOffcanvas .pay-hist-ref { word-break: break-word; }
+/* Edicion inline: la fila que se esta editando se marca con el verde de marca y el formulario cuelga
+   de ella. El filete va SOLO en la primera celda: en todas dibujaba una linea vertical por columna. */
+#paymentsOffcanvas .pay-hist tbody tr.is-editing td { background: #fff; }
+#paymentsOffcanvas .pay-hist tbody tr.is-editing td:first-child { box-shadow: inset 3px 0 0 #6E7A50; }
+#paymentsOffcanvas .pay-hist-edit td { padding: 0; border-top: none; }
+#paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit:hover td { background: transparent; }
+/* En escritorio las filas no tienen bordes laterales, asi que enmarcar el formulario como tarjeta
+   dejaba dos lineas verticales sueltas: aqui es un bloque mas de la tabla. */
+#paymentsOffcanvas .pay-hist-form {
+    background: #fff;
+    border-bottom: 1px solid #e6e6da;
+    padding: 0 1rem 0.9rem;
+}
+/* El pie se sale del relleno lateral para que su linea divisoria corte el bloque completo, pero lo
+   recupera por dentro para que los botones sigan alineados con los campos. */
+#paymentsOffcanvas .pay-hist-form .pay-form-actions {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+/* Encabezados ordenables (Pago / Registro / Monto). */
+#paymentsOffcanvas .pay-hist-sort {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+#paymentsOffcanvas .pay-hist-sort:hover { color: #4f5838; }
+#paymentsOffcanvas .pay-hist-sort .ti { font-size: 0.85rem; opacity: 0.35; }
+#paymentsOffcanvas .pay-hist-sort.is-active { color: #4f5838; }
+#paymentsOffcanvas .pay-hist-sort.is-active .ti { opacity: 1; }
+/* Separador de mes: solo aparece al ordenar por fecha. */
+#paymentsOffcanvas .pay-hist-group td {
+    background: #edeee4;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: #6b7256;
+    padding: 0.4rem 0.7rem;
+}
+#paymentsOffcanvas .pay-hist-group .pay-hist-group-sum { float: right; color: #8a8f78; }
+/* El monto es EL dato de cada renglon. */
+#paymentsOffcanvas .pay-hist-amount { text-align: right; white-space: nowrap; font-weight: 700; font-size: 1.02rem; color: #2b2b2b; }
+#paymentsOffcanvas .pay-hist-curr { font-size: 0.7rem; font-weight: 700; color: #8a8f78; margin-left: 3px; }
+/* Moneda distinta a la de la reservacion: se resalta en ambar con el monto original debajo. */
+#paymentsOffcanvas .pay-hist-curr.is-foreign {
+    background: #f6efe2;
+    color: #96682f;
+    border: 1px solid #e7d6bd;
+    border-radius: 999px;
+    padding: 0.1rem 0.4rem;
+}
+#paymentsOffcanvas .pay-hist-orig { font-size: 0.76rem; font-weight: 600; color: #96682f; margin-top: 2px; }
+/* Pie: total de los pagos listados, para cuadrar contra "Pagado" de la card de cobertura. */
+#paymentsOffcanvas .pay-hist tfoot td {
+    border-top: 2px solid #ddddd2;
+    padding: 0.7rem 0.55rem;
+    font-weight: 700;
+    color: #2b2b2b;
+}
+#paymentsOffcanvas .pay-hist tfoot .pay-hist-foot-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8a8f78; }
+/* Chip de metodo con color propio: permite distinguir efectivo/transferencia/tarjeta de un vistazo. */
+#paymentsOffcanvas .pay-hist-method {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 0.24rem 0.62rem;
+    white-space: nowrap;
+}
+/* Acciones "fantasma" para que no compitan con el monto; el color aparece en hover. */
+#paymentsOffcanvas .pay-hist-actions { text-align: right; white-space: nowrap; }
+#paymentsOffcanvas .pay-hist-act {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #8a8f78;
+    font-size: 1rem;
+    line-height: 1;
+    text-decoration: none;
+    transition: all 0.12s ease;
+}
+#paymentsOffcanvas .pay-hist-act:hover { background: #f1f2ec; color: #4f5838; border-color: #e0e3d6; }
+#paymentsOffcanvas .pay-hist-act.is-danger:hover { background: #f7ecea; color: #a1443a; border-color: #e6c9c4; }
+#paymentsOffcanvas .pay-hist-act.is-receipt { color: #566040; }
+/* Formulario de pago (alta y edicion inline): etiquetas en versalitas chicas, como los encabezados de
+   la tabla, para que no compitan con los campos. */
+#paymentsOffcanvas .pay-form .form-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    color: #8a8f78;
+    margin-bottom: 0.3rem;
+}
+#paymentsOffcanvas .pay-form .form-control,
+#paymentsOffcanvas .pay-form .form-select,
+#paymentsOffcanvas .pay-form .input-group-text { font-size: 0.9rem; }
+/* El tema le pone border-radius propio a .form-control, asi que dentro de un .input-group el prefijo y
+   el campo se dibujaban como dos cajas sueltas con un hueco. Se fuerza la union a mano. */
+#paymentsOffcanvas .pay-form .input-group { flex-wrap: nowrap; }
+#paymentsOffcanvas .pay-form .input-group > .input-group-text {
+    background: #f7f7f2;
+    color: #8a8f78;
+    font-weight: 700;
+    border-right: 0;
+    border-radius: 0.375rem 0 0 0.375rem;
+}
+#paymentsOffcanvas .pay-form .input-group > .form-control {
+    border-left: 0;
+    border-radius: 0 0.375rem 0.375rem 0;
+    margin-left: 0;
+}
+#paymentsOffcanvas .pay-form textarea.form-control { resize: vertical; }
+/* Altura compartida por la zona de adjunto y el textarea de Notas: son vecinos en el mismo renglon y
+   con alturas distintas dejaban un escalon raro. */
+#paymentsOffcanvas { --pay-attach-h: 96px; }
+#paymentsOffcanvas .pay-form textarea#paymentNotes { height: var(--pay-attach-h); min-height: var(--pay-attach-h); }
+/* El <input type="file"> nativo no se puede estilizar y su texto se recortaba. Se esconde de la vista
+   (sigue en el DOM y accesible por teclado via el label) y se reemplaza por esta zona. */
+#paymentsOffcanvas .pay-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: var(--pay-attach-h);
+    padding: 0.7rem;
+    text-align: center;
+    border: 1.5px dashed #dcdccf;
+    border-radius: 8px;
+    background: #fbfbf7;
+    position: relative;
+    transition: border-color 0.12s ease, background 0.12s ease;
+}
+#paymentsOffcanvas .pay-drop.is-dragover { border-color: #6E7A50; background: #f1f2ec; }
+#paymentsOffcanvas .pay-drop input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+#paymentsOffcanvas .pay-file-row { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+#paymentsOffcanvas .pay-receipt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #566040;
+    background: #eef0e6;
+    border: 1px solid #dce2d0;
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+    text-decoration: none;
+}
+#paymentsOffcanvas .pay-receipt-chip:hover { background: #e4e8d8; color: #4f5838; }
+#paymentsOffcanvas .pay-file-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #a1443a;
+    line-height: 1;
+    cursor: pointer;
+}
+#paymentsOffcanvas .pay-file-clear:hover { background: #f7ecea; }
+#paymentsOffcanvas .pay-file-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4f5838;
+    background: #f1f2ec;
+    border: 1px solid #e0e3d6;
+    border-radius: 8px;
+    padding: 0.36rem 0.7rem;
+    margin: 0;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+#paymentsOffcanvas .pay-file-btn:hover { background: #e7e9df; border-color: #d2d6c4; }
+#paymentsOffcanvas .pay-drop input[type="file"]:focus-visible ~ .pay-file-row .pay-file-btn { outline: 2px solid #6E7A50; outline-offset: 2px; }
+#paymentsOffcanvas .pay-file-name {
+    font-size: 0.82rem;
+    color: #a8ac98;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#paymentsOffcanvas .pay-file-name.has-file { color: #2b2b2b; font-weight: 600; }
+/* Pie de botones: separado del cuerpo y pegajoso, para que "Guardar" nunca quede bajo el pliegue. */
+#paymentsOffcanvas .pay-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid #f1efe8;
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+}
+#paymentsOffcanvas .pay-form-actions .btn {
+    font-size: 0.92rem;
+    font-weight: 600;
+    padding: 0.55rem 1.6rem;
+    border-radius: 8px;
+}
+#paymentsOffcanvas .pay-form-actions .btn-outline-secondary { border-color: #dcdccf; color: #6b7256; }
+#paymentsOffcanvas .pay-form-actions .btn-outline-secondary:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
+/* Etiqueta de contexto en el pie (reemplaza al encabezado del formulario): ocupa el hueco que ya
+   existia a la izquierda de los botones, asi que no suma alto. */
+#paymentsOffcanvas .pay-form-context {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-right: auto;
+    align-self: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #8a8f78;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Bajo 576px el offcanvas es full-width (~360px reales): 6 columnas aprietan, asi que cada pago se
+   apila como tarjeta. Las etiquetas vuelven via data-label, ya que el thead se oculta. */
+@media (max-width: 576px) {
+    #paymentsOffcanvas .pay-hist thead { display: none; }
+    #paymentsOffcanvas .pay-hist,
+    #paymentsOffcanvas .pay-hist tbody,
+    #paymentsOffcanvas .pay-hist tfoot,
+    #paymentsOffcanvas .pay-hist tr,
+    #paymentsOffcanvas .pay-hist td { display: block; width: 100%; }
+    #paymentsOffcanvas .pay-hist tbody tr {
+        background: #fff;
+        border: 1px solid #ece9df;
+        border-radius: 10px;
+        margin-bottom: 0.6rem;
+        overflow: hidden;
+    }
+    #paymentsOffcanvas .pay-hist tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        border-top: 1px solid #f5f3ec;
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+    }
+    #paymentsOffcanvas .pay-hist tbody td::before {
+        content: attr(data-label);
+        flex: 0 0 auto;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 700;
+        color: #8a8f78;
+        padding-top: 3px;
+    }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-date::before,
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-actions::before { content: none; }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-date { background: #faf9f4; display: block; }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-actions { justify-content: flex-end; }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-amount { text-align: right; }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-meta .pay-hist-stack { text-align: right; }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-meta .pay-hist-person { justify-content: flex-end; }
+    /* La fila de edición no es una tarjeta más: se pega a la del pago que está editando. */
+    #paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit { border: none; margin: -0.6rem 0 0.6rem; }
+    #paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit td { display: block; border-top: none; padding: 0; }
+    #paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit td::before { content: none; }
+    #paymentsOffcanvas .pay-hist-form {
+        border: 1px solid #ece9df;
+        border-top: none;
+        border-radius: 0 0 10px 10px;
+    }
+    #paymentsOffcanvas .pay-hist-group td { border-radius: 8px; margin-bottom: 0.4rem; }
+    #paymentsOffcanvas .pay-hist-group .pay-hist-group-sum { float: none; margin-left: 6px; }
+    #paymentsOffcanvas .pay-hist tfoot td { display: flex; justify-content: space-between; border-radius: 10px; }
+    /* Botones a todo el ancho y "Guardar" arriba (column-reverse: va último en el DOM). */
+    #paymentsOffcanvas .pay-form-actions { flex-direction: column-reverse; gap: 8px; }
+    #paymentsOffcanvas .pay-form-actions .btn { width: 100%; }
+    #paymentsOffcanvas .pay-form-context { display: none; }
+}
+/* Esqueleto de carga del carrito: el panel se puede abrir mientras GET .../payments sigue en vuelo,
+   asi que mostramos barras "shimmer" con la forma del contenido real en vez de dejarlo vacio. */
+#paymentsOffcanvas .pay-skel {
+    background: linear-gradient(90deg, #eceee6 25%, #f7f8f3 50%, #eceee6 75%);
+    background-size: 200% 100%;
+    animation: paySkelShimmer 1.2s ease-in-out infinite;
+    border-radius: 6px;
+}
+@keyframes paySkelShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #paymentsOffcanvas .pay-skel { animation: none; }
+}
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
@@ -352,6 +837,30 @@ document.addEventListener('DOMContentLoaded', async function() {
         return new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
     }
 
+    // Rango de fechas compacto (es-MX, UTC): mismo día → una sola fecha; mismo mes → "16 → 17 ago
+    // 2026"; mismo año → "28 jul → 03 ago 2026"; años distintos → ambas completas.
+    function formatDateRange(startStr, endStr) {
+        if (!startStr) return '—';
+        const start = new Date(startStr);
+        if (Number.isNaN(start.getTime())) return '—';
+        if (!endStr) return formatDate(startStr);
+        const end = new Date(endStr);
+        if (Number.isNaN(end.getTime())) return formatDate(startStr);
+        // Se formatea día y mes por separado para evitar el guion del locale ("28-jul" → "28 jul").
+        const fmt = (dt, o) => dt.toLocaleDateString('es-MX', Object.assign({ timeZone: 'UTC' }, o));
+        const day = (dt) => fmt(dt, { day: '2-digit' });
+        const dayMonth = (dt) => `${fmt(dt, { day: '2-digit' })} ${fmt(dt, { month: 'short' })}`;
+        const full = (dt) => `${dayMonth(dt)} ${fmt(dt, { year: 'numeric' })}`;
+        const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+        const sameMonth = sameYear && start.getUTCMonth() === end.getUTCMonth();
+        const sameDay = sameMonth && start.getUTCDate() === end.getUTCDate();
+        const arrow = ' <span class="bkg-arrow">&rarr;</span> ';
+        if (sameDay) return formatDate(startStr);
+        if (sameMonth) return `${day(start)}${arrow}${full(end)}`;
+        if (sameYear) return `${dayMonth(start)}${arrow}${full(end)}`;
+        return `${full(start)}${arrow}${full(end)}`;
+    }
+
     function formatCurrency(amount, currency) {
         const sym = currency === 'USD' ? 'USD $' : '$';
         return `${sym}${(amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -391,8 +900,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         const d = reservationData;
 
         document.getElementById('breadcrumbFolio').textContent = d.folio;
+        // El folio ya encabeza la página: la tarjeta de info dejó de repetirlo en un tile propio.
         document.getElementById('pageTitle').innerHTML = `<i class="ti ti-clipboard-list me-2 text-primary"></i>${d.folio}`;
-        document.getElementById('infoFolio').textContent = d.folio;
 
         const quoteLink = document.getElementById('infoQuoteLink');
         if (d.quoteId) {
@@ -403,39 +912,79 @@ document.addEventListener('DOMContentLoaded', async function() {
         const quoteBadge = getQuoteStatusBadge(d.quoteStatus);
         const reservationBadge = getReservationStatusBadge(d.status);
         document.getElementById('infoStatus').innerHTML = `${quoteBadge} ${reservationBadge}`;
-        document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);
         // Display company name first, then fallback to fullName or contactPerson
         const clientDisplay = d.client?.companyName || d.client?.fullName || d.contactPerson || '—';
         document.getElementById('infoClient').textContent = clientDisplay;
-        document.getElementById('infoContact').innerHTML = `${d.contactEmail || ''}${d.contactPhone ? '<br>' + d.contactPhone : ''}`;
+        // Contacto: nombre (si existe) + email + teléfono, cada uno en su línea y solo si viene.
+        const contactName = (d.contactPerson
+            || `${d.contactFirstName || ''} ${d.contactLastName || ''}`.trim()).trim();
+        const contactLines = [];
+        if (contactName) contactLines.push(`<span class="fw-semibold">${PaymentBreakdownHelpers.escapeHtml(contactName)}</span>`);
+        if (d.contactEmail) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactEmail));
+        if (d.contactPhone) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactPhone));
+        document.getElementById('infoContact').innerHTML = contactLines.length ? contactLines.join('<br>') : '&mdash;';
         document.getElementById('infoEventType').textContent = d.eventType || '—';
         document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';
-        document.getElementById('infoStartDate').textContent = formatDate(d.startDate);
-        document.getElementById('infoEndDate').textContent = formatDate(d.endDate);
-        document.getElementById('infoPaymentType').textContent = d.paymentType || '—';
-        document.getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency);
+        // Fecha inicio y fin se fusionaron en un rango compacto; el Total dejó de repetirse aquí porque
+        // el Resumen Financiero ya lo muestra ("Total a pagar").
+        document.getElementById('infoDates').innerHTML = formatDateRange(d.startDate, d.endDate);
+        // Duración (noches) = diferencia en días; se oculta en reservaciones de un solo día.
+        const nightsEl = document.getElementById('infoNights');
+        if (nightsEl) {
+            if (d.startDate && d.endDate) {
+                const nights = Math.max(0, Math.round((new Date(d.endDate) - new Date(d.startDate)) / 86400000));
+                nightsEl.textContent = nights <= 0 ? '' : (nights === 1 ? '1 noche' : `${nights} noches`);
+            } else {
+                nightsEl.textContent = '';
+            }
+        }
+        // El método de pago dejó de tener tile propio: se muestra como chip junto al "Total a pagar"
+        // del Resumen Financiero, que es donde tiene contexto.
 
-        // Service Customer
+        // Lead guest — la celda siempre ocupa su lugar en la rejilla; solo se vacía cuando no hay uno.
+        // Cae a contactPerson para que una reservación que trae al viajero en los campos de contacto
+        // igual lo muestre como lead guest.
+        const leadGuestParts = [d.leadGuestFirstName, d.leadGuestLastName]
+            .map((p) => (p || '').trim())
+            .filter(Boolean);
+        const leadGuestName = leadGuestParts.length > 0
+            ? leadGuestParts.join(' ')
+            : (d.contactPerson || '').trim();
+        const leadGuestRow = document.getElementById('infoLeadGuestRow');
+        const leadGuestEl = document.getElementById('infoLeadGuest');
+        if (leadGuestEl && leadGuestRow) {
+            leadGuestEl.textContent = leadGuestName || '—';
+            leadGuestRow.classList.toggle('is-empty', !leadGuestName);
+        }
+
+        // Service Customer — de solo lectura: reasignarlo es admin-only, así que aquí no hay botón.
         const scEl = document.getElementById('infoServiceCustomer');
         if (d.serviceCustomer) {
-            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Seguidor', 'ti-user-star', 'primary');
+            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Seguidor', 'ti-headset', 'primary');
         } else {
             scEl.innerHTML = '<span class="text-muted">Sin asignar</span>';
         }
 
-        // Header actions — "Exportar" opens the public reservation view in a new tab,
+        // Header actions — "Exportar confirmación" opens the public reservation view in a new tab,
         // which has the PDF export + print-friendly layout. "Cancelar" only shows when
         // the reservation can still be cancelled.
         const actions = document.getElementById('headerActions');
         const folio = encodeURIComponent(d.folio || '');
         const canCancel = d.status !== 'cancelled' && d.status !== 'completed';
         const exportBtnHtml = folio
-            ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir vista pública (incluye Exportar a PDF)"><i class="ti ti-file-export me-1"></i>Exportar</a>`
+            ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir la confirmación (vista pública, exportable a PDF)"><i class="ti ti-file-export me-1"></i>Exportar confirmación</a>`
             : '';
         const cancelBtnHtml = canCancel
             ? `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservación</button>`
             : '';
         actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
+        // Botón "Exportar itinerario" del header de Servicios → página de itinerario (exportable a PDF).
+        // Misma familia de rutas públicas que "Exportar confirmación", así que no abre acceso nuevo.
+        const itinBtn = document.getElementById('exportItineraryBtn');
+        if (itinBtn && folio) {
+            itinBtn.href = `/reservations/${folio}/itinerary`;
+            itinBtn.classList.remove('d-none');
+        }
         if (canCancel) {
             document.getElementById('cancelResBtn')?.addEventListener('click', cancelReservation);
         }
@@ -454,9 +1003,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         const card = document.getElementById('financialSummaryCard');
         const body = document.getElementById('financialSummaryBody');
         const adjustments = d.adjustments || [];
-        const servicesSubtotal = d.servicesSubtotal || d.totalAmount || 0;
         const curr = d.currency || 'MXN';
         const pay = d.payment;
+        const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
+        // Subtotal recalculado desde pricesByType[paymentType] de cada servicio, para que la reservación
+        // cuadre con la cotización cuando ambas usan el mismo método. Cae a los valores guardados en data
+        // muy vieja sin pricesByType.
+        const computedSubtotal = PaymentBreakdownHelpers.computeServicesSubtotalByType(d.services, d.paymentType, curr);
+        const servicesSubtotal = computedSubtotal > 0
+            ? computedSubtotal
+            : (d.servicesSubtotal || d.totalAmount || 0);
         // Propina cobrada (Fase 2): del summary del servidor (d.payment), NUNCA de d.globalTip del snapshot
         // bruto ni recalculada localmente. d.totalAmount ya la incluye vía recalculateTotal.
         const generalTip = pay ? PaymentBreakdownHelpers.round2(pay.generalTip) : 0;
@@ -465,81 +1021,129 @@ document.addEventListener('DOMContentLoaded', async function() {
         // La tarjeta financiera se pinta SIEMPRE que haya datos de reservación, con o sin ajustes.
         // (Antes un early-return con 0 ajustes ocultaba también Subtotal/Total/Saldo — bug corregido.)
         card.style.display = '';
-        document.getElementById('addPaymentBtn')?.classList.remove('d-none');
+        // "Agregar pago" se renderiza dentro del hero (solo si canEdit); su click se cablea por
+        // delegación sobre #financialSummaryCard, porque el hero se re-renderiza en cada pago.
 
-        // Esta plantilla es SIEMPRE de agencia: los ajustes se enmarcan como cargo/ajuste, nunca como
-        // "descuento".
+        const paymentTypeLabel = d.paymentType
+            ? d.paymentType.charAt(0).toUpperCase() + d.paymentType.slice(1)
+            : '—';
+
+        // Comparativo por método: los precios de servicios cambian por método. Se despliega desde el
+        // chip de método (Transferencia ⇄), no como sección suelta — queda pegado a lo que explica.
+        const comparisonMethods = [
+            { method: 'efectivo', label: 'Efectivo', icon: 'ti-cash' },
+            { method: 'transferencia', label: 'Transferencia', icon: 'ti-building-bank' },
+            { method: 'tarjeta', label: 'Tarjeta', icon: 'ti-credit-card' },
+        ];
+        // El método solo cambia el SUBTOTAL de servicios; el resto (ajustes, propinas) es igual. Por eso
+        // el TOTAL por método = total actual + Δsubtotal — así cada fila es el "Total a pagar" en ese
+        // método, y el actual coincide con el número grande del hero.
+        const cmpSubtotals = comparisonMethods.map((m) => ({ ...m, subtotal: PaymentBreakdownHelpers.computeServicesSubtotalByType(d.services, m.method, curr) }));
+        const cmpCurrentSubtotal = (cmpSubtotals.find((m) => m.method === d.paymentType) || {}).subtotal || 0;
+        const cmpBaseTotal = pay ? (Number(pay.total) || 0) : cmpCurrentSubtotal;
+        const cmpAmounts = cmpSubtotals.map((m) => ({ ...m, amount: cmpBaseTotal + (m.subtotal - cmpCurrentSubtotal) }));
+        const cmpCurrent = (cmpAmounts.find((m) => m.method === d.paymentType) || {}).amount || 0;
+        const cmpCheapest = Math.min(...cmpAmounts.map((m) => m.amount));
+        const comparisonRows = cmpAmounts.map((m) => {
+            const isActive = m.method === d.paymentType;
+            const delta = m.amount - cmpCurrent;
+            let tag;
+            if (isActive) {
+                tag = '<span class="fin-cmp-badge">Actual</span>';
+            } else if (Math.abs(delta) >= 0.005) {
+                const c = delta > 0 ? '#b8894a' : '#4b6b3f';
+                tag = `<span class="fin-cmp-delta" style="color:${c}">${delta > 0 ? '+' : '-'}${formatCurrency(Math.abs(delta), curr)}</span>`;
+            } else {
+                tag = '<span class="fin-cmp-delta" style="color:#8a8f78">igual</span>';
+            }
+            const cheap = (!isActive && m.amount === cmpCheapest && cmpCheapest < cmpCurrent)
+                ? '<span class="fin-cmp-cheap">más barato</span>' : '';
+            return `<div class="fin-cmp-row ${isActive ? 'active' : ''}">
+                <span class="fin-cmp-method"><i class="ti ${m.icon}"></i>${m.label}${cheap}</span>
+                <span class="fin-cmp-right"><span class="fin-cmp-amount">${formatCurrency(m.amount, curr)}</span>${tag}</span>
+            </div>`;
+        }).join('');
+        // Chip de método = disparador del comparativo (collapse INLINE, no dropdown flotante).
+        const methodChipHtml = '<button type="button" class="fin-hero-method" data-bs-toggle="collapse" data-bs-target="#paymentMethodComparison" aria-expanded="false" aria-controls="paymentMethodComparison" title="Comparar por método de pago">'
+            + `<i class="ti ti-credit-card"></i>${PaymentBreakdownHelpers.escapeHtml(paymentTypeLabel)}<i class="ti ti-arrows-exchange fin-chev" title="Comparar métodos de pago"></i></button>`;
+        // El comparativo se expande inline (empuja el contenido), no como panel flotante.
+        const comparisonInlineHtml = '<div class="collapse fin-cmp-inline" id="paymentMethodComparison">'
+            + `<div class="fin-cmp-cap">Total a pagar según el método de pago:</div>${comparisonRows}</div>`;
+        // Hint de ahorro SIEMPRE visible: si otro método es más barato que el actual, lo anuncia sin
+        // tener que abrir el comparativo (p. ej. "En efectivo ahorras $7,542").
+        const cmpCheapestMethod = cmpAmounts.find((m) => m.amount === cmpCheapest);
+        const cmpSavings = cmpCurrent - cmpCheapest;
+        const savingsHint = (cmpCheapestMethod && cmpCheapestMethod.method !== d.paymentType && cmpSavings >= 0.005)
+            ? `<div class="fin-hero-hint"><i class="ti ti-discount-2"></i>En ${PaymentBreakdownHelpers.escapeHtml(cmpCheapestMethod.label.toLowerCase())} ahorras ${formatCurrency(cmpSavings, curr)}</div>`
+            : '';
 
         let html = '';
-        html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-            <span class="text-muted"><i class="ti ti-list-details me-2"></i>Subtotal Servicios</span>
-            <span class="fw-semibold">${formatCurrency(servicesSubtotal, curr)}</span>
-        </div>`;
-
-        adjustments.filter(a => a.type === 'charge').forEach(adj => {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-plus text-danger me-1"></i><span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span></div>
-                <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
+        // ===== Hero de pago: cifras clave + barra de cobertura (solo si hay datos de pago) =====
+        if (pay) {
+            const heroResolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
+            const heroPaid = Number(pay.paidAmount) || 0;
+            const heroTotal = Number(pay.total) || 0;
+            const heroBal = heroResolved.displayedBalance;
+            const heroPct = heroTotal > 0 ? Math.min(100, Math.round((heroPaid / heroTotal) * 100)) : 0;
+            const heroSavings = heroResolved.savings
+                ? `<div class="fin-savings"><i class="ti ti-discount-2 me-2"></i><strong>${PaymentBreakdownHelpers.escapeHtml(heroResolved.savings.label)}</strong><div class="small">${PaymentBreakdownHelpers.escapeHtml(heroResolved.savings.sublabel)}</div></div>`
+                : '';
+            html += `<div class="fin-hero">
+                <div class="fin-hero-top">
+                    <div>
+                        <div class="fin-hero-lbl">Total a pagar ${methodChipHtml}</div>
+                        <div class="fin-hero-total">${formatCurrency(heroTotal, curr)}</div>
+                        ${savingsHint}
+                    </div>
+                    <div class="fin-hero-meta">
+                        <span class="fin-status-lbl">Estado de pago</span>
+                        ${PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus)}
+                        ${canEdit ? '<button class="fin-pay-btn" id="addPaymentBtn"><i class="ti ti-cash"></i>Agregar pago</button>' : ''}
+                    </div>
+                </div>
+                ${comparisonInlineHtml}
+                <div class="fin-hero-pct">${heroPct}% pagado</div>
+                <div class="fin-bar"><span style="width:${heroPct}%;background:#4b6b3f"></span></div>
+                <div class="fin-hero-foot">
+                    <div><span class="lbl">Pagado</span><div class="val" style="color:#4b6b3f">${formatCurrency(heroPaid, curr)}</div></div>
+                    <div class="text-end"><span class="lbl">Saldo</span><div class="val" style="color:${heroBal > 0 ? '#b8894a' : '#4b6b3f'}">${formatCurrency(heroBal, curr)}</div></div>
+                </div>
+                ${heroSavings}
             </div>`;
-        });
+        }
 
-        // Ajustes de tipo discount: se muestran como reducción (nunca se pierde dinero real) pero con
-        // framing neutral de "ajuste" — sin la palabra "descuento" ni el ícono de descuento.
-        adjustments.filter(a => a.type === 'discount').forEach(adj => {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-minus text-success me-1"></i><span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span></div>
-                <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
-            </div>`;
-        });
+        // ===== Desglose =====
+        // Sin datos de pago no hay hero: el chip de método (con su comparativo inline) se muestra aquí.
+        if (!pay) {
+            html += `<div class="fin-row"><span class="lbl"><i class="ti ti-credit-card"></i>Tipo de pago</span><span class="val">${methodChipHtml}</span></div>${comparisonInlineHtml}`;
+        }
+        html += `<div class="fin-row"><span class="lbl"><i class="ti ti-list-details"></i>Subtotal servicios</span><span class="val">${formatCurrency(servicesSubtotal, curr)}</span></div>`;
 
         // Propina cobrada (Fase 2): líneas del summary del servidor para que Subtotal + ajustes + propina
         // reconcilie con el Total a pagar. La general en su línea; la de por-servicio agregada (los tips por
         // servicio también aparecen por servicio en el itinerario, aquí es el agregado).
         if (generalTip > 0) {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propina general</span></div>
-                <span class="text-info fw-semibold">+${formatCurrency(generalTip, curr)}</span>
-            </div>`;
+            html += `<div class="fin-row"><span class="lbl"><i class="ti ti-coin fin-tip"></i>Propina general</span><span class="val fin-tip">+${formatCurrency(generalTip, curr)}</span></div>`;
         }
         if (serviceTipsTotal > 0) {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propinas por servicio</span></div>
-                <span class="text-info fw-semibold">+${formatCurrency(serviceTipsTotal, curr)}</span>
-            </div>`;
+            html += `<div class="fin-row"><span class="lbl"><i class="ti ti-coin fin-tip"></i>Propinas por servicio</span><span class="val fin-tip">+${formatCurrency(serviceTipsTotal, curr)}</span></div>`;
         }
 
-        // Bloque de pago (agencia/agente): Estado / Total a pagar / Pagado / Saldo. El "Saldo" se resuelve
-        // con resolveDisplayedBalance (0 cuando está pagado; línea de ahorro aparte si se pagó en un método
-        // más barato que el ancla). El detalle completo (chips, cobertura, saldo por método, descuento e
-        // historial) vive en #paymentsOffcanvas, junto al formulario de registro ("Agregar pago").
-        if (pay) {
-            const resolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
-            const balanceCls = resolved.displayedBalance > 0 ? 'text-danger' : 'text-success';
-            const savingsRow = resolved.savings
-                ? `<div class="py-2 border-top" style="color:#146c43;">
-                    <div class="fw-semibold"><i class="ti ti-discount-2 me-2"></i>${PaymentBreakdownHelpers.escapeHtml(resolved.savings.label)}</div>
-                    <div class="small">${PaymentBreakdownHelpers.escapeHtml(resolved.savings.sublabel)}</div>
-                </div>` : '';
-            html += `<div class="mt-2 pt-2">
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
-                    ${PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus)}
-                </div>
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total a pagar</span>
-                    <span class="fw-semibold">${formatCurrency(pay.total, curr)}</span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <span class="text-muted"><i class="ti ti-check me-2"></i>Pagado</span>
-                    <span class="fw-semibold text-success">${formatCurrency(pay.paidAmount, curr)}</span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center py-2">
-                    <span class="text-muted"><i class="ti ti-wallet me-2"></i>Saldo</span>
-                    <span class="fw-semibold ${balanceCls}">${formatCurrency(resolved.displayedBalance, curr)}</span>
-                </div>
-                ${savingsRow}
+        // Ajustes YA creados: se listan pero NO se pueden crear ni eliminar desde aquí (/adjustments es
+        // admin-only, así que ni el botón de agregar ni el de quitar existen en el DOM). Framing neutral
+        // de cargo/ajuste — nunca la palabra "descuento" ni su ícono.
+        adjustments.filter((a) => a.type === 'charge').forEach((adj) => {
+            html += `<div class="fin-row">
+                <span class="lbl"><i class="ti ti-plus text-danger"></i>${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span>
+                <span class="val text-danger">+${formatCurrency(adj.amount, curr)}</span>
             </div>`;
-        }
+        });
+        adjustments.filter((a) => a.type === 'discount').forEach((adj) => {
+            html += `<div class="fin-row">
+                <span class="lbl"><i class="ti ti-minus text-success"></i>${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span>
+                <span class="val text-success">-${formatCurrency(adj.amount, curr)}</span>
+            </div>`;
+        });
 
         body.innerHTML = html;
     }
@@ -558,6 +1162,131 @@ document.addEventListener('DOMContentLoaded', async function() {
     let paymentsCache = [];
 
     const PAYMENT_METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
+    // [fondo, texto, borde] por método para el chip del historial. Misma paleta suave de marca que la
+    // píldora de estado de la card de cobertura, para que el drawer se lea como una sola pieza.
+    const PAYMENT_METHOD_COLORS = {
+        efectivo: ['#e6efe1', '#3f5a34', '#cfe0c6'],
+        transferencia: ['#eaf1f0', '#3a6b63', '#cfe1dd'],
+        tarjeta: ['#f6efe2', '#96682f', '#e7d6bd'],
+        _default: ['#f0eee7', '#6b6656', '#ded9cb'],
+    };
+    // Orden del historial. Vive fuera de renderPayments para sobrevivir a los re-render que dispara
+    // cada alta/edición/borrado de pago.
+    let paymentsSort = { key: 'date', dir: 'desc' };
+    // Pago que se está editando. El formulario de edición se abre INLINE, en una fila expandida bajo el
+    // pago tocado: el #paymentFormWrap del alta vive arriba, así que editar desde el historial dibujaba
+    // el formulario lejos de la fila y podía quedar fuera de vista.
+    let editingPaymentId = null;
+    // Formulario de alta abierto. Su par de edición es editingPaymentId.
+    let addPaymentFormOpen = false;
+    // El carrito solo se abre desde "Agregar pago", así que la intención al abrirlo es siempre registrar
+    // uno: el formulario se despliega solo.
+    let pendingAddForm = false;
+
+    // "Registrar pago" se OCULTA mientras hay un formulario abierto, en vez de quedarse con su aspecto
+    // de llamada a la acción: ahí parecía que otro clic agregaría un segundo formulario. Además impide
+    // abrir el alta encima de una edición inline (savePayment lee los campos por id global, así que un
+    // segundo formulario guardaría los valores del equivocado).
+    function syncAddPaymentBtn() {
+        const btn = document.getElementById('showPaymentFormBtn');
+        if (!btn) return;
+        const status = reservationData ? reservationData.status : null;
+        const canEdit = status !== 'cancelled' && status !== 'completed';
+        const formOpen = addPaymentFormOpen || !!editingPaymentId;
+        btn.classList.toggle('d-none', !canEdit || formOpen);
+    }
+
+    // El formulario necesita availableMethods del summary AMPLIO para poblar el select de método; si se
+    // dibujara antes de que llegue, saldría con el select vacío y el guardado bloqueado, y no se volvería
+    // a construir solo. Por eso se intenta en dos momentos: al terminar de abrir el panel y al llegar el
+    // summary — lo que ocurra al final.
+    function maybeOpenAddForm() {
+        if (!pendingAddForm) return;
+        const status = reservationData ? reservationData.status : null;
+        const canEdit = status !== 'cancelled' && status !== 'completed';
+        if (!canEdit || addPaymentFormOpen || editingPaymentId) { pendingAddForm = false; return; }
+        if (!latestSummary) return; // Aún cargando: se reintenta desde applyPaymentSummary.
+        pendingAddForm = false;
+        renderPaymentForm(null);
+    }
+
+    // Cierra el formulario abierto, sea el del alta o el inline del historial. NUNCA puede haber dos
+    // abiertos a la vez, por lo mismo de los ids globales.
+    function closePaymentForm() {
+        const wasEditing = !!editingPaymentId;
+        editingPaymentId = null;
+        addPaymentFormOpen = false;
+        const wrap = document.getElementById('paymentFormWrap');
+        if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; wrap.classList.remove('pay-form'); }
+        syncAddPaymentBtn();
+        // Re-render para quitar la fila expandida y reactivar los encabezados de orden.
+        if (wasEditing) renderPayments();
+    }
+
+    // Las dos fechas del historial son de naturaleza distinta y por eso se leen distinto:
+    //  · PAGO (paidAt): viene de un <input type="date">, se guarda como medianoche UTC y NO tiene hora
+    //    útil. Se lee en UTC — en local (México, offset negativo) caería un día antes.
+    //  · REGISTRO (createdAt): instante real en que se capturó el pago. Se lee en hora local.
+    // Cada una trae además su propia persona: quién recibió el dinero vs. quién lo capturó.
+    const PAYMENT_DATE_FIELDS = {
+        date: { get: (p) => p.paidAt || p.createdAt, utc: true },
+        created: { get: (p) => p.createdAt, utc: false },
+    };
+    const paymentMs = (p, key) => {
+        const field = PAYMENT_DATE_FIELDS[key] || PAYMENT_DATE_FIELDS.date;
+        const t = new Date(field.get(p) || 0).getTime();
+        return Number.isNaN(t) ? 0 : t;
+    };
+    const monthKey = (p, key) => {
+        const utc = (PAYMENT_DATE_FIELDS[key] || PAYMENT_DATE_FIELDS.date).utc;
+        const dt = new Date(paymentMs(p, key));
+        const year = utc ? dt.getUTCFullYear() : dt.getFullYear();
+        const month = (utc ? dt.getUTCMonth() : dt.getMonth()) + 1;
+        return `${year}-${String(month).padStart(2, '0')}`;
+    };
+    const monthLabel = (p, key) => {
+        const utc = (PAYMENT_DATE_FIELDS[key] || PAYMENT_DATE_FIELDS.date).utc;
+        const opts = { month: 'long', year: 'numeric' };
+        if (utc) opts.timeZone = 'UTC';
+        const s = new Date(paymentMs(p, key)).toLocaleDateString('es-MX', opts);
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+    // Fecha + hora de registro, en hora local (ver PAYMENT_DATE_FIELDS).
+    function formatDateTimeShort(dateStr) {
+        const dt = new Date(dateStr);
+        if (Number.isNaN(dt.getTime())) return '—';
+        // Día y mes por separado para evitar el guion del locale ("10-jun" → "10 jun"). Hora en 24h: más
+        // compacta que "02:32 p.m." y sin ambigüedad.
+        const day = dt.toLocaleDateString('es-MX', { day: '2-digit' });
+        const month = dt.toLocaleDateString('es-MX', { month: 'short' });
+        const time = dt.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+        return `${day} ${month}, ${time}`;
+    }
+
+    // Copiar al portapapeles con respaldo para contextos sin navigator.clipboard (HTTP, navegadores
+    // viejos), donde la API no existe y el botón quedaría muerto sin avisar.
+    async function copyToClipboard(text) {
+        if (!text) return;
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+            pmToast('Referencia copiada', 'success');
+        } catch (err) {
+            console.error('Error copiando al portapapeles:', err);
+            pmToast('No se pudo copiar la referencia', 'warning');
+        }
+    }
 
     // Live thousands formatting for the amount input (mismo comportamiento que admin).
     function formatThousandsInput(el) {
@@ -598,108 +1327,346 @@ document.addEventListener('DOMContentLoaded', async function() {
         return el ? bootstrap.Offcanvas.getOrCreateInstance(el) : null;
     }
 
+    // Esqueleto de carga del carrito. "Agregar pago" se habilita apenas carga la reservación, así que
+    // el panel se puede abrir mientras GET .../payments sigue en vuelo: sin esto salía en blanco y
+    // parecía que no funcionaba.
+    function renderPaymentsSkeleton() {
+        const bar = (w, h, extra = '') => `<div class="pay-skel" style="width:${w};height:${h};${extra}"></div>`;
+        const coverage = document.getElementById('paymentCoverageCard');
+        if (coverage) {
+            coverage.innerHTML = `<div aria-busy="true" aria-live="polite">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+                  <div style="flex:1;">
+                    ${bar('190px', '12px')}
+                    ${bar('220px', '32px', 'margin-top:9px;')}
+                  </div>
+                  ${bar('118px', '30px', 'border-radius:999px;')}
+                </div>
+                ${bar('96px', '11px', 'margin:14px 0 0 auto;')}
+                ${bar('100%', '11px', 'border-radius:999px;margin:7px 0 18px;')}
+                <div style="display:flex;justify-content:space-between;gap:12px;">
+                  <div>${bar('64px', '10px')}${bar('120px', '22px', 'margin-top:7px;')}</div>
+                  <div style="text-align:right;">${bar('64px', '10px', 'margin-left:auto;')}${bar('120px', '22px', 'margin:7px 0 0 auto;')}</div>
+                </div>
+                <div class="d-flex align-items-center gap-2 mt-3 text-muted" style="font-size:.82rem;">
+                  <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>Cargando pagos…
+                </div>
+              </div>`;
+        }
+        const methodTable = document.getElementById('paymentMethodTable');
+        if (methodTable) {
+            const rows = [1, 2, 3].map(() => `<div style="display:flex;align-items:center;gap:12px;padding:.55rem 0;border-top:1px solid #f1efe8;">
+                ${bar('120px', '13px')}<div style="flex:1;"></div>${bar('80px', '13px')}${bar('44px', '13px')}${bar('90px', '13px')}
+              </div>`).join('');
+            methodTable.innerHTML = `<div aria-busy="true">${bar('100%', '10px', 'margin-bottom:.35rem;')}${rows}</div>`;
+            methodTable.style.display = '';
+        }
+        const body = document.getElementById('paymentsBody');
+        if (body) {
+            body.innerHTML = `<div aria-busy="true" class="p-1">${[1, 2, 3].map(() => `<div style="display:flex;align-items:center;gap:12px;padding:.6rem .2rem;border-bottom:1px solid #f4f2ec;">
+                ${bar('86px', '12px')}${bar('96px', '12px')}<div style="flex:1;"></div>${bar('70px', '12px')}
+              </div>`).join('')}</div>`;
+        }
+    }
+
+    // Si el GET falla no hay summary que pintar: dejar el esqueleto girando para siempre es peor que el
+    // panel vacío, así que mostramos el error con reintento.
+    function renderPaymentsLoadError() {
+        const coverage = document.getElementById('paymentCoverageCard');
+        if (coverage) {
+            coverage.innerHTML = `<div class="text-center py-2">
+                <div class="text-muted mb-2"><i class="ti ti-alert-triangle me-1"></i>No se pudo cargar la información de pagos.</div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="retryPaymentsBtn"><i class="ti ti-refresh me-1"></i>Reintentar</button>
+              </div>`;
+            document.getElementById('retryPaymentsBtn')?.addEventListener('click', () => loadPayments());
+        }
+        const methodTable = document.getElementById('paymentMethodTable');
+        if (methodTable) { methodTable.innerHTML = ''; methodTable.style.display = 'none'; }
+        const body = document.getElementById('paymentsBody');
+        if (body) body.innerHTML = '<div class="text-center py-3 text-muted">No se pudo cargar el historial de pagos.</div>';
+    }
+
     async function loadPayments() {
+        // Solo en la primera carga: las recargas posteriores a registrar/editar/borrar un pago ya tienen
+        // contenido en pantalla y reemplazarlo por barras se vería como un parpadeo.
+        if (!latestSummary) renderPaymentsSkeleton();
+        let loaded = false;
         try {
             const response = await fetch(`/api/reservations/${reservationId}/payments`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
-            const result = await response.json();
-            paymentsCache = result?.data?.payments || [];
-            if (result?.data?.summary) applyPaymentSummary(result.data.summary);
+            const result = await response.json().catch(() => null);
+            loaded = response.ok && !!result?.data;
+            if (loaded) {
+                paymentsCache = result.data.payments || [];
+                if (result.data.summary) applyPaymentSummary(result.data.summary);
+            } else {
+                console.error('Error loading payments:', response.status, result);
+            }
         } catch (err) {
             console.error('Error loading payments:', err);
         }
+        if (!loaded && !latestSummary) { renderPaymentsLoadError(); return; }
         renderPayments();
     }
 
     function renderPayments() {
         const body = document.getElementById('paymentsBody');
-        const showFormBtn = document.getElementById('showPaymentFormBtn');
         if (!body) return;
 
         const d = reservationData;
         const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
         const curr = d.currency || 'MXN';
 
-        // "Registrar pago" (dentro del carrito) solo si la reservación sigue editable (no cancelada/completada).
-        if (showFormBtn) { if (canEdit) showFormBtn.classList.remove('d-none'); else showFormBtn.classList.add('d-none'); }
+        // "Registrar pago" depende de que la reservación siga editable Y de que no haya formulario abierto.
+        syncAddPaymentBtn();
+        // Contador de pagos en el tab "Historial".
+        const histCount = document.getElementById('historialCount');
+        if (histCount) histCount.textContent = paymentsCache.length ? String(paymentsCache.length) : '';
 
         if (!paymentsCache.length) {
-            body.innerHTML = '<div class="text-center py-3 text-muted">Sin pagos registrados</div>';
+            body.innerHTML = `<div class="text-center py-4">
+                <i class="ti ti-receipt-off" style="font-size:2rem;color:#c9cdbb;"></i>
+                <div class="mt-2 fw-semibold" style="color:#6b6656;">Sin pagos registrados</div>
+                <div class="small text-muted">Los pagos que registres aparecerán aquí.</div>
+            </div>`;
             return;
         }
 
-        const rows = paymentsCache.map((p) => {
-            const ref = p.reference ? PaymentBreakdownHelpers.escapeHtml(p.reference) : '<span class="text-muted">—</span>';
-            // "Recibió" solo aplica al efectivo; en otros métodos es irrelevante y se muestra un guion.
-            const received = (p.method === 'efectivo' && p.receivedBy)
-                ? PaymentBreakdownHelpers.escapeHtml(p.receivedBy) : '<span class="text-muted">—</span>';
-            const receipt = p.receiptUrl
-                ? `<a href="${PaymentBreakdownHelpers.escapeHtml(p.receiptUrl)}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
+        // El backend entrega los pagos ascendentes por paidAt; el historial los muestra por defecto del
+        // más reciente al más viejo (lo último es lo que se viene a revisar).
+        const isDateSort = paymentsSort.key === 'date' || paymentsSort.key === 'created';
+        const sorted = paymentsCache.slice().sort((a, b) => {
+            const dir = paymentsSort.dir === 'asc' ? 1 : -1;
+            if (paymentsSort.key === 'amount') {
+                const diff = (a.amount || 0) - (b.amount || 0);
+                if (diff) return diff * dir;
+            } else {
+                const diff = paymentMs(a, paymentsSort.key) - paymentMs(b, paymentsSort.key);
+                if (diff) return diff * dir;
+            }
+            // Desempate estable (dos pagos del mismo día, o dos del mismo monto): el orden de captura.
+            return (paymentMs(a, 'created') - paymentMs(b, 'created')) * dir;
+        });
+
+        // Agrupar por mes solo tiene sentido con un orden cronológico —y por el mes de LA fecha que se
+        // está ordenando—, y solo aporta cuando hay varios pagos repartidos en más de un mes.
+        const months = new Set(sorted.map((p) => monthKey(p, paymentsSort.key)));
+        const grouped = isDateSort && sorted.length > 4 && months.size > 1;
+
+        let lastMonth = null;
+        const rows = sorted.map((p) => {
+            let groupRow = '';
+            if (grouped && monthKey(p, paymentsSort.key) !== lastMonth) {
+                lastMonth = monthKey(p, paymentsSort.key);
+                const inMonth = sorted.filter((q) => monthKey(q, paymentsSort.key) === lastMonth);
+                const monthSum = inMonth.reduce((acc, q) => acc + (q.amount || 0), 0);
+                groupRow = `<tr class="pay-hist-group"><td colspan="6">${PaymentBreakdownHelpers.escapeHtml(monthLabel(p, paymentsSort.key))}
+                    <span class="pay-hist-group-sum">${inMonth.length} ${inMonth.length === 1 ? 'pago' : 'pagos'} · ${formatCurrency(monthSum, curr)}</span></td></tr>`;
+            }
+            const refLine = p.reference
+                ? `<span class="pay-hist-ref">${PaymentBreakdownHelpers.escapeHtml(p.reference)}</span>
+                   <button type="button" class="pay-hist-act copy-ref-btn" data-ref="${PaymentBreakdownHelpers.escapeHtml(p.reference)}" title="Copiar referencia" aria-label="Copiar referencia" style="width:24px;height:24px;font-size:.85rem;vertical-align:middle;"><i class="ti ti-copy"></i></button>`
                 : '<span class="text-muted">—</span>';
-            return `<tr>
-                <td>${formatDate(p.paidAt || p.createdAt)}</td>
-                <td><span class="badge bg-secondary-subtle text-secondary">${PAYMENT_METHOD_LABELS[p.method] || p.method || '—'}</span></td>
-                <td>${ref}</td>
-                <td>${received}</td>
-                <td class="text-end">${formatCurrency(p.amount, curr)}</td>
-                <td>${p.origCurrency || curr}</td>
-                <td class="text-center">${receipt}</td>
-                <td class="text-end">
-                    ${canEdit ? `<button class="btn btn-sm btn-outline-primary py-0 px-1 edit-payment-btn" data-payment-id="${p.id}" title="Editar"><i class="ti ti-edit"></i></button>
-                    <button class="btn btn-sm btn-outline-danger py-0 px-1 delete-payment-btn" data-payment-id="${p.id}" title="Eliminar"><i class="ti ti-trash"></i></button>` : ''}
+            // Columna PAGO: cuándo se pagó y quién recibió el dinero. "Recibió" solo aplica al efectivo
+            // (en transferencia/tarjeta no hay una persona que lo tome en mano).
+            const receivedLine = (p.method === 'efectivo' && p.receivedBy)
+                ? `<div class="pay-hist-person" title="Recibió el dinero"><i class="ti ti-user"></i>${PaymentBreakdownHelpers.escapeHtml(p.receivedBy)}</div>` : '';
+            // Columna REGISTRO: cuándo se capturó en el sistema y quién lo capturó. Es el par de la
+            // columna de pago, no lo mismo: un pago del día 10 puede capturarse el 28 por otra persona.
+            const registeredLine = p.registeredByName
+                ? `<div class="pay-hist-person" title="Registró el pago"><i class="ti ti-user"></i>${PaymentBreakdownHelpers.escapeHtml(p.registeredByName)}</div>` : '';
+            const registeredAt = p.createdAt ? formatDateTimeShort(p.createdAt) : '<span class="text-muted">—</span>';
+            // El comprobante es una acción más (abrir el archivo), así que vive junto a editar/eliminar.
+            const receipt = p.receiptUrl
+                ? `<a href="${PaymentBreakdownHelpers.escapeHtml(p.receiptUrl)}" target="_blank" rel="noopener" class="pay-hist-act is-receipt" title="Ver comprobante" aria-label="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
+                : '';
+            const [mBg, mFg, mBd] = PAYMENT_METHOD_COLORS[p.method] || PAYMENT_METHOD_COLORS._default;
+            // Moneda distinta a la de la reservación: el monto listado está en la moneda de la reserva,
+            // así que el original se muestra aparte en ámbar en vez de dejar solo un código ambiguo.
+            const isForeign = !!p.origCurrency && p.origCurrency !== curr;
+            const origLine = (isForeign && p.origAmount)
+                ? `<div class="pay-hist-orig">Original ${formatCurrency(p.origAmount, p.origCurrency)}${p.exchangeRate ? ` · TC ${p.exchangeRate}` : ''}</div>` : '';
+            // Fila expandida con el formulario de edición, justo bajo el pago tocado. El contenido lo
+            // dibuja renderPaymentForm después de montar la tabla (necesita el nodo ya en el DOM).
+            const editRow = p.id === editingPaymentId
+                ? `<tr class="pay-hist-edit"><td colspan="6"><div class="pay-hist-form" id="paymentEditWrap"></div></td></tr>` : '';
+            return `${groupRow}<tr${p.id === editingPaymentId ? ' class="is-editing"' : ''}>
+                <td class="pay-hist-date" data-label="Pago">${formatDate(p.paidAt || p.createdAt)}${receivedLine}</td>
+                <td data-label="Método"><span class="pay-hist-method" style="background:${mBg};color:${mFg};border-color:${mBd};">${PaymentBreakdownHelpers.escapeHtml(PAYMENT_METHOD_LABELS[p.method] || p.method || '—')}</span></td>
+                <td data-label="Referencia">${refLine}</td>
+                <td class="pay-hist-meta" data-label="Registro"><div class="pay-hist-stack">${registeredAt}${registeredLine}</div></td>
+                <td class="pay-hist-amount" data-label="Monto">${formatCurrency(p.amount, curr)}<span class="pay-hist-curr${isForeign ? ' is-foreign' : ''}">${PaymentBreakdownHelpers.escapeHtml(p.origCurrency || curr)}</span>${origLine}</td>
+                <td class="pay-hist-actions" data-label="Acciones">
+                    ${receipt}
+                    ${canEdit ? `<button type="button" class="pay-hist-act edit-payment-btn" data-payment-id="${p.id}" title="Editar" aria-label="Editar pago"><i class="ti ti-edit"></i></button>
+                    <button type="button" class="pay-hist-act is-danger delete-payment-btn" data-payment-id="${p.id}" title="Eliminar" aria-label="Eliminar pago"><i class="ti ti-trash"></i></button>` : ''}
                 </td>
-            </tr>`;
+            </tr>${editRow}`;
         }).join('');
 
-        body.innerHTML = `<div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0 small">
-                <thead class="table-light">
+        // Total de lo listado: ancla el historial contra el "Pagado" de la card de cobertura y delata
+        // capturas duplicadas.
+        const total = paymentsCache.reduce((acc, p) => acc + (p.amount || 0), 0);
+        const arrow = paymentsSort.dir === 'asc' ? 'ti-arrow-up' : 'ti-arrow-down';
+        // Reordenar re-monta la tabla, y con ella el formulario inline: se deshabilita mientras hay una
+        // edición abierta para no borrar lo que el usuario está escribiendo.
+        const sortTh = (key, label, align) => `<th style="text-align:${align};">
+            <button type="button" class="pay-hist-sort${paymentsSort.key === key ? ' is-active' : ''}" data-sort-key="${key}"
+                ${editingPaymentId ? 'disabled title="Termina de editar el pago para reordenar"' : ''}
+                aria-label="Ordenar por ${label.toLowerCase()}">${label} <i class="ti ${paymentsSort.key === key ? arrow : 'ti-arrows-sort'}"></i></button>
+        </th>`;
+
+        body.innerHTML = `<table class="pay-hist">
+                <thead>
                     <tr>
-                        <th>Fecha</th>
+                        ${sortTh('date', 'Pago', 'left')}
                         <th>Método</th>
                         <th>Referencia</th>
-                        <th>Recibió</th>
-                        <th class="text-end">Monto</th>
-                        <th>Moneda</th>
-                        <th class="text-center">Comprobante</th>
-                        <th class="text-end">Acciones</th>
+                        ${sortTh('created', 'Registro', 'left')}
+                        ${sortTh('amount', 'Monto', 'right')}
+                        <th style="text-align:right;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
-            </table>
-        </div>`;
+                <tfoot>
+                    <tr>
+                        <td colspan="4" class="pay-hist-foot-label">Total registrado · ${paymentsCache.length} ${paymentsCache.length === 1 ? 'pago' : 'pagos'}</td>
+                        <td class="pay-hist-amount" data-label="Total">${formatCurrency(total, curr)}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>`;
 
+        body.querySelectorAll('.pay-hist-sort').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.sortKey;
+                // Volver a la misma columna invierte el sentido; cambiar de columna arranca descendente
+                // (lo más nuevo / lo más grande primero, que es lo que se busca en ambos casos).
+                if (paymentsSort.key === key) paymentsSort.dir = paymentsSort.dir === 'asc' ? 'desc' : 'asc';
+                else paymentsSort = { key, dir: 'desc' };
+                renderPayments();
+            });
+        });
+        body.querySelectorAll('.copy-ref-btn').forEach((btn) => {
+            btn.addEventListener('click', () => copyToClipboard(btn.dataset.ref || ''));
+        });
         body.querySelectorAll('.edit-payment-btn').forEach((btn) => {
-            btn.addEventListener('click', () => renderPaymentForm(btn.dataset.paymentId));
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.paymentId;
+                // Cerrar primero descarta el otro formulario (alta u otra fila) antes de abrir este.
+                closePaymentForm();
+                editingPaymentId = id;
+                renderPayments();
+            });
         });
         body.querySelectorAll('.delete-payment-btn').forEach((btn) => {
             btn.addEventListener('click', () => deletePayment(btn.dataset.paymentId));
         });
+
+        // El formulario inline se dibuja al final, cuando su contenedor ya está en el DOM. Si el pago
+        // en edición desapareció (lo borró otra pestaña), el estado se limpia solo.
+        if (editingPaymentId) {
+            const editWrap = document.getElementById('paymentEditWrap');
+            if (editWrap) renderPaymentForm(editingPaymentId, editWrap);
+            else editingPaymentId = null;
+        }
     }
 
     // Rellena las secciones del offcanvas (chips / cobertura / saldo restante / descuento) desde el
     // summary AMPLIO. Los % de cada chip y la barra usan coveragePercent/remainingPercent del backend TAL
     // CUAL (no re-derivar en cliente: rompería con ajustes manuales).
+    // "En efectivo ahorras $X" bajo el total: el mismo hint del hero del Resumen Financiero, para que
+    // el ahorro se vea al registrar el pago y no solo al bajar al desglose por método. Devuelve '' si no
+    // hay un método más barato que el cotizado.
+    function cheapestSavingsHint(summary, services, curr) {
+        const H = PaymentBreakdownHelpers;
+        const s = summary || {};
+        const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
+        const anchor = s.anchoredMethod;
+        const cheapest = H.cheapestAvailableMethod(methods, services, curr);
+        if (!cheapest || !anchor || cheapest === anchor) return '';
+        // Mismos totales por método que el resto del panel (subtotal del método + ajustes + propina).
+        const extras = H.round2(s.adjustments) + H.round2(s.tip);
+        const totalFor = (m) => Math.max(0, H.round2(H.computeServicesSubtotalByType(services, m, curr) + extras));
+        const savings = H.round2(totalFor(anchor) - totalFor(cheapest));
+        if (savings < 0.005) return '';
+        return `<div class="pay-savings-hint"><i class="ti ti-discount-2"></i>En ${H.escapeHtml(H.methodLabel(cheapest).toLowerCase())} ahorras ${formatCurrency(savings, curr)}</div>`;
+    }
+
+    // Tabla "Por método de pago": un renglón por método con Total, Cubierto y Restante. Reemplaza los
+    // chips de progreso + la sección de saldo restante, que repetían las mismas barras dos veces.
+    // Total = subtotal por método + ajustes + propina; restante = montoParaSaldar del backend.
+    function buildMethodTableHtml(summary, services, curr) {
+        const H = PaymentBreakdownHelpers;
+        const s = summary || {};
+        const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
+        if (!methods.length) return '';
+        const adjustments = H.round2(s.adjustments);
+        const tip = H.round2(s.tip);
+        const mps = s.montoParaSaldar || {};
+        const isPaid = s.paymentStatus === 'paid';
+        const paid = H.round2(s.paidAmount);
+        const rows = methods.map((m) => {
+            const total = Math.max(0, H.round2(H.computeServicesSubtotalByType(services, m, curr) + adjustments + tip));
+            return {
+                method: m,
+                label: H.methodLabel(m),
+                total,
+                // % cubierto CORRECTO por método = pagado ÷ total del método (distinto en cada método).
+                pct: total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0,
+                // Monto cubierto de ESTE total. Se topa al total del método por la misma razón que el
+                // porcentaje: si lo pagado supera el total de un método más barato, lo excedente es
+                // saldo a favor, no cobertura de este renglón.
+                covered: Math.min(paid, total),
+                remaining: H.round2(mps[m]),
+            };
+        });
+        const cheapest = H.cheapestAvailableMethod(methods, services, curr);
+        const anchor = s.anchoredMethod;
+        const showCheaper = cheapest && anchor && cheapest !== anchor;
+        // Ahorro del método más barato vs. el cotizado, dentro del tag "Más barato".
+        const anchorTotal = (rows.find((r) => r.method === anchor) || {}).total || 0;
+        const savingsVsAnchor = H.round2(anchorTotal - ((rows.find((r) => r.method === cheapest) || {}).total || 0));
+        const thR = 'text-align:right;padding:.45rem .3rem;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#8a8f78;font-weight:700;';
+        const body = rows.map((r) => {
+            const cheap = (showCheaper && r.method === cheapest)
+                ? `<span class="badge ms-2" style="background:#146c43;color:#fff;font-size:.74rem;padding:.32em .6em;">Más barato · ahorra ${formatCurrency(savingsVsAnchor, curr)}</span>` : '';
+            const remainingCell = isPaid
+                ? '<span style="color:#4b6b3f;font-weight:700;">Pagado</span>'
+                : `<span style="font-weight:700;color:#2b2b2b;">${formatCurrency(r.remaining, curr)}</span>`;
+            return `<tr style="border-top:1px solid #f1efe8;">
+                <td style="padding:.55rem .3rem;font-weight:600;">${H.escapeHtml(r.label)}${cheap}</td>
+                <td style="padding:.55rem .3rem;text-align:right;color:#6b6656;">${formatCurrency(r.total, curr)}</td>
+                <td style="padding:.55rem .3rem;text-align:right;">
+                    <div style="font-weight:700;color:#4b6b3f;">${formatCurrency(r.covered, curr)}</div>
+                    <div style="font-size:.76rem;font-weight:600;color:#8a8f78;">${r.pct}%</div>
+                </td>
+                <td style="padding:.55rem .3rem;text-align:right;">${remainingCell}</td>
+            </tr>`;
+        }).join('');
+        return `<table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="text-align:left;padding:.45rem .3rem;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#8a8f78;font-weight:700;">Método</th>
+              <th style="${thR}">Total</th>
+              <th style="${thR}">Cubierto</th>
+              <th style="${thR}">Restante</th>
+            </tr></thead>
+            <tbody>${body}</tbody>
+          </table>`;
+    }
+
     function renderPaymentsOffcanvas() {
         if (!latestSummary) return;
         const services = reservationData?.services || [];
         const curr = reservationData?.currency || 'MXN';
-        const chips = document.getElementById('paymentChips');
         const coverage = document.getElementById('paymentCoverageCard');
-        const remaining = document.getElementById('paymentRemainingByMethod');
-        const discount = document.getElementById('paymentDiscountEmphasis');
-        if (chips) chips.innerHTML = PaymentBreakdownHelpers.buildMethodChips(latestSummary, services, curr);
-        if (coverage) coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr);
-        if (remaining) {
-            const html = PaymentBreakdownHelpers.buildRemainingByMethod(latestSummary, curr);
-            remaining.innerHTML = html;
-            remaining.style.display = html ? '' : 'none';
-        }
-        if (discount) {
-            const html = PaymentBreakdownHelpers.buildDiscountEmphasis(latestSummary, services, curr);
-            discount.innerHTML = html;
-            discount.style.display = html ? '' : 'none';
+        const methodTable = document.getElementById('paymentMethodTable');
+        if (coverage) coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr, cheapestSavingsHint(latestSummary, services, curr));
+        if (methodTable) {
+            const html = buildMethodTableHtml(latestSummary, services, curr);
+            methodTable.innerHTML = html;
+            methodTable.style.display = html ? '' : 'none';
         }
     }
 
@@ -710,6 +1677,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         else reservationData.payment = { ...summary };
         renderFinancialSummary();
         renderPaymentsOffcanvas();
+        // Si el panel se abrió antes de que llegara el summary, este es el momento de desplegar el alta.
+        maybeOpenAddForm();
     }
 
     // Read a File as base64 (strip the "data:...;base64," prefix) for the JSON receipt upload.
@@ -746,9 +1715,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     // Inline payment form (dentro de #paymentsOffcanvas). null = nuevo, id = editar el pago.
-    function renderPaymentForm(paymentId) {
-        const wrap = document.getElementById('paymentFormWrap');
+    // targetWrap permite dibujarlo en dos sitios: el contenedor fijo del alta o la fila expandida del
+    // historial (edición). Todo lo demás es idéntico.
+    function renderPaymentForm(paymentId, targetWrap) {
+        const wrap = targetWrap || document.getElementById('paymentFormWrap');
         if (!wrap) return;
+        // Alta = sin id y en el contenedor fijo. Marca el estado para que el botón que lo abrió ceda su
+        // lugar al formulario.
+        if (!paymentId && !targetWrap) addPaymentFormOpen = true;
+        syncAddPaymentBtn();
         const existing = paymentId ? paymentsCache.find((p) => p.id === paymentId) : null;
         const curr = existing?.origCurrency || 'MXN';
         const paidAt = existing?.paidAt ? new Date(existing.paidAt).toISOString().slice(0, 10) : '';
@@ -756,7 +1731,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const paidAtMax = (() => { const dt = new Date(); dt.setFullYear(dt.getFullYear() + 20); return dt.toISOString().slice(0, 10); })();
         const opt = (v, label, sel) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${label}</option>`;
         const receiptLink = existing?.receiptUrl
-            ? `<a href="${existing.receiptUrl}" target="_blank" class="small d-block mt-1"><i class="ti ti-file-invoice me-1"></i>Ver comprobante actual</a>` : '';
+            ? `<a href="${existing.receiptUrl}" target="_blank" rel="noopener" class="pay-receipt-chip"><i class="ti ti-file-invoice"></i>Ver comprobante actual</a>` : '';
 
         // Método: poblado dinámicamente desde availableMethods (Fase C), NUNCA hardcodeado a 3 opciones.
         // Al editar, se conserva el método guardado aunque ya no esté disponible (no cambiarlo en silencio).
@@ -773,13 +1748,22 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const amountInit = existing ? (existing.origAmount ?? existing.amount ?? '') : '';
 
+        // Sin encabezado propio: la fila resaltada de arriba (o el botón que lo abrió) ya dice de qué
+        // pago se trata, así que un título + separador solo restaba alto útil. El dato se conserva como
+        // etiqueta en el pie, que tenía todo el lado izquierdo vacío.
+        const contextLabel = existing
+            ? `Editando el pago del ${formatDate(existing.paidAt || existing.createdAt)}`
+            : 'Nuevo pago';
+        wrap.classList.add('pay-form');
         wrap.innerHTML = `
-            <h6 class="fw-bold mb-2">${existing ? '<i class="ti ti-edit me-1"></i>Editar pago' : '<i class="ti ti-cash me-1"></i>Registrar pago'}</h6>
             <input type="hidden" id="paymentId" value="${existing ? existing.id : ''}">
             <div class="row g-3">
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentAmount">Monto</label>
-                    <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentAmount" placeholder="0.00" value="${amountInit}">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text" id="paymentAmountPrefix">${curr === 'USD' ? 'USD $' : '$'}</span>
+                        <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentAmount" placeholder="0.00" value="${amountInit}">
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label fw-semibold small" for="paymentCurrency">Moneda</label>
@@ -793,27 +1777,35 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
                     <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}" required>
                 </div>
-                <div class="col-md-6">
+                <div class="${method === 'efectivo' ? 'col-md-4' : 'col-md-8'}" id="paymentReferenceWrap">
                     <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
                     <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${PaymentBreakdownHelpers.escapeHtml(existing?.reference || '')}">
                 </div>
-                <div class="col-md-6" id="paymentReceivedByWrap" style="display:${method === 'efectivo' ? '' : 'none'};">
+                <div class="col-md-4" id="paymentReceivedByWrap" style="display:${method === 'efectivo' ? '' : 'none'};">
                     <label class="form-label fw-semibold small" for="paymentReceivedBy">¿Quién recibió el efectivo?</label>
                     <input type="text" class="form-control form-control-sm" id="paymentReceivedBy" maxlength="100" placeholder="Nombre de quien recibió" value="${PaymentBreakdownHelpers.escapeHtml(existing?.receivedBy || '')}" ${method === 'efectivo' ? 'required' : ''}>
                 </div>
-                <div class="col-12">
+                <div class="col-md-5">
                     <label class="form-label fw-semibold small" for="paymentReceipt">Comprobante (imagen o PDF)</label>
-                    <input type="file" class="form-control form-control-sm" id="paymentReceipt" accept="image/*,application/pdf">
-                    ${receiptLink}
+                    <div class="pay-drop" id="paymentReceiptDrop">
+                        <input type="file" id="paymentReceipt" accept="image/*,application/pdf">
+                        <div class="pay-file-row">
+                            <label class="pay-file-btn" for="paymentReceipt"><i class="ti ti-paperclip"></i>Adjuntar</label>
+                            <button type="button" class="pay-file-clear d-none" id="paymentReceiptClear" title="Quitar archivo" aria-label="Quitar archivo"><i class="ti ti-x"></i></button>
+                        </div>
+                        <span class="pay-file-name" id="paymentReceiptName">o arrastra el archivo aquí</span>
+                        ${receiptLink}
+                    </div>
                 </div>
-                <div class="col-12">
+                <div class="col-md-7">
                     <label class="form-label fw-semibold small" for="paymentNotes">Notas</label>
                     <textarea class="form-control form-control-sm" id="paymentNotes" rows="2" maxlength="300" placeholder="Notas del pago">${PaymentBreakdownHelpers.escapeHtml(existing?.notes || '')}</textarea>
                 </div>
             </div>
-            <div class="d-flex justify-content-end gap-2 mt-3">
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelPaymentBtn">Cancelar</button>
-                <button type="button" class="btn btn-sm btn-primary px-4" id="savePaymentBtn"><i class="ti ti-check me-1"></i>Guardar</button>
+            <div class="pay-form-actions">
+                <span class="pay-form-context">${existing ? '<i class="ti ti-edit"></i>' : '<i class="ti ti-cash"></i>'}${PaymentBreakdownHelpers.escapeHtml(contextLabel)}</span>
+                <button type="button" class="btn btn-outline-secondary" id="cancelPaymentBtn">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="savePaymentBtn"><i class="ti ti-check me-1"></i>Guardar</button>
             </div>`;
         // El formulario vive dentro del offcanvas (posición fija con scroll propio): se muestra en su
         // sitio y se desplaza a la vista dentro del panel, sin scrollIntoView de página ni borde inline.
@@ -822,7 +1814,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const saveBtn = document.getElementById('savePaymentBtn');
         // Sin métodos disponibles (H3): no se puede registrar/editar el pago — bloquea el guardado.
         if (methodDisabled && saveBtn) saveBtn.disabled = true;
-        document.getElementById('cancelPaymentBtn').addEventListener('click', () => { wrap.style.display = 'none'; wrap.innerHTML = ''; });
+        document.getElementById('cancelPaymentBtn').addEventListener('click', () => closePaymentForm());
         saveBtn.addEventListener('click', () => savePayment(existing ? existing.id : ''));
         attachThousands(document.getElementById('paymentAmount'));
 
@@ -835,21 +1827,105 @@ document.addEventListener('DOMContentLoaded', async function() {
             const inputEl = document.getElementById('paymentReceivedBy');
             if (wrapEl) wrapEl.style.display = isCash ? '' : 'none';
             if (inputEl) inputEl.required = !!isCash;
+            // Referencia absorbe el ancho de "¿Quién recibió?" cuando está oculto, para que el renglón
+            // siempre cierre las 12 columnas y no quede el hueco a la derecha.
+            const refWrap = document.getElementById('paymentReferenceWrap');
+            if (refWrap) {
+                refWrap.classList.toggle('col-md-4', !!isCash);
+                refWrap.classList.toggle('col-md-8', !isCash);
+            }
         }
         if (methodSel) methodSel.addEventListener('change', syncReceivedByVisibility);
         syncReceivedByVisibility();
+
+        // Zona de comprobante: el input nativo está oculto, así que el nombre del archivo elegido y el
+        // botón para quitarlo son la única señal de qué se adjuntó.
+        const receiptInput = document.getElementById('paymentReceipt');
+        const receiptName = document.getElementById('paymentReceiptName');
+        const receiptClear = document.getElementById('paymentReceiptClear');
+        const receiptDrop = document.getElementById('paymentReceiptDrop');
+        function syncReceiptName() {
+            if (!receiptInput || !receiptName) return;
+            const picked = receiptInput.files && receiptInput.files[0];
+            receiptName.textContent = picked ? picked.name : 'o arrastra el archivo aquí';
+            receiptName.title = picked ? picked.name : '';
+            receiptName.classList.toggle('has-file', !!picked);
+            if (receiptClear) receiptClear.classList.toggle('d-none', !picked);
+        }
+        if (receiptInput) receiptInput.addEventListener('change', syncReceiptName);
+        if (receiptClear && receiptInput) {
+            receiptClear.addEventListener('click', () => { receiptInput.value = ''; syncReceiptName(); });
+        }
+        // Arrastrar y soltar sobre la zona. Se asigna vía DataTransfer porque input.files es de solo
+        // lectura salvo con una FileList real.
+        if (receiptDrop && receiptInput) {
+            ['dragenter', 'dragover'].forEach((ev) => receiptDrop.addEventListener(ev, (e) => {
+                e.preventDefault();
+                receiptDrop.classList.add('is-dragover');
+            }));
+            // relatedTarget dentro de la zona = solo se pasó sobre un hijo, no es una salida real.
+            receiptDrop.addEventListener('dragleave', (e) => {
+                if (!receiptDrop.contains(e.relatedTarget)) receiptDrop.classList.remove('is-dragover');
+            });
+            receiptDrop.addEventListener('drop', (e) => {
+                e.preventDefault();
+                receiptDrop.classList.remove('is-dragover');
+                const dropped = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                if (!dropped) return;
+                const dt = new DataTransfer();
+                dt.items.add(dropped);
+                receiptInput.files = dt.files;
+                syncReceiptName();
+            });
+        }
+
+        // El prefijo del monto sigue a la moneda elegida, para que no quede "$" sobre un importe en USD.
+        const currencySel = document.getElementById('paymentCurrency');
+        const amountPrefix = document.getElementById('paymentAmountPrefix');
+        if (currencySel && amountPrefix) {
+            currencySel.addEventListener('change', () => {
+                amountPrefix.textContent = currencySel.value === 'USD' ? 'USD $' : '$';
+            });
+        }
     }
 
-    // "Agregar pago" (header): abre el carrito. El formulario queda colapsado detrás de "Registrar pago".
-    document.getElementById('addPaymentBtn')?.addEventListener('click', () => {
-        paymentsOffcanvasInstance()?.show();
+    // "Agregar pago": abre el carrito. Como es la ÚNICA puerta de entrada al panel, la intención es
+    // siempre registrar un pago: el formulario se despliega solo (ver maybeOpenAddForm).
+    // El botón vive dentro del hero, que se re-renderiza en cada pago, así que se cablea por delegación
+    // sobre el contenedor estable del Resumen Financiero.
+    document.getElementById('financialSummaryCard')?.addEventListener('click', (e) => {
+        if (e.target.closest('#addPaymentBtn')) {
+            pendingAddForm = true;
+            paymentsOffcanvasInstance()?.show();
+        }
     });
+    // El hint "En efectivo ahorras…" solo tiene sentido colapsado (al expandir se duplica con la fila
+    // del comparativo), así que se oculta mientras el comparativo está abierto. Eventos de Bootstrap
+    // Collapse (burbujean) delegados en el contenedor estable, para sobrevivir al re-render del hero.
+    const toggleSavingsHint = (show) => {
+        const hint = document.querySelector('.fin-hero-hint');
+        if (hint) hint.style.display = show ? '' : 'none';
+    };
+    document.getElementById('financialSummaryCard')?.addEventListener('show.bs.collapse', (e) => {
+        if (e.target.id === 'paymentMethodComparison') toggleSavingsHint(false);
+    });
+    document.getElementById('financialSummaryCard')?.addEventListener('hide.bs.collapse', (e) => {
+        if (e.target.id === 'paymentMethodComparison') toggleSavingsHint(true);
+    });
+    // Al terminar la animación de apertura: si el summary ya está, el formulario se despliega solo.
+    document.getElementById('paymentsOffcanvas')?.addEventListener('shown.bs.offcanvas', () => maybeOpenAddForm());
     // "Registrar pago" (dentro del carrito): muestra el formulario de nuevo pago sin reabrir el panel.
-    document.getElementById('showPaymentFormBtn')?.addEventListener('click', () => renderPaymentForm(null));
+    // Cierra antes cualquier edición inline abierta en el historial (un solo formulario a la vez).
+    document.getElementById('showPaymentFormBtn')?.addEventListener('click', () => {
+        closePaymentForm();
+        renderPaymentForm(null);
+    });
     // Cerrar el carrito (backdrop-click / Escape / botón) descarta el formulario en silencio (H5).
     document.getElementById('paymentsOffcanvas')?.addEventListener('hidden.bs.offcanvas', () => {
-        const wrap = document.getElementById('paymentFormWrap');
-        if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+        // Cerrar con el summary aún en vuelo dejaría la bandera levantada y el formulario se abriría solo
+        // la próxima vez, sin que nadie lo pidiera.
+        pendingAddForm = false;
+        closePaymentForm();
     });
 
     async function savePayment(paymentId) {
@@ -920,8 +1996,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // el pago se queda — solo avisamos para que el usuario reintente el comprobante.
                 let receiptWarn = result.warning || null;
                 if (file && savedId) receiptWarn = await uploadReceipt(savedId, file);
-                const wrap = document.getElementById('paymentFormWrap');
-                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+                closePaymentForm();
                 applyPaymentSummary(result.data?.summary);
                 await loadPayments();
                 if (receiptWarn) pmToast(receiptWarn, 'warning');
@@ -946,12 +2021,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                 await loadPayments();
                 saved = paymentsCache.length > prevCount;
             }
-            const wrap = document.getElementById('paymentFormWrap');
             if (saved) {
-                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+                closePaymentForm();
                 pmToast('Pago guardado (se recuperó tras un corte de conexión)', 'success');
             } else if (isEdit) {
-                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+                closePaymentForm();
                 pmToast('La respuesta se perdió, pero la lista ya se actualizó — verifica que el pago sea correcto.', 'warning');
             } else {
                 pmToast('No se pudo confirmar el guardado. Revisa la lista; si el pago no aparece, regístralo otra vez.', 'warning');
@@ -1146,6 +2220,19 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (sub.hotelName) tags.push(tag('building', sub.hotelName, 'secondary'));
             if (sub.isWalkingTour) tags.push(tag('walk', `Walking tour (${sub.walkingTourPeopleCount || 0} pax)`, 'info'));
             if (sub.persons) tags.push(tag('users', `${sub.persons} persona${sub.persons > 1 ? 's' : ''}`, 'primary'));
+            // Entradas asociadas al/los destino(s) del tour (boletos de acceso): nombre + ×cantidad si > 1.
+            if (Array.isArray(sub.tourEntradas)) {
+                const incEntradas = sub.tourEntradas.filter((e) => e && e.included !== false);
+                if (incEntradas.length) {
+                    const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+                    }[ch]));
+                    const listEnt = incEntradas
+                        .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+                        .join(', ');
+                    tags.push(tag('ticket', `Entradas: ${listEnt}`, 'primary'));
+                }
+            }
         }
 
         // Experience-specific details
@@ -1156,6 +2243,19 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (sub.adultsNoAlcoholQuantity) tickets.push(`${sub.adultsNoAlcoholQuantity} sin alcohol`);
             if (tickets.length) tags.push(tag('ticket', tickets.join(', '), 'primary'));
             if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
+            // Entradas asociadas a la experiencia (boletos de acceso): nombre + ×cantidad si > 1.
+            if (Array.isArray(sub.experienceEntradas)) {
+                const incEntradas = sub.experienceEntradas.filter((e) => e && e.included !== false);
+                if (incEntradas.length) {
+                    const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+                    }[ch]));
+                    const listEnt = incEntradas
+                        .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+                        .join(', ');
+                    tags.push(tag('ticket', `Entradas: ${listEnt}`, 'primary'));
+                }
+            }
         }
 
         // A Disposición-specific details

@@ -197,6 +197,10 @@
                         border-left-color: ${this.config.typeColors['a-disposicion']};
                     }
 
+                    .service-card.entrada {
+                        border-left-color: ${this.config.typeColors.entrada};
+                    }
+
                     .service-header {
                         display: flex;
                         justify-content: space-between;
@@ -603,7 +607,15 @@
                 // esta línea lo hace visible en el resumen. Se escala por la forma de pago (getServiceDiscount)
                 // para que coincida con el descuento que getServicePrice ya restó al precio mostrado.
                 if (Number(service.discountAmount) > 0) {
-                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(this.getServiceDiscount(service))}</div>`;
+                    html += service.discountType === 'percent'
+                        ? `<div class="service-discount small text-success">Descuento ${service.discountValue}%</div>`
+                        : `<div class="service-discount small text-success">Descuento −${this.formatCurrency(this.getServiceDiscount(service))}</div>`;
+                }
+                // Descuento por volumen (a-disposición): el precio ya viene con el descuento aplicado
+                // (pricesByType); esta línea solo lo hace VISIBLE en la lista/resumen. Sólo el texto,
+                // sin % ni monto (el monto se muestra en el desglose del modal).
+                if (service.type === 'a-disposicion' && Number(service.discountPercent) > 0) {
+                    html += `<div class="service-discount small text-success">Descuento por volumen</div>`;
                 }
                 // Fase 2: propina por servicio (línea aparte, aditiva; se suma al total).
                 const svcTip = this.getServiceTip(service);
@@ -714,6 +726,38 @@
                 html += `<div class="service-detail-item text-success mt-1">
                     <i class="ti ti-user me-1"></i>
                     <strong>${service.type === 'tour' ? 'Incluye Guía + Driver' : 'Incluye Guía'}</strong>
+                </div>`;
+            }
+
+            // Entradas asociadas a la experiencia (informativas): nombre + ×cantidad si > 1.
+            if (service.type === 'experience' && Array.isArray(service.experienceEntradas)
+                && service.experienceEntradas.some((e) => e && e.included !== false)) {
+                const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+                }[ch]));
+                const entList = service.experienceEntradas
+                    .filter((e) => e && e.included !== false)
+                    .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+                    .join(', ');
+                html += `<div class="service-detail-item mt-1">
+                    <i class="ti ti-ticket me-1 text-primary"></i>
+                    <span class="text-muted me-1">Entradas:</span>${entList}
+                </div>`;
+            }
+
+            // Entradas asociadas al/los destino(s) del tour (informativas): nombre + ×cantidad si > 1.
+            if (service.type === 'tour' && Array.isArray(service.tourEntradas)
+                && service.tourEntradas.some((e) => e && e.included !== false)) {
+                const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+                    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+                }[ch]));
+                const entList = service.tourEntradas
+                    .filter((e) => e && e.included !== false)
+                    .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+                    .join(', ');
+                html += `<div class="service-detail-item mt-1">
+                    <i class="ti ti-ticket me-1 text-primary"></i>
+                    <span class="text-muted me-1">Entradas:</span>${entList}
                 </div>`;
             }
 
@@ -1214,7 +1258,9 @@
                 // Fase 1: descuento por servicio (transporte). El precio ya viene con descuento (pricesByType);
                 // la etiqueta se escala por la forma de pago (getServiceDiscount) para coincidir con él.
                 if (Number(service.discountAmount) > 0) {
-                    html += `<div class="service-discount small text-success">Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(this.getServiceDiscount(service))}</div>`;
+                    html += service.discountType === 'percent'
+                        ? `<div class="service-discount small text-success">Descuento ${service.discountValue}%</div>`
+                        : `<div class="service-discount small text-success">Descuento −${this.formatCurrency(this.getServiceDiscount(service))}</div>`;
                 }
                 // Fase 2: propina por servicio (línea aparte, aditiva; se suma al total).
                 const svcTip = this.getServiceTip(service);

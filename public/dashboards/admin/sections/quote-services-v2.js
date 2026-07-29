@@ -137,6 +137,8 @@ class ItineraryBuilder {
     // Cache for API data
     this.vehiclesCache = null;
     this.experiencesCache = new Map();
+    this.entradasCache = new Map(); // Catálogo de Entradas (boletos de admisión): key 'all' -> array
+    this._experienceEntradasCache = new Map(); // experienceId -> array de entradas asociadas
     this.toursCache = new Map();
     // Destinos adicionales combinados en un tour (array de tourId). El mínimo de horas del tour
     // toma el mayor de los mínimos de todos los destinos; el precio del vehículo es del principal.
@@ -306,6 +308,7 @@ class ItineraryBuilder {
         this.loadVehicles(),
         this.loadAllRates(),
         this.loadAllExperiences(),
+        this.loadAllEntradas(),
         this.loadAllTours(),
         this.loadAllTourPrices(),
         this.loadVehicleTypes(),
@@ -820,12 +823,25 @@ class ItineraryBuilder {
       this.handleExperienceSelection(newExpId);
     });
 
+    // Entrada selection handler: autollena el precio unitario del catálogo (editable).
+    document.getElementById('entradaSelect')?.addEventListener('change', (e) => {
+      this.serviceModified = true;
+      this.resetMainPriceManualEdit(); // nueva entrada → reautollenar precio de catálogo
+      this.handleEntradaSelection(e.target.value);
+    });
+    // Cantidad de entradas → recalcular el total del servicio.
+    document.getElementById('entradaQuantity')?.addEventListener('input', () => {
+      this.serviceModified = true;
+      this.updateServicePriceBreakdown();
+    });
+
     // Tour selection handler
     document.getElementById('tourSelect')?.addEventListener('change', (e) => {
       this.serviceModified = true; // Mark as modified when user changes tour selection
       this.resetMainPriceManualEdit(); // nuevo tour → reautollenar precio de catálogo
       // Cambiar el destino principal reinicia los destinos adicionales combinados.
       this.additionalTourIds = [];
+      this._restoreTourEntradas = null; // selección manual = fresca; descarta cualquier restore pendiente
       this.handleTourSelection(e.target.value);
       this.updateAdditionalDestinationsUI();
       // Bug fix: al cambiar de tour con un segmento YA seleccionado, los vehículos quedaban los del
@@ -847,6 +863,7 @@ class ItineraryBuilder {
       this.additionalTourIds.push(id);
       this.renderAdditionalDestinationChips();
       this.populateAdditionalDestinationSelect();
+      this.refreshTourEntradas(); // nuevo destino → recargar sus entradas (preserva ediciones)
       this.recalcTourMinHours();
       // Walking: regenerar los inputs de tier desde el tour ganador (más caro) antes de recalcular
       // el precio (el desglose lee esos inputs). En vehículo no aplica (no cambia el precio).
@@ -861,6 +878,7 @@ class ItineraryBuilder {
       this.additionalTourIds = (this.additionalTourIds || []).filter((x) => x !== btn.dataset.tourId);
       this.renderAdditionalDestinationChips();
       this.populateAdditionalDestinationSelect();
+      this.refreshTourEntradas(); // destino removido → recargar entradas (preserva ediciones)
       this.recalcTourMinHours();
       this.refreshWalkingTourGroupInputs();
       this.updateServicePriceBreakdown();
@@ -1094,7 +1112,11 @@ class ItineraryBuilder {
     ];
 
     experienceFields.forEach((fieldId) => {
+      const isPeopleQty = ['adultsQuantity', 'childrenQuantity', 'adultsNoAlcoholQuantity'].includes(fieldId);
       document.getElementById(fieldId)?.addEventListener('input', () => {
+        // Al cambiar las cantidades de personas, auto-llenar la cantidad de cada entrada con la suma
+        // (adultos + niños + sin-alcohol): cada persona = 1 boleto.
+        if (isPeopleQty) this.syncExperienceEntradaQtys();
         this.updateDevPaymentBreakdown();
         // Small delay to ensure dev breakdown is updated before service breakdown reads it
         setTimeout(() => {
@@ -1110,7 +1132,16 @@ class ItineraryBuilder {
       'conceptoAdultsQuantity', 'conceptoChildrenQuantity', 'conceptoAdultsNoAlcoholQuantity'].forEach((id) => {
         const field = document.getElementById(id);
         if (!field) return;
-        const update = () => this.updateServicePriceBreakdown();
+        const isTourPeopleQty = ['tourAdultsQuantity', 'tourChildrenQuantity', 'tourInfantsQuantity'].includes(id);
+        const update = () => {
+          // Al cambiar el nº de personas del tour, auto-llenar la cantidad de cada entrada (1 boleto
+          // por persona) y recomputar el desglose (que ya incluye el costo de entradas).
+          if (isTourPeopleQty) {
+            this.syncTourEntradaQtys();
+            this.updateDevPaymentBreakdown();
+          }
+          this.updateServicePriceBreakdown();
+        };
         field.addEventListener('keydown', preventNonIntegerChars);
         field.addEventListener('paste', handlePricePaste);
         field.addEventListener('input', sanitizeIntegerInput);
@@ -1241,6 +1272,10 @@ class ItineraryBuilder {
       // Marcar cambios y agendar el autosave: sin esto, la propina global vivía solo en memoria y
       // no se persistía (al navegar al resumen o recargar se perdía).
       this.hasUnsavedChanges = true;
+      // Feedback inmediato: los controles de propina viven FUERA de day/serviceForm, así que el
+      // 'input' de setupAutoSave no los cubre y el estado solo cambiaba al arrancar el autosave (2s).
+      // Mostramos "Guardando…" al instante para que el usuario sepa que su cambio se va a guardar.
+      if (this.updateSaveStatus) this.updateSaveStatus('saving');
       if (this.scheduleAutoSave) this.scheduleAutoSave();
     };
     ['applyGlobalTip', 'globalTipType', 'globalTipValue', 'globalTipMandatory'].forEach((id) => {
@@ -1263,6 +1298,7 @@ class ItineraryBuilder {
       const v = parseFloat(document.getElementById('suggestedTipPct')?.value || 0);
       this.suggestedTipPct = (Number.isFinite(v) && v >= 0) ? v : 10;
       this.hasUnsavedChanges = true;
+      if (this.updateSaveStatus) this.updateSaveStatus('saving'); // feedback inmediato (control fuera del form)
       if (this.scheduleAutoSave) this.scheduleAutoSave();
       this.updateTotals();
     };
@@ -1412,6 +1448,7 @@ class ItineraryBuilder {
         );
         if (selectedTour?.isWalkingTour) {
           this.highlightWalkingTourTier(selectedTour);
+          this.syncTourEntradaQtys(); // nº de personas del walking cambió → 1 boleto por persona
           this.updateServicePriceBreakdown();
           this.updateDevPaymentBreakdown();
         }
@@ -2139,8 +2176,8 @@ class ItineraryBuilder {
     // transporte y para tour con traslado. Reubica el campo Precio (compartido). Idempotente.
     this.syncMainVehiclePriceLayout();
 
-    if (type === 'concepto' || type === 'experience' || type === 'a-disposicion') {
-      // Hide category, vehicle and guide for Concepto and Experience
+    if (type === 'concepto' || type === 'experience' || type === 'a-disposicion' || type === 'entrada') {
+      // Hide category, vehicle and guide for Concepto, Experience, A Disposición y Entradas
       categoryField?.classList.add('d-none');
       vehicleField?.classList.add('d-none');
       guideField?.classList.add('d-none');
@@ -2207,6 +2244,25 @@ class ItineraryBuilder {
 
         // Populate rate dropdown for A Disposición
         this.populateADisposicionRates();
+      } else if (type === 'entrada') {
+        // Entradas: precio UNITARIO editable en el campo estándar (#servicePrice) × Cantidad
+        // (#entradaQuantity). A diferencia de experiencia (precios adulto/niño propios), SÍ muestra
+        // standardPricingSection. Oculta la cantidad genérica (usa su propio #entradaQuantity).
+        document.getElementById('standardPricingSection')?.classList.remove('d-none');
+        quantityField?.classList.add('d-none');
+        document.getElementById('serviceQuantity')?.removeAttribute('required');
+        priceField?.setAttribute('required', 'required');
+        currencyField?.setAttribute('required', 'required');
+        priceTypeField?.setAttribute('required', 'required');
+        if (priceLabel) {
+          priceLabel.innerHTML = 'Precio <small class="text-muted">(efectivo, por entrada)</small> <span class="text-danger">*</span>';
+        }
+        if (currencyLabel) {
+          currencyLabel.innerHTML = 'Moneda <span class="text-danger">*</span>';
+        }
+        if (priceTypeLabel) {
+          priceTypeLabel.innerHTML = 'Pago <span class="text-danger">*</span>';
+        }
       } else {
         // Hide quantity field for Experience (uses its own quantity fields)
         // La experiencia usa sus propios precios (adulto/niño/sin alcohol); ocultar el genérico.
@@ -2380,6 +2436,7 @@ class ItineraryBuilder {
       transport: 'transportContent',
       'a-disposicion': 'aDisposicionContent',
       concepto: 'conceptoContent',
+      entrada: 'entradaContent',
     };
 
     const contentId = contentMap[type];
@@ -2444,6 +2501,15 @@ class ItineraryBuilder {
           servicePriceField.classList.remove('readonly-price');
           servicePriceField.style.backgroundColor = '';
         }
+      } else if (type === 'entrada') {
+        // Entradas: precio unitario SIEMPRE editable (autollenado del catálogo, sin ClientPrices).
+        if (servicePriceField) {
+          servicePriceField.readOnly = false;
+          servicePriceField.removeAttribute('readonly');
+          servicePriceField.removeAttribute('data-readonly');
+          servicePriceField.classList.remove('readonly-price');
+          servicePriceField.style.backgroundColor = '';
+        }
       }
     } else {
       // Non-admin users cannot edit prices for transport/a-disposicion
@@ -2464,6 +2530,11 @@ class ItineraryBuilder {
     // Load tours when tour type is selected
     if (type === 'tour' && this.currentDayId) {
       this.loadDayTours(this.currentDayId);
+    }
+
+    // Populate the global entradas dropdown when Entradas type is selected.
+    if (type === 'entrada') {
+      this.populateEntradaSelect();
     }
 
     // Repopulate rates dropdown to filter based on service type
@@ -3552,15 +3623,45 @@ class ItineraryBuilder {
         return diff(basePrice, this._mainVehicleCatalogPrice);
       case 'a-disposicion':
         return diff(basePrice, this._disposicionHourlyRate);
+      case 'entrada': {
+        // Personalizado si el precio UNITARIO (#servicePrice) difiere del precio de catálogo de la
+        // entrada. basePrice aquí es el total (unitario × cantidad), así que se lee el unitario directo.
+        const all = (this.entradasCache && this.entradasCache.get('all')) || [];
+        const ent = all.find((e) => e && (e.id === data.entradaId || e.objectId === data.entradaId));
+        if (!ent) return false;
+        const unit = parseFloat(document.getElementById('servicePrice')?.value || 0) || 0;
+        return diff(unit, ent.price);
+      }
       case 'tour':
         // Walking tours use tier-based pricing (no manual override possible).
         if (data.isWalkingTour) return false;
         return diff(basePrice, this.lastValidTourPrice);
       case 'experience': {
-        const cat = (this.calculatedPrices && this.calculatedPrices.experience) || {};
-        return diff(data.adultPrice, cat.adult)
-          || diff(data.childPrice, cat.child)
-          || diff(data.noAlcoholPrice, cat.noAlcohol);
+        // Precios de lista AUTORITATIVOS desde el catálogo (por experienceId). calculatedPrices.experience
+        // se llena condicionalmente (arranca en 0/{}) y puede quedar stale de una selección previa o en 0
+        // cuando el catálogo no trae child/noAlcohol -> diff(valor_input, 0) marcaba "personalizado" falso.
+        // El cache siempre refleja la experiencia actual; un campo sin precio de lista queda null y diff()
+        // lo ignora (b == null -> false), así que "input == precio de lista" nunca es personalizado.
+        let cat = (this.calculatedPrices && this.calculatedPrices.experience) || {};
+        const all = this.experiencesCache && this.experiencesCache.get('all');
+        if (Array.isArray(all) && data.experienceId) {
+          const exp = all.find((e) => e && (e.id === data.experienceId || e.objectId === data.experienceId));
+          if (exp) {
+            // cost || price = misma lógica que autollena el input adulto (adultCatalogPrice) y el caption
+            // "Lista: $X", para que coincidan exactamente cuando el usuario no cambió nada.
+            cat = { adult: exp.cost || exp.price, child: exp.price_child, noAlcohol: exp.price_no_alcohol };
+          }
+        }
+        // Campo vacío = NO personalizado (mismo criterio que el desglose): leer el input crudo y tratar
+        // '' como null, en vez de data.*Price (parseFloat(||0) convierte vacío en 0 y diff(0, lista) lo
+        // marcaría personalizado falsamente).
+        const expVal = (id) => {
+          const v = document.getElementById(id)?.value;
+          return (v === '' || v == null) ? null : parseFloat(v);
+        };
+        return diff(expVal('adultPrice'), cat.adult)
+          || diff(expVal('childPrice'), cat.child)
+          || diff(expVal('noAlcoholPrice'), cat.noAlcohol);
       }
       default:
         return false;
@@ -3681,10 +3782,15 @@ class ItineraryBuilder {
       const childPrice = parseFloat(document.getElementById('childPrice')?.value || 0) || adultPrice;
       const noAlcoholPrice = parseFloat(document.getElementById('noAlcoholPrice')?.value || 0) || adultPrice;
 
+      // Entradas asociadas: si el toggle está ON, se suma Σ(precio × cantidad de incluidas) al total.
+      // La cantidad ya es el nº de boletos (default = personas), así que NO se multiplica por personas.
+      const entradasCostMXN = this.getExperienceEntradasCostMXN();
+
       // Calculate base total (efectivo)
       const baseTotal = (adultsQty * adultPrice)
         + (childrenQty * childPrice)
-        + (noAlcoholQty * noAlcoholPrice);
+        + (noAlcoholQty * noAlcoholPrice)
+        + entradasCostMXN;
 
       // Recargo por forma de pago vía el motor único (un solo nodo: el total base).
       const experiencePricing = window.PricingEngine
@@ -3716,6 +3822,32 @@ class ItineraryBuilder {
         pricesByType,
         transferRate: this.transferRate,
         agencyRate: this.agencyRate,
+      });
+    } else if (type === 'entrada') {
+      // Entradas: precio UNITARIO (efectivo) × Cantidad, con recargo por forma de pago (un solo nodo,
+      // mismo motor que experiencia). El precio unitario editable vive en #servicePrice.
+      const unitPrice = parseFloat(document.getElementById('servicePrice')?.value || 0) || 0;
+      const qty = parseInt(document.getElementById('entradaQuantity')?.value || 1, 10) || 1;
+      const baseTotal = unitPrice * qty;
+      const entradaPricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: baseTotal, surcharge: true }],
+        })
+        : {
+          efectivo: baseTotal,
+          transferencia: baseTotal * (1 + (this.transferRate / 100)),
+          tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
+        };
+      pricesByType = {
+        efectivo: entradaPricing.efectivo,
+        transferencia: entradaPricing.transferencia,
+        tarjeta: entradaPricing.tarjeta,
+      };
+      basePriceEfectivo = baseTotal;
+      qsDevLog('✅ COLLECT SERVICE DATA - Entrada pricesByType:', {
+        unitPrice, qty, baseTotal, pricesByType,
       });
     } else if (type === 'tour') {
       // Use clean separation between walking and vehicle tours
@@ -3787,14 +3919,19 @@ class ItineraryBuilder {
       } else if (tourType === 'vehicle') {
         qsDevLog('📊 COLLECT SERVICE DATA - Processing vehicle tour');
 
-        // Extract totals directly from devBreakdown fields (most accurate source)
+        // Lee el snapshot ya calculado durante la interacción (_vehicleTourBreakdownTotals), igual que
+        // transport / a-disposición / walking. No se recalcula al guardar ni se reparsea el texto del
+        // desglose. El desglose ya no queda "solo-guía" (ver hasMainVehicle en
+        // calculateVehicleTourDevBreakdown), así que el snapshot es fiable. Fallback al parse de texto
+        // por si el snapshot no existe (breakdown nunca calculado).
         const devBreakdownEfectivoField = document.getElementById('devBreakdownEfectivo');
         const devBreakdownTransferenciaField = document.getElementById('devBreakdownTransferencia');
         const devBreakdownTarjetaField = document.getElementById('devBreakdownTarjeta');
 
-        const efectivoTotal = this.extractTotalFromBreakdown(devBreakdownEfectivoField?.value || '');
-        const transferenciaTotal = this.extractTotalFromBreakdown(devBreakdownTransferenciaField?.value || '');
-        const tarjetaTotal = this.extractTotalFromBreakdown(devBreakdownTarjetaField?.value || '');
+        const vtTotals = this._vehicleTourBreakdownTotals;
+        const efectivoTotal = vtTotals ? vtTotals.efectivo : this.extractTotalFromBreakdown(devBreakdownEfectivoField?.value || '');
+        const transferenciaTotal = vtTotals ? vtTotals.transferencia : this.extractTotalFromBreakdown(devBreakdownTransferenciaField?.value || '');
+        const tarjetaTotal = vtTotals ? vtTotals.tarjeta : this.extractTotalFromBreakdown(devBreakdownTarjetaField?.value || '');
 
         qsDevLog('📊 VEHICLE TOUR SAVE - Extracting totals from devBreakdown fields:', {
           efectivoTotal,
@@ -4379,6 +4516,36 @@ class ItineraryBuilder {
 
     // Collect type-specific data
     switch (type) {
+      case 'entrada': {
+        // Entradas: id del catálogo + cantidad. El precio unitario va en pricesByType. Se guarda el
+        // nombre en `concept` (snapshot) para el título de tarjeta/resumen/reservación sin depender del
+        // cache.
+        data.entradaId = document.getElementById('entradaSelect')?.value || null;
+        data.entradaQuantity = parseInt(document.getElementById('entradaQuantity')?.value || 1, 10) || 1;
+        if (data.entradaId) {
+          const all = (this.entradasCache && this.entradasCache.get('all')) || [];
+          const ent = all.find((x) => x && (x.id === data.entradaId || x.objectId === data.entradaId));
+          if (ent) data.concept = ent.name || 'Entrada';
+        }
+        // Horario opcional (mismo componente que Concepto): si hay hora de inicio se guarda.
+        const entradaStartTime = document.getElementById('entradaStartTime')?.value;
+        const entradaEndTime = document.getElementById('entradaEndTime')?.value;
+        if (entradaStartTime) {
+          data.startTime = entradaStartTime;
+          if (entradaEndTime) {
+            data.endTime = entradaEndTime;
+            data.selectedSchedule = `${entradaStartTime} - ${entradaEndTime}`;
+          } else {
+            data.endTime = '';
+            data.selectedSchedule = entradaStartTime;
+          }
+        } else {
+          data.startTime = '';
+          data.endTime = '';
+          data.selectedSchedule = '';
+        }
+        break;
+      }
       case 'experience': {
         data.experienceId = document.getElementById('experienceSelect')?.value;
         // Dirección de pickup (texto libre).
@@ -4392,6 +4559,13 @@ class ItineraryBuilder {
         data.adultsQuantity = parseInt(document.getElementById('adultsQuantity')?.value || 0);
         data.childrenQuantity = parseInt(document.getElementById('childrenQuantity')?.value || 0);
         data.adultsNoAlcoholQuantity = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value || 0);
+        // Entradas asociadas a la experiencia: estado editable (incluir/precio/cantidad) + toggle de
+        // "sumar al precio por persona". El precio ya viene incluido en pricesByType si el toggle está ON.
+        {
+          const entState = this.getExperienceEntradasState();
+          data.experienceEntradas = entState.items;
+          data.experienceEntradasPerPerson = entState.perPerson;
+        }
 
         // Always capture provider type + name from selected dropdown option
         const selectedOption = document.getElementById('experienceSelect')?.selectedOptions[0];
@@ -4441,6 +4615,14 @@ class ItineraryBuilder {
       }
       case 'tour': {
         data.tourId = document.getElementById('tourSelect')?.value;
+        // Entradas asociadas al/los destino(s) del tour: estado editable (incluir/precio/cantidad) +
+        // toggle "sumar al precio". Si el toggle está ON, el costo ya viene incluido en pricesByType
+        // (plegado en el desglose). Aquí solo se persiste el estado para restaurar y mostrar.
+        {
+          const tourEntState = this.getTourEntradasState();
+          data.tourEntradas = tourEntState.items;
+          data.tourEntradasPerPerson = tourEntState.perPerson;
+        }
         // Destinos adicionales combinados (solo tours con vehículo; en walking se limpian).
         // El nombre del servicio se compone con todos los destinos ("Principal + Adic1 + …").
         data.additionalTourIds = Array.isArray(this.additionalTourIds) ? [...this.additionalTourIds] : [];
@@ -5129,6 +5311,12 @@ class ItineraryBuilder {
 
     // Type-specific validation
     switch (data.type) {
+      case 'entrada':
+        if (!data.entradaId) {
+          this.showModalAlert('serviceModalAlert', 'Por favor selecciona una entrada', 'warning');
+          return false;
+        }
+        break;
       case 'experience':
         if (!data.experienceId) {
           this.showModalAlert('serviceModalAlert', 'Por favor selecciona una experiencia', 'warning');
@@ -5666,6 +5854,35 @@ class ItineraryBuilder {
     }
 
     switch (service.type) {
+      case 'entrada': {
+        // Restaura la Entrada: muestra el content, puebla el dropdown y setea entrada + cantidad.
+        document.getElementById('entradaContent')?.classList.remove('d-none');
+        this.populateEntradaSelect();
+        const entradaSelectEl = document.getElementById('entradaSelect');
+        if (entradaSelectEl && service.entradaId) entradaSelectEl.value = service.entradaId;
+        const qty = service.entradaQuantity || 1;
+        const entradaQtyEl = document.getElementById('entradaQuantity');
+        if (entradaQtyEl) entradaQtyEl.value = qty;
+        // Restaura el precio UNITARIO guardado (pricesByType.efectivo / cantidad) SIN pisarlo con el de
+        // catálogo (respeta precios personalizados). Se marca "editado a mano" para que no se reautollene.
+        const savedEfectivo = (service.pricesByType && Number(service.pricesByType.efectivo))
+          || Number(service.price) || 0;
+        const unit = qty > 0 ? (savedEfectivo / qty) : savedEfectivo;
+        const entradaPriceField = document.getElementById('servicePrice');
+        if (entradaPriceField) entradaPriceField.value = (Number(unit) || 0).toFixed(2);
+        this._mainPriceManuallyEdited = true;
+        // Caption "Lista: $X" del catálogo (referencia).
+        const allEntradas = (this.entradasCache && this.entradasCache.get('all')) || [];
+        const entCat = allEntradas.find((e) => e && (e.id === service.entradaId || e.objectId === service.entradaId));
+        this.updateMainVehicleListPrice(entCat ? (Number(entCat.price) || 0) : 0);
+        // Restaura el horario (mismo componente que Concepto; sin checkbox, siempre visible).
+        const entStartEl = document.getElementById('entradaStartTime');
+        const entEndEl = document.getElementById('entradaEndTime');
+        if (entStartEl) entStartEl.value = service.startTime || '';
+        if (entEndEl) entEndEl.value = service.endTime || '';
+        this.updateServicePriceBreakdown();
+        break;
+      }
       case 'experience':
         qsDevLog('📝 EDIT EXPERIENCE DEBUG - Starting experience edit:', {
           serviceId: service.id,
@@ -5700,6 +5917,13 @@ class ItineraryBuilder {
             // en 0, pisando los personalizados guardados. Se apaga al final de populateQuantityFields,
             // ya restaurados los precios.
             this._restoringExperienceData = true;
+            // Estado guardado de las entradas de la experiencia: lo consume el render async que dispara
+            // handleExperienceSelection (loadExperienceEntradas().then(...)).
+            this._restoreExperienceEntradas = {
+              experienceId: service.experienceId,
+              list: Array.isArray(service.experienceEntradas) ? service.experienceEntradas : null,
+              perPerson: !!service.experienceEntradasPerPerson,
+            };
             this.handleExperienceSelection(service.experienceId);
 
             // Force show pricing section after selection
@@ -7190,6 +7414,21 @@ class ItineraryBuilder {
           qsDevLog('🚛 Transport: using vehicle base for Precio field (not total):', {
             correctPrice, baseVehiclePrice: service.baseVehiclePrice, pricesByType: service.pricesByType,
           });
+        } else if (service.type === 'entrada') {
+          // Entradas: el campo "Precio" muestra el precio UNITARIO en EFECTIVO, NO el total
+          // (unitario × cantidad × recargo). pricesByType[currentPaymentType] es el total, así que
+          // este sync lo escribía en el campo. Se deriva el unitario de pricesByType.efectivo / cantidad.
+          const entQty = service.entradaQuantity || 1;
+          const efTotal = (service.pricesByType && service.pricesByType.efectivo !== undefined)
+            ? Number(service.pricesByType.efectivo) : (Number(service.price) || 0);
+          correctPrice = entQty > 0 ? (efTotal / entQty) : efTotal;
+          // "Lista: $X" = precio de catálogo de la entrada.
+          const entAll = (this.entradasCache && this.entradasCache.get('all')) || [];
+          const entCat = entAll.find((e) => e && (e.id === service.entradaId || e.objectId === service.entradaId));
+          if (entCat) this.updateMainVehicleListPrice(Number(entCat.price) || 0);
+          qsDevLog('🎟️ Entrada: precio UNITARIO en Precio base (no el total):', {
+            correctPrice, entQty, efTotal, pricesByType: service.pricesByType,
+          });
         }
 
         // Only update if the price is different to avoid unnecessary changes
@@ -7237,6 +7476,13 @@ class ItineraryBuilder {
       // Restaurar destinos adicionales combinados (sin forzar el mínimo: la duración guardada
       // se restaura en el Step de duración; aquí solo repoblamos chips/select).
       this.additionalTourIds = Array.isArray(service.additionalTourIds) ? [...service.additionalTourIds] : [];
+      // Estado guardado de las entradas del tour: lo consume refreshTourEntradas dentro de
+      // updateAdditionalDestinationsUI (ya con TODOS los destinos fijados, para restaurar completo).
+      this._restoreTourEntradas = {
+        tourId: service.tourId,
+        list: Array.isArray(service.tourEntradas) ? service.tourEntradas : null,
+        perPerson: !!service.tourEntradasPerPerson,
+      };
       this.updateAdditionalDestinationsUI();
     }
 
@@ -7541,8 +7787,14 @@ class ItineraryBuilder {
 
     // Nodos en efectivo; el recargo por forma de pago lo aplica el motor único, con las
     // mismas reglas que transporte (vehículo/adicionales llevan recargo; la guía no).
+    // El "Guía + Chofer" ACOMPAÑA al vehículo principal: sin un vehículo SELECCIONADO (p.ej. al marcar
+    // el guía ANTES de elegir vehículo, recalculateTourPrice deja #servicePrice='0.00') no genera cargo.
+    // Esto evita el desglose "solo-guía" (total = guía = $1,905) que se persistía como precio del
+    // servicio en vez de vehículo + guía ($5,205). Se gatea por vehículo seleccionado (no por costo > 0)
+    // para no soltar la guía en un vehículo comped (precio 0 manual pero sí elegido).
+    const hasMainVehicle = !!document.getElementById('vehicleSelect')?.value;
     const vehicleEfectivoBase = mainVehicleCost * tourDuration;
-    const guideEfectivoBase = guideRate * tourDuration;
+    const guideEfectivoBase = (hasMainVehicle ? guideRate : 0) * tourDuration;
     const additionalEfectivoBase = additionalVehicleInfo
       ? this.getPrimaryAdditionalVehiclePrice(additionalVehicleInfo.baseCost) * tourDuration : 0;
     const extrasEfectivoBase = extraVehicleItemsForTour.reduce(
@@ -7556,12 +7808,17 @@ class ItineraryBuilder {
     const tourAdultUnitPrice = parseFloat(document.getElementById('tourAdultPrice')?.value || 0) || 0;
     const tourChildUnitPrice = parseFloat(document.getElementById('tourChildPrice')?.value || 0) || 0;
     const peopleEfectivoBase = (tourAdultsQty * tourAdultUnitPrice) + (tourChildrenQty * tourChildUnitPrice);
+    // Entradas del/los destino(s): si el toggle "sumar al precio" está ON, Σ(precio × cantidad) de las
+    // incluidas. Ortogonal a vehículos/personas; se suma como un nodo más (con recargo por forma de pago).
+    const entradasEfectivoBase = this.getTourEntradasCostMXN();
+    const entradasTickets = this.getTourEntradasTicketCount();
     const tourNodes = [
       { key: 'vehicle', efectivo: vehicleEfectivoBase, surcharge: true },
       { key: 'guide', efectivo: guideEfectivoBase, surcharge: true },
       { key: 'additionalVehicle', efectivo: additionalEfectivoBase, surcharge: true },
       { key: 'extraVehicles', efectivo: extrasEfectivoBase, surcharge: true },
       { key: 'people', efectivo: peopleEfectivoBase, surcharge: true },
+      { key: 'entradas', efectivo: entradasEfectivoBase, surcharge: true },
     ];
     const tourPricing = window.PricingEngine
       ? window.PricingEngine.composeServiceNodes({ transferRate: this.transferRate, agencyRate: this.agencyRate, nodes: tourNodes })
@@ -7591,6 +7848,7 @@ class ItineraryBuilder {
       const additionalCost = tourPricing.nodes.additionalVehicle[paymentType];
       const extraVehiclesTotal = tourPricing.nodes.extraVehicles[paymentType];
       const peopleCost = tourPricing.nodes.people[paymentType]; // costo por persona (no × duración)
+      const entradasCost = tourPricing.nodes.entradas[paymentType]; // boletos de acceso del destino
 
       // Debug guide cost calculation
       qsDevLog(`👨‍🦯 ${paymentType} - Guide cost calculation:`, {
@@ -7601,7 +7859,7 @@ class ItineraryBuilder {
         guideGetsNoSurcharge: 'Guide cost is NOT multiplied by payment surcharge',
       });
 
-      const total = vehicleCost + guideCost + additionalCost + extraVehiclesTotal + peopleCost;
+      const total = vehicleCost + guideCost + additionalCost + extraVehiclesTotal + peopleCost + entradasCost;
 
       qsDevLog(`🚗 ${paymentType} calculation:`, {
         mainVehicleCost,
@@ -7633,7 +7891,12 @@ class ItineraryBuilder {
         willAddToBreakdown: guideRate > 0,
       });
 
-      if (guideRate > 0) {
+      // La línea de guía SOLO se dibuja si hay vehículo (el "Guía + Chofer" acompaña al vehículo). Sin
+      // vehículo no se muestra nada (ni "$0.00" ni el warning) para no confundir en la secuencia
+      // guía-primero → vehículo-después: al elegir el vehículo, la línea reaparece con el monto real.
+      if (!hasMainVehicle) {
+        qsDevLog(`👨‍🦯 ${paymentType} - Sin vehículo: no se dibuja línea de guía`);
+      } else if (guideRate > 0) {
         const guideLine = `Guía: $${guideRate.toFixed(2)} × ${tourDuration}h = $${guideCost.toFixed(2)}\n`;
         breakdownText += guideLine;
         qsDevLog(`👨‍🦯 ${paymentType} - ✅ Added guide line:`, guideLine.trim());
@@ -7685,8 +7948,13 @@ class ItineraryBuilder {
         breakdownText += `Personas: ${pParts.join(' + ')} = $${peopleCost.toFixed(2)}\n`;
       }
 
+      // Línea de entradas del destino (boletos de acceso; ya trae recargo por forma de pago).
+      if (entradasCost > 0) {
+        breakdownText += `Entradas: ${entradasTickets} boleto(s) = $${entradasCost.toFixed(2)}\n`;
+      }
+
       // Add subtotal and total
-      const subtotal = vehicleCost + guideCost + additionalCost + extraVehiclesTotal + peopleCost;
+      const subtotal = vehicleCost + guideCost + additionalCost + extraVehiclesTotal + peopleCost + entradasCost;
       breakdownText += `Subtotal: $${subtotal.toFixed(2)}\n`;
       breakdownText += `Total: $${total.toFixed(2)}`;
 
@@ -7696,6 +7964,15 @@ class ItineraryBuilder {
 
     // Update all dev fields
     this.updateDevFields(prices, breakdowns);
+
+    // Snapshot de los totales para el guardado (collectServiceData), igual que transport /
+    // a-disposición / walking guardan _xxxBreakdownTotals. El guardado LEE este valor ya calculado
+    // durante la interacción (sin recalcular ni reparsear el texto del desglose).
+    this._vehicleTourBreakdownTotals = {
+      efectivo: prices.efectivo,
+      transferencia: prices.transferencia,
+      tarjeta: prices.tarjeta,
+    };
 
     qsDevLog('✅ Vehicle tour dev breakdown calculated:', { prices, breakdowns });
     qsDevLog('🚗 ================================');
@@ -8036,6 +8313,7 @@ class ItineraryBuilder {
       transport: 'Transporte',
       'a-disposicion': 'A Disposición',
       concepto: 'Concepto',
+      entrada: 'Entrada',
     };
 
     // Mirror the transport header: pick a start time from startTime or the
@@ -8191,6 +8469,40 @@ class ItineraryBuilder {
                                             </div>
                                         </div>
                                     ` : ''}
+                                    ${service.type === 'experience' && Array.isArray(service.experienceEntradas)
+                                      && service.experienceEntradas.some((e) => e && e.included !== false) ? (() => {
+        const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+        }[ch]));
+        const list = service.experienceEntradas
+          .filter((e) => e && e.included !== false)
+          .map((e) => `${esc(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+          .join(', ');
+        return `
+                                        <div class="row g-2 text-muted small mt-1">
+                                            <div class="col-auto">
+                                                <i class="ti ti-ticket me-1 text-primary"></i>
+                                                <span class="text-muted">Entradas:</span> ${list}
+                                            </div>
+                                        </div>`;
+      })() : ''}
+                                    ${service.type === 'tour' && Array.isArray(service.tourEntradas)
+                                      && service.tourEntradas.some((e) => e && e.included !== false) ? (() => {
+        const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+        }[ch]));
+        const list = service.tourEntradas
+          .filter((e) => e && e.included !== false)
+          .map((e) => `${esc(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
+          .join(', ');
+        return `
+                                        <div class="row g-2 text-muted small mt-1">
+                                            <div class="col-auto">
+                                                <i class="ti ti-ticket me-1 text-primary"></i>
+                                                <span class="text-muted">Entradas:</span> ${list}
+                                            </div>
+                                        </div>`;
+      })() : ''}
                                     ${(service.type === 'tour' || service.type === 'transport' || service.type === 'a-disposicion') && service.includeGreeter ? `
                                         <div class="row g-2 text-info small mt-1">
                                             <div class="col-auto">
@@ -8317,6 +8629,7 @@ class ItineraryBuilder {
                                 ${this.getPriceTypeLabel()}
                             </div>
                             ${Number(service.discountAmount) > 0 ? `<div class="small text-success mt-1" title="Descuento aplicado"><i class="ti ti-discount-2 me-1"></i>Descuento ${service.discountType === 'percent' ? service.discountValue + '%' : ''} −${this.formatCurrency(service.discountAmount)}</div>` : ''}
+                            ${service.type === 'a-disposicion' && Number(service.discountPercent) > 0 ? `<div class="small text-success mt-1" title="Descuento por volumen"><i class="ti ti-discount-2 me-1"></i>Descuento por volumen</div>` : ''}
                             ${this.getServiceTipInPaymentType(service) > 0 ? `<div class="small text-info mt-1" title="Propina"><i class="ti ti-coin me-1"></i>Propina ${service.tipType === 'percent' ? service.tipValue + '%' : ''} +${this.formatCurrency(this.getServiceTipInPaymentType(service))}${service.tipMandatory ? ' <span class="badge bg-info-subtle text-info ms-1">obligatoria</span>' : ''}</div>` : ''}
                             ${(['admin', 'superadmin'].includes(this.userRole) || !this.isServiceProtected(service)) ? `
                             <button type="button" class="btn btn-sm btn-link p-0 mt-1 toggle-include-total-btn d-flex align-items-center gap-1"
@@ -9244,6 +9557,38 @@ class ItineraryBuilder {
           });
         }
       }
+    } else if (serviceType === 'entrada') {
+      // Entradas: N × precio unitario (efectivo) con recargo por forma de pago. Llena los dev
+      // breakdowns (efectivo/transferencia/tarjeta) y los campos de precio dev — análogo a los demás
+      // tipos — para que el desglose y el modo dev muestren los 3 métodos. El guardado calcula
+      // pricesByType directo del #servicePrice × cantidad (no depende de estos campos).
+      const entradaUnitEfectivo = parseFloat(document.getElementById('servicePrice')?.value || 0) || 0;
+      const entradaQty = parseInt(document.getElementById('entradaQuantity')?.value || 1, 10) || 1;
+      const entradaBaseTotal = entradaUnitEfectivo * entradaQty;
+      const entradaPricing = window.PricingEngine
+        ? window.PricingEngine.composeServiceNodes({
+          transferRate: this.transferRate,
+          agencyRate: this.agencyRate,
+          nodes: [{ key: 'base', efectivo: entradaBaseTotal, surcharge: true }],
+        })
+        : {
+          efectivo: entradaBaseTotal,
+          transferencia: entradaBaseTotal * (1 + (this.transferRate / 100)),
+          tarjeta: entradaBaseTotal * (1 + (this.agencyRate / 100)),
+        };
+      const entradaPrices = {
+        efectivo: entradaPricing.efectivo,
+        transferencia: entradaPricing.transferencia,
+        tarjeta: entradaPricing.tarjeta,
+      };
+      const entradaLine = (total, mult) => `${entradaQty} entrada(s) × $${(entradaUnitEfectivo * mult).toFixed(2)} = $${total.toFixed(2)}\nTotal: $${total.toFixed(2)}`;
+      const entradaBreakdowns = {
+        efectivo: entradaLine(entradaPrices.efectivo, 1),
+        transferencia: entradaLine(entradaPrices.transferencia, 1 + (this.transferRate / 100)),
+        tarjeta: entradaLine(entradaPrices.tarjeta, 1 + (this.agencyRate / 100)),
+      };
+      this.updateDevFields(entradaPrices, entradaBreakdowns);
+      return;
     } else if (serviceType === 'a-disposicion') {
       qsDevLog('📊 Processing A Disposición breakdown');
 
@@ -9783,8 +10128,16 @@ class ItineraryBuilder {
       // (impacta total, pricesByType, guardado y desglose de una sola vez).
       const guideCost = this.getExperienceGuideCostMXN();
 
+      // Entradas asociadas: Σ(precio × cantidad de incluidas). La cantidad ya es el nº de boletos
+      // (default = personas), así que NO se multiplica por personas. 0 si el toggle está OFF.
+      const entradasCost = this.getExperienceEntradasCostMXN();
+      // Total de boletos incluidos (para la etiqueta del desglose). El formato "N boleto(s) = $X"
+      // deja que el parser del desglose separe bien etiqueta y monto (evita "$X ... $X" redundante).
+      const entradasTickets = this.getExperienceEntradasState().items
+        .filter((it) => it.included).reduce((s, it) => s + (it.quantity || 0), 0);
+
       // Calculate base total (efectivo)
-      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal + guideCost;
+      const baseTotal = adultsTotal + childrenTotal + noAlcoholTotal + guideCost + entradasCost;
 
       // Totales por forma de pago vía el motor único (un solo nodo: el total base).
       const experiencePricing = window.PricingEngine
@@ -9829,6 +10182,10 @@ class ItineraryBuilder {
         if (efectivoBreakdown) efectivoBreakdown += '\n';
         efectivoBreakdown += `Guía: $${guideCost.toFixed(2)}`;
       }
+      if (entradasCost > 0) {
+        if (efectivoBreakdown) efectivoBreakdown += '\n';
+        efectivoBreakdown += `Entradas: ${entradasTickets} boleto(s) = $${entradasCost.toFixed(2)}`;
+      }
       if (efectivoBreakdown) efectivoBreakdown += '\n';
       efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
 
@@ -9850,6 +10207,10 @@ class ItineraryBuilder {
         if (transferenciaBreakdown) transferenciaBreakdown += '\n';
         transferenciaBreakdown += `Guía: $${(guideCost * tMult).toFixed(2)}`;
       }
+      if (entradasCost > 0) {
+        if (transferenciaBreakdown) transferenciaBreakdown += '\n';
+        transferenciaBreakdown += `Entradas: ${entradasTickets} boleto(s) = $${(entradasCost * tMult).toFixed(2)}`;
+      }
       if (transferenciaBreakdown) transferenciaBreakdown += '\n';
       transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
 
@@ -9870,6 +10231,10 @@ class ItineraryBuilder {
       if (guideCost > 0) {
         if (tarjetaBreakdown) tarjetaBreakdown += '\n';
         tarjetaBreakdown += `Guía: $${(guideCost * cMult).toFixed(2)}`;
+      }
+      if (entradasCost > 0) {
+        if (tarjetaBreakdown) tarjetaBreakdown += '\n';
+        tarjetaBreakdown += `Entradas: ${entradasTickets} boleto(s) = $${(entradasCost * cMult).toFixed(2)}`;
       }
       if (tarjetaBreakdown) tarjetaBreakdown += '\n';
       tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
@@ -9967,9 +10332,20 @@ class ItineraryBuilder {
             transferencia: baseTotal * (1 + (this.transferRate / 100)),
             tarjeta: baseTotal * (1 + (this.agencyRate / 100)),
           };
-        const efectivoTotal = walkingPricing.efectivo;
-        const transferenciaTotal = walkingPricing.transferencia;
-        const tarjetaTotal = walkingPricing.tarjeta;
+        const efectivoBase = walkingPricing.efectivo;
+        const transferenciaBase = walkingPricing.transferencia;
+        const tarjetaBase = walkingPricing.tarjeta;
+
+        // Entradas del/los destino(s) del tour (con recargo por forma de pago). Ortogonal a la base;
+        // se suma al total y se muestra como una línea propia, igual que en experiencias.
+        const entradasEfectivoBase = this.getTourEntradasCostMXN();
+        const entradasTickets = this.getTourEntradasTicketCount();
+        const entradasEfectivo = entradasEfectivoBase;
+        const entradasTransferencia = entradasEfectivoBase * (1 + (this.transferRate / 100));
+        const entradasTarjeta = entradasEfectivoBase * (1 + (this.agencyRate / 100));
+        const efectivoTotal = efectivoBase + entradasEfectivo;
+        const transferenciaTotal = transferenciaBase + entradasTransferencia;
+        const tarjetaTotal = tarjetaBase + entradasTarjeta;
 
         // Get dev payment fields
         const devPriceEfectivoField = document.getElementById('devPriceEfectivo');
@@ -9987,35 +10363,40 @@ class ItineraryBuilder {
         let transferenciaBreakdown = '';
         let tarjetaBreakdown = '';
         if (isTotalOverride) {
-          efectivoBreakdown = `Precio manual (efectivo): $${efectivoTotal.toFixed(2)}`;
-          transferenciaBreakdown = `Precio manual + recargo (${this.transferRate}%): $${transferenciaTotal.toFixed(2)}`;
-          tarjetaBreakdown = `Precio manual + recargo (${this.agencyRate}%): $${tarjetaTotal.toFixed(2)}`;
+          efectivoBreakdown = `Precio manual (efectivo): $${efectivoBase.toFixed(2)}`;
+          transferenciaBreakdown = `Precio manual + recargo (${this.transferRate}%): $${transferenciaBase.toFixed(2)}`;
+          tarjetaBreakdown = `Precio manual + recargo (${this.agencyRate}%): $${tarjetaBase.toFixed(2)}`;
         } else {
           groups.forEach((group, index) => {
             const groupTotal = resolveTierPrice(group.tier) * duration;
             if (efectivoBreakdown) efectivoBreakdown += '\n';
             efectivoBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotal.toFixed(2)}`;
           });
-          if (efectivoBreakdown) efectivoBreakdown += '\n';
-          efectivoBreakdown += `Total: $${efectivoTotal.toFixed(2)}`;
-
           groups.forEach((group, index) => {
             const groupTotal = resolveTierPrice(group.tier) * duration;
             const groupTotalWithSurcharge = groupTotal * (1 + (this.transferRate / 100));
             if (transferenciaBreakdown) transferenciaBreakdown += '\n';
             transferenciaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotalWithSurcharge.toFixed(2)}`;
           });
-          if (transferenciaBreakdown) transferenciaBreakdown += '\n';
-          transferenciaBreakdown += `Total: $${transferenciaTotal.toFixed(2)}`;
-
           groups.forEach((group, index) => {
             const groupTotal = resolveTierPrice(group.tier) * duration;
             const groupTotalWithSurcharge = groupTotal * (1 + (this.agencyRate / 100));
             if (tarjetaBreakdown) tarjetaBreakdown += '\n';
             tarjetaBreakdown += `Grupo ${index + 1}: ${group.tier.label} × ${duration}h = $${groupTotalWithSurcharge.toFixed(2)}`;
           });
-          if (tarjetaBreakdown) tarjetaBreakdown += '\n';
-          tarjetaBreakdown += `Total: $${tarjetaTotal.toFixed(2)}`;
+        }
+        // Línea de entradas del destino (si el toggle "sumar al precio" está ON), antes del Total.
+        if (entradasEfectivoBase > 0) {
+          efectivoBreakdown += `${efectivoBreakdown ? '\n' : ''}Entradas: ${entradasTickets} boleto(s) = $${entradasEfectivo.toFixed(2)}`;
+          transferenciaBreakdown += `${transferenciaBreakdown ? '\n' : ''}Entradas: ${entradasTickets} boleto(s) = $${entradasTransferencia.toFixed(2)}`;
+          tarjetaBreakdown += `${tarjetaBreakdown ? '\n' : ''}Entradas: ${entradasTickets} boleto(s) = $${entradasTarjeta.toFixed(2)}`;
+        }
+        // Total (base + entradas). Automático siempre lleva Total; override solo si hay entradas
+        // (sin entradas, la línea "Precio manual" ya expresa el total, como antes).
+        if (!isTotalOverride || entradasEfectivoBase > 0) {
+          efectivoBreakdown += `\nTotal: $${efectivoTotal.toFixed(2)}`;
+          transferenciaBreakdown += `\nTotal: $${transferenciaTotal.toFixed(2)}`;
+          tarjetaBreakdown += `\nTotal: $${tarjetaTotal.toFixed(2)}`;
         }
 
         // Update dev payment prices
@@ -11720,6 +12101,9 @@ class ItineraryBuilder {
 
   getServiceTitle(service) {
     switch (service.type) {
+      case 'entrada':
+        // Nombre de la entrada (snapshot en `concept`, fallback al catálogo).
+        return service.concept || this.getEntradaName(service.entradaId) || 'Entrada';
       case 'experience': {
         // En la lista de servicios mostramos SOLO el nombre de la experiencia (sin el
         // "- Proveedor" que traía antes para las de establecimiento).
@@ -11896,6 +12280,383 @@ class ItineraryBuilder {
       || r.objectId === segmentId
       || r.id === segmentId);
     return rate ? (rate.color || '') : '';
+  }
+
+  /**
+   * Nombre de una Entrada del catálogo por id (para títulos de tarjeta/resumen).
+   * @param {string} entradaId
+   * @returns {string}
+   * @example
+   */
+  getEntradaName(entradaId) {
+    if (!entradaId) return 'Entrada';
+    const all = this.entradasCache && this.entradasCache.get('all');
+    if (Array.isArray(all)) {
+      const e = all.find((x) => x && (x.id === entradaId || x.objectId === entradaId));
+      if (e) return e.name || 'Entrada';
+    }
+    return 'Entrada';
+  }
+
+  /**
+   * Carga (y cachea) las entradas asociadas a una experiencia vía GET /api/experiences/:id.
+   * @param {string} experienceId
+   * @returns {Promise<Array>} entradas [{id,name,price,destinoName}]
+   * @example
+   */
+  async loadExperienceEntradas(experienceId) {
+    if (!experienceId) return [];
+    if (this._experienceEntradasCache.has(experienceId)) {
+      return this._experienceEntradasCache.get(experienceId);
+    }
+    // Las experiencias DE PROVEEDOR viven en otra clase Parse (ProviderExperiencia) y se leen de otro
+    // endpoint; pedir /api/experiences/:id para ellas da 404. Se detectan por el cache de proveedor.
+    const isProvider = Array.isArray(this.providerExperiencesCache)
+      && this.providerExperiencesCache.some((e) => e && (e.id === experienceId || e.objectId === experienceId));
+    const url = isProvider
+      ? `/api/provider-experiences/${experienceId}`
+      : `/api/experiences/${experienceId}`;
+    try {
+      const accessToken = this.getAccessToken();
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const entradas = (result.data && Array.isArray(result.data.entradas)) ? result.data.entradas : [];
+        this._experienceEntradasCache.set(experienceId, entradas);
+        return entradas;
+      }
+    } catch (error) {
+      console.error('Error loading experience entradas:', error);
+    }
+    return [];
+  }
+
+  /**
+   * Renderiza la lista editable de entradas de la experiencia (checkbox incluir + precio + cantidad),
+   * restaura el estado guardado y cablea el recálculo. Oculta la sección si no hay entradas.
+   * @param {Array} entradas - Entradas del catálogo de la experiencia.
+   * @param {Array} savedList - Estado guardado [{id,price,quantity,included}] (opcional).
+   * @param {boolean} savedPerPerson - Estado guardado del toggle (opcional).
+   * @example
+   */
+  renderExperienceEntradas(entradas, savedList = null, savedPerPerson = null) {
+    const section = document.getElementById('experienceEntradasSection');
+    const list = document.getElementById('experienceEntradasList');
+    const toggle = document.getElementById('experienceEntradasPerPerson');
+    if (!section || !list) return;
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+    }[c]));
+    const arr = Array.isArray(entradas) ? entradas.filter((e) => e && e.id) : [];
+    if (arr.length === 0) {
+      section.classList.add('d-none');
+      list.innerHTML = '';
+      return;
+    }
+    section.classList.remove('d-none');
+    // Cantidad por defecto = nº de personas del servicio (adultos + niños + sin-alcohol; si están en 0,
+    // cae a las personas de la cotización). Vacío con placeholder "0" si no hay. Se re-sincroniza al
+    // cambiar esas cantidades (syncExperienceEntradaQtys).
+    const people = this._experiencePeopleCount();
+    const defaultQty = people > 0 ? people : '';
+    const savedById = new Map((Array.isArray(savedList) ? savedList : []).map((s) => [s.id, s]));
+    list.innerHTML = arr.map((e) => {
+      const saved = savedById.get(e.id);
+      const included = saved ? saved.included !== false : true;
+      const price = (saved && saved.price != null) ? saved.price : (Number(e.price) || 0);
+      const qty = (saved && saved.quantity != null) ? saved.quantity : defaultQty;
+      const destino = e.destinoName ? ` · ${esc(e.destinoName)}` : '';
+      return `
+        <div class="d-flex align-items-center gap-2 mb-2 exp-entrada-row" data-entrada-id="${esc(e.id)}" data-entrada-name="${esc(e.name || 'Entrada')}">
+          <input type="checkbox" class="form-check-input mt-0 exp-entrada-include" ${included ? 'checked' : ''}>
+          <span class="flex-grow-1 text-truncate" title="${esc(e.name || 'Entrada')}">${esc(e.name || 'Entrada')}<span class="text-muted small">${destino}</span></span>
+          <div class="input-group" style="width: 180px;">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control exp-entrada-price" value="${(Number(price) || 0).toFixed(2)}" min="0" step="0.01">
+          </div>
+          <input type="number" class="form-control exp-entrada-qty" value="${qty}" min="0" step="1" style="width: 100px;" placeholder="0" title="Cantidad (personas)">
+        </div>`;
+    }).join('');
+    if (toggle) toggle.checked = savedPerPerson != null ? !!savedPerPerson : false;
+    const recalc = () => { this.serviceModified = true; this.updateServicePriceBreakdown(); };
+    list.querySelectorAll('.exp-entrada-include, .exp-entrada-price, .exp-entrada-qty').forEach((el) => {
+      el.addEventListener('input', recalc);
+      el.addEventListener('change', recalc);
+    });
+    if (toggle && !toggle._entradaWired) {
+      toggle.addEventListener('change', recalc);
+      toggle._entradaWired = true;
+    }
+  }
+
+  /**
+   * Lee el estado actual de las entradas de experiencia del DOM.
+   * @returns {{items: Array, perPerson: boolean}}
+   * @example
+   */
+  getExperienceEntradasState() {
+    const rows = document.querySelectorAll('#experienceEntradasList .exp-entrada-row');
+    const items = [];
+    rows.forEach((row) => {
+      items.push({
+        id: row.dataset.entradaId,
+        name: row.dataset.entradaName || '',
+        included: row.querySelector('.exp-entrada-include')?.checked !== false,
+        price: parseFloat(row.querySelector('.exp-entrada-price')?.value || 0) || 0,
+        // Cantidad = nº de boletos (default = personas de la cotización). Vacío → 0 (no aporta).
+        quantity: parseInt(row.querySelector('.exp-entrada-qty')?.value || 0, 10) || 0,
+      });
+    });
+    const perPerson = document.getElementById('experienceEntradasPerPerson')?.checked || false;
+    return { items, perPerson };
+  }
+
+  /**
+   * Costo TOTAL (efectivo) de las entradas incluidas: Σ(precio × cantidad). La cantidad ya es el nº de
+   * boletos (default = personas), así que NO se multiplica de nuevo por personas. 0 si el toggle está OFF.
+   * @returns {number}
+   * @example
+   */
+  getExperienceEntradasCostMXN() {
+    const { items, perPerson } = this.getExperienceEntradasState();
+    if (!perPerson) return 0;
+    return items
+      .filter((it) => it.included)
+      .reduce((sum, it) => sum + (it.price * it.quantity), 0);
+  }
+
+  /**
+   * Nº de personas del servicio de experiencia: adultos + niños + sin-alcohol (de los inputs del modal).
+   * Si están en 0, cae a las personas de la cotización (numberOfAdults + numberOfChildren).
+   * @returns {number}
+   * @example
+   */
+  _experiencePeopleCount() {
+    const a = parseInt(document.getElementById('adultsQuantity')?.value, 10) || 0;
+    const c = parseInt(document.getElementById('childrenQuantity')?.value, 10) || 0;
+    const n = parseInt(document.getElementById('adultsNoAlcoholQuantity')?.value, 10) || 0;
+    let people = a + c + n;
+    if (people === 0 && this.quoteData) {
+      people = (parseInt(this.quoteData.numberOfAdults, 10) || 0) + (parseInt(this.quoteData.numberOfChildren, 10) || 0);
+    }
+    return people;
+  }
+
+  /**
+   * Auto-llena la cantidad de CADA entrada de experiencia con el nº de personas (adultos + niños +
+   * sin-alcohol). Se llama al cambiar esas cantidades: cada persona = 1 boleto. Vacío si personas = 0.
+   * @example
+   */
+  syncExperienceEntradaQtys() {
+    const list = document.getElementById('experienceEntradasList');
+    if (!list) return;
+    const people = this._experiencePeopleCount();
+    list.querySelectorAll('.exp-entrada-qty').forEach((el) => {
+      el.value = people > 0 ? people : '';
+    });
+  }
+
+  // ── Entradas asociadas al/los destino(s) del tour (boletos de acceso) ─────────────
+  // Mismo patrón/UX que las entradas de experiencia, pero la FUENTE es distinta: un tour
+  // no tiene relación explícita con entradas; sus entradas son las del CATÁLOGO cuyo
+  // destino (POI) coincide con el destino del tour principal + los destinos adicionales
+  // combinados (this.additionalTourIds). Se resuelven filtrando entradasCache('all').
+
+  /**
+   * IDs de destino (POI) del tour seleccionado: principal + destinos adicionales combinados.
+   * @returns {string[]} objectIds de POI, sin duplicados ni nulos.
+   * @example
+   */
+  getTourDestinoIds() {
+    if (!this.toursCache.has('all')) return [];
+    const tours = this.toursCache.get('all');
+    const mainId = document.getElementById('tourSelect')?.value;
+    const ids = [mainId, ...(this.additionalTourIds || [])];
+    const destinoIds = [];
+    ids.forEach((tid) => {
+      if (!tid) return;
+      const t = tours.find((x) => x.id === tid || x.objectId === tid);
+      const did = (t && t.destinationPOI) ? t.destinationPOI.objectId : null;
+      if (did && !destinoIds.includes(did)) destinoIds.push(did);
+    });
+    return destinoIds;
+  }
+
+  /**
+   * Entradas del catálogo asociadas al/los destino(s) del tour, deduplicadas por id.
+   * @returns {Array} entradas [{id,name,price,destinoId,destinoName}]
+   * @example
+   */
+  getTourEntradas() {
+    const all = this.entradasCache.has('all') ? this.entradasCache.get('all') : [];
+    const destinoIds = this.getTourDestinoIds();
+    if (!Array.isArray(all) || destinoIds.length === 0) return [];
+    const seen = new Set();
+    const out = [];
+    all.forEach((e) => {
+      if (e && e.id && destinoIds.includes(e.destinoId) && !seen.has(e.id)) {
+        seen.add(e.id);
+        out.push(e);
+      }
+    });
+    return out;
+  }
+
+  /**
+   * Resuelve las entradas del tour y las renderiza (atajo para los call-sites).
+   * @param {Array} savedList - Estado guardado [{id,price,quantity,included}] (opcional).
+   * @param {boolean} savedPerPerson - Estado guardado del toggle (opcional).
+   * @example
+   */
+  loadAndRenderTourEntradas(savedList = null, savedPerPerson = null) {
+    this.renderTourEntradas(this.getTourEntradas(), savedList, savedPerPerson);
+  }
+
+  /**
+   * Renderiza la lista editable de entradas del tour (checkbox incluir + precio + cantidad),
+   * restaura el estado guardado y cablea el recálculo. Oculta la sección si no hay entradas.
+   * @param {Array} entradas - Entradas del/los destino(s) del tour.
+   * @param {Array} savedList - Estado guardado [{id,price,quantity,included}] (opcional).
+   * @param {boolean} savedPerPerson - Estado guardado del toggle (opcional).
+   * @example
+   */
+  renderTourEntradas(entradas, savedList = null, savedPerPerson = null) {
+    const section = document.getElementById('tourEntradasSection');
+    const list = document.getElementById('tourEntradasList');
+    const toggle = document.getElementById('tourEntradasPerPerson');
+    if (!section || !list) return;
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
+    }[c]));
+    const arr = Array.isArray(entradas) ? entradas.filter((e) => e && e.id) : [];
+    if (arr.length === 0) {
+      section.classList.add('d-none');
+      list.innerHTML = '';
+      return;
+    }
+    section.classList.remove('d-none');
+    // Cantidad por defecto = nº de personas del tour (walking: peopleCount; vehículo: adultos +
+    // niños; si están en 0, cae a las personas de la cotización). Se re-sincroniza al cambiar esas
+    // cantidades (syncTourEntradaQtys).
+    const people = this._tourPeopleCount();
+    const defaultQty = people > 0 ? people : '';
+    const savedById = new Map((Array.isArray(savedList) ? savedList : []).map((s) => [s.id, s]));
+    list.innerHTML = arr.map((e) => {
+      const saved = savedById.get(e.id);
+      const included = saved ? saved.included !== false : true;
+      const price = (saved && saved.price != null) ? saved.price : (Number(e.price) || 0);
+      const qty = (saved && saved.quantity != null) ? saved.quantity : defaultQty;
+      const destino = e.destinoName ? ` · ${esc(e.destinoName)}` : '';
+      return `
+        <div class="d-flex align-items-center gap-2 mb-2 tour-entrada-row" data-entrada-id="${esc(e.id)}" data-entrada-name="${esc(e.name || 'Entrada')}">
+          <input type="checkbox" class="form-check-input mt-0 tour-entrada-include" ${included ? 'checked' : ''}>
+          <span class="flex-grow-1 text-truncate" title="${esc(e.name || 'Entrada')}">${esc(e.name || 'Entrada')}<span class="text-muted small">${destino}</span></span>
+          <div class="input-group" style="width: 180px;">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control tour-entrada-price" value="${(Number(price) || 0).toFixed(2)}" min="0" step="0.01">
+          </div>
+          <input type="number" class="form-control tour-entrada-qty" value="${qty}" min="0" step="1" style="width: 100px;" placeholder="0" title="Cantidad (personas)">
+        </div>`;
+    }).join('');
+    if (toggle) toggle.checked = savedPerPerson != null ? !!savedPerPerson : false;
+    const recalc = () => {
+      this.serviceModified = true;
+      this.updateDevPaymentBreakdown();
+      this.updateServicePriceBreakdown();
+    };
+    list.querySelectorAll('.tour-entrada-include, .tour-entrada-price, .tour-entrada-qty').forEach((el) => {
+      el.addEventListener('input', recalc);
+      el.addEventListener('change', recalc);
+    });
+    if (toggle && !toggle._entradaWired) {
+      toggle.addEventListener('change', recalc);
+      toggle._entradaWired = true;
+    }
+  }
+
+  /**
+   * Lee el estado actual de las entradas del tour del DOM.
+   * @returns {{items: Array, perPerson: boolean}}
+   * @example
+   */
+  getTourEntradasState() {
+    const rows = document.querySelectorAll('#tourEntradasList .tour-entrada-row');
+    const items = [];
+    rows.forEach((row) => {
+      items.push({
+        id: row.dataset.entradaId,
+        name: row.dataset.entradaName || '',
+        included: row.querySelector('.tour-entrada-include')?.checked !== false,
+        price: parseFloat(row.querySelector('.tour-entrada-price')?.value || 0) || 0,
+        // Cantidad = nº de boletos (default = personas del tour). Vacío → 0 (no aporta).
+        quantity: parseInt(row.querySelector('.tour-entrada-qty')?.value || 0, 10) || 0,
+      });
+    });
+    const perPerson = document.getElementById('tourEntradasPerPerson')?.checked || false;
+    return { items, perPerson };
+  }
+
+  /**
+   * Costo TOTAL (efectivo) de las entradas del tour incluidas: Σ(precio × cantidad). La cantidad ya
+   * es el nº de boletos (default = personas), así que NO se multiplica de nuevo. 0 si el toggle OFF.
+   * @returns {number}
+   * @example
+   */
+  getTourEntradasCostMXN() {
+    const { items, perPerson } = this.getTourEntradasState();
+    if (!perPerson) return 0;
+    return items
+      .filter((it) => it.included)
+      .reduce((sum, it) => sum + (it.price * it.quantity), 0);
+  }
+
+  /**
+   * Nº de boletos de entradas del tour incluidos (Σ cantidad de las incluidas), para etiquetas.
+   * @returns {number}
+   * @example
+   */
+  getTourEntradasTicketCount() {
+    const { items, perPerson } = this.getTourEntradasState();
+    if (!perPerson) return 0;
+    return items
+      .filter((it) => it.included)
+      .reduce((sum, it) => sum + (it.quantity || 0), 0);
+  }
+
+  /**
+   * Nº de personas del tour: walking usa #walkingTourPeopleCount; vehículo usa adultos + niños.
+   * Si están en 0, cae a las personas de la cotización (numberOfAdults + numberOfChildren).
+   * @returns {number}
+   * @example
+   */
+  _tourPeopleCount() {
+    if (this.getTourType() === 'walking') {
+      const p = parseInt(document.getElementById('walkingTourPeopleCount')?.value, 10) || 0;
+      if (p > 0) return p;
+    } else {
+      const a = parseInt(document.getElementById('tourAdultsQuantity')?.value, 10) || 0;
+      const c = parseInt(document.getElementById('tourChildrenQuantity')?.value, 10) || 0;
+      if (a + c > 0) return a + c;
+    }
+    if (this.quoteData) {
+      return (parseInt(this.quoteData.numberOfAdults, 10) || 0) + (parseInt(this.quoteData.numberOfChildren, 10) || 0);
+    }
+    return 0;
+  }
+
+  /**
+   * Auto-llena la cantidad de CADA entrada del tour con el nº de personas. Vacío si personas = 0.
+   * @example
+   */
+  syncTourEntradaQtys() {
+    const list = document.getElementById('tourEntradasList');
+    if (!list) return;
+    const people = this._tourPeopleCount();
+    list.querySelectorAll('.tour-entrada-qty').forEach((el) => {
+      el.value = people > 0 ? people : '';
+    });
   }
 
   getExperienceName(experienceId) {
@@ -12168,6 +12929,30 @@ class ItineraryBuilder {
    * Muestra/oculta la UI de destinos adicionales: visible solo para tours CON VEHÍCULO.
    * Para walking tour o sin tour, se oculta y se limpian los destinos combinados.
    */
+  /**
+   * Refresca la sección de entradas del tour según el/los destino(s) actuales. Consume el estado
+   * guardado (edición) vía _restoreTourEntradas; en re-render normal preserva las ediciones del DOM.
+   * @example
+   */
+  refreshTourEntradas() {
+    const restore = this._restoreTourEntradas;
+    let savedList = null;
+    let savedPerPerson = null;
+    if (restore) {
+      savedList = restore.list;
+      savedPerPerson = restore.perPerson;
+      this._restoreTourEntradas = null;
+    } else {
+      // Re-render normal (p.ej. agregar/quitar destino): conservar lo que el usuario ya editó.
+      const state = this.getTourEntradasState();
+      if (state.items.length) {
+        savedList = state.items;
+        savedPerPerson = state.perPerson;
+      }
+    }
+    this.loadAndRenderTourEntradas(savedList, savedPerPerson);
+  }
+
   updateAdditionalDestinationsUI() {
     const container = document.getElementById('tourAdditionalDestinationsContainer');
     const mainId = document.getElementById('tourSelect')?.value;
@@ -12190,6 +12975,9 @@ class ItineraryBuilder {
     } else {
       this.updateTourMinHoursDevHint(null, []);
     }
+    // Refrescar las entradas del/los destino(s) del tour (principal + adicionales). Consume el
+    // estado guardado en edición y, en re-render normal, preserva las ediciones actuales.
+    this.refreshTourEntradas();
   }
 
   updateEmptyState() {
@@ -12277,17 +13065,25 @@ class ItineraryBuilder {
     let displaySubtotal; let
       iva;
 
+    // Descomposición del subtotal SOBRE totalMXN (servicios + propinas por servicio, SIN la propina
+    // general), NO sobre finalTotal. Antes se derivaba de finalTotal/1.16 (con la propina general
+    // adentro), por lo que Subtotal + IVA ya igualaba al Total y el renglón de propina parecía que
+    // no sumaba. Ahora Subtotal + IVA = totalMXN y el Total = Subtotal + IVA + Propina general.
     if (paymentType === 'efectivo') {
-      // Efectivo: no IVA breakdown
-      displaySubtotal = finalTotal;
+      // Efectivo: sin IVA. Subtotal = servicios + propinas por servicio.
+      displaySubtotal = totalMXN;
       iva = 0;
       if (ivaRow) {
         ivaRow.classList.add('d-none');
       }
     } else {
-      // Transferencia/Tarjeta: calculate backwards from total (which already includes IVA)
-      displaySubtotal = finalTotal / 1.16;
-      iva = finalTotal - displaySubtotal;
+      // Transferencia/Tarjeta: el precio de servicio ya incluye el 16%; se desglosa. El IVA se calcula
+      // SOLO sobre la base de servicios (netSubtotalMXN) — nunca sobre las propinas (regla CFDI). El
+      // Subtotal es esa base sin IVA MÁS las propinas por servicio (sin IVA); la propina general va
+      // aparte. Así Subtotal + IVA + Propina general = Total (antes se dividía todo /1.16, gravando las
+      // propinas por servicio y dejando el Subtotal inflado con la propina general adentro).
+      iva = netSubtotalMXN - netSubtotalMXN / 1.16;
+      displaySubtotal = netSubtotalMXN / 1.16 + serviceTipsTotalMXN;
       if (ivaRow) {
         ivaRow.classList.remove('d-none');
       }
@@ -12435,6 +13231,7 @@ class ItineraryBuilder {
     this._transportBreakdownTotals = null;
     this._aDisposicionBreakdownTotals = null;
     this._walkingTourBreakdownTotals = null;
+    this._vehicleTourBreakdownTotals = null;
     // Limpia "Lista: $X" del precio principal para que no se herede entre servicios; se
     // repuebla al recalcular el servicio que se abre (setMainVehiclePrice).
     const listEl = document.getElementById('servicePriceListPrice');
@@ -12449,6 +13246,10 @@ class ItineraryBuilder {
     // Modal nuevo: olvidar la experiencia "ya cargada" para que la primera selección genuina
     // limpie/autollene los precios por persona con el catálogo correcto.
     this._loadedExperienceId = null;
+    // Olvidar el estado de restauración de entradas de una edición previa (si no, un servicio nuevo
+    // con la MISMA experiencia heredaría las entradas guardadas de aquél).
+    this._restoreExperienceEntradas = null;
+    this._restoreTourEntradas = null; // idem para las entradas del tour
     this.currentServiceCopy = null;
     this.additionalTourIds = []; // limpiar destinos adicionales combinados del tour
     this.serviceTypeFields = {
@@ -12694,6 +13495,9 @@ class ItineraryBuilder {
             teamNotes: subconcept.teamNotes || '',
             internalNotes: subconcept.internalNotes || '',
             experienceId: subconcept.experienceId,
+            // Entradas: id de catálogo + cantidad (precio unitario en pricesByType).
+            entradaId: subconcept.entradaId || null,
+            entradaQuantity: subconcept.entradaQuantity || 1,
             providerType: subconcept.providerType,
             providerName: subconcept.providerName || '',
             tourId: subconcept.tourId,
@@ -12714,6 +13518,12 @@ class ItineraryBuilder {
             noAlcoholPrice: subconcept.noAlcoholPrice || 0,
             // Checkbox "Guía" de experiencia (incluye guía tipo walking tour SMA en el precio).
             experienceGuide: subconcept.experienceGuide || false,
+            // Entradas asociadas a la experiencia (estado editable + toggle "sumar al precio por persona").
+            experienceEntradas: Array.isArray(subconcept.experienceEntradas) ? subconcept.experienceEntradas : null,
+            experienceEntradasPerPerson: subconcept.experienceEntradasPerPerson || false,
+            // Entradas asociadas al/los destino(s) del tour (mismo patrón que experiencia).
+            tourEntradas: Array.isArray(subconcept.tourEntradas) ? subconcept.tourEntradas : null,
+            tourEntradasPerPerson: subconcept.tourEntradasPerPerson || false,
             // Tour-specific fields (from backend)
             duration: subconcept.duration || 1,
             includeGuide: subconcept.includeGuide || false,
@@ -14054,6 +14864,82 @@ class ItineraryBuilder {
     }
   }
 
+  /**
+   * Carga el catálogo global de Entradas (boletos de admisión) a `entradasCache`. El índice global
+   * (/api/destinos/all-entradas) devuelve { id, name, price, destinoId, destinoName }.
+   * @example
+   */
+  async loadAllEntradas() {
+    try {
+      const accessToken = this.getAccessToken();
+      if (!accessToken) {
+        console.warn('No access token found, skipping entradas load');
+        return;
+      }
+      const response = await fetch('/api/destinos/all-entradas', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        const data = Array.isArray(result.data) ? result.data : (Array.isArray(result) ? result : []);
+        this.entradasCache.set('all', data);
+      } else {
+        console.warn(`Entradas API returned ${response.status}: ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error('Error loading entradas:', error);
+    }
+  }
+
+  /**
+   * Puebla el dropdown global de Entradas (#entradaSelect) desde entradasCache. Cada opción muestra
+   * "Nombre (Destino) — $precio" y lleva data-price. Conserva la selección actual si sigue disponible.
+   * @example
+   */
+  populateEntradaSelect() {
+    const select = document.getElementById('entradaSelect');
+    if (!select) return;
+    const currentVal = select.value;
+    const all = (this.entradasCache && this.entradasCache.get('all')) || [];
+    select.innerHTML = '<option value="">-- Selecciona una entrada --</option>';
+    all.forEach((e) => {
+      if (!e || !e.id) return;
+      const opt = document.createElement('option');
+      opt.value = e.id;
+      opt.dataset.price = e.price != null ? e.price : 0;
+      const destino = e.destinoName ? ` (${e.destinoName})` : '';
+      opt.textContent = `${e.name || 'Entrada'}${destino} — ${this.formatCurrency(Number(e.price) || 0)}`;
+      select.appendChild(opt);
+    });
+    if (currentVal) select.value = currentVal;
+  }
+
+  /**
+   * Maneja la selección de una Entrada: autollena el precio UNITARIO (#servicePrice) con el precio de
+   * catálogo (respeta ediciones manuales vía setMainVehiclePrice) y refresca el desglose.
+   * @param {string} entradaId
+   * @example
+   */
+  handleEntradaSelection(entradaId) {
+    if (!entradaId) {
+      const priceField = document.getElementById('servicePrice');
+      if (priceField && !this._mainPriceManuallyEdited) priceField.value = '';
+      const cap = document.getElementById('servicePriceListPrice');
+      if (cap) cap.textContent = '';
+      this.updateServicePriceBreakdown();
+      return;
+    }
+    const all = (this.entradasCache && this.entradasCache.get('all')) || [];
+    const entrada = all.find((e) => e && (e.id === entradaId || e.objectId === entradaId));
+    const catalogPrice = entrada ? (Number(entrada.price) || 0) : 0;
+    // Autollena #servicePrice + "Lista: $X" respetando ediciones manuales.
+    this.setMainVehiclePrice(catalogPrice);
+    this.updateServicePriceBreakdown();
+  }
+
   async loadAllTours() {
     try {
       const accessToken = this.getAccessToken();
@@ -14573,6 +15459,14 @@ class ItineraryBuilder {
   }
 
   handleExperienceSelection(experienceId) {
+    // El estado guardado de entradas (restauración de edición) se descarta SOLO si el usuario elige
+    // una experiencia DISTINTA a la restaurada. Robusto ante el 'change' async de TomSelect, que
+    // vuelve a llamar handleExperienceSelection con el MISMO id después de que _restoringExperienceData
+    // ya es false; usar ese flag pisaba el estado con defaults (toggle OFF → entradas fuera del
+    // desglose). Comparando por experienceId, ambas llamadas de restauración conservan el estado.
+    if (this._restoreExperienceEntradas && this._restoreExperienceEntradas.experienceId !== experienceId) {
+      this._restoreExperienceEntradas = null;
+    }
     if (!experienceId) {
       // Clear price and details when no experience is selected
       document.getElementById('servicePrice').value = '0.00';
@@ -14627,6 +15521,16 @@ class ItineraryBuilder {
 
         // Show experience details
         this.showExperienceDetails(selectedExperience);
+
+        // Entradas asociadas a la experiencia: cargar (async) y renderizar la lista editable. En
+        // edición se restaura el estado guardado vía this._restoreExperienceEntradas.
+        this.loadExperienceEntradas(experienceId).then((entradas) => {
+          const restore = this._restoreExperienceEntradas;
+          this.renderExperienceEntradas(entradas, restore ? restore.list : null, restore ? restore.perPerson : null);
+          // NO se limpia aquí: handleExperienceSelection puede dispararse 2 veces en restauración y
+          // ambas deben aplicar el estado guardado. Se descarta al cambiar de experiencia el usuario.
+          this.updateServicePriceBreakdown();
+        });
 
         // Refresh the desglose with the freshly-loaded prices (fillExperienceFields
         // sets the price fields programmatically, which doesn't fire input events).
@@ -16830,7 +17734,18 @@ class ItineraryBuilder {
       // Indicador de precios personalizados: SOLO si algún precio por persona difiere del
       // catálogo/lista. (El override está forzado ON por "precio siempre editable", así que no
       // sirve como señal.) Misma detección que computeServiceIsCustomPrice; campo vacío = no custom.
-      const expCat = (this.calculatedPrices && this.calculatedPrices.experience) || {};
+      // Precios de lista AUTORITATIVOS desde el catálogo (por experienceId); calculatedPrices.experience
+      // puede quedar stale o en 0 (ver computeServiceIsCustomPrice). Un campo sin precio de lista queda
+      // null y expDiff lo ignora, así que "input == precio de lista" nunca marca personalizado.
+      let expCat = (this.calculatedPrices && this.calculatedPrices.experience) || {};
+      const expId = document.getElementById('experienceSelect')?.value;
+      const expAll = this.experiencesCache && this.experiencesCache.get('all');
+      if (Array.isArray(expAll) && expId) {
+        const exp = expAll.find((e) => e && (e.id === expId || e.objectId === expId));
+        if (exp) {
+          expCat = { adult: exp.cost || exp.price, child: exp.price_child, noAlcohol: exp.price_no_alcohol };
+        }
+      }
       const expDiff = (a, b) => a != null && b != null && Math.abs(Number(a) - Number(b)) > 0.01;
       const expVal = (id) => {
         const v = document.getElementById(id)?.value;
@@ -16841,6 +17756,18 @@ class ItineraryBuilder {
         || expDiff(expVal('noAlcoholPrice'), expCat.noAlcohol);
       if (expIsCustom && this.canEditPrices) {
         items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precios personalizados</span>', amountMXN: 0 });
+      }
+    } else if (serviceType === 'entrada') {
+      // Espeja el dev breakdown (fuente de verdad): "N entrada(s) × $unit = $total". Usa el mismo
+      // redondeo que el total autoritativo del dev breakdown, así que renglón y total cuadran.
+      items.push(...this.collectServiceBreakdownItemsFromDev());
+      // Indicador de precio personalizado: si el unitario difiere del catálogo de la entrada.
+      const entAll = (this.entradasCache && this.entradasCache.get('all')) || [];
+      const entSel = document.getElementById('entradaSelect')?.value;
+      const entCat = entAll.find((e) => e && (e.id === entSel || e.objectId === entSel));
+      const entUnit = parseFloat(document.getElementById('servicePrice')?.value || 0) || 0;
+      if (entCat && this.canEditPrices && Math.abs(entUnit - (Number(entCat.price) || 0)) > 0.01) {
+        items.push({ label: '<span class="text-info"><i class="ti ti-edit"></i> Precio personalizado</span>', amountMXN: 0 });
       }
     } else if (serviceType === 'a-disposicion') {
       // Mirror the dev breakdown for the selected payment type (the single source of
@@ -19163,6 +20090,10 @@ class ItineraryBuilder {
     this._adispVehiclesCache = this._adispVehiclesCache || new Map();
     let vehicles = this._adispVehiclesCache.get(rateId);
     if (!vehicles) {
+      // Loader: el select queda deshabilitado mostrando "Cargando vehículos…" mientras se trae la
+      // lista del segmento desde la API (solo cuando NO está en caché; re-seleccionar es instantáneo).
+      vehicleSelect.disabled = true;
+      vehicleSelect.innerHTML = '<option value="">Cargando vehículos…</option>';
       try {
         const accessToken = this.getAccessToken();
         const response = await fetch(`/api/disposable-prices/vehicles-for-rate?rateId=${rateId}`, {
@@ -19178,8 +20109,12 @@ class ItineraryBuilder {
         }
       } catch (error) {
         console.error('Error loading vehicles for A Disposición:', error);
+      } finally {
+        vehicleSelect.disabled = false;
       }
     }
+    // Repuebla el select (reset del placeholder por si el loader lo reemplazó).
+    vehicleSelect.innerHTML = '<option value="">-- Seleccionar vehículo --</option>';
     (vehicles || []).forEach((vehicle) => {
       const option = document.createElement('option');
       option.value = vehicle.value || vehicle.id;
@@ -19206,10 +20141,15 @@ class ItineraryBuilder {
       return;
     }
 
+    // Loader en el campo de Precio SOLO cuando se trae la tarifa por hora de la API (si ya está en
+    // caché es instantáneo). Se limpia SIEMPRE en el finally, aunque el fetch falle o retorne temprano.
+    const cacheKey = `${vehicleTypeId}_${rateId}`;
+    const needsPriceFetch = this._disposicionPriceCacheKey !== cacheKey;
+    if (needsPriceFetch) this._setADisposicionPriceLoading(true);
+
     try {
       // Fetch hourly rate if not cached for this combination
-      const cacheKey = `${vehicleTypeId}_${rateId}`;
-      if (this._disposicionPriceCacheKey !== cacheKey) {
+      if (needsPriceFetch) {
         const accessToken = this.getAccessToken();
         const response = await fetch(`/api/disposable-prices/price?vehicleTypeId=${vehicleTypeId}&rateId=${rateId}`, {
           headers: {
@@ -19259,7 +20199,7 @@ class ItineraryBuilder {
       // Show discount info
       if (discountInfo) {
         discountInfo.textContent = discount > 0
-          ? `Descuento por volumen: -${discount}%`
+          ? 'Descuento por volumen'
           : '';
       }
 
@@ -19275,6 +20215,37 @@ class ItineraryBuilder {
       }
     } catch (error) {
       console.error('Error calculating A Disposición price:', error);
+    } finally {
+      if (needsPriceFetch) this._setADisposicionPriceLoading(false);
+    }
+  }
+
+  /**
+   * Muestra/oculta un loader (spinner + "Cargando…") en el campo de Precio mientras se trae la tarifa
+   * por hora de a-disposición desde la API. El campo queda readOnly durante la carga y vuelve editable
+   * al terminar (a-disposición es siempre editable). El spinner se inserta dentro del input-group.
+   * @param {boolean} isLoading
+   * @example
+   */
+  _setADisposicionPriceLoading(isLoading) {
+    const field = document.getElementById('servicePrice');
+    if (!field) return;
+    const group = field.closest('.input-group');
+    const existing = group?.querySelector('.adisp-price-spinner');
+    if (isLoading) {
+      field.readOnly = true;
+      field.value = '';
+      field.placeholder = 'Cargando…';
+      if (group && !existing) {
+        const sp = document.createElement('span');
+        sp.className = 'input-group-text adisp-price-spinner';
+        sp.innerHTML = '<span class="spinner-border spinner-border-sm text-muted" role="status" aria-hidden="true"></span>';
+        field.insertAdjacentElement('afterend', sp);
+      }
+    } else {
+      field.readOnly = false;
+      field.placeholder = '0.00';
+      if (existing) existing.remove();
     }
   }
 
@@ -19975,8 +20946,10 @@ class ItineraryBuilder {
             if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
           } else {
             tourAdultPriceField.value = '';
-            if (adultPriceContainer) adultPriceContainer.style.display = 'none';
-            if (adultQuantityContainer) adultQuantityContainer.style.display = 'none';
+            // Vehicle tour (#311): la cantidad de adultos SIEMPRE se muestra (editable), aunque el
+            // catálogo no traiga precio por persona — el usuario puede capturarlo a mano. Antes se
+            // ocultaba con precio 0, quedando inconsistente con el precio (que sí se ve, en col-md-6).
+            if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
             // Don't clear quantity field for vehicle tours - preserve prefilled values
           }
         }
@@ -19996,8 +20969,8 @@ class ItineraryBuilder {
             if (childQuantityContainer) childQuantityContainer.style.display = 'block';
           } else {
             tourChildPriceField.value = '';
-            if (childPriceContainer) childPriceContainer.style.display = 'none';
-            if (childQuantityContainer) childQuantityContainer.style.display = 'none';
+            // Vehicle tour (#311): la cantidad de niños SIEMPRE se muestra (editable), igual que adultos.
+            if (childQuantityContainer) childQuantityContainer.style.display = 'block';
             // Don't clear quantity field for vehicle tours - preserve prefilled values
           }
         }
@@ -20045,8 +21018,8 @@ class ItineraryBuilder {
                 if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
               } else {
                 tourAdultPriceField.value = '';
-                if (adultPriceContainer) adultPriceContainer.style.display = 'none';
-                if (adultQuantityContainer) adultQuantityContainer.style.display = 'none';
+                // Vehicle tour (#311): la cantidad de adultos siempre visible (editable).
+                if (adultQuantityContainer) adultQuantityContainer.style.display = 'block';
               }
             }
 
@@ -20062,8 +21035,8 @@ class ItineraryBuilder {
                 if (childQuantityContainer) childQuantityContainer.style.display = 'block';
               } else {
                 tourChildPriceField.value = '';
-                if (childPriceContainer) childPriceContainer.style.display = 'none';
-                if (childQuantityContainer) childQuantityContainer.style.display = 'none';
+                // Vehicle tour (#311): la cantidad de niños siempre visible (editable).
+                if (childQuantityContainer) childQuantityContainer.style.display = 'block';
               }
             }
 
@@ -20956,6 +21929,9 @@ class ItineraryBuilder {
             total: serviceTotal,
             // Type-specific fields
             experienceId: service.experienceId || null,
+            // Entradas (boletos de admisión): id de catálogo + cantidad (precio unitario en pricesByType).
+            entradaId: service.entradaId || null,
+            entradaQuantity: service.entradaQuantity ?? null,
             providerType: service.providerType || null,
             providerName: service.providerName || '',
             tourId: service.tourId || null,
@@ -20968,6 +21944,12 @@ class ItineraryBuilder {
             adultsNoAlcoholQuantity: service.adultsNoAlcoholQuantity ?? null,
             // Flag "Guía" de experiencia (el precio ya incluye el costo del guía en pricesByType).
             experienceGuide: service.experienceGuide || false,
+            // Entradas asociadas a la experiencia (estado editable + toggle "sumar al precio por persona").
+            experienceEntradas: Array.isArray(service.experienceEntradas) ? service.experienceEntradas : null,
+            experienceEntradasPerPerson: service.experienceEntradasPerPerson || false,
+            // Entradas asociadas al/los destino(s) del tour (mismo patrón que experiencia).
+            tourEntradas: Array.isArray(service.tourEntradas) ? service.tourEntradas : null,
+            tourEntradasPerPerson: service.tourEntradasPerPerson || false,
             infantsQuantity: service.infantsQuantity ?? null,
             // Schedule for experiences
             selectedSchedule: service.selectedSchedule || null,

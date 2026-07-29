@@ -29,7 +29,9 @@ class TripAdvisorService {
    * @example
    */
   constructor() {
-    this.apiKey = process.env.TRIPADVISOR_API_KEY || '4FABE856A3C849588F6A0B5827BFA5E2';
+    // La key es un secreto: se lee SOLO del entorno (sin fallback hardcodeado). Sin ella, el
+    // servicio salta la llamada y devuelve reseñas de respaldo directamente.
+    this.apiKey = process.env.TRIPADVISOR_API_KEY || '';
     this.locationId = process.env.TRIPADVISOR_LOCATION_ID || '19425238';
     this.baseUrl = 'https://api.content.tripadvisor.com/api/v1';
     this.cache = null;
@@ -337,33 +339,61 @@ class TripAdvisorService {
    */
   async fetchFromAPI(language = 'es') {
     try {
+      // Sin key configurada no tiene sentido llamar (siempre 403): usa el respaldo directo.
+      if (!this.apiKey) {
+        logger.warn('TRIPADVISOR_API_KEY no configurada: se omite la llamada a la API y se usan reseñas de respaldo');
+        return null;
+      }
+
       const url = `${this.baseUrl}/location/${this.locationId}/reviews`;
 
-      const response = await axios.get(url, {
-        params: {
-          key: this.apiKey,
-          language: language === 'es' ? 'es' : 'en',
-          limit: 20, // Get up to 20 reviews
-        },
-        headers: {
-          Accept: 'application/json',
-        },
-        timeout: 5000, // 5 second timeout
-      });
+      // El Content API pagina por `offset` (cada página trae pocas reseñas), así que iteramos y
+      // acumulamos únicas por id para no quedarnos solo con 5 (el lugar da ~25 accesibles).
+      // NO filtramos por idioma: el param `language` filtra las reseñas AL idioma pedido, y como
+      // las reseñas del lugar están en inglés, pedir 'es' devolvía 0 (y caíamos al fallback); el
+      // idioma se usa solo para localizar el "hace X" en formatReview.
+      const byId = new Map();
+      const offsets = [0, 5, 10, 15, 20, 25];
+      for (let i = 0; i < offsets.length && byId.size < 25; i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        const response = await axios.get(url, {
+          params: { key: this.apiKey, offset: offsets[i] },
+          headers: { Accept: 'application/json' },
+          timeout: 5000,
+        });
+        const data = (response.data && response.data.data) || [];
+        if (data.length === 0) break;
+        const before = byId.size;
+        data.forEach((review) => {
+          const id = String(review.id);
+          if (!byId.has(id)) byId.set(id, review);
+        });
+        if (byId.size === before) break; // página sin reseñas nuevas → no hay más
+      }
 
-      if (response.data && response.data.data) {
-        logger.info(`Successfully fetched ${response.data.data.length} reviews from TripAdvisor`);
-        return response.data.data.map((review) => this.formatReview(review, language));
+      if (byId.size > 0) {
+        logger.info(`Successfully fetched ${byId.size} reviews from TripAdvisor`);
+        return Array.from(byId.values()).map((review) => this.formatReview(review, language));
       }
 
       logger.warn('No reviews data in TripAdvisor response');
       return null;
     } catch (error) {
-      logger.error('Error fetching from TripAdvisor API:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-      });
+      const status = error.response?.status;
+      // 403 = key inválida/revocada o IP/dominio del servidor no está en el allowlist de la key
+      // (se configura en el portal de TripAdvisor). No es un problema de código.
+      if (status === 403) {
+        logger.error('TripAdvisor API 403: key no autorizada o IP del servidor fuera del allowlist (revisar portal de TripAdvisor)', {
+          locationId: this.locationId,
+          data: error.response?.data,
+        });
+      } else {
+        logger.error('Error fetching from TripAdvisor API:', {
+          message: error.message,
+          status,
+          data: error.response?.data,
+        });
+      }
       return null;
     }
   }

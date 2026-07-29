@@ -405,6 +405,10 @@ class ProviderExperienciaController {
       query.equalTo('objectId', id);
       query.equalTo('exists', true);
       query.include('provider');
+      // Entradas asociadas (boletos de acceso): incluir para que lleguen resueltas (name/price/destino)
+      // — formatExperienciaForResponse lee esos campos. Sin el include, salían con name/price vacíos.
+      query.include('entradas');
+      query.include('entradas.destino');
 
       const experiencia = await query.first({ useMasterKey: true });
 
