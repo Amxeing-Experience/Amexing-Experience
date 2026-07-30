@@ -90,6 +90,14 @@
     <div class="fin-wrap mb-4" id="financialSummaryCard" style="display:none;">
         <div class="fin-section-head">
             <h5 class="fin-section-title"><i class="ti ti-calculator me-2"></i>Resumen Financiero</h5>
+            <!-- Acceso visible al carrito desde la cabecera. El del hero queda 27% más abajo, dentro
+                 del bloque de totales, y con la tarjeta a media altura no se alcanza a ver. Hace
+                 EXACTAMENTE lo mismo que aquél —incluido desplegar el formulario— para que no importe
+                 por cuál se entre: dos puertas con comportamiento distinto fue justo lo que hizo que
+                 el cajón abriera unas veces con el formulario y otras sin él. -->
+            <button type="button" class="hdr-btn" id="viewPaymentsBtn">
+                <i class="ti ti-cash"></i>Pagos
+            </button>
         </div>
         <div id="financialSummaryBody"></div>
     </div>
@@ -535,8 +543,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     // El resumen lo arma FinancialSummary, compartido con client y department_manager.
-    // `allowEdit: false` — este rol no registra pagos: el servidor le niega POST/PUT/DELETE con
-    // denyRoles('end_client'), así que su hero no debe ofrecer el botón de agregar.
+    // `allowEdit: true` desde que el negocio retiró denyRoles('end_client') de los endpoints de
+    // escritura: el hero pinta "Agregar pago" igual que en las otras tres vistas.
     function renderFinancialSummary() {
         const card = document.getElementById('financialSummaryCard');
         if (card) card.style.display = '';
@@ -545,7 +553,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             body.innerHTML = FinancialSummary.buildHtml({
                 reservationData,
                 formatCurrency,
-                allowEdit: false,
+                allowEdit: true,
             });
         }
     }
@@ -647,17 +655,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         methodLabels: PAYMENT_METHOD_LABELS,
     });
 
-    // Una SOLA puerta al carrito, igual que en las otras tres vistas: "Agregar pago". Que sea la
-    // única es lo que hace que el formulario se despliegue solo al abrir — entrar por ahí ya declara
-    // la intención. Hubo un "Ver pagos" aparte mientras este rol no podía registrar pagos; con dos
-    // puertas, la mitad de las veces el cajón se abría con el formulario colapsado.
+    // Dos puertas al carrito —el botón de la cabecera y el del hero— pero UN SOLO comportamiento.
+    // Antes la de la cabecera abría el cajón sin declarar intención, así que el formulario salía
+    // colapsado según por dónde se entrara; el problema no eran las dos puertas sino que hicieran
+    // cosas distintas.
     //
     // "Agregar pago" vive DENTRO del hero, que renderFinancialSummary vuelve a pintar en cada pago,
     // así que se cablea por DELEGACIÓN sobre el contenedor estable. Va al nivel del closure y no
     // dentro del render: ahí se volvería a registrar en cada recarga y un clic dispararía varias
     // veces. Sin este cableo el botón se dibujaba y no hacía nada, desde que este rol registra pagos.
     document.getElementById('financialSummaryCard')?.addEventListener('click', (e) => {
-        if (e.target.closest('#addPaymentBtn')) {
+        // Las dos puertas del carrito, atendidas por el MISMO camino: el botón de la cabecera y el que
+        // vive dentro del hero. La delegación las cubre a ambas porque las dos cuelgan de esta tarjeta.
+        if (e.target.closest('#addPaymentBtn') || e.target.closest('#viewPaymentsBtn')) {
             paymentForm.requestAddForm();
             paymentsOffcanvasInstance()?.show();
         }
