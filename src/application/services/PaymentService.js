@@ -756,6 +756,83 @@ class PaymentService {
       }
     });
   }
+
+  /**
+   * Whether the rollup PERSISTED on a reservation already equals a freshly computed summary.
+   *
+   * This is the only unambiguous evidence available to the webhook: "matchedCount 0 + the Payment is
+   * already at the destination" cannot tell a legitimate sibling event apart from the retry of a
+   * delivery that died between Capa B and the rollup — but a STALE rollup can, because it is the
+   * fingerprint the dead delivery leaves behind. Never-written fields (undefined/null on a legacy or
+   * half-finished reservation) count as stale, which is the fail-safe reading: a spurious repair
+   * rewrites the same absolute values, a skipped repair strands money.
+   * @param {object} reservation - The Parse Reservation carrying the persisted rollup.
+   * @param {object} summary - A freshly built summary for that same reservation.
+   * @returns {boolean} True when the persisted rollup already matches.
+   * @example
+   * PaymentService.rollupIsCurrent(reservation, summary); // true => nothing to repair
+   */
+  static rollupIsCurrent(reservation, summary) {
+    const storedPaid = reservation.get('paidAmount');
+    const storedBalance = reservation.get('balance');
+    const storedStatus = reservation.get('paymentStatus');
+    // typeof, never Number(): Number(null) is 0, which would read a never-written rollup as "already
+    // current" against a summary of 0 and skip the repair the whole mechanism exists for.
+    if (typeof storedPaid !== 'number' || !Number.isFinite(storedPaid)) return false;
+    if (typeof storedBalance !== 'number' || !Number.isFinite(storedBalance)) return false;
+    if (typeof storedStatus !== 'string' || storedStatus.length === 0) return false;
+    // Below one centavo: both sides come out of round2, so anything smaller is float noise, never money.
+    const MONEY_EPSILON = 0.005;
+    return Math.abs(storedPaid - summary.paidAmount) < MONEY_EPSILON
+      && Math.abs(storedBalance - summary.balance) < MONEY_EPSILON
+      && storedStatus === summary.paymentStatus;
+  }
+
+  /**
+   * Repair a reservation's rollup ONLY IF what is persisted no longer matches a fresh computation.
+   *
+   * Runs the compare INSIDE the same per-reservation lock recalculate uses, so a loser event that
+   * arrives while the winner's recalculate is still in flight waits for it, re-reads what the winner
+   * persisted, finds it current and writes nothing. That is what keeps "exactly one rollup write" true
+   * under concurrency without any new marker or schema field.
+   *
+   * MUST NOT call recalculate(): withReservationLock chains per id and is NOT reentrant, so nesting it
+   * would deadlock. The ~6 lines of persistence below are therefore duplicated from recalculate on
+   * purpose — extracting a shared helper would mean editing a function consumed by PaymentController,
+   * the cancellation flow and the manual-payment suites, widening the regression radius for nothing.
+   *
+   * No try/catch: a failure of loadAndCompute or of the save PROPAGATES, so the webhook controller
+   * retracts its GatewayEvent and answers 500 for Stripe to retry (same contract as recalculate).
+   * @param {string} reservationId - Reservation objectId.
+   * @returns {Promise<{healed: boolean, summary: object}>} True in `healed` when the rollup was rewritten.
+   * @example
+   * const { healed } = await PaymentService.recalculateIfStale(reservationId);
+   */
+  static async recalculateIfStale(reservationId) {
+    return withReservationLock(reservationId, async () => {
+      const computed = await this.loadAndCompute(reservationId);
+      const { reservation } = computed;
+      const summary = this.buildSummary(reservationId, computed);
+
+      if (this.rollupIsCurrent(reservation, summary)) {
+        return { healed: false, summary };
+      }
+
+      reservation.set('paidAmount', summary.paidAmount);
+      reservation.set('balance', summary.balance);
+      reservation.set('paymentStatus', summary.paymentStatus);
+      await reservation.save(null, { useMasterKey: true });
+
+      logger.info('Stale reservation payment rollup repaired', {
+        reservationId,
+        paidAmount: summary.paidAmount,
+        total: summary.total,
+        paymentStatus: summary.paymentStatus,
+      });
+
+      return { healed: true, summary };
+    });
+  }
 }
 
 module.exports = PaymentService;

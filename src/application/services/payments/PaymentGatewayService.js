@@ -72,6 +72,10 @@ const PaymentGatewayError = require('./PaymentGatewayError');
  * Normalized webhook event (provider-independent). Decision #12: in PR1 this is a
  * JSDoc typedef ONLY. It is NOT the Parse model of the same name (that lands in PR2);
  * no GatewayEvent.js class/file is created here.
+ * NOTE (PR5): this `type` vocabulary is the ADAPTER-level one described here, and it is NOT the set of
+ * Payment.gatewayStatus values the Stripe webhook applies. That translation (which includes 'expired',
+ * absent from this list) lives in its own pure module, services/payments/stripeWebhookEvents.js — do not
+ * read this typedef as the authoritative webhook mapping.
  * @typedef {object} GatewayEvent
  * @property {string} gateway - Gateway id that originated the event.
  * @property {string} type - Normalized event type (succeeded/failed/refunded/pending/unknown).

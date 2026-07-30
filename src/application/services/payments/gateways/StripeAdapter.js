@@ -24,8 +24,15 @@ const PaymentGatewayService = require('../PaymentGatewayService');
 const PaymentGatewayError = require('../PaymentGatewayError');
 const { getStripeClient, isStripeConfigured } = require('../../../../infrastructure/payments/stripeClient');
 const { redactGatewayPayload } = require('../../../../infrastructure/payments/redactGatewayPayload');
+const logger = require('../../../../infrastructure/logger');
 
 const GATEWAY_ID = 'stripe';
+
+// Webhook signing secrets always look like whsec_..., in BOTH test and live mode — unlike the secret
+// API key, whose sk_/rk_ prefix encodes the mode. So the shape guard here can only reject a value that
+// is not a webhook secret at all (a pasted sk_ key, a placeholder, junk). The real test/live crossing
+// guard for webhooks is NOT the secret, it is event.livemode, enforced by the caller.
+const WEBHOOK_SECRET_PATTERN = /^whsec_/;
 
 // Checkout Session lifetime FALLBACK. Stripe requires expires_at within [now+30min, now+24h]. The local
 // pending Payment lives PENDING_TTL_MS (30 min exactos en el controller); un colchón de 1 min sobre ese TTL
@@ -61,6 +68,33 @@ function notConfigured(capability) {
     `Stripe "${capability}" is not wired in this build (deferred to a later PR)`,
     { gateway: GATEWAY_ID }
   );
+}
+
+/**
+ * Parse STRIPE_WEBHOOK_SECRETS into the ordered list of currently-valid signing secrets.
+ *
+ * A LIST (comma separated), not a single value, so a secret can be rotated with no downtime: during
+ * the overlap window both the outgoing and the incoming secret are vigentes and the signature is
+ * tried against each in order. Blank entries are dropped (trailing commas are harmless) and entries
+ * that are not shaped like a webhook secret are dropped LOUDLY — silently accepting a pasted API key
+ * here would look identical to "the signature never validates".
+ * @returns {string[]} The usable signing secrets, in configured order.
+ * @example
+ * // STRIPE_WEBHOOK_SECRETS="whsec_new, whsec_old" -> ['whsec_new', 'whsec_old']
+ */
+function resolveWebhookSecrets() {
+  const raw = process.env.STRIPE_WEBHOOK_SECRETS;
+  if (typeof raw !== 'string' || raw.trim().length === 0) return [];
+  const entries = raw.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+  const valid = entries.filter((s) => WEBHOOK_SECRET_PATTERN.test(s));
+  if (valid.length !== entries.length) {
+    // Count only — never the value itself, which is a credential.
+    logger.warn('STRIPE_WEBHOOK_SECRETS contains entries that are not webhook signing secrets (expected whsec_...); they were ignored', {
+      configured: entries.length,
+      usable: valid.length,
+    });
+  }
+  return valid;
 }
 
 /**
@@ -330,10 +364,79 @@ class StripeAdapter extends PaymentGatewayService {
   }
 
   /**
-   * @throws {PaymentGatewayError} NOT_CONFIGURED — webhook verification lands in PR5.
+   * @returns {boolean} True when at least one usable webhook signing secret is configured.
+   * @example
+   * if (!adapter.isWebhookConfigured()) return res.status(503)...;
    */
-  verifyWebhook() {
-    throw notConfigured('verifyWebhook');
+  isWebhookConfigured() {
+    return resolveWebhookSecrets().length > 0;
+  }
+
+  /**
+   * Verify a Stripe webhook signature over the RAW request body and return the parsed event.
+   *
+   * The two failure modes are deliberately DIFFERENT and must never be collapsed: no usable secret is
+   * a CONFIGURATION problem (NOT_CONFIGURED -> 503, same as the checkout controller reports an
+   * unconfigured gateway), while "secrets exist but none of them validates this signature" is a
+   * REJECTION (INVALID_SIGNATURE -> 400). Answering 400 to a missing secret would look like an attack
+   * and hide a deployment mistake behind the exact symptom it produces.
+   *
+   * The replay tolerance is the SDK default (5 minutes) — tolerance is never passed, and in particular
+   * never 0, which would disable the timestamp window and reject every legitimate delivery that spent
+   * a second in transit.
+   * @param {(Buffer|string)} rawBody - The UNPARSED request body, exactly as Stripe sent it.
+   * @param {string} signatureHeader - The `stripe-signature` header value.
+   * @returns {object} The verified Stripe event.
+   * @throws {PaymentGatewayError} NOT_CONFIGURED (no usable secret / no client) or INVALID_SIGNATURE.
+   * @example
+   * const event = adapter.verifyWebhook(req.body, req.headers['stripe-signature']);
+   */
+  verifyWebhook(rawBody, signatureHeader) {
+    const secrets = resolveWebhookSecrets();
+    if (secrets.length === 0) {
+      throw new PaymentGatewayError(
+        PaymentGatewayError.CODES.NOT_CONFIGURED,
+        'Stripe webhook signing secret is not configured for this environment',
+        { gateway: GATEWAY_ID }
+      );
+    }
+
+    let webhooks;
+    try {
+      const client = this.client();
+      webhooks = client && client.webhooks;
+    } catch (err) {
+      // No usable SDK client (missing/crossed API key): still a configuration problem, not a rejection.
+      throw new PaymentGatewayError(
+        PaymentGatewayError.CODES.NOT_CONFIGURED,
+        `Stripe client is not available to verify the webhook signature: ${err && err.message ? err.message : 'unknown error'}`,
+        { gateway: GATEWAY_ID }
+      );
+    }
+    if (!webhooks || typeof webhooks.constructEvent !== 'function') {
+      throw new PaymentGatewayError(
+        PaymentGatewayError.CODES.NOT_CONFIGURED,
+        'Stripe client does not expose webhook verification',
+        { gateway: GATEWAY_ID }
+      );
+    }
+
+    let lastError = null;
+    // eslint-disable-next-line no-restricted-syntax
+    for (const secret of secrets) {
+      try {
+        // Default tolerance (5 min) on purpose: never pass a custom one, never 0.
+        return webhooks.constructEvent(rawBody, signatureHeader, secret);
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    throw new PaymentGatewayError(
+      PaymentGatewayError.CODES.INVALID_SIGNATURE,
+      `Stripe webhook signature verification failed: ${lastError && lastError.message ? lastError.message : 'unknown error'}`,
+      { gateway: GATEWAY_ID }
+    );
   }
 }
 
