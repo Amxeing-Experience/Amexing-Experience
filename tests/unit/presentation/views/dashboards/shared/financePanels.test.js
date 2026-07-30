@@ -103,3 +103,103 @@ describe('PaymentsPanel — allowEdit', () => {
     expect(html).not.toContain('<script>alert(1)');
   });
 });
+
+describe('PaymentForm — la fábrica del formulario de pago', () => {
+  // DOM mínimo: al formulario solo se le pide el HTML que deja en su contenedor.
+  const nodo = () => ({
+    innerHTML: '',
+    style: {},
+    value: '',
+    dataset: {},
+    textContent: '',
+    checked: false,
+    files: [],
+    classList: {
+      add() {}, remove() {}, toggle() {}, contains: () => false,
+    },
+    addEventListener() {},
+    appendChild() {},
+    focus() {},
+    remove() {},
+    scrollIntoView() {},
+    setAttribute() {},
+    getAttribute: () => null,
+    closest: () => null,
+    querySelector: () => nodo(),
+    querySelectorAll: () => [],
+  });
+
+  const pagos = [{
+    id: 'p1', amount: 1500, method: 'transferencia', paidAt: '2026-07-15T10:00:00Z', reference: 'REF-9', origCurrency: 'MXN',
+  }];
+
+  const contexto = (over = {}) => ({
+    reservationId: 'R1',
+    token: () => 'tok',
+    reservationData: () => ({ status: 'pending', currency: 'MXN', paymentType: 'efectivo', services: [] }),
+    payments: () => pagos,
+    summary: () => ({ total: 5000, availableMethods: ['efectivo', 'transferencia', 'tarjeta'] }),
+    formatCurrency,
+    formatDate: (x) => String(x || '').slice(0, 10),
+    toast: () => {},
+    confirm: async () => true,
+    attachThousands: () => {},
+    parseAmount: (x) => Number(String(x).replace(/,/g, '')) || 0,
+    applySummary: () => {},
+    reload: async () => {},
+    repaint: () => {},
+    methodLabels: { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' },
+    ...over,
+  });
+
+  let PaymentForm;
+
+  beforeAll(() => {
+    global.document = {
+      getElementById: () => nodo(),
+      querySelector: () => nodo(),
+      querySelectorAll: () => [],
+      createElement: () => nodo(),
+      body: nodo(),
+    };
+    // eslint-disable-next-line global-require
+    PaymentForm = require('../../../../../../src/presentation/views/dashboards/shared/paymentForm');
+  });
+
+  it('el alta pinta un formulario sin pago asociado', () => {
+    const wrap = nodo();
+    PaymentForm.create(contexto()).renderPaymentForm(null, wrap);
+    expect(wrap.innerHTML).toContain('id="paymentId" value=""');
+  });
+
+  it('la edición precarga el pago', () => {
+    const wrap = nodo();
+    PaymentForm.create(contexto()).renderPaymentForm('p1', wrap);
+    expect(wrap.innerHTML).toContain('id="paymentId" value="p1"');
+    expect(wrap.innerHTML).toContain('REF-9');
+  });
+
+  it('ofrece solo los métodos DISPONIBLES, no tres fijos', () => {
+    const wrap = nodo();
+    PaymentForm.create(contexto({
+      summary: () => ({ total: 5000, availableMethods: ['efectivo'] }),
+    })).renderPaymentForm(null, wrap);
+    expect(wrap.innerHTML).toContain('efectivo');
+    expect(wrap.innerHTML).not.toContain('value="tarjeta"');
+  });
+
+  it('cada instancia lleva SU propio pago en edición: dos no se pisan', () => {
+    const a = PaymentForm.create(contexto());
+    const b = PaymentForm.create(contexto());
+    a.setEditingId('p1');
+    expect(a.getEditingId()).toBe('p1');
+    expect(b.getEditingId()).toBeNull();
+  });
+
+  it('salir de la edición lo limpia', () => {
+    const f = PaymentForm.create(contexto());
+    f.setEditingId('p1');
+    f.setEditingId(null);
+    expect(f.getEditingId()).toBeNull();
+  });
+});

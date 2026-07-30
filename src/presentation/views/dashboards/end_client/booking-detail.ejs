@@ -174,8 +174,10 @@
             <div class="tab-pane fade show active" id="tabPago" role="tabpanel" aria-labelledby="tabPagoBtn">
                 <!-- Card de cobertura (total + estado + barra + Pagado/Saldo) -->
                 <div class="rounded p-3 mb-3 payment-coverage-highlight" id="paymentCoverageCard"></div>
-                <!-- Sin "Registrar pago" ni formulario: el servidor le niega POST/PUT/DELETE a este rol
-                     (denyRoles('end_client')), así que el control no debe ni existir en el DOM. -->
+                <!-- Acción principal: registrar pago -->
+                <button class="btn btn-primary w-100 mb-3 d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
+                <!-- Formulario de pago inline (renderPaymentForm) -->
+                <div id="paymentFormWrap" class="p-3 mb-3" style="display:none;"></div>
                 <!-- Por método de pago: total + cubierto + restante (reemplaza chips y saldo restante) -->
                 <div class="text-muted fw-semibold mb-2"><i class="ti ti-credit-card me-1"></i>Por método de pago</div>
                 <div class="p-3 mb-3" id="paymentMethodTable" style="display:none;"></div>
@@ -194,6 +196,7 @@
 <script src="/shared/payments/paymentBreakdownHelpers.js"></script>
 <script src="/shared/services/financialSummary.js"></script>
 <script src="/shared/services/paymentsPanel.js"></script>
+<script src="/shared/services/paymentForm.js"></script>
 <script src="/shared/services/serviceListHelpers.js"></script>
 <script src="/shared/services/serviceListRenderer.js"></script>
 <script src="/shared/services/itineraryExport.js"></script>
@@ -386,6 +389,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             paymentsOffcanvasInstance()?.show();
         });
 
+        // "Registrar pago" dentro del carrito.
+        document.getElementById('showPaymentFormBtn')?.addEventListener('click', () => {
+            const wrap = document.getElementById('paymentFormWrap');
+            if (wrap) paymentForm.renderPaymentForm(null, wrap);
+        });
+
         // Render services grouped by day
         renderServices(d.services);
 
@@ -550,6 +559,103 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
+    const PAYMENT_METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
+
+    function attachThousands(el) {
+        if (!el) return;
+        el.addEventListener('input', () => formatThousandsInput(el));
+        if (el.value) formatThousandsInput(el);
+    }
+
+    // Parse an amount that may carry thousands separators ("1,234.56" -> 1234.56).
+    function parseAmount(value) {
+        return parseFloat(String(value == null ? '' : value).replace(/,/g, ''));
+    }
+
+    function pmConfirm({ title = 'Confirmar', message = '', confirmText = 'Aceptar', danger = false } = {}) {
+        return new Promise((resolve) => {
+            let el = document.getElementById('pmConfirmModal');
+            if (!el) {
+                document.body.insertAdjacentHTML('beforeend', `
+                    <div class="modal fade" id="pmConfirmModal" tabindex="-1" aria-hidden="true">
+                      <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow-lg" style="border-radius:0.85rem;overflow:hidden">
+                          <div class="modal-body text-center px-4 pt-4 pb-2">
+                            <div data-pm-icon class="d-inline-flex align-items-center justify-content-center mb-3" style="width:56px;height:56px;border-radius:50%"></div>
+                            <h5 class="fw-bold mb-2" data-pm-title></h5>
+                            <p class="text-muted mb-0" data-pm-msg></p>
+                          </div>
+                          <div class="modal-footer border-0 justify-content-center pt-1 pb-4 gap-2">
+                            <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn px-4" data-pm-ok></button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>`);
+                el = document.getElementById('pmConfirmModal');
+            }
+            el.querySelector('[data-pm-title]').textContent = title;
+            el.querySelector('[data-pm-msg]').textContent = message;
+            const icon = el.querySelector('[data-pm-icon]');
+            icon.classList.remove('bg-danger-subtle', 'text-danger', 'bg-primary-subtle', 'text-primary');
+            icon.classList.add(danger ? 'bg-danger-subtle' : 'bg-primary-subtle', danger ? 'text-danger' : 'text-primary');
+            icon.innerHTML = `<i class="ti ${danger ? 'ti-alert-triangle' : 'ti-help-circle'}" style="font-size:1.75rem"></i>`;
+            const old = el.querySelector('[data-pm-ok]');
+            const ok = old.cloneNode(true);
+            ok.textContent = confirmText;
+            ok.className = `btn px-4 ${danger ? 'btn-danger' : 'btn-primary'}`;
+            old.replaceWith(ok);
+            const modal = bootstrap.Modal.getOrCreateInstance(el);
+            let confirmed = false;
+            ok.addEventListener('click', () => { confirmed = true; modal.hide(); });
+            el.addEventListener('hidden.bs.modal', () => resolve(confirmed), { once: true });
+            modal.show();
+        });
+    }
+
+    function pmToast(message, type = 'info') {
+        let c = document.getElementById('pmToastContainer');
+        if (!c) {
+            document.body.insertAdjacentHTML('beforeend', '<div id="pmToastContainer" class="toast-container position-fixed top-0 end-0 p-3" style="z-index:1090"></div>');
+            c = document.getElementById('pmToastContainer');
+        }
+        const bg = {
+            error: 'bg-danger text-white', success: 'bg-success text-white',
+            warning: 'bg-warning text-dark', info: 'bg-dark text-white',
+        }[type] || 'bg-dark text-white';
+        const wrap = document.createElement('div');
+        wrap.className = `toast align-items-center ${bg} border-0`;
+        wrap.setAttribute('role', 'alert');
+        wrap.innerHTML = `<div class="d-flex"><div class="toast-body">${pmEsc(message)}</div>`
+            + `<button type="button" class="btn-close ${type === 'warning' ? '' : 'btn-close-white'} me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>`;
+        c.appendChild(wrap);
+        const t = new bootstrap.Toast(wrap, { delay: 4500 });
+        t.show();
+        wrap.addEventListener('hidden.bs.toast', () => wrap.remove());
+    }
+
+    // El formulario de pago lo arma PaymentForm, el mismo módulo que usan client y department_manager.
+    // El cliente directo registra sus propios pagos desde que el negocio retiró denyRoles('end_client')
+    // de los cuatro endpoints de escritura; lo que sigue acotándolo es la PROPIEDAD de la reservación,
+    // que el controller aplica en loadReservation.
+    const paymentForm = PaymentForm.create({
+        reservationId,
+        token: () => token,
+        reservationData: () => reservationData,
+        payments: () => paymentsCache,
+        summary: () => latestSummary,
+        formatCurrency,
+        formatDate,
+        toast: pmToast,
+        confirm: pmConfirm,
+        attachThousands,
+        parseAmount,
+        applySummary: applyPaymentSummary,
+        reload: loadPayments,
+        repaint: renderPayments,
+        methodLabels: PAYMENT_METHOD_LABELS,
+    });
+
     /** Instancia del carrito, creada a demanda. */
     function paymentsOffcanvasInstance() {
         const el = document.getElementById('paymentsOffcanvas');
@@ -576,11 +682,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (body) body.innerHTML = PaymentsPanel.renderPaymentsLoadError();
     }
 
-    // Historial de SOLO LECTURA: la tabla la arma PaymentsPanel y aquí solo se enganchan el orden y
-    // el copiar-referencia. Sin editar ni borrar, que es lo que el servidor le niega a este rol.
+    // La tabla la arma PaymentsPanel; aquí se quedan el ORDEN y el pago en edición, que los cambia el
+    // usuario al hacer clic, y esos clics los escucha esta vista.
     function renderPayments() {
         const body = document.getElementById('paymentsBody');
         if (!body) return;
+        paymentForm.syncAddPaymentBtn();
         const histCount = document.getElementById('historialCount');
         if (histCount) histCount.textContent = paymentsCache.length ? String(paymentsCache.length) : '';
         body.innerHTML = PaymentsPanel.renderPayments({
@@ -588,7 +695,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             formatCurrency,
             payments: paymentsCache,
             sort: paymentsSort,
-            allowEdit: false,
+            editingId: paymentForm.getEditingId(),
+            allowEdit: true,
         });
         body.querySelectorAll('.pay-hist-sort').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -602,6 +710,28 @@ document.addEventListener('DOMContentLoaded', async function() {
         body.querySelectorAll('.copy-ref-btn').forEach((btn) => {
             btn.addEventListener('click', () => copyToClipboard(btn.dataset.ref || ''));
         });
+        body.querySelectorAll('.edit-payment-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                // Cerrar primero descarta el otro formulario antes de abrir este.
+                // Cerrar primero descarta el otro formulario antes de abrir este.
+                paymentForm.closePaymentForm();
+                paymentForm.setEditingId(btn.dataset.paymentId);
+                renderPayments();
+            });
+        });
+        body.querySelectorAll('.delete-payment-btn').forEach((btn) => {
+            btn.addEventListener('click', () => paymentForm.deletePayment(btn.dataset.paymentId));
+        });
+
+        // El formulario inline se dibuja al final, cuando su contenedor ya está en el DOM.
+        // El formulario inline se dibuja al final, cuando su contenedor ya está en el DOM. Si el pago
+        // en edición desapareció, el estado se limpia solo.
+        const editando = paymentForm.getEditingId();
+        if (editando) {
+            const editWrap = document.getElementById('paymentEditWrap');
+            if (editWrap) paymentForm.renderPaymentForm(editando, editWrap);
+            else paymentForm.setEditingId(null);
+        }
     }
 
     function renderPaymentsOffcanvas() {
@@ -629,6 +759,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         else reservationData.payment = { ...summary };
         renderFinancialSummary();
         renderPaymentsOffcanvas();
+        // Si el panel se abrió antes de que llegara el summary, este es el momento de desplegar el alta.
+        paymentForm.maybeOpenAddForm();
     }
 
     // GET /payments SÍ está abierto a este rol: leer su propio historial es parte de su scope. Los

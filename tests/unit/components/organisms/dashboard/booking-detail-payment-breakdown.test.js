@@ -25,6 +25,7 @@ const RAIZ_SHARED = path.join(__dirname, '../../../../../src/presentation/views/
 const leerModulo = (nombre) => fs.readFileSync(path.join(RAIZ_SHARED, nombre), 'utf8');
 const FUENTE_FINANZAS = leerModulo('financialSummary.js');
 const FUENTE_PAGOS = leerModulo('paymentsPanel.js');
+const FUENTE_FORMULARIO = leerModulo('paymentForm.js');
 
 
 const params = { reservationId: 'test-reservation-id' };
@@ -169,9 +170,11 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     // "Agregar pago" lo pinta el módulo del resumen, no el markup de la plantilla.
     expect(FUENTE_FINANZAS).toContain('id="addPaymentBtn"');
     expect(html).toContain('id="showPaymentFormBtn"');
-    // savePaymentBtn se emite dentro de renderPaymentForm (marcador literal en el <script>).
-    expect(html).toContain('id="savePaymentBtn"');
-    expect(html).toContain('function renderPaymentForm');
+    // El formulario se extrajo a PaymentForm; la plantilla aporta el contenedor y el disparador, y el
+    // módulo el formulario en sí. Se comprueba además que lo ENLACE: sin eso el botón no haría nada.
+    expect(FUENTE_FORMULARIO).toContain('id="savePaymentBtn"');
+    expect(FUENTE_FORMULARIO).toContain('function renderPaymentForm');
+    expect(html).toContain('/shared/services/paymentForm.js');
   });
 
   // INVERSIÓN Fase D: antes agencia/agente NO tenían historial de pagos; ahora SÍ (offcanvas de lectura).
