@@ -1306,6 +1306,11 @@
 <script src="/js/reservation-cancel-utils.js"></script>
 <!-- Shared payment breakdown helpers (isomorphic; also require'd by Jest) -->
 <script src="/shared/payments/paymentBreakdownHelpers.js"></script>
+<!-- Modelo compartido de la lista de servicios: el MISMO archivo que usa el itinerario del cliente
+     (ahí vía require, desde su controlador) y que prueba Jest. Existe porque esa lista vivía escrita
+     dos veces y divergía sola: el orden difería en 9 de 93 grupos día y el conteo de personas en
+     122 de 291 servicios, sin que nadie lo hubiera decidido. -->
+<script src="/shared/services/serviceListHelpers.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
@@ -1804,73 +1809,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         return html;
     }
 
-    // Composición de personas en el formato del itinerario ("3 adultos, 1 niño"), para mostrarla como
-    // una línea destacada bajo el título en vez de un renglón perdido dentro de la sección PERSONAS.
-    // A diferencia de peopleLabel() del itinerario, respeta los campos POR TIPO que usa esta vista
-    // (un traslado guarda su conteo en transportAdults, no en adultsQuantity) y conserva la distinción
-    // de "sin alcohol", que el itinerario fusiona con los adultos.
+    // Línea destacada bajo el título en vez de un renglón perdido dentro de la sección PERSONAS.
     function servicePeopleLabel(svc) {
-        const sub = svc.subconcept || {};
-        const parts = [];
-        const push = (n, sing, plur) => { const v = Number(n) || 0; if (v > 0) parts.push(`${v} ${v === 1 ? sing : plur}`); };
-
-        if (isTransportType(svc)) {
-            push(sub.transportAdults, 'adulto', 'adultos');
-            push(sub.transportChildren, 'niño', 'niños');
-            push(sub.transportInfants, 'infante', 'infantes');
-        } else if (svc.type === 'experience') {
-            push(sub.adultsQuantity, 'adulto', 'adultos');
-            push(sub.childrenQuantity, 'niño', 'niños');
-            push(sub.adultsNoAlcoholQuantity, 'sin alcohol', 'sin alcohol');
-        } else if (svc.type === 'tour' && sub.isWalkingTour) {
-            push(sub.adultsQuantity, 'adulto', 'adultos');
-            push(sub.childrenQuantity, 'niño', 'niños');
-            push(sub.infantsQuantity, 'infante', 'infantes');
-            if (!parts.length) push(sub.walkingTourPeopleCount, 'persona', 'personas');
-        }
-        // Respaldo común: el conteo plano del servicio (o el de la reservación) cuando no hay desglose.
-        if (!parts.length) push(sub.persons || sub.numberOfPeople, 'persona', 'personas');
-        return parts.join(', ');
+        return ServiceListHelpers.peopleLabel(serviceFacts(svc));
     }
 
-    // Ubicaciones del servicio, como renglones etiquetados bajo el título (el hueco que dejó
-    // "Desde/Hacia"). En los TRASLADOS son las DIRECCIONES exactas de pick-up y drop-off: la ruta ya la
-    // dice el título, pero la calle y el punto de encuentro no estaban a la vista — vivían enterrados en
-    // la sección UBICACIONES. En tours y experiencias se conserva el origen/destino por nombre, porque
-    // ahí el título es el nombre del servicio y no dice de dónde sale.
+    // Renglones etiquetados bajo el título, en el hueco que dejó "Desde/Hacia": esas direcciones
+    // vivían enterradas en la sección UBICACIONES.
     function serviceLocationLines(svc) {
-        const sub = svc.subconcept || {};
-        const lines = [];
-        const add = (label, value) => {
-            const v = String(value == null ? '' : value).trim();
-            if (v) lines.push({ label, value: v });
-        };
-        if (isTransportType(svc)) {
-            if (sub.tripType === 'round-trip') {
-                add('Pick-up (ida)', sub.pickupAddressIda);
-                add('Drop-off (ida)', sub.dropoffAddressIda);
-                add('Pick-up (regreso)', sub.pickupAddressVuelta);
-                add('Drop-off (regreso)', sub.dropoffAddressVuelta);
-            } else {
-                add('Pick-up', sub.pickupAddress);
-                add('Drop-off', sub.dropoffAddress);
-            }
-        } else {
-            add('Desde', svc.originName);
-            add('Hacia', svc.destinationName);
-            add('Pick-up', sub.pickupAddress);
-        }
-        return lines;
+        return ServiceListHelpers.locationLines(serviceFacts(svc));
     }
 
     // Nombres de las personas del servicio, justo bajo el conteo: esa línea dice CUÁNTOS ("3 adultos,
     // 1 niño"), esta QUIÉNES. Sin rótulo ni contador: apiladas se entiende la relación, y un segundo
     // conteo junto al primero invitaba a leer un error cuando difieren (los nombres capturados no
     // tienen por qué ser todos los pasajeros).
+    // El módulo devuelve los NOMBRES; el envoltorio los pinta, que es lo que difiere entre vistas.
     function serviceAttendeesLine(svc) {
-        const sub = svc.subconcept || {};
-        if (!Array.isArray(sub.attendees)) return '';
-        const names = sub.attendees.map((n) => String(n == null ? '' : n).trim()).filter(Boolean);
+        const names = ServiceListHelpers.attendeeNames(serviceFacts(svc));
         if (!names.length) return '';
         return `<div class="svc-names">${PaymentBreakdownHelpers.escapeHtml(names.join(', '))}</div>`;
     }
@@ -1883,17 +1839,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Para el chofer manda la de pick-up, así que es la que encabeza el servicio. En LLEGADAS hay una
     // sola —el chofer pasa cuando aterriza el avión—, así que ahí no cambia nada.
     function servicePickupTime(svc) {
-        const sub = svc.subconcept || {};
-        if (isTransportType(svc) && sub.transportType === 'aeropuerto' && sub.directionType === 'departure') {
-            const suggested = svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested;
-            if (suggested) return roundTimeToNearest15(suggested) || suggested;
-        }
-        let t = svc.time || sub.startTime || sub.time || '';
-        if (!t && sub.selectedSchedule) {
-            const m = String(sub.selectedSchedule).match(/^(\d{1,2}:\d{2})/);
-            if (m) [, t] = m;
-        }
-        return t;
+        return ServiceListHelpers.startTime(serviceFacts(svc));
     }
 
     // Hora del VUELO, cuando es un dato distinto al pick-up (solo salidas a aeropuerto). Sirve para
@@ -1905,50 +1851,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         return m ? m[1] : '';
     }
 
-    // Duración del servicio POR TIPO, mismo criterio que serviceDuration() del itinerario: cada tipo la
-    // guarda en un campo distinto y no son intercambiables.
-    //   a-disposición      -> hours          (horas contratadas)
-    //   tour / experiencia -> duration       (duración del catálogo, en horas)
-    //   traslado           -> routeDuration  (duración de la ruta, en MINUTOS)
-    //   concepto           -> ninguna
-    // El orden importa: los subconceptos arrastran un `duration: 1` espurio en todo lo que no es tour,
-    // así que con `duration` primero un a-disposición de 6 h se anunciaba como "1 h".
-    // El texto usa el MISMO formato que durationLabel() del itinerario: "4 hrs", "1 hr 45 min". Antes
-    // divergían —aquí "4 horas", allá "4 hours"— y no había razón: es el mismo dato para el mismo
-    // negocio, solo que en dos pantallas.
-    // Horas en una sola forma: "1 hr", "6 hrs". La usan la duración y los tiempos de espera.
     function hoursText(h) {
-        const n = Number(h) || 0;
-        return `${n} hr${n === 1 ? '' : 's'}`;
+        return ServiceListHelpers.hoursText(h);
     }
 
     function serviceDurationLabel(svc) {
-        const sub = svc.subconcept || {};
-        // "hr/hrs" en todo lo que sean horas, en las dos vistas. Antes convivían "hora/horas" aquí,
-        // "hour/hours" en el itinerario y un "6h" pegado en Espera: tres formas del mismo dato.
-        const hoursLabel = (h) => `${h} hr${h === 1 ? '' : 's'}`;
-        if (svc.type === 'a-disposicion') {
-            const h = Number(sub.hours || 0);
-            return h > 0 ? hoursLabel(h) : '';
-        }
-        if (svc.type === 'tour' || svc.type === 'experience') {
-            const h = Number(sub.duration || sub.hours || 0);
-            return h > 0 ? hoursLabel(h) : '';
-        }
-        if (isTransportType(svc)) {
-            const min = Number(sub.routeDuration || 0);
-            if (min <= 0) return '';
-            const h = Math.floor(min / 60);
-            const m = min % 60;
-            if (h === 0) return `${m} min`;
-            return m ? `${hoursLabel(h)} ${m} min` : hoursLabel(h);
-        }
-        return '';
+        return ServiceListHelpers.durationLabel(serviceFacts(svc));
     }
 
-    // Etiqueta del día con el mismo formato que dayLabel() de reservation-itinerary.ejs
-    // ("Miércoles. Jul 29"), pero con los días en español: aquella plantilla es de cara al cliente y
-    // está en inglés, esta vista es interna y va en español (usa el mismo DOW_ES que ya declara).
+    // Etiqueta del día ("Miércoles. Jul 29"). Sigue siendo propia de esta vista: el itinerario arma la
+    // suya con los días en inglés, que es una decisión de ese documento y no del modelo.
     const SVC_DOW = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const SVC_MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto',
         'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -1964,30 +1876,40 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `${SVC_DOW[d.getDay()]}. ${SVC_MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
     }
 
-    // Ícono del riel de la línea de tiempo: MISMO criterio que iconKey() de reservation-itinerary.ejs,
-    // para que un servicio se vea igual en la lista y en el itinerario. Son PNG de /images/icons, no
-    // la fuente Tabler (que además no tenía glifo para todos los tipos).
-    // Los tipos que el itinerario no distingue caen en su mismo default ('experience'), salvo
-    // a-disposición: es transporte con vehículo, así que comparte el ícono de traslado.
-    // `traslado` es un valor de type LEGADO que sigue vivo: 28 servicios en la base, del 9 de marzo al
-    // 24 de julio, en 24 reservaciones. Vive en UN predicado porque lo consultan seis funciones y con
-    // que una se olvide, ese traslado pierde su dirección de pick-up, su duración o su conteo de
-    // pasajeros sin que nada avise. El template del itinerario ya trataba los dos valores.
+    // PNG de /images/icons y no la fuente Tabler, que no tiene glifo para todos los tipos.
+    // El módulo compartido trabaja sobre una forma PLANA (subconcepto + type); esta vista tiene el
+    // subconcepto anidado. Este adaptador es el único lugar donde se traduce: dos formas de dato era
+    // justo lo que permitía que las dos vistas divergieran.
+    function serviceFacts(svc) {
+        const s = svc || {};
+        const sub = s.subconcept || {};
+        return {
+            ...sub,
+            type: s.type || sub.type,
+            time: s.time || sub.time || '',
+            flightDepartureTimeSuggested: s.flightDepartureTimeSuggested
+                || sub.flightDepartureTimeSuggested || '',
+            // Esta vista los lee del primer nivel; el itinerario, del subconcepto. Gana el de arriba.
+            originName: s.originName || sub.originName || '',
+            destinationName: s.destinationName || sub.destinationName || '',
+            transportType: sub.transportType || s.transportType || '',
+            directionType: sub.directionType || s.directionType || '',
+            // ReservationService guarda además su PROPIO vehicleTypeName al margen del subconcepto;
+            // sin este respaldo las plazas de esos servicios volverían al genérico «Vehículo».
+            vehicleTypeName: sub.vehicleTypeName || s.vehicleTypeName || '',
+            additionalVehicleTypeName: sub.additionalVehicleTypeName || s.additionalVehicleTypeName || '',
+            additionalVehicleSegmentName: sub.additionalVehicleSegmentName || s.additionalVehicleSegmentName || '',
+        };
+    }
+
+    // Envoltorios finos sobre ServiceListHelpers, para no tocar los call sites (mismo criterio que
+    // los de PaymentBreakdownHelpers). La lógica vive en /shared/services/serviceListHelpers.js.
     function isTransportType(svc) {
-        return svc && (svc.type === 'transport' || svc.type === 'traslado');
+        return ServiceListHelpers.isTransportType(svc && svc.type);
     }
 
     function getServiceIconKey(svc) {
-        const sub = svc.subconcept || {};
-        const transportType = sub.transportType || svc.transportType;
-        const directionType = sub.directionType || svc.directionType;
-        if (isTransportType(svc)) {
-            if (transportType === 'aeropuerto') return directionType === 'departure' ? 'departure' : 'arrival';
-            return 'transfer';
-        }
-        if (svc.type === 'tour') return 'city';
-        if (svc.type === 'a-disposicion') return 'transfer';
-        return 'experience';
+        return ServiceListHelpers.iconKey(serviceFacts(svc));
     }
 
     function getServiceTypeLabel(type) {
@@ -2282,14 +2204,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Round a HH:MM string DOWN to the previous 15-minute mark — same strategy used
     // in the quote services list so timestamps stay consistent across views.
     function roundTimeToNearest15(timeStr) {
-        if (!timeStr || !timeStr.includes(':')) return timeStr || '';
-        const [hours, minutes] = timeStr.split(':').map(Number);
-        if (Number.isNaN(hours) || Number.isNaN(minutes)) return timeStr;
-        let totalMinutes = hours * 60 + minutes;
-        totalMinutes = Math.floor(totalMinutes / 15) * 15;
-        const h = Math.floor(totalMinutes / 60) % 24;
-        const m = totalMinutes % 60;
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        return ServiceListHelpers.roundDownTo15(timeStr);
     }
 
     // Build a single detail line: small icon + label (optional) + value.
@@ -2519,33 +2434,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             days[key].services.push(svc);
         });
 
-        // Order services within each day chronologically — same strategy used by the
-        // quote services list (sortSubconceptsByTime).
-        const parseTimeToMinutes = (timeStr) => {
-            if (!timeStr) return null;
-            // Range format "HH:MM - HH:MM" → use the start of the range
-            const rangeMatch = String(timeStr).match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
-            if (rangeMatch) return parseInt(rangeMatch[1], 10) * 60 + parseInt(rangeMatch[2], 10);
-            const singleMatch = String(timeStr).match(/^(\d{1,2}):(\d{2})/);
-            if (singleMatch) return parseInt(singleMatch[1], 10) * 60 + parseInt(singleMatch[2], 10);
-            return null;
-        };
-        // Los servicios SIN hora van PRIMERO, no al final: es el orden del itinerario del cliente, que
-        // es el documento de referencia, y así la misma reservación se lee igual en las dos vistas.
-        // Antes divergían en 9 de 93 grupos día —el 76% de los servicios no tiene hora capturada—.
-        //
-        // La comparación sigue siendo NUMÉRICA aunque el itinerario ordene por cadena en la base: con
-        // horas bien formadas dan lo mismo, y una hora sin cero a la izquierda ("9:00") el orden de
-        // cadena la mandaría después de "14:15". Se replica el resultado, no la fragilidad.
+        // Orden dentro del día: lo decide ServiceListHelpers.compareByTime, el mismo comparador que
+        // aplica el itinerario del cliente. Antes cada vista traía el suyo y divergían en 9 de 93
+        // grupos día, porque el 76% de los servicios no tiene hora capturada y no coincidían en
+        // dónde poner a los que no la tienen.
         Object.values(days).forEach((d) => {
-            d.services.sort((a, b) => {
-                const ma = parseTimeToMinutes(a.time);
-                const mb = parseTimeToMinutes(b.time);
-                if (ma === null && mb === null) return 0;
-                if (ma === null) return -1;
-                if (mb === null) return 1;
-                return ma - mb;
-            });
+            d.services.sort(ServiceListHelpers.compareByTime);
         });
 
         if (Object.keys(days).length === 0) {
@@ -2567,236 +2461,54 @@ document.addEventListener('DOMContentLoaded', async function() {
             html += `<div class="svc-day"><div class="svc-day-bar">${dayLbl}</div>`;
 
             day.services.forEach(svc => {
-                const includeGuide = svc.subconcept?.includeGuide;
-                const includeGreeter = svc.subconcept?.includeGreeter;
-                // Decide whether this service actually needs vehicle assignment slots.
-                // Experiences, conceptos and walking tours never need a vehicle even if
-                // their subconcept.quantity is > 0 (that's people count for them).
-                const isWalkingTour = !!svc.subconcept?.isWalkingTour;
-                const hasVehicleData = !!(svc.subconcept?.vehicleType || svc.subconcept?.vehicleTypeName
-                    || svc.subconcept?.requiresTransport
-                    || svc.subconcept?.additionalVehicleId
-                    || (Array.isArray(svc.subconcept?.extraAdditionalVehicles) && svc.subconcept.extraAdditionalVehicles.length > 0));
-                // isTransportType cubre `transport` y el legado `traslado`: sin eso esos 28 servicios
-                // no calculaban plazas y caían al texto suelto, 9 de ellos con datos de vehículo.
-                const needsVehicle = (isTransportType(svc)
-                    || svc.type === 'a-disposicion'
-                    || (svc.type === 'tour' && !isWalkingTour && hasVehicleData));
-                // For a-disposición the "quantity" field on the subconcept is the count of
-                // the service entry; the actual vehicle count lives in `vehicleCount`.
-                let vehicleQty = 0;
-                if (needsVehicle) {
-                    if (svc.type === 'a-disposicion') {
-                        vehicleQty = Number(svc.subconcept?.vehicleCount) || 1;
-                    } else {
-                        vehicleQty = Number(svc.subconcept?.quantity) || 1;
-                    }
-                }
-
-                // Parejas chofer+vehículo (una por plaza) y los roles que no van amarrados a un
-                // vehículo. Las plazas que el servicio pide y nadie ha llenado se dibujan en gris
-                // punteado: el hueco es justo lo que quien asigna necesita ver.
+                // Plazas chofer+vehículo y renglones de rol: los arma ServiceListHelpers, el mismo
+                // modelo que usa el itinerario del cliente. Aquí solo se adapta la forma del dato,
+                // se agrega lo que únicamente esta vista necesita (el rótulo del selector) y se pinta.
+                const facts = serviceFacts(svc);
                 const extras = svc.extraAssignments || [];
-                // En «a disposición» el chofer se captura en el campo de guía, no en el de
-                // conductor, así que la pareja nunca debe pedirlo ahí: diría «Conductor pendiente»
-                // con el chofer ya asignado en el renglón de abajo.
                 const isAtDisposal = svc.type === 'a-disposicion';
-                const isTour = svc.type === 'tour';
-                // ¿La PLAZA ofrece chofer? El checkbox de la cotización se llama "Guía + Chofer" y lo
-                // que contrata es el CHOFER; el guía va aparte según el tipo (ver más abajo).
-                //   traslado      → siempre: sin chofer no hay traslado.
-                //   tour          → solo con "Guía + Chofer": el tour ya trae guía propio y el chofer
-                //                   es el extra. Sin marcar, la plaza muestra únicamente el vehículo.
-                //   a disposición → nunca en la plaza: ahí el chofer se captura en el campo de guía y
-                //                   se dibuja como renglón de rol.
-                //   resto         → como el tour.
-                const pairOffersDriver = isAtDisposal
-                    ? false
-                    : (isTransportType(svc) ? true : !!includeGuide);
+                const assigned = {
+                    driver: svc.assignedDriver || null,
+                    vehicle: svc.assignedVehicle || null,
+                    guide: svc.assignedGuide || null,
+                    greeter: svc.assignedGreeter || null,
+                    serviceCustomer: svc.assignedServiceCustomer || null,
+                    extras,
+                };
 
-                // Tipo y segmento ESPERADOS de cada plaza. Es el mismo mapeo que arma el modal de
-                // asignación que se retiró: plaza 0 = vehículo principal,
-                // plaza 1 = adicional cuando venía marcado, 2+ = extras en orden. Se replica aquí
-                // para que la lista y el formulario nombren la misma plaza igual.
-                const sub = svc.subconcept || {};
-                const hasPrimaryAdditional = !!(sub.additionalVehicleTypeName || svc.additionalVehicleTypeName);
-                const slotSpecs = [{
-                    type: sub.vehicleTypeName || vehicleTypeAsName(sub.vehicleType) || svc.vehicleTypeName || '',
-                    segment: sub.categoryName || '',
-                    color: sub.categoryColor || '',
-                }];
-                // hasPrimaryAdditional se define igual que en el modal (por el nombre del tipo) a
-                // propósito: de él depende el índice de plaza, y si las dos vistas no coincidieran,
-                // la lista diría "Vehículo adicional" donde el formulario dice "Vehículo extra 1".
-                if (hasPrimaryAdditional) {
-                    slotSpecs.push({
-                        type: sub.additionalVehicleTypeName || svc.additionalVehicleTypeName || '',
-                        segment: sub.additionalVehicleSegmentName || svc.additionalVehicleSegmentName || '',
-                        color: sub.additionalVehicleSegmentColor || '',
-                    });
-                }
-                // Las plazas 3+ se leen de `extraAdditionalVehicles` —la lista COTIZADA— y no de
-                // `extraAssignments`, que solo tiene lo ya asignado: por eso una plaza extra vacía
-                // salía como «Vehículo» pelón. La cotizada siempre trae vehicleTypeName, segmentName
-                // y segmentColor, así que las extras se ven igual que la principal.
-                const expectedExtras = Array.isArray(sub.extraAdditionalVehicles) ? sub.extraAdditionalVehicles : [];
-                const extraSlotCount = Math.max(expectedExtras.length, extras.length);
-                for (let i = 0; i < extraSlotCount; i += 1) {
-                    const exp = expectedExtras[i] || {};
-                    const asg = extras[i] || {};
-                    slotSpecs.push({
-                        type: exp.vehicleTypeName || asg.vehicleName || '',
-                        segment: exp.segmentName || asg.segmentName || '',
-                        color: exp.segmentColor || asg.segmentColor || '',
-                    });
-                }
+                const slots = ServiceListHelpers.buildVehicleSlots(facts, assigned);
+                // El rótulo NO se pinta en el renglón —ahí lo distinguen el tipo y el segmento—, pero
+                // es el título del selector, que una vez abierto es la única pista de cuál plaza se
+                // está editando. Vive aquí porque el itinerario no tiene selector.
+                // `hasPrimaryAdditional` se lee igual que en el modelo (por el nombre del tipo): de él
+                // depende cómo se NOMBRA la plaza 1, y si se calculara distinto el rótulo diría
+                // "Vehículo extra 1" donde la plaza es la adicional.
+                const hasPrimaryAdditional = !!facts.additionalVehicleTypeName;
+                const pairs = slots.map((p) => ({
+                    ...p,
+                    slotLabel: p.totalSlots > 1
+                        ? (p.slotIndex === 0
+                            ? 'Vehículo principal'
+                            : (p.slotIndex === 1 && hasPrimaryAdditional
+                                ? 'Vehículo adicional'
+                                : `Vehículo extra ${p.slotIndex - (hasPrimaryAdditional ? 1 : 0)}`))
+                        : '',
+                }));
 
-                // Cuántas plazas dibujar. Manda lo mayor entre lo que pide el conteo capturado, lo que
-                // pidió la cotización (slotSpecs) y lo que YA está asignado: un `quantity` mal
-                // capturado no debe ocultar a nadie real. Sin vehículo, solo se dibuja lo asignado —
-                // slotSpecs siempre trae la plaza principal y sin ese guardia un tour caminando
-                // acabaría pidiendo camioneta.
-                let lastFilledExtra = -1;
-                extras.forEach((ea, i) => { if (ea && (ea.driverId || ea.vehicleId)) lastFilledExtra = i; });
-                const impliedSlots = lastFilledExtra >= 0
-                    ? lastFilledExtra + 2
-                    : ((svc.assignedDriver || svc.assignedVehicle) ? 1 : 0);
-                const totalSlots = vehicleQty > 0
-                    ? Math.max(vehicleQty, slotSpecs.length, impliedSlots)
-                    : impliedSlots;
-
-                // Las plazas se construyen INDEXADAS POR PLAZA, no apilando lo asignado: es lo que
-                // permite que un clic en el renglón sepa dónde escribir. Los dos ejes comparten el
-                // mismo índice —slotSpecs[i] es lo que pidió la cotización, y lo asignado vive en
-                // top-level para la plaza 0 y en extras[i - 1] para las demás—, igual que el modal.
-                const pairs = [];
-                for (let i = 0; i < totalSlots; i += 1) {
-                    const spec = slotSpecs[i] || {};
-                    const ea = i === 0 ? null : (extras[i - 1] || null);
-                    const driverId = i === 0 ? (svc.assignedDriver?.id || '') : (ea?.driverId || '');
-                    const vehicleId = i === 0 ? (svc.assignedVehicle?.id || '') : (ea?.vehicleId || '');
-                    // Las plazas extra ya traen teléfono, foto y placa resueltos del catálogo (el blob
-                    // `extraAssignments` solo guarda ids y nombres), así que se leen igual que la
-                    // principal en vez de quedarse sin ellos.
-                    const driver = i === 0
-                        ? svc.assignedDriver
-                        : (ea?.driverId ? {
-                            fullName: ea.driverName,
-                            phone: ea.driverPhone || '',
-                            profilePhotoUrl: ea.driverPhotoUrl || '',
-                        } : null);
-                    const vehicle = i === 0
-                        ? svc.assignedVehicle
-                        : (ea?.vehicleId ? {
-                            name: ea.vehicleName,
-                            plate: ea.vehiclePlate || '',
-                            imageUrl: ea.vehicleImageUrl || '',
-                        } : null);
-                    const hasDriver = !!(driver && driver.fullName);
-                    const hasVehicle = !!(vehicle && vehicle.name);
-                    pairs.push({
-                        slotIndex: i,
-                        // null = la plaza escribe en los campos de primer nivel.
-                        extraIndex: i === 0 ? null : i - 1,
-                        driver: hasDriver ? driver : null,
-                        vehicle: hasVehicle ? vehicle : null,
-                        driverId,
-                        vehicleId,
-                        // Vacía por completo: la negrita lleva el TIPO esperado y «Pendiente» baja a la
-                        // segunda línea, así el renglón vacío se lee igual que uno asignado.
-                        pending: !hasDriver && !hasVehicle,
-                        // En «a disposición» el chofer se captura en el campo de guía, así que la
-                        // pareja nunca debe pedirlo: lo cubre el renglón de rol.
-                        offersDriver: pairOffersDriver,
-                        needsDriver: hasVehicle && !hasDriver && pairOffersDriver,
-                        needsVehicle: hasDriver && !hasVehicle,
-                        label: spec.type || 'Vehículo',
-                        expectedType: spec.type || '',
-                        // El segmento se hereda del servicio cuando la plaza no trae uno propio: los
-                        // campos por plaza existen para poder DIFERIR y casi nunca están capturados,
-                        // así que un traslado Premium de dos vehículos anunciaba "Premium" solo en la
-                        // primera plaza.
-                        segmentName: spec.segment || sub.categoryName || '',
-                        segmentColor: spec.color || sub.categoryColor || '',
-                        expectedVehicleName: spec.type || '',
-                        // Ya no se pinta en el renglón: ahí lo distinguen el tipo y el segmento. Sigue
-                        // vivo para el TÍTULO del selector, que es donde una vez abierto el panel no
-                        // hay otra pista de cuál de las plazas se está editando.
-                        slotLabel: totalSlots > 1
-                            ? (i === 0
-                                ? 'Vehículo principal'
-                                : (i === 1 && hasPrimaryAdditional
-                                    ? 'Vehículo adicional'
-                                    : `Vehículo extra ${i - (hasPrimaryAdditional ? 1 : 0)}`))
-                            : '',
-                    });
-                }
-
-                // includeGuide / includeGreeter dicen si el servicio los lleva contratados, así que
-                // un rol contratado y sin asignar también se muestra pendiente. El Customer Support
-                // por servicio es OPCIONAL —siempre se puede asignar, pero no se contrata—, así que
-                // no lleva plaza pendiente: un «Pendiente» ahí haría creer que falta algo.
-                // Qué roles se dibujan:
-                //   Guía   → SIEMPRE en tours: un tour trae guía propio, no depende del checkbox.
-                //            En traslados y experiencias, solo con "Guía + Chofer" marcado, porque ahí
-                //            el guía es el extra que se contrata.
-                //   Chofer → SIEMPRE en «a disposición», que es el único tipo donde el chofer vive en
-                //            este campo en vez de en la plaza del vehículo. Por eso su pool es
-                //            `drivers` y no `guides`.
-                //   Greeter → solo con includeGreeter.
-                //   Customer Support → siempre por ahora; ninguna bandera lo contrata, así que su
-                //            renglón vacío dice "Opcional" y no "Pendiente": no falta nada, se ofrece.
-                //
-                // `field` es el campo del guardado y `pool` el conjunto de empleados que puede
-                // ocuparlo; los usa el selector por renglón.
-                // Customer Support: HERENCIA con override. La reservación tiene uno global y un servicio
-                // puede tener el suyo porque alguien más se encarga de ese en particular.
-                //
-                // El renglón se dibuja SOLO cuando diverge del global. Mostrarlo siempre repetía en
-                // cada servicio un dato que ya vive en el chip del encabezado —con el global puesto,
-                // los catorce servicios de una reservación decían lo mismo—, y donde no hay nadie el
-                // hueco es de la RESERVACIÓN, no del servicio. Mismo criterio que la píldora de estado:
-                // una señal que se prende en todos los renglones no señala nada.
-                //
-                // El mismo id capturado aparte no cuenta como divergencia: no difiere de nada.
+                // Customer Support: HERENCIA con override. La reservación tiene uno global y un
+                // servicio puede tener el suyo porque alguien más se encarga de ese en particular; el
+                // renglón se dibuja SOLO cuando diverge. Mostrarlo siempre repetía en cada servicio un
+                // dato que ya vive en el chip del encabezado, y donde no hay nadie el hueco es de la
+                // RESERVACIÓN, no del servicio.
                 const resSupport = reservationData.serviceCustomer || null;
-                const ownSupport = (svc.assignedServiceCustomer && svc.assignedServiceCustomer.fullName)
-                    ? svc.assignedServiceCustomer : null;
-                const supportDiverges = !!ownSupport
-                    && !(resSupport && ownSupport.id === resSupport.id);
-                const roles = [
-                    {
-                        person: svc.assignedGuide,
-                        role: isAtDisposal ? 'Chofer' : 'Guía',
-                        field: 'guideId',
-                        pool: isAtDisposal ? 'drivers' : 'guides',
-                        ownId: svc.assignedGuide ? svc.assignedGuide.id : '',
-                        always: isTour || isAtDisposal,
-                        expected: !!includeGuide,
-                    },
-                    {
-                        person: svc.assignedGreeter,
-                        ownId: svc.assignedGreeter ? svc.assignedGreeter.id : '',
-                        role: 'Greeter',
-                        field: 'greeterId',
-                        pool: 'greeters',
-                        expected: !!includeGreeter,
-                    },
-                    {
-                        person: supportDiverges ? ownSupport : null,
-                        ownId: ownSupport ? ownSupport.id : '',
-                        note: supportDiverges ? 'solo este servicio' : '',
-                        // Nombre del global, para que el selector ofrezca "Usar el de la reservación"
-                        // en vez de un "Quitar asignación" que no dice a qué se vuelve.
-                        inheritLabel: (supportDiverges && resSupport) ? resSupport.fullName : '',
-                        role: 'Customer Support',
-                        field: 'serviceCustomerId',
-                        pool: 'admins',
-                        always: supportDiverges,
-                        optional: true,
-                    },
-                ].filter((r) => r.always || (r.person && r.person.fullName) || r.expected)
-                 .map((r) => (r.person && r.person.fullName ? r : { ...r, person: null }));
+                const roles = ServiceListHelpers.roleRows(facts, assigned, {
+                    reservationSupportId: resSupport ? resSupport.id : '',
+                    reservationSupportName: resSupport ? resSupport.fullName : '',
+                });
+                // Que exista renglón de Customer Support ES la divergencia: el módulo ya aplicó la
+                // regla, así que se lee de su resultado en vez de recalcularla y arriesgar que las
+                // dos versiones se separen.
+                const supportDiverges = roles.some((r) => r.field === 'serviceCustomerId');
 
                 const slotCtx = { serviceId: svc.id, canAssign: canAssign && svc.status !== 'cancelled', isAtDisposal };
                 const pairsHtml = pairs.map((p) => svcPairRow(p, slotCtx)).join('');

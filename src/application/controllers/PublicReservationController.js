@@ -12,6 +12,10 @@ const FileStorageService = require('../services/FileStorageService');
 const PaymentService = require('../services/PaymentService');
 const { renderUrlToPdf } = require('../services/PdfRenderService');
 const { getArponaEmbedCss, getMyriadEmbedCss } = require('../../infrastructure/utils/fontEmbed');
+// Modelo compartido de la lista de servicios: el MISMO archivo que el navegador carga en el detalle
+// de reservación como /shared/services/serviceListHelpers.js. Se pasa como local porque dentro de
+// una plantilla EJS no hay `require`.
+const serviceListHelpers = require('../../presentation/views/dashboards/shared/serviceListHelpers');
 
 const fileStorageService = new FileStorageService({
   baseFolder: 'general',
@@ -149,6 +153,7 @@ class PublicReservationController {
         pageTitle: `Itinerario ${folio}`,
         arponaEmbedCss: getArponaEmbedCss(),
         myriadEmbedCss: getMyriadEmbedCss(),
+        svcHelpers: serviceListHelpers,
       });
     } catch (error) {
       return this.handleError(error, folio, req, res);
@@ -546,6 +551,11 @@ class PublicReservationController {
       const subconcepts = await Promise.all(
         bucket.services.map((svc) => this.formatServiceAsSubconcept(svc, segmentNames, vehicleImageMap))
       );
+      // La consulta ya pide addAscending('time'), pero ese es un orden de CADENA: una hora sin cero
+      // a la izquierda ("9:00") quedaría después de "14:15". Se reordena con el comparador que usa
+      // también el detalle interno, para que las dos vistas no puedan separarse. Hoy no cambia nada
+      // —no hay ninguna hora así en la base—; es para el día que la haya.
+      subconcepts.sort(serviceListHelpers.compareByTime);
       return {
         id: `day_${bucket.dayNumber}`,
         dayNumber: bucket.dayNumber,
