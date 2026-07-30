@@ -385,6 +385,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         // acceso nuevo. Esta vista no tiene pmToast, así que el fallo del PDF avisa con alert.
         ItineraryExport.wire({ folio, alFallar: (msg) => alert(msg) });
 
+        // "Ver pagos" abre el carrito para CONSULTAR: el formulario se queda colapsado detrás de
+        // "Registrar pago". Desplegarlo aquí contradiría lo que dice el botón.
         document.getElementById('viewPaymentsBtn')?.addEventListener('click', () => {
             paymentsOffcanvasInstance()?.show();
         });
@@ -655,6 +657,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         repaint: renderPayments,
         methodLabels: PAYMENT_METHOD_LABELS,
     });
+
+    // "Agregar pago" vive DENTRO del hero, que renderFinancialSummary vuelve a pintar en cada pago,
+    // así que se cablea por DELEGACIÓN sobre el contenedor estable. Va al nivel del closure y no
+    // dentro del render: ahí se volvería a registrar en cada recarga y un clic dispararía varias
+    // veces. Sin este cableo el botón se dibujaba y no hacía nada, desde que este rol registra pagos.
+    document.getElementById('financialSummaryCard')?.addEventListener('click', (e) => {
+        if (e.target.closest('#addPaymentBtn')) {
+            paymentForm.requestAddForm();
+            paymentsOffcanvasInstance()?.show();
+        }
+    });
+    // Al terminar la animación de apertura: si el summary ya llegó, el formulario se despliega solo.
+    // Se espera al 'shown' y no al 'show' porque antes el contenedor no está en su posición final.
+    document.getElementById('paymentsOffcanvas')?.addEventListener('shown.bs.offcanvas', () => {
+        paymentForm.maybeOpenAddForm();
+    });
+
 
     /** Instancia del carrito, creada a demanda. */
     function paymentsOffcanvasInstance() {
