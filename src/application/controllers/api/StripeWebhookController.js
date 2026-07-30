@@ -187,6 +187,40 @@ class StripeWebhookController {
   }
 
   /**
+   * Shout when we just confirmed money the rollup CANNOT see.
+   *
+   * `loadAndCompute` reads payments through `queryExisting` (exists:true), so a soft-deleted row — retired
+   * by `retirePending`, or removed by `PaymentController.deletePayment` — stays out of paidAmount/balance
+   * forever even though the card really cleared. Admitting 'expired' as a source toward 'succeeded' is what
+   * makes this reachable and, more to the point, DETECTABLE: the row now reads 'succeeded' instead of being
+   * indistinguishable from an abandoned checkout, so `gatewayStatus:'succeeded' AND exists:false` is an
+   * exact query for stranded money.
+   *
+   * It shouts instead of acting on purpose. Restoring `exists` here would resurrect a record staff may have
+   * deleted deliberately, which is a product decision and not this PR's to make.
+   * @param {object} event - The verified Stripe event (for the ids in the log).
+   * @param {object} payment - The Payment that was just transitioned.
+   * @param {object} destination - The translated destination.
+   * @param {boolean} movedTheRollup - True when this transition is the one that drives the rollup; a no-op
+   * or a non-counting destination has nothing to strand and stays silent.
+   * @returns {void} Nothing; the effect is the log.
+   * @example
+   * StripeWebhookController.warnIfInvisibleToRollup(event, payment, destination, shouldRecalculate);
+   */
+  static warnIfInvisibleToRollup(event, payment, destination, movedTheRollup) {
+    if (!movedTheRollup) return;
+    // Defensive read, same style as the getReservationPtr guard below: a real Parse object always has get.
+    const softDeleted = !!payment.get && payment.get('exists') === false;
+    if (!softDeleted) return;
+    logger.error('CRITICAL: confirmed a gateway payment that the rollup cannot see (soft-deleted row); the reservation balance will NOT reflect this charge until it is reconciled', {
+      eventId: event.id,
+      type: event.type,
+      paymentId: payment.id,
+      gatewayStatus: destination.gatewayStatus,
+    });
+  }
+
+  /**
    * Capa B + rollup: apply the destination status to the Payment this event points at.
    *
    * Returns false (a clean no-op, never an error) for every case that must not move money: an
@@ -230,6 +264,7 @@ class StripeWebhookController {
     // silently skip the rollup for a refund. Keying on matchedCount (not on the event type) is what makes
     // the two success events converge into exactly one recalculate, whichever of them wins the race.
     const shouldRecalculate = matchedCount === 1 && destination.crossesThreshold;
+    StripeWebhookController.warnIfInvisibleToRollup(event, payment, destination, shouldRecalculate);
 
     // The OTHER branch: matchedCount 0 on a counting destination when the Payment is ALREADY at that
     // destination. Capa B can succeed and THEN recalculate throw below, which makes the outer catch

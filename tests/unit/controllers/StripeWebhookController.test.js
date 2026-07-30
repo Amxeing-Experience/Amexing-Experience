@@ -467,9 +467,13 @@ describe('StripeWebhookController.applyToPayment — which transitions move the 
   // "the card cleared". Written literally so this suite fails the day the two ideas get collapsed again.
   const REFUND = { gatewayStatus: 'refunded', crossesThreshold: true };
 
-  const paymentDouble = (reservationId = 'res_1') => ({
+  // `get` is part of the shape on purpose: findPayment returns a real Parse object, and applyToPayment
+  // reads payment.get('exists') to detect money it just confirmed on a soft-deleted row. `exists` defaults
+  // to true (the normal case) so only the tests that opt in exercise the stranded-money branch.
+  const paymentDouble = (reservationId = 'res_1', exists = true) => ({
     id: 'pay_1',
     getReservationPtr: () => (reservationId ? { id: reservationId } : null),
+    get: (field) => (field === 'exists' ? exists : undefined),
   });
 
   const paymentAt = (gatewayStatus) => ({
@@ -503,6 +507,37 @@ describe('StripeWebhookController.applyToPayment — which transitions move the 
     healSpy.mockRestore();
     infoSpy.mockRestore();
     errorSpy.mockRestore();
+  });
+
+  describe('money confirmed on a soft-deleted row is announced, not swallowed', () => {
+    // The rollup reads payments through queryExisting (exists:true), so a row retired by retirePending or
+    // removed by deletePayment stays out of paidAmount forever even though the card really cleared.
+    // Admitting 'expired' as a source toward 'succeeded' makes that reachable AND detectable; until the
+    // ownership of `exists` is decided, the least we owe is a loud log instead of silence.
+    it('logs CRITICAL when the confirmed Payment is soft-deleted (exists:false)', async () => {
+      firstSpy.mockResolvedValueOnce(paymentDouble('res_1', false));
+      transitionSpy.mockResolvedValueOnce({ matchedCount: 1 });
+      await expect(StripeWebhookController.applyToPayment(anEvent(), SUCCESS)).resolves.toBe(true);
+      const critical = errorSpy.mock.calls.find(([msg]) => String(msg).includes('rollup cannot see'));
+      expect(critical).toBeDefined();
+      expect(critical[1]).toMatchObject({ paymentId: 'pay_1', gatewayStatus: 'succeeded' });
+      // It still confirms and still recalculates: shouting must never replace doing the work.
+      expect(recalcSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays quiet for the normal case (exists:true)', async () => {
+      transitionSpy.mockResolvedValueOnce({ matchedCount: 1 });
+      await expect(StripeWebhookController.applyToPayment(anEvent(), SUCCESS)).resolves.toBe(true);
+      expect(errorSpy.mock.calls.find(([msg]) => String(msg).includes('rollup cannot see'))).toBeUndefined();
+    });
+
+    it('does not fire when nothing transitioned, even on a soft-deleted row', async () => {
+      firstSpy.mockResolvedValueOnce(paymentDouble('res_1', false));
+      transitionSpy.mockResolvedValueOnce({ matchedCount: 0 });
+      getSpy.mockResolvedValueOnce(paymentAt('refunded'));
+      await expect(StripeWebhookController.applyToPayment(anEvent(), SUCCESS)).resolves.toBe(false);
+      expect(errorSpy.mock.calls.find(([msg]) => String(msg).includes('rollup cannot see'))).toBeUndefined();
+    });
   });
 
   describe('the decision is crossesThreshold, never "this event means success"', () => {
