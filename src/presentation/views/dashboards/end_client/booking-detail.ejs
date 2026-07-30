@@ -90,11 +90,6 @@
     <div class="fin-wrap mb-4" id="financialSummaryCard" style="display:none;">
         <div class="fin-section-head">
             <h5 class="fin-section-title"><i class="ti ti-calculator me-2"></i>Resumen Financiero</h5>
-            <!-- El acceso al carrito: en las vistas que registran pagos se entra por "Agregar pago",
-                 que aquí no existe. Sin este botón el historial quedaría inalcanzable. -->
-            <button type="button" class="hdr-btn" id="viewPaymentsBtn">
-                <i class="ti ti-cash"></i>Ver pagos
-            </button>
         </div>
         <div id="financialSummaryBody"></div>
     </div>
@@ -385,12 +380,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         // acceso nuevo. Esta vista no tiene pmToast, así que el fallo del PDF avisa con alert.
         ItineraryExport.wire({ folio, alFallar: (msg) => alert(msg) });
 
-        // "Ver pagos" abre el carrito para CONSULTAR: el formulario se queda colapsado detrás de
-        // "Registrar pago". Desplegarlo aquí contradiría lo que dice el botón.
-        document.getElementById('viewPaymentsBtn')?.addEventListener('click', () => {
-            paymentsOffcanvasInstance()?.show();
-        });
-
         // "Registrar pago" dentro del carrito.
         document.getElementById('showPaymentFormBtn')?.addEventListener('click', () => {
             const wrap = document.getElementById('paymentFormWrap');
@@ -658,6 +647,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         methodLabels: PAYMENT_METHOD_LABELS,
     });
 
+    // Una SOLA puerta al carrito, igual que en las otras tres vistas: "Agregar pago". Que sea la
+    // única es lo que hace que el formulario se despliegue solo al abrir — entrar por ahí ya declara
+    // la intención. Hubo un "Ver pagos" aparte mientras este rol no podía registrar pagos; con dos
+    // puertas, la mitad de las veces el cajón se abría con el formulario colapsado.
+    //
     // "Agregar pago" vive DENTRO del hero, que renderFinancialSummary vuelve a pintar en cada pago,
     // así que se cablea por DELEGACIÓN sobre el contenedor estable. Va al nivel del closure y no
     // dentro del render: ahí se volvería a registrar en cada recarga y un clic dispararía varias

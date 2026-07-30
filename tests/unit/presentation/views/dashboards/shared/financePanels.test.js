@@ -196,6 +196,53 @@ describe('PaymentForm — la fábrica del formulario de pago', () => {
     expect(b.getEditingId()).toBeNull();
   });
 
+  // El despliegue automático al abrir el cajón: el usuario pide "Agregar pago", el panel se abre y el
+  // formulario debe salir solo. Se prueba aquí porque la lógica vive en el módulo y la comparten las
+  // cuatro vistas; lo que cada vista aporta es el clic que llama a requestAddForm().
+  describe('despliegue automático al abrir el carrito', () => {
+    it('con la intención marcada y el summary presente, el formulario se despliega', () => {
+      const wrap = nodo();
+      global.document.getElementById = (id) => (id === 'paymentFormWrap' ? wrap : nodo());
+      const f = PaymentForm.create(contexto());
+      f.requestAddForm();
+      f.maybeOpenAddForm();
+      expect(wrap.innerHTML).toContain('id="paymentId" value=""');
+    });
+
+    it('sin la intención marcada NO se despliega: abrir a consultar no es abrir a registrar', () => {
+      const wrap = nodo();
+      global.document.getElementById = (id) => (id === 'paymentFormWrap' ? wrap : nodo());
+      const f = PaymentForm.create(contexto());
+      f.maybeOpenAddForm();
+      expect(wrap.innerHTML).toBe('');
+    });
+
+    it('sin summary aún NO se despliega, y la intención SOBREVIVE para el segundo intento', () => {
+      const wrap = nodo();
+      global.document.getElementById = (id) => (id === 'paymentFormWrap' ? wrap : nodo());
+      let resumen = null;
+      const f = PaymentForm.create(contexto({ summary: () => resumen }));
+      f.requestAddForm();
+      f.maybeOpenAddForm();
+      expect(wrap.innerHTML).toBe('');
+      // Llega el summary y se reintenta, que es lo que hace applyPaymentSummary.
+      resumen = { total: 5000, availableMethods: ['efectivo'] };
+      f.maybeOpenAddForm();
+      expect(wrap.innerHTML).toContain('id="paymentId"');
+    });
+
+    it('una reservación cancelada no lo despliega ni con la intención marcada', () => {
+      const wrap = nodo();
+      global.document.getElementById = (id) => (id === 'paymentFormWrap' ? wrap : nodo());
+      const f = PaymentForm.create(contexto({
+        reservationData: () => ({ status: 'cancelled', currency: 'MXN', services: [] }),
+      }));
+      f.requestAddForm();
+      f.maybeOpenAddForm();
+      expect(wrap.innerHTML).toBe('');
+    });
+  });
+
   it('salir de la edición lo limpia', () => {
     const f = PaymentForm.create(contexto());
     f.setEditingId('p1');
