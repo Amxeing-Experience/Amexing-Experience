@@ -873,6 +873,10 @@ class PublicReservationController {
       additionalVehicleSegmentName,
       additionalVehicleSegmentColor,
       duration: sub.duration || null,
+      // Duración REAL de la ruta, en MINUTOS (los traslados no usan `duration`: ese campo viene del
+      // catálogo de experiencias y en ellos llega con un 1 espurio). La vista la necesita para poder
+      // mostrar la duración correcta de un traslado en vez de ese 1.
+      routeDuration: sub.routeDuration || null,
       isWalkingTour: sub.isWalkingTour || false,
       pricesByType: sub.pricesByType || null,
       includeInTotal: sub.includeInTotal !== false,

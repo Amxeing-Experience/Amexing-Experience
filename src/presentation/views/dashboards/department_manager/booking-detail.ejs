@@ -983,7 +983,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Service Customer — de solo lectura: reasignarlo es admin-only, así que aquí no hay botón.
         const scEl = document.getElementById('infoServiceCustomer');
         if (d.serviceCustomer) {
-            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Seguidor', 'ti-headset', 'primary');
+            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Customer Support', 'ti-headset', 'primary');
         } else {
             scEl.innerHTML = '<span class="text-muted">Sin asignar</span>';
         }
@@ -2327,7 +2327,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 peopleHtml += buildPersonCard(svc.assignedDriver, 'Conductor', 'ti-steering-wheel', 'info');
                 peopleHtml += buildPersonCard(svc.assignedGuide, 'Guía', 'ti-map-pin', 'success');
                 peopleHtml += buildPersonCard(svc.assignedGreeter, 'Greeter', 'ti-hand-stop', 'warning');
-                peopleHtml += buildPersonCard(svc.assignedServiceCustomer, 'Seguidor', 'ti-user-star', 'primary');
+                peopleHtml += buildPersonCard(svc.assignedServiceCustomer, 'Customer Support', 'ti-user-star', 'primary');
 
                 // Vehicle card
                 if (svc.assignedVehicle) vehiclesHtml += buildVehicleCard(svc.assignedVehicle);

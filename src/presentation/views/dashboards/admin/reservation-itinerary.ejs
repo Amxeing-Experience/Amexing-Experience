@@ -44,12 +44,86 @@ if (startDate) {
   headerRange = endDate && endDay !== startDay ? `${startDay}-${endDay}` : String(startDay);
 }
 
+// Duración del servicio POR TIPO: cada uno la guarda en un campo distinto y no son intercambiables.
+//   a-disposición      -> hours          (horas contratadas)
+//   tour / experiencia -> duration       (duración del catálogo, en horas)
+//   traslado           -> routeDuration  (duración de la ruta, en MINUTOS)
+//   concepto           -> ninguna
+// El orden importa: los subconceptos arrastran un `duration: 1` espurio en todo lo que no es tour, así
+// que evaluar `duration || hours` lo hacía ganar y un a-disposición de 6 h se anunciaba como "1 hour".
+const serviceDuration = (sc) => {
+  if (sc.type === 'a-disposicion') {
+    const h = Number(sc.hours || 0);
+    return h > 0 ? { hours: h } : null;
+  }
+  if (sc.type === 'tour' || sc.type === 'experience' || sc.type === 'experiencia') {
+    const h = Number(sc.duration || sc.hours || 0);
+    return h > 0 ? { hours: h } : null;
+  }
+  if (sc.type === 'transport' || sc.type === 'traslado') {
+    const min = Number(sc.routeDuration || 0);
+    return min > 0 ? { minutes: min } : null;
+  }
+  return null;
+};
+const durationLabel = (sc) => {
+  const d = serviceDuration(sc);
+  if (!d) return '';
+  if (d.minutes) {
+    const h = Math.floor(d.minutes / 60);
+    const m = d.minutes % 60;
+    if (h === 0) return `${m} min`;
+    return m ? `${h} h ${m} min` : `${h} hour${h === 1 ? '' : 's'}`;
+  }
+  return `${d.hours} hour${d.hours === 1 ? '' : 's'}`;
+};
+
+// Ubicaciones del servicio, en renglones etiquetados. En los TRASLADOS son las DIRECCIONES exactas de
+// pick-up y drop-off: la ruta ya la dice el título, pero la calle y el punto de encuentro no se
+// mostraban en ningún lado de este documento — y son justo lo que el pasajero necesita. En tours y
+// experiencias se conserva el origen/destino por nombre, porque ahí el título es el nombre del servicio.
+const locationLines = (sc) => {
+  const lines = [];
+  const add = (label, value) => {
+    const v = String(value == null ? '' : value).trim();
+    if (v) lines.push({ label, value: v });
+  };
+  if (sc.type === 'transport' || sc.type === 'traslado') {
+    if (sc.tripType === 'round-trip') {
+      add('Pick-up (ida)', sc.pickupAddressIda);
+      add('Drop-off (ida)', sc.dropoffAddressIda);
+      add('Pick-up (regreso)', sc.pickupAddressVuelta);
+      add('Drop-off (regreso)', sc.dropoffAddressVuelta);
+    } else {
+      add('Pick-up', sc.pickupAddress);
+      add('Drop-off', sc.dropoffAddress);
+    }
+  } else {
+    add('Desde', sc.originName);
+    add('Hacia', sc.destinationName);
+    add('Pick-up', sc.pickupAddress);
+  }
+  return lines;
+};
+
+// Nombres de las personas del servicio. El DTO ya los exponía (attendees) pero este documento nunca los
+// mostraba: complementan a peopleLabel, que dice cuántos son pero no quiénes. Sin rótulo, igual que
+// peopleLabel: en este documento los únicos nombres son los del propio cliente, así que no hay con qué
+// confundirlos.
+const attendeesLine = (sc) => {
+  const names = Array.isArray(sc.attendees)
+    ? sc.attendees.map((n) => String(n == null ? '' : n).trim()).filter(Boolean)
+    : [];
+  return names.length ? escapeHtml(names.join(', ')) : '';
+};
+
 const titleFor = (sc) => {
   if (sc.concept && sc.concept.trim()) return sc.concept;
   if (sc.destinationPOI) return sc.destinationPOI;
   if (sc.originName && sc.destinationName) return `${sc.originName} → ${sc.destinationName}`;
   if (sc.type === 'a-disposicion') {
-    const h = Number(sc.duration || sc.hours || 0);
+    // `hours` primero por lo mismo: con duration primero, un a-disposición de 6 h se titulaba "1 hora".
+    const h = Number(sc.hours || sc.duration || 0);
     return h ? `A Disposición - ${h} hora${h === 1 ? '' : 's'}` : 'A Disposición';
   }
   return sc.serviceType || 'Servicio';
@@ -96,9 +170,9 @@ const dayLabel = (day) => {
   return `${DOW[d.getDay()]}. ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
 };
 
+// `address` se quitó junto con el bloque por servicio que la repetía: ya no se usa en ningún lado.
 const COMPANY = {
   name: 'Amexing Experience',
-  address: '5 Vicente Suárez, San Miguel de Allende, Guanajuato, MX, 37732',
   url: 'https://www.amexingexperience.com/en',
 };
 
@@ -118,6 +192,201 @@ const iconKey = (sc) => {
   if (sc.type === 'tour') return 'city';
   if (sc.type === 'experiencia') return 'experience';
   return 'experience';
+};
+
+// ---------------------------------------------------------------------------
+// Asignaciones por servicio
+//
+// Chofer y vehículo van EMPAREJADOS, no en renglones sueltos: el pasajero los lee como una
+// sola cosa («me recoge Juan en la Hiace blanca, placas ABC-12-34»). Ponerlos en filas
+// separadas dejaría la relación a la simple adyacencia, y con dos vehículos deja de leerse.
+// El nombre + color de segmento (Green Class / Premium) es lo que le dice CUÁL camioneta es
+// la suya cuando hay más de una esperando.
+//
+// Plazas incompletas: si el servicio pide 2 vehículos y solo 1 está asignado, la plaza que falta
+// SÍ se dibuja, en gris y con borde punteado. El cliente ve que el lugar existe y está por
+// confirmarse, en vez de creer que su traslado va con un solo vehículo. La redacción evita la
+// jerga del operador («Conductor pendiente»): aquí es «por confirmar» + «te avisamos».
+// ---------------------------------------------------------------------------
+
+// Cuántos vehículos NECESITA el servicio. Mismo criterio que el detalle interno: en
+// «a disposición» el conteo vive en vehicleCount; en el resto, en quantity.
+const vehicleSlotCount = (sc) => {
+  const isTransport = sc.type === 'transport' || sc.type === 'traslado';
+  const isAtDisposal = sc.type === 'a-disposicion';
+  const isTour = sc.type === 'tour';
+  const hasVehicleData = !!(sc.vehicleType || sc.vehicleTypeName || sc.additionalVehicleId
+    || (Array.isArray(sc.extraAdditionalVehicles) && sc.extraAdditionalVehicles.length > 0));
+  const needsVehicle = isTransport || isAtDisposal || (isTour && !sc.isWalkingTour && hasVehicleData);
+  if (!needsVehicle) return 0;
+  if (isAtDisposal) return Number(sc.vehicleCount) || 1;
+  return Number(sc.quantity) || 1;
+};
+
+// Tipo y segmento ESPERADOS de cada plaza: plaza 0 = vehículo principal, plaza 1 = adicional
+// cuando venía marcado, 2+ = extras en orden (mismo mapeo que el modal de asignación del detalle).
+// Así una plaza vacía anuncia QUÉ vehículo va a ser —«Suburban»— en vez del genérico «Vehículo».
+// `vehicleType` guarda normalmente el objectId del catálogo, pero en algunos registros trae el
+// NOMBRE ("SEDAN") ahí. Aprovecharlo recupera el tipo sin tocar la base; el guardia evita que un
+// objectId real se imprima en el PDF del cliente como si fuera un modelo de camioneta. Los objectId
+// de Parse son 10 alfanuméricos con mayúsculas y minúsculas mezcladas, forma que ningún nombre del
+// catálogo tiene (SEDAN, SUBURBAN, JAC Sunray, Van Turística…).
+const vehicleTypeAsName = (value) => {
+  const v = String(value == null ? '' : value).trim();
+  if (!v) return '';
+  const looksLikeObjectId = /^[A-Za-z0-9]{10}$/.test(v) && /[a-z]/.test(v) && /[A-Z]/.test(v);
+  return looksLikeObjectId ? '' : v;
+};
+
+const vehicleSlotSpecs = (sc) => {
+  const specs = [{
+    type: sc.vehicleTypeName || vehicleTypeAsName(sc.vehicleType) || '',
+    segment: sc.categoryName || '',
+    color: sc.categoryColor || '',
+  }];
+  if (sc.additionalVehicleTypeName) {
+    specs.push({
+      type: sc.additionalVehicleTypeName,
+      segment: sc.additionalVehicleSegmentName || '',
+      color: sc.additionalVehicleSegmentColor || '',
+    });
+  }
+  // Las plazas 3+ se leen de `extraAdditionalVehicles` —la lista COTIZADA— y no de los extras ya
+  // asignados: la cotizada siempre trae vehicleTypeName, segmentName y segmentColor, así que una
+  // plaza extra vacía anuncia su tipo igual que la principal en vez de quedar como «Vehículo».
+  const expected = Array.isArray(sc.extraAdditionalVehicles) ? sc.extraAdditionalVehicles : [];
+  const assigned = (sc.assignments && sc.assignments.extras) || [];
+  for (let i = 0; i < Math.max(expected.length, assigned.length); i += 1) {
+    const exp = expected[i] || {};
+    const asg = assigned[i] || {};
+    specs.push({
+      type: exp.vehicleTypeName || asg.vehicleName || '',
+      segment: exp.segmentName || asg.segmentName || '',
+      color: exp.segmentColor || asg.segmentColor || '',
+    });
+  }
+  return specs;
+};
+
+const assignmentPairs = (sc) => {
+  const a = sc.assignments || {};
+  const slots = vehicleSlotCount(sc);
+  // En «a disposición» el chofer se captura en el campo de guía, no en el de conductor, así que
+  // la pareja NUNCA debe pedir chofer ahí: si lo hiciera, diría «Chofer por confirmar» con el
+  // chofer ya asignado en el renglón de abajo. Ese rol lo cubre assignmentRoles.
+  const isAtDisposal = sc.type === 'a-disposicion';
+  const pairs = [];
+  const push = (driver, vehicle, segmentName, segmentColor) => {
+    const hasDriver = !!(driver && driver.fullName);
+    const hasVehicle = !!(vehicle && vehicle.name);
+    if (!hasDriver && !hasVehicle) return;
+    pairs.push({
+      driver: hasDriver ? driver : null,
+      vehicle: hasVehicle ? vehicle : null,
+      needsDriver: !hasDriver && !isAtDisposal,
+      // La mitad que falta solo se marca si el servicio de verdad lleva vehículo: un tour
+      // caminando con guía no debe pedir camioneta.
+      needsVehicle: !hasVehicle && slots > 0,
+      segmentName: segmentName || '',
+      segmentColor: segmentColor || '',
+    });
+  };
+  push(a.driver, a.vehicle, sc.categoryName, sc.categoryColor);
+  (a.extras || []).forEach((e) => push(e.driver, e.vehicle, e.segmentName, e.segmentColor));
+
+  // Se rellena hasta las plazas que pide el servicio. Math.max porque si ya hay más parejas
+  // asignadas que el `quantity` capturado, manda lo asignado: nunca se oculta a nadie real.
+  const specs = vehicleSlotSpecs(sc);
+  // El piso por specs solo cuando el servicio lleva vehículo: specs siempre tiene la plaza
+  // principal, y sin este guardia un tour caminando acabaría pidiendo camioneta.
+  const total = slots > 0 ? Math.max(slots, pairs.length, specs.length) : pairs.length;
+  for (let i = pairs.length; i < total; i += 1) {
+    const spec = specs[i] || {};
+    // El tipo va en la línea en negrita y «Por confirmar» debajo, igual que en un renglón
+    // asignado: arriba qué es, abajo el detalle y el estado.
+    // El segmento se hereda del servicio cuando la plaza no trae uno propio: los campos por plaza
+    // existen para poder DIFERIR del servicio y casi nunca están capturados, así que sin la herencia
+    // un traslado Premium de dos vehículos anunciaba "Premium" solo en la primera plaza.
+    pairs.push({
+      driver: null,
+      vehicle: null,
+      pending: true,
+      label: spec.type || 'Vehículo',
+      segmentName: spec.segment || sc.categoryName || '',
+      segmentColor: spec.color || sc.categoryColor || '',
+    });
+  }
+  return pairs;
+};
+
+// Roles que no van amarrados a un vehículo. En «a disposición» el chofer se captura en el
+// campo de guía — mismo criterio que el detalle interno (ver buildPersonCard en booking-detail).
+// includeGuide / includeGreeter dicen si el servicio los lleva, así que un rol contratado y sin
+// asignar también se muestra por confirmar. `serviceCustomer` no tiene bandera: solo si existe.
+const assignmentRoles = (sc) => {
+  const a = sc.assignments || {};
+  const isAtDisposal = sc.type === 'a-disposicion';
+  const guideRole = isAtDisposal ? 'Chofer' : 'Guía';
+  const rows = [
+    { person: a.guide, role: guideRole, expected: !!sc.includeGuide },
+    { person: a.greeter, role: 'Greeter', expected: !!sc.includeGreeter },
+    { person: a.serviceCustomer, role: 'Customer Support', expected: false },
+  ];
+  return rows
+    .filter((r) => (r.person && r.person.fullName) || r.expected)
+    .map((r) => (r.person && r.person.fullName
+      ? { role: r.role, person: r.person }
+      : { role: r.role, person: null, pending: true }));
+};
+
+// escapeHtml NO escapa comillas, así que no sirve dentro de un atributo: una URL con `"` se
+// saldría del src e inyectaría markup en esta página, que es pública y sin auth.
+const escapeAttr = (s) => escapeHtml(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+// El color del segmento se pinta en un style inline, así que se valida en vez de escaparse:
+// solo hex o un nombre de color simple; cualquier otra cosa se descarta.
+const safeColor = (s) => (/^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20})$/.test(String(s || '').trim())
+  ? String(s).trim() : '');
+
+// Iniciales: es el respaldo REAL cuando profilePhotoUrl viene vacío (pasa seguido), no un adorno.
+const initialsOf = (name) => String(name || '').trim().split(/\s+/).slice(0, 2)
+  .map((w) => w.charAt(0).toUpperCase()).join('') || '·';
+
+// La foto va ENCIMA de las iniciales, así que si la URL falla en el PDF quedan las iniciales
+// visibles en vez de un círculo vacío.
+const personAvatar = (person) => {
+  const ini = escapeHtml(initialsOf(person && person.fullName));
+  const url = person && person.profilePhotoUrl;
+  return `<div class="itin-av">${ini}${url ? `<img src="${escapeAttr(url)}" alt="" onerror="this.remove()">` : ''}</div>`;
+};
+
+const vehicleAvatar = (vehicle) => {
+  const url = vehicle && vehicle.imageUrl;
+  return `<div class="itin-av itin-av-veh"><i class="ti ti-car"></i>${url ? `<img src="${escapeAttr(url)}" alt="" onerror="this.remove()">` : ''}</div>`;
+};
+
+// Plaza vacía: mismo círculo, punteado y sin relleno, para que se lea como «hay lugar aquí».
+const pendingAvatar = (icon) => `<div class="itin-av itin-av-pend"><i class="ti ti-${icon}"></i></div>`;
+
+// Segunda línea de la pareja: segmento (con su punto de color), placas y teléfono, en ese orden
+// —lo que sirve para identificar la unidad primero, y para localizar al chofer después. Cuando
+// falta una mitad, esa mitad ocupa el primer lugar de la línea.
+const segmentBit = (p) => {
+  if (!p.segmentName) return '';
+  const color = safeColor(p.segmentColor);
+  const dot = color ? `<span class="itin-seg-dot" style="background:${color};"></span>` : '';
+  return `${dot}${escapeHtml(p.segmentName)}`;
+};
+
+const pairDetailLine = (p) => {
+  const bits = [];
+  const seg = segmentBit(p);
+  if (seg) bits.push(seg);
+  if (p.needsDriver) bits.push('<span class="itin-pend-txt">Chofer por confirmar</span>');
+  if (p.needsVehicle) bits.push('<span class="itin-pend-txt">Vehículo por confirmar</span>');
+  if (p.vehicle && p.vehicle.plate) bits.push(`Placas ${escapeHtml(p.vehicle.plate)}`);
+  if (p.driver && p.driver.phone) bits.push(escapeHtml(p.driver.phone));
+  return bits.join(' · ');
 };
 %>
 <!DOCTYPE html>
@@ -155,7 +424,6 @@ const iconKey = (sc) => {
     .itin-header { color: #fff; }
     .itin-logo-img { max-width: 230px; height: auto; }
     .itin-icon img { width: 50px; height: 50px; object-fit: contain; }
-    .itin-place .thumb img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 
     /* Solid sage top bar: left logo (vertically centered) + travel specialist on the right */
     .itin-topbar {
@@ -236,15 +504,34 @@ const iconKey = (sc) => {
 
     .itin-desc { margin-top: 8px; color: #555; line-height: 1.55; white-space: pre-line; text-align: justify; }
 
-    /* Per-service location / company footer */
-    .itin-place { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
-    .itin-place .thumb {
-      width: 54px; height: 54px; border-radius: 50%; background: #eef0e8; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center; color: #b6bda0;
+    /* Per-service assignments: driver + vehicle paired, unattached roles below */
+    .itin-assign { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .itin-assign-row { display: flex; align-items: center; gap: 12px; }
+    .itin-av {
+      position: relative; width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0;
+      overflow: hidden; display: flex; align-items: center; justify-content: center;
+      background: #eef0e8; color: #6f7459; font-weight: 700; font-size: 0.9rem;
     }
-    .itin-place .meta { font-size: 0.78rem; line-height: 1.45; color: #555; }
-    .itin-place .meta .t { font-weight: 700; color: #1b1b1b; }
-    .itin-place .meta a { color: #6f7459; text-decoration: none; }
+    .itin-av img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+    .itin-av-veh { background: #f3f1ea; color: #a89a7a; font-size: 1.35rem; }
+    /* Plaza vacía: punteada y sin relleno, se lee como «aquí falta alguien» sin gritar. */
+    .itin-av-pend { background: #fff; border: 1.5px dashed #d4d0c2; color: #b9b5a6; font-size: 1.25rem; }
+    /* Los dos avatares se solapan para que la pareja se lea como una sola unidad. El aro blanco que
+       los separa va en box-shadow, NO en border: con border, este selector (más específico) le ganaba
+       a .itin-av-pend y le borraba el punteado al segundo círculo de una plaza vacía. */
+    .itin-duo { display: flex; flex-shrink: 0; }
+    .itin-duo .itin-av + .itin-av { margin-left: -14px; box-shadow: 0 0 0 2px #fff; }
+    .itin-assign-meta { font-size: 0.86rem; line-height: 1.45; color: #555; min-width: 0; }
+    .itin-assign-meta .n { font-size: 0.95rem; font-weight: 700; color: #1b1b1b; }
+    /* Va después de `.n` y con la clase encadenada: si no, `.itin-assign-meta .n` le gana el
+       peso y el color, y el renglón pendiente se vería igual que uno asignado. */
+    .itin-assign-meta .itin-pend-txt,
+    .itin-assign-meta .n.itin-pend-txt { font-style: italic; font-weight: 400; color: #a09c8d; }
+    /* El tipo esperado de una plaza vacía conserva la negrita —ES el sujeto del renglón— pero
+       apagado, y sin itálica: es un dato, no un estado. Encadenada por lo mismo que la de arriba. */
+    .itin-assign-meta .n.itin-pend-name { color: #8a8f78; }
+    .itin-assign-role { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 700; color: #8a8f78; }
+    .itin-seg-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
 
     @media print { body { font-size: 12px; } }
     .itin-notes-list { margin: 6px 0 0; padding-left: 1.2em; }
@@ -297,18 +584,23 @@ const iconKey = (sc) => {
           </div>
           <div class="itin-body">
 
-            <% if (sc.time || sc.duration || sc.hours) { %>
+            <% const _dur = durationLabel(sc); %>
+            <% if (sc.time || _dur) { %>
               <div class="itin-time">
-                <% if (sc.time) { %><%= sc.time %><% } %><% if ((sc.time) && (sc.duration || sc.hours)) { %> - <% } %><% if (sc.duration || sc.hours) { const _h = Number(sc.duration || sc.hours); %><%= _h %> hour<%= _h === 1 ? '' : 's' %><% } %>
+                <% if (sc.time) { %><%= sc.time %><% } %><% if (sc.time && _dur) { %> - <% } %><%= _dur %>
               </div>
             <% } %>
 
             <div class="itin-svc-title"><%= titleFor(sc) %></div>
 
-            <% if (sc.originName || sc.destinationName) { %>
+            <%# En los TRASLADOS el "Desde/Hacia" por nombre se quitó: el título ya trae la ruta —sea el
+                concepto ("Aeropuerto: (BJX) … - …") o el propio "origen → destino" de titleFor—, así que
+                lo decía dos veces. En su lugar van las DIRECCIONES de pick-up/drop-off (locationLines),
+                que no aparecían en ningún lado y son las que el pasajero necesita. %>
+            <% const locLines = locationLines(sc); %>
+            <% if (locLines.length) { %>
               <div class="itin-sub">
-                <% if (sc.originName) { %>Desde: <strong><%= sc.originName %></strong><% } %>
-                <% if (sc.destinationName) { %><br>Hacia: <strong><%= sc.destinationName %></strong><% } %>
+                <%- locLines.map((l) => `${l.label}: <strong>${escapeHtml(l.value)}</strong>`).join('<br>') %>
               </div>
             <% } %>
 
@@ -323,6 +615,9 @@ const iconKey = (sc) => {
             <% } %>
 
             <% if (peopleLabel(sc)) { %><div class="itin-sub" style="margin-top:6px;"><strong><%= peopleLabel(sc) %></strong></div><% } %>
+            <%# Quiénes son, no solo cuántos. %>
+            <% const attLine = attendeesLine(sc); %>
+            <% if (attLine) { %><div class="itin-sub"><%- attLine %></div><% } %>
 
             <% const desc = sc.clientNotes || sc.notes || ''; if (desc) { %>
               <div class="itin-desc"><%- renderNotes(desc) %></div>
@@ -331,15 +626,50 @@ const iconKey = (sc) => {
               <div class="itin-desc"><%- renderNotes(agencyD) %></div>
             <% } %>
 
-            <!-- Thumbnail is a placeholder until per-service photos are provided -->
-            <div class="itin-place">
-              <div class="thumb"><i class="ti ti-photo"></i></div>
-              <div class="meta">
-                <div class="t"><%= COMPANY.name %></div>
-                <div><%= COMPANY.address %></div>
-                <a href="<%= COMPANY.url %>"><%= COMPANY.url %></a>
+            <%# Quién opera el servicio. Sustituye al bloque con la dirección de Amexing, que se
+                repetía idéntico en cada servicio y ya está en la portada junto al especialista.
+                Si el servicio no tiene a nadie asignado el bloque no se dibuja. %>
+            <% const asgPairs = assignmentPairs(sc); const asgRoles = assignmentRoles(sc); %>
+            <% if (asgPairs.length || asgRoles.length) { %>
+              <div class="itin-assign">
+                <% asgPairs.forEach((p) => { %>
+                  <div class="itin-assign-row">
+                    <div class="itin-duo">
+                      <% if (p.driver) { %><%- personAvatar(p.driver) %>
+                      <% } else if (p.pending || p.needsDriver) { %><%- pendingAvatar('user') %><% } %>
+                      <% if (p.vehicle) { %><%- vehicleAvatar(p.vehicle) %>
+                      <% } else if (p.pending || p.needsVehicle) { %><%- pendingAvatar('car') %><% } %>
+                    </div>
+                    <div class="itin-assign-meta">
+                      <% if (p.pending) { %>
+                        <div class="n itin-pend-name"><%= p.label %></div>
+                        <div>
+                          <% const _seg = segmentBit(p); if (_seg) { %><%- _seg %> · <% } %>
+                          <span class="itin-pend-txt">Por confirmar</span>
+                        </div>
+                      <% } else { %>
+                        <div class="n"><%= [p.driver && p.driver.fullName, p.vehicle && p.vehicle.name].filter(Boolean).join(' · ') %></div>
+                        <% const _line = pairDetailLine(p); if (_line) { %><div><%- _line %></div><% } %>
+                      <% } %>
+                    </div>
+                  </div>
+                <% }) %>
+                <% asgRoles.forEach((r) => { %>
+                  <div class="itin-assign-row">
+                    <%- r.person ? personAvatar(r.person) : pendingAvatar('user') %>
+                    <div class="itin-assign-meta">
+                      <div class="itin-assign-role"><%= r.role %></div>
+                      <% if (r.person) { %>
+                        <div class="n"><%= r.person.fullName %></div>
+                        <% if (r.person.phone) { %><div><%= r.person.phone %></div><% } %>
+                      <% } else { %>
+                        <div class="n itin-pend-txt">Por confirmar</div>
+                      <% } %>
+                    </div>
+                  </div>
+                <% }) %>
               </div>
-            </div>
+            <% } %>
 
           </div>
         </div>

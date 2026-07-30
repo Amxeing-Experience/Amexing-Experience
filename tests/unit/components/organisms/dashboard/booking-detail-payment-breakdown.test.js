@@ -187,18 +187,29 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
 });
 
 // Fix bug ALTA: un servicio "Pago externo" (includeInTotal:false) se mostraba distinto en cada vista —
-// $0.00 sin badge en admin, precio completo sin badge en agencia/agente. Ahora las 3 marcan el servicio
-// con el badge "Pago externo" (condición svc.subconcept?.includeInTotal === false) igual que la vista
-// pública. El <script> no se ejecuta en el cascarón; se verifica el literal en su fuente renderizada.
+// $0.00 sin badge en admin, precio completo sin badge en agencia/agente.
+//
+// El BADGE se retiró de admin al rediseñar su lista de servicios con la maqueta del itinerario; agencia
+// y agente aún lo pintan y se alinearán al portar esa maqueta. Lo que NO cambia —y es lo que de verdad
+// arreglaba el bug— es que la línea del servicio muestre el precio REAL en las 3, en vez de $0.
+// El <script> no se ejecuta en el cascarón; se verifica el literal en su fuente renderizada.
 describe('Booking Detail — servicio "Pago externo" (includeInTotal:false) unificado entre roles', () => {
   let htmlAdmin;
 
   beforeAll(async () => { htmlAdmin = await render('admin'); });
 
-  it.each(['admin', 'department_manager', 'client'])('%s: pinta el badge "Pago externo" condicionado a includeInTotal === false', async (role) => {
+  it.each(AGENCY_ROLES)('%s: pinta el badge "Pago externo" condicionado a includeInTotal === false', async (role) => {
     const html = await render(role);
     expect(html).toContain('Pago externo');
     expect(html).toContain('svc.subconcept?.includeInTotal === false');
+  });
+
+  // Se verifica el MARKUP del badge, no la frase: el <script> embebido viaja en el HTML y la frase
+  // sobrevive en sus comentarios, así que un not.toContain('Pago externo') fallaría sin que el badge
+  // se pinte.
+  it('admin: el badge salió del título con el rediseño de la lista (el precio real lo sustituye)', () => {
+    expect(htmlAdmin).not.toContain('>Pago externo</span>');
+    expect(htmlAdmin).not.toContain('externalBadge');
   });
 
   // Admin era la única que ponía la LÍNEA del servicio en $0 (usaba getServicePriceByType). Ahora la
