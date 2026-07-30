@@ -490,6 +490,40 @@
       "dependencies": [],
       "idempotent": true,
       "order": 26
+    },
+    {
+      "name": "027-setting-key-unique-index",
+      "file": "027-setting-key-unique-index.js",
+      "description": "Create a partial unique index on Setting.key (active rows only) after deduping",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": [
+        "development",
+        "staging",
+        "production"
+      ],
+      "dependencies": [
+        "008-seed-system-settings"
+      ],
+      "idempotent": true,
+      "order": 27
+    },
+    {
+      "name": "028-payment-online-pending-unique-index",
+      "file": "028-payment-online-pending-unique-index.js",
+      "description": "Create a partial unique index on Payment (one pending online charge per reservation)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": [
+        "development",
+        "staging",
+        "production"
+      ],
+      "dependencies": [
+        "026-create-gatewayevent-class"
+      ],
+      "idempotent": true,
+      "order": 28
     }
   ],
   "notes": [
