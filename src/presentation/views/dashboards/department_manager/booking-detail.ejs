@@ -227,9 +227,14 @@
     <div class="svc-wrap">
         <div class="fin-section-head">
             <h5 class="fin-section-title"><i class="ti ti-list-details me-2"></i>Servicios</h5>
-            <a class="btn btn-sm btn-outline-secondary d-none" id="exportItineraryBtn" href="#" target="_blank" rel="noopener" title="Abrir itinerario de viaje (exportable a PDF)">
-                <i class="ti ti-file-export me-1"></i>Exportar itinerario
-            </a>
+            <!-- Dos acciones sobre el mismo documento: verlo en pantalla y descargarlo. Antes era un
+                 solo control, así que solo se podía hacer una de las dos. -->
+            <span class="hdr-seg d-none" id="exportItinerarySeg" role="group" aria-label="Itinerario">
+                <a class="hdr-seg-btn" id="previewItineraryBtn" href="#" target="_blank" rel="noopener"
+                   title="Ver el itinerario en pantalla"><i class="ti ti-eye"></i>Ver itinerario</a>
+                <a class="hdr-seg-btn" id="downloadItineraryBtn" href="#"
+                   title="Descargar el itinerario en PDF"><i class="ti ti-download"></i>PDF</a>
+            </span>
         </div>
         <div id="servicesContainer">
             <!-- Services will be rendered here -->
@@ -734,6 +739,7 @@
 <script src="/shared/payments/paymentBreakdownHelpers.js"></script>
 <script src="/shared/services/serviceListHelpers.js"></script>
 <script src="/shared/services/serviceListRenderer.js"></script>
+<script src="/shared/services/itineraryExport.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
@@ -936,13 +942,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             ? `<button type="button" class="hdr-danger" id="cancelResBtn"><i class="ti ti-x"></i>Cancelar reservación</button>`
             : '';
         actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
-        // Botón "Exportar itinerario" del header de Servicios → página de itinerario (exportable a PDF).
-        // Misma familia de rutas públicas que "Exportar confirmación", así que no abre acceso nuevo.
-        const itinBtn = document.getElementById('exportItineraryBtn');
-        if (itinBtn && folio) {
-            itinBtn.href = `/reservations/${folio}/itinerary`;
-            itinBtn.classList.remove('d-none');
-        }
+        // Los dos botones del itinerario los cablea ItineraryExport, el mismo módulo que usa el
+        // detalle de admin. Son rutas públicas por folio, la misma familia que "Exportar
+        // confirmación", así que no abren acceso nuevo para este rol.
+        ItineraryExport.wire({ folio, alFallar: (msg) => pmToast(msg, 'warning') });
         if (canCancel) {
             document.getElementById('cancelResBtn')?.addEventListener('click', cancelReservation);
         }

@@ -439,3 +439,17 @@
     .svc-timeline { --svc-gutter: 14px; --svc-icon: 44px; }
     .svc-side { width: 100%; justify-content: flex-end; }
 }
+
+/* Botones del itinerario en la cabecera del panel: ver en pantalla y descargar. Van en un control
+   segmentado porque son la misma acción con dos variantes —el mismo documento—, así que "Exportar"
+   queda implícito en el grupo y cada botón solo nombra lo que entrega. Antes era un control único,
+   así que solo se podía hacer una de las dos cosas. */
+.hdr-seg{display:inline-flex;gap:3px;background:#f1f2ec;border:1px solid #e6e4dd;border-radius:10px;padding:3px;}
+.hdr-seg-btn{display:inline-flex;align-items:center;gap:.35rem;border:none;background:transparent;border-radius:7px;
+  font-size:.8rem;font-weight:600;color:#6b7256;padding:.35rem .75rem;line-height:1.2;white-space:nowrap;
+  text-decoration:none;font-family:inherit;transition:background .12s,color .12s;}
+.hdr-seg-btn:hover{background:#fff;color:#4f5838;}
+.hdr-seg-btn:disabled{color:#b3b7a5;cursor:not-allowed;}
+/* Generando el PDF: el botón deja de aceptar clics y muestra el progreso en su propio lugar. */
+.hdr-seg-btn.is-busy{pointer-events:none;color:#8a8f78;}
+.hdr-seg-btn:disabled:hover{background:transparent;color:#b3b7a5;}

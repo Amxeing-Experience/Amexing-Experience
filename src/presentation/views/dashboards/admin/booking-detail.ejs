@@ -44,15 +44,6 @@
       /* Acciones del encabezado. Las dos EXPORTACIONES van en un control segmentado (mismo patrón que
          las pestañas del carrito): se leen como una cosa con dos variantes en vez de dos botones que
          compiten por empezar igual. Nada se esconde: todo sigue a un clic. */
-      .hdr-seg{display:inline-flex;gap:3px;background:#f1f2ec;border:1px solid #e6e4dd;border-radius:10px;padding:3px;}
-      .hdr-seg-btn{display:inline-flex;align-items:center;gap:.35rem;border:none;background:transparent;border-radius:7px;
-        font-size:.8rem;font-weight:600;color:#6b7256;padding:.35rem .75rem;line-height:1.2;white-space:nowrap;
-        text-decoration:none;font-family:inherit;transition:background .12s,color .12s;}
-      .hdr-seg-btn:hover{background:#fff;color:#4f5838;}
-      .hdr-seg-btn:disabled{color:#b3b7a5;cursor:not-allowed;}
-      /* Generando el PDF: el botón deja de aceptar clics y muestra el progreso en su propio lugar. */
-      .hdr-seg-btn.is-busy{pointer-events:none;color:#8a8f78;}
-      .hdr-seg-btn:disabled:hover{background:transparent;color:#b3b7a5;}
       /* Exportación suelta (cuando solo hay una): mismo peso visual que un elemento del segmento. */
       .hdr-btn{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#6b7256;
         background:#fff;border:1px solid #dcdccf;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
@@ -884,6 +875,7 @@
      122 de 291 servicios, sin que nadie lo hubiera decidido. -->
 <script src="/shared/services/serviceListHelpers.js"></script>
     <script src="/shared/services/serviceListRenderer.js"></script>
+    <script src="/shared/services/itineraryExport.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
@@ -1377,57 +1369,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             cancelBtnHtml = `<button type="button" class="hdr-danger" id="cancelResBtn"><i class="ti ti-x"></i>Cancelar reservación</button>`;
         }
         actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportSegHtml}${cancelBtnHtml}</div>`;
-        // Las dos rutas del itinerario son distintas y ambas hacen falta:
-        //   /itinerary → la vista HTML, para revisarlo en pantalla antes de mandarlo.
-        //   /pdf       → puppeteer sobre esa misma plantilla, devuelve application/pdf como adjunto.
-        // La de descarga NO lleva target="_blank": al ser un adjunto, abriría una pestaña que se cierra
-        // sola y en algunos navegadores parpadea.
-        const itinSeg = document.getElementById('exportItinerarySeg');
-        if (itinSeg && folio) {
-            document.getElementById('previewItineraryBtn').href = `/reservations/${folio}/itinerary`;
-            const dlBtn = document.getElementById('downloadItineraryBtn');
-            dlBtn.href = `/reservations/${folio}/pdf`;
-            itinSeg.classList.remove('d-none');
-            // El PDF lo arma puppeteer y tarda varios segundos. Como <a href> la descarga es una
-            // navegación: no avisa cuándo empieza ni cuándo termina, así que el botón parecía muerto.
-            // Se baja por fetch para poder mostrar el progreso; el archivo pesa ~1 MB, así que tenerlo
-            // en memoria un momento no es problema. El href se conserva para que el clic con el botón
-            // central o "abrir en pestaña nueva" siga funcionando.
-            if (!dlBtn.dataset.bound) {
-                dlBtn.dataset.bound = '1';
-                dlBtn.addEventListener('click', async (ev) => {
-                    ev.preventDefault();
-                    if (dlBtn.dataset.busy === '1') return;
-                    dlBtn.dataset.busy = '1';
-                    const original = dlBtn.innerHTML;
-                    dlBtn.classList.add('is-busy');
-                    dlBtn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;border-width:.14em;"></span>Generando…';
-                    let blobUrl = '';
-                    try {
-                        const resp = await fetch(dlBtn.href);
-                        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                        const blob = await resp.blob();
-                        blobUrl = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = blobUrl;
-                        a.download = `${folio}.pdf`;
-                        document.body.appendChild(a);
-                        a.click();
-                        a.remove();
-                    } catch (err) {
-                        console.error('PDF download failed:', err);
-                        pmToast('No se pudo generar el PDF. Intenta de nuevo.', 'warning');
-                    } finally {
-                        dlBtn.innerHTML = original;
-                        dlBtn.classList.remove('is-busy');
-                        dlBtn.dataset.busy = '';
-                        // Revocar de inmediato cancelaría la descarga en algunos navegadores, que
-                        // leen el blob después del click.
-                        if (blobUrl) setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-                    }
-                });
-            }
-        }
+        // Los dos botones del itinerario los cablea ItineraryExport, compartido con los detalles de
+        // client, department_manager y end_client: la descarga por fetch con su indicador de progreso
+        // es la misma en las cuatro.
+        ItineraryExport.wire({ folio, alFallar: (msg) => pmToast(msg, 'warning') });
         // El listener solo aplica cuando se renderizó el botón (no en las etiquetas).
         document.getElementById('cancelResBtn')?.addEventListener('click', () => {
             // Use shared utility with existing reservation data and loadReservation callback
