@@ -46,47 +46,9 @@
          · SIN bloque "Notas de la cotización": esta vista nunca ha mostrado d.notes y son notas
            internas; no se agrega. -->
     <link rel="stylesheet" href="/shared/services/serviceList.css">
+<link rel="stylesheet" href="/shared/services/reservationHeader.css">
 <link rel="stylesheet" href="/shared/services/reservationFinance.css">
     <style>
-      .bkg-info{border:1px solid #ece8dd;border-radius:14px;overflow:hidden;background:#fff;}
-      .bkg-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
-        padding:20px 26px;background:linear-gradient(135deg,#f7f6f1 0%,#ffffff 60%);border-bottom:1px solid #ece8dd;}
-      .bkg-eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.64rem;font-weight:700;color:#8a8f78;margin-bottom:4px;}
-      .bkg-title{font-size:1.35rem;font-weight:700;color:#2b2b2b;line-height:1.2;word-break:break-word;}
-      .bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
-      /* Badges de estado suavizados SOLO en la tarjeta de info (paleta de marca, sin tocar las
-         funciones compartidas getQuoteStatusBadge / getReservationStatusBadge). */
-      .bkg-status .badge{font-weight:700;font-size:.72rem;border:1px solid transparent;border-radius:999px;padding:.4rem .8rem;}
-      .bkg-status .badge.bg-success{background:#e6efe1 !important;color:#3f5a34 !important;border-color:#cfe0c6;}
-      .bkg-status .badge.bg-warning{background:#f6efe2 !important;color:#96682f !important;border-color:#e7d6bd;}
-      .bkg-status .badge.bg-primary{background:#eef0e6 !important;color:#566040 !important;border-color:#dce2d0;}
-      .bkg-status .badge.bg-info{background:#eaf1f0 !important;color:#3a6b63 !important;border-color:#cfe1dd;}
-      .bkg-status .badge.bg-secondary{background:#f0eee7 !important;color:#6b6656 !important;border-color:#ded9cb;}
-      .bkg-status .badge.bg-danger{background:#f7ecea !important;color:#a1443a !important;border-color:#e6c9c4;}
-      .bkg-top-left{display:flex;align-items:center;gap:26px;flex-wrap:wrap;}
-      .bkg-cs{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding-left:26px;border-left:1px solid #e6e1d5;}
-      .bkg-cs-lbl{text-transform:uppercase;letter-spacing:.07em;font-size:.62rem;font-weight:700;color:#8a8f78;}
-      .bkg-cs #infoServiceCustomer{font-weight:600;color:#2b2b2b;font-size:.9rem;}
-      .bkg-grid{display:grid;grid-template-columns:repeat(4,1fr);background:#fff;}
-      /* Hairlines con inset box-shadow: solo aparecen en tiles reales, así una fila
-         incompleta queda en blanco (no muestra el fondo de la rejilla). */
-      .bkg-tile{background:#fff;padding:16px 22px;min-width:0;box-shadow:inset -1px -1px 0 #efeadf;}
-      /* Celda sin dato (hoy solo Lead Guest): se oculta el CONTENIDO, no la celda. Con d-none la celda
-         salia del flujo del grid y todo lo de atras se recorria una posicion, cambiando el orden de las
-         demas. Asi conserva su lugar y sus lineas de rejilla, y visibility:hidden ademas la saca del
-         arbol de accesibilidad (el lector no anuncia "Lead Guest —"). */
-      .bkg-tile.is-empty > *{visibility:hidden;}
-      @media(max-width:992px){.bkg-grid{grid-template-columns:repeat(2,1fr);}}
-      @media(max-width:576px){.bkg-grid{grid-template-columns:1fr;}}
-      .bkg-lbl{display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.07em;font-size:.72rem;
-        font-weight:700;color:#8a8f78;margin-bottom:6px;}
-      .bkg-lbl i{font-size:1.05rem;color:#6E7A50;}
-      .bkg-val{font-size:1.08rem;font-weight:600;color:#2b2b2b;word-break:break-word;line-height:1.35;}
-      .bkg-link{color:#566040;text-decoration:none;}
-      .bkg-link:hover{text-decoration:underline;}
-      .bkg-dates{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-      .bkg-arrow{color:#8a8f78;font-weight:400;}
-      .bkg-sub{font-size:.72rem;color:#8a8f78;margin-top:5px;font-style:italic;}
     </style>
     <div class="bkg-info mb-4">
         <!-- [Cliente | Customer Support] a la izquierda, Estado a la derecha; el folio ya está en el título -->

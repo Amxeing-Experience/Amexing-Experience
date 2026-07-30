@@ -39,71 +39,49 @@
 
 <!-- Reservation Content -->
 <div id="reservationContent" style="display: none;">
-    <!-- Info Card -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Folio</small>
-                    <strong id="infoFolio">—</strong>
+    <!-- Info Card — misma tarjeta que client y department_manager. -->
+    <div class="bkg-info mb-4">
+        <!-- [Cliente | Customer Support] a la izquierda, Estado a la derecha; el folio ya está en el título -->
+        <div class="bkg-top">
+            <div class="bkg-top-left">
+                <div>
+                    <div class="bkg-eyebrow"><i class="ti ti-building me-1"></i>Cliente</div>
+                    <div class="bkg-title" id="infoClient">&mdash;</div>
                 </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Cotización</small>
-                    <a href="#" id="infoQuoteLink" class="fw-semibold text-decoration-none">—</a>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Estado</small>
-                    <span id="infoStatus">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Creación</small>
-                    <span id="infoCreatedAt">—</span>
+                <div class="bkg-cs">
+                    <span class="bkg-cs-lbl"><i class="ti ti-headset me-1"></i>Customer Support</span>
+                    <div id="infoServiceCustomer">&mdash;</div>
                 </div>
             </div>
-            <hr>
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Cliente</small>
-                    <strong id="infoClient">—</strong>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Contacto</small>
-                    <span id="infoContact">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Motivo de viaje</small>
-                    <span id="infoEventType">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Personas</small>
-                    <span id="infoPeople">—</span>
-                </div>
+            <div class="bkg-status" id="infoStatus">&mdash;</div>
+        </div>
+
+        <!-- Datos en tiles -->
+        <div class="bkg-grid">
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-file-invoice"></i> Cotización</div>
+                <a href="#" id="infoQuoteLink" class="bkg-val bkg-link">&mdash;</a>
             </div>
-            <hr>
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Inicio</small>
-                    <span id="infoStartDate">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Fin</small>
-                    <span id="infoEndDate">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Tipo de Pago</small>
-                    <span id="infoPaymentType">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Total</small>
-                    <strong id="infoTotal" class="text-success fs-5">—</strong>
-                </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-mail"></i> Contacto</div>
+                <div class="bkg-val" id="infoContact">&mdash;</div>
             </div>
-            <hr>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <small class="text-muted d-block">Seguidor de Servicio (Amexing)</small>
-                    <span id="infoServiceCustomer" class="fw-semibold">—</span>
-                </div>
+            <div class="bkg-tile is-empty" id="infoLeadGuestRow">
+                <div class="bkg-lbl"><i class="ti ti-user"></i> Lead Guest</div>
+                <div class="bkg-val" id="infoLeadGuest">&mdash;</div>
+            </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-calendar"></i> Fechas</div>
+                <div class="bkg-val bkg-dates" id="infoDates">&mdash;</div>
+                <div class="bkg-sub" id="infoNights"></div>
+            </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-users"></i> Personas</div>
+                <div class="bkg-val" id="infoPeople">&mdash;</div>
+            </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-plane"></i> Motivo de viaje</div>
+                <div class="bkg-val" id="infoEventType">&mdash;</div>
             </div>
         </div>
     </div>
@@ -142,6 +120,7 @@
 <!-- Assign Employee Modal -->
 
 <link rel="stylesheet" href="/shared/services/serviceList.css">
+<link rel="stylesheet" href="/shared/services/reservationHeader.css">
 <link rel="stylesheet" href="/shared/services/reservationFinance.css">
 <style>
 .service-row {
@@ -315,7 +294,6 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         document.getElementById('breadcrumbFolio').textContent = d.folio;
         document.getElementById('pageTitle').innerHTML = `<i class="ti ti-clipboard-list me-2 text-primary"></i>${d.folio}`;
-        document.getElementById('infoFolio').textContent = d.folio;
 
         const quoteLink = document.getElementById('infoQuoteLink');
         if (d.quoteId) {
@@ -323,30 +301,66 @@ document.addEventListener('DOMContentLoaded', async function() {
             quoteLink.textContent = d.quoteFolio;
         }
 
+        // Header actions — "Exportar" opens the public reservation view in a new tab,
+        // which has the PDF export + print-friendly layout. "Cancelar" only shows when
+        // the reservation can still be cancelled.
         const quoteBadge = getQuoteStatusBadge(d.quoteStatus);
         const reservationBadge = getReservationStatusBadge(d.status);
         document.getElementById('infoStatus').innerHTML = `${quoteBadge} ${reservationBadge}`;
-        document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);
         // Display company name first, then fallback to fullName or contactPerson
         const clientDisplay = d.client?.companyName || d.client?.fullName || d.contactPerson || '—';
         document.getElementById('infoClient').textContent = clientDisplay;
-        document.getElementById('infoContact').innerHTML = `${d.contactEmail || ''}${d.contactPhone ? '<br>' + d.contactPhone : ''}`;
+        // Contacto: nombre (si existe) + email + teléfono, cada uno en su línea y solo si viene.
+        const contactName = (d.contactPerson
+            || `${d.contactFirstName || ''} ${d.contactLastName || ''}`.trim()).trim();
+        const contactLines = [];
+        if (contactName) contactLines.push(`<span class="fw-semibold">${PaymentBreakdownHelpers.escapeHtml(contactName)}</span>`);
+        if (d.contactEmail) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactEmail));
+        if (d.contactPhone) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactPhone));
+        document.getElementById('infoContact').innerHTML = contactLines.length ? contactLines.join('<br>') : '&mdash;';
         document.getElementById('infoEventType').textContent = d.eventType || '—';
         document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';
-        document.getElementById('infoStartDate').textContent = formatDate(d.startDate);
-        document.getElementById('infoEndDate').textContent = formatDate(d.endDate);
-        document.getElementById('infoPaymentType').textContent = d.paymentType || '—';
-        document.getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency);
+        // Fecha inicio y fin se fusionaron en un rango compacto; el Total dejó de repetirse aquí porque
+        // el Resumen Financiero ya lo muestra ("Total a pagar").
+        document.getElementById('infoDates').innerHTML = formatDateRange(d.startDate, d.endDate);
+        // Duración (noches) = diferencia en días; se oculta en reservaciones de un solo día.
+        const nightsEl = document.getElementById('infoNights');
+        if (nightsEl) {
+            if (d.startDate && d.endDate) {
+                const nights = Math.max(0, Math.round((new Date(d.endDate) - new Date(d.startDate)) / 86400000));
+                nightsEl.textContent = nights <= 0 ? '' : (nights === 1 ? '1 noche' : `${nights} noches`);
+            } else {
+                nightsEl.textContent = '';
+            }
+        }
+        // El método de pago dejó de tener tile propio: se muestra como chip junto al "Total a pagar"
+        // del Resumen Financiero, que es donde tiene contexto.
 
-        // Service Customer
+        // Lead guest — la celda siempre ocupa su lugar en la rejilla; solo se vacía cuando no hay uno.
+        // Cae a contactPerson para que una reservación que trae al viajero en los campos de contacto
+        // igual lo muestre como lead guest.
+        const leadGuestParts = [d.leadGuestFirstName, d.leadGuestLastName]
+            .map((p) => (p || '').trim())
+            .filter(Boolean);
+        const leadGuestName = leadGuestParts.length > 0
+            ? leadGuestParts.join(' ')
+            : (d.contactPerson || '').trim();
+        const leadGuestRow = document.getElementById('infoLeadGuestRow');
+        const leadGuestEl = document.getElementById('infoLeadGuest');
+        if (leadGuestEl && leadGuestRow) {
+            leadGuestEl.textContent = leadGuestName || '—';
+            leadGuestRow.classList.toggle('is-empty', !leadGuestName);
+        }
+
+        // Service Customer — de solo lectura: reasignarlo es admin-only, así que aquí no hay botón.
         const scEl = document.getElementById('infoServiceCustomer');
         if (d.serviceCustomer) {
-            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Seguidor', 'ti-user-star', 'primary');
+            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Customer Support', 'ti-headset', 'primary');
         } else {
             scEl.innerHTML = '<span class="text-muted">Sin asignar</span>';
         }
 
-        // Header actions — "Exportar" opens the public reservation view in a new tab,
+        // Header actions — "Exportar confirmación" opens the public reservation view in a new tab,
         // which has the PDF export + print-friendly layout. "Cancelar" only shows when
         // the reservation can still be cancelled.
         const actions = document.getElementById('headerActions');
@@ -381,6 +395,30 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('reservationContent').style.display = '';
+    }
+
+    // Rango de fechas compacto (es-MX, UTC): mismo día → una sola fecha; mismo mes → "16 → 17 ago
+    // 2026"; mismo año → "28 jul → 03 ago 2026"; años distintos → ambas completas.
+    function formatDateRange(startStr, endStr) {
+        if (!startStr) return '—';
+        const start = new Date(startStr);
+        if (Number.isNaN(start.getTime())) return '—';
+        if (!endStr) return formatDate(startStr);
+        const end = new Date(endStr);
+        if (Number.isNaN(end.getTime())) return formatDate(startStr);
+        // Se formatea día y mes por separado para evitar el guion del locale ("28-jul" → "28 jul").
+        const fmt = (dt, o) => dt.toLocaleDateString('es-MX', Object.assign({ timeZone: 'UTC' }, o));
+        const day = (dt) => fmt(dt, { day: '2-digit' });
+        const dayMonth = (dt) => `${fmt(dt, { day: '2-digit' })} ${fmt(dt, { month: 'short' })}`;
+        const full = (dt) => `${dayMonth(dt)} ${fmt(dt, { year: 'numeric' })}`;
+        const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+        const sameMonth = sameYear && start.getUTCMonth() === end.getUTCMonth();
+        const sameDay = sameMonth && start.getUTCDate() === end.getUTCDate();
+        const arrow = ' <span class="bkg-arrow">&rarr;</span> ';
+        if (sameDay) return formatDate(startStr);
+        if (sameMonth) return `${day(start)}${arrow}${full(end)}`;
+        if (sameYear) return `${dayMonth(start)}${arrow}${full(end)}`;
+        return `${full(start)}${arrow}${full(end)}`;
     }
 
     // Estado del carrito de pagos. Vive fuera de los render para sobrevivir a las recargas.
