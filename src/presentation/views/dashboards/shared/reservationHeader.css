@@ -11,7 +11,12 @@
   padding:20px 26px;background:linear-gradient(135deg,#f7f6f1 0%,#ffffff 60%);border-bottom:1px solid #ece8dd;}
 .bkg-eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.64rem;font-weight:700;color:#8a8f78;margin-bottom:4px;}
 .bkg-title{font-size:1.35rem;font-weight:700;color:#2b2b2b;line-height:1.2;word-break:break-word;}
-.bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+/* margin-left:auto y no solo justify-content: si .bkg-top se desborda a una segunda línea, el estado
+   deja de ser el segundo elemento de una fila con space-between y queda pegado a la izquierda. Con el
+   margen automático se queda a la derecha en los dos casos. Aquí no se nota hoy —el chip de Customer
+   Support es solo texto y la fila cabe— pero es el mismo hueco que sí se ve en admin. */
+.bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;
+  margin-left:auto;}
 /* Badges de estado suavizados SOLO en la tarjeta de info (paleta de marca, sin tocar las
    funciones compartidas getQuoteStatusBadge / getReservationStatusBadge). */
 .bkg-status .badge{font-weight:700;font-size:.72rem;border:1px solid transparent;border-radius:999px;padding:.4rem .8rem;}
