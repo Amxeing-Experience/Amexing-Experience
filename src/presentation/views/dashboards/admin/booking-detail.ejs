@@ -41,19 +41,12 @@
 <div id="reservationContent" style="display: none;">
     <!-- Info Card -->
     <style>
-      /* Acciones del encabezado. Las dos EXPORTACIONES van en un control segmentado (mismo patrón que
-         las pestañas del carrito): se leen como una cosa con dos variantes en vez de dos botones que
       .bkg-info{border:1px solid #ece8dd;border-radius:14px;overflow:hidden;background:#fff;}
       .bkg-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
         padding:20px 26px;background:linear-gradient(135deg,#f7f6f1 0%,#ffffff 60%);border-bottom:1px solid #ece8dd;}
       .bkg-eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.64rem;font-weight:700;color:#8a8f78;margin-bottom:4px;}
       .bkg-title{font-size:1.35rem;font-weight:700;color:#2b2b2b;line-height:1.2;word-break:break-word;}
-      /* margin-left:auto y no solo justify-content: cuando .bkg-top se desborda a una segunda línea
-         —pasa en admin, cuyo chip de Customer Support lleva avatar y ensancha la fila— el estado deja
-         de ser el segundo elemento de una fila con space-between y queda solo, pegado a la izquierda.
-         El margen automático lo mantiene a la derecha en los dos casos. */
-      .bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;
-        margin-left:auto;}
+      .bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
       /* Badges de estado suavizados SOLO en la tarjeta de info (paleta de marca, sin tocar las
          funciones compartidas getQuoteStatusBadge / getReservationOverallStatusBadge). */
       .bkg-status .badge{font-weight:700;font-size:.72rem;border:1px solid transparent;border-radius:999px;padding:.4rem .8rem;}
