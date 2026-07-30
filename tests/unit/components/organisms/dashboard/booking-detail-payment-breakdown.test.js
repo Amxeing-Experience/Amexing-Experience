@@ -207,17 +207,21 @@ describe('Booking Detail — servicio "Pago externo" (includeInTotal:false) unif
   // Se verifica el MARKUP del badge, no la frase: el <script> embebido viaja en el HTML y la frase
   // sobrevive en sus comentarios, así que un not.toContain('Pago externo') fallaría sin que el badge
   // se pinte.
-  it('admin: el badge salió del título con el rediseño de la lista (el precio real lo sustituye)', () => {
+  it('admin: el badge salió del título con el rediseño de la lista', () => {
     expect(htmlAdmin).not.toContain('>Pago externo</span>');
     expect(htmlAdmin).not.toContain('externalBadge');
   });
 
-  // Admin era la única que ponía la LÍNEA del servicio en $0 (usaba getServicePriceByType). Ahora la
-  // línea usa getServicePriceByTypeGross (precio real, sin zero-out); el agregado financiero sigue
-  // excluyendo vía computeServicesSubtotalByType (getServicePriceByType), que no debe tocarse.
-  it('admin: la línea del servicio usa getServicePriceByTypeGross (precio real), no getServicePriceByType', () => {
-    // Marcador literal del call site del renglón dentro del <script>.
-    expect(htmlAdmin).toContain('getServicePriceByTypeGross(svc, reservationData.paymentType)');
+  // Admin ya no muestra PRECIO por servicio: su lista es la vista de operación (quién va, a qué hora,
+  // en qué vehículo) y el dinero vive en el Resumen Financiero y en el carrito de pagos. Con eso el
+  // bug original queda sin superficie en admin —no hay precio que pueda aparecer en $0—, pero lo que
+  // de verdad hay que blindar es que el AGREGADO siga excluyendo "Pago externo" (test siguiente).
+  //
+  // Marcadores de MARKUP y del call site completo, no del nombre del helper: ese sigue nombrado en
+  // los comentarios de la plantilla, que viajan en el <script> embebido.
+  it('admin: la línea del servicio ya no pinta precio', () => {
+    expect(htmlAdmin).not.toContain('<span class="svc-price">');
+    expect(htmlAdmin).not.toContain('getServicePriceByTypeGross(svc, reservationData.paymentType)');
   });
 
   it('admin: el agregado financiero sigue usando computeServicesSubtotalByType (excluye Pago externo, no se tocó)', () => {

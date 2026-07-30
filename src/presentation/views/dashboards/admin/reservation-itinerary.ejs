@@ -66,6 +66,12 @@ const serviceDuration = (sc) => {
   }
   return null;
 };
+// Horas en una sola forma: "1 hr", "6 hrs". Igual que en el detalle de reservación.
+const hoursText = (h) => {
+  const n = Number(h) || 0;
+  return `${n} hr${n === 1 ? '' : 's'}`;
+};
+
 const durationLabel = (sc) => {
   const d = serviceDuration(sc);
   if (!d) return '';
@@ -73,9 +79,10 @@ const durationLabel = (sc) => {
     const h = Math.floor(d.minutes / 60);
     const m = d.minutes % 60;
     if (h === 0) return `${m} min`;
-    return m ? `${h} h ${m} min` : `${h} hour${h === 1 ? '' : 's'}`;
+    // "hr/hrs", y en español: este documento está en español y decía "hour/hours".
+    return m ? `${hoursText(h)} ${m} min` : hoursText(h);
   }
-  return `${d.hours} hour${d.hours === 1 ? '' : 's'}`;
+  return hoursText(d.hours);
 };
 
 // Ubicaciones del servicio, en renglones etiquetados. En los TRASLADOS son las DIRECCIONES exactas de
@@ -117,6 +124,32 @@ const attendeesLine = (sc) => {
   return names.length ? escapeHtml(names.join(', ')) : '';
 };
 
+// Hora que encabeza el servicio. En una SALIDA a aeropuerto no es la del avión sino la del PICK-UP:
+// el pasajero leía "18:00" arriba y entendía que a esa hora pasaban por él, cuando la camioneta sale
+// mucho antes. La del vuelo sigue visible en la tabla de vuelos, así que no se pierde nada.
+// Mismo criterio que servicePickupTime del detalle de reservación.
+const roundDownTo15 = (timeStr) => {
+  if (!timeStr || !String(timeStr).includes(':')) return timeStr || '';
+  const [hours, minutes] = String(timeStr).split(':').map(Number);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return timeStr;
+  const total = Math.floor((hours * 60 + minutes) / 15) * 15;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+};
+
+const serviceStartTime = (sc) => {
+  const isTransport = sc.type === 'transport' || sc.type === 'traslado';
+  if (isTransport && sc.transportType === 'aeropuerto' && sc.directionType === 'departure') {
+    const suggested = sc.flightDepartureTimeSuggested;
+    if (suggested) return roundDownTo15(suggested) || suggested;
+  }
+  let t = sc.time || sc.startTime || '';
+  if (!t && sc.selectedSchedule) {
+    const m = String(sc.selectedSchedule).match(/^(\d{1,2}:\d{2})/);
+    if (m) [, t] = m;
+  }
+  return t;
+};
+
 const titleFor = (sc) => {
   if (sc.concept && sc.concept.trim()) return sc.concept;
   if (sc.destinationPOI) return sc.destinationPOI;
@@ -124,7 +157,7 @@ const titleFor = (sc) => {
   if (sc.type === 'a-disposicion') {
     // `hours` primero por lo mismo: con duration primero, un a-disposición de 6 h se titulaba "1 hora".
     const h = Number(sc.hours || sc.duration || 0);
-    return h ? `A Disposición - ${h} hora${h === 1 ? '' : 's'}` : 'A Disposición';
+    return h ? `A Disposición - ${hoursText(h)}` : 'A Disposición';
   }
   return sc.serviceType || 'Servicio';
 };
@@ -184,11 +217,23 @@ const ICON_BASE = '/images/icons';
 // when a proxy/WAF blocks the .otf network requests (HTTP 426) — no network fetch needed.
 const ARPONA_EMBED_CSS = typeof arponaEmbedCss === 'string' ? arponaEmbedCss : '';
 const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '';
+// "Incluye / no incluye" de tours y experiencias. Las inyecta injectServiceIncludes desde el
+// catálogo (el subconcepto guardado no las trae), así que aquí solo se normaliza: pueden faltar,
+// venir vacías o traer entradas en blanco.
+const includeLists = (sc) => ({
+  includes: Array.isArray(sc.includes) ? sc.includes.filter(Boolean) : [],
+  notIncludes: Array.isArray(sc.notIncludes) ? sc.notIncludes.filter(Boolean) : [],
+});
+
 const iconKey = (sc) => {
   if (sc.type === 'traslado' || sc.type === 'transport') {
     if (sc.transportType === 'aeropuerto') return sc.directionType === 'departure' ? 'departure' : 'arrival';
     return 'transfer';
   }
+  // «A disposición» es un vehículo con chofer por horas, así que lleva el ícono de traslado igual que
+  // el resto del transporte. Antes caía al default y salía con el de experiencias, que no le
+  // corresponde. Mismo criterio que getServiceIconKey en el detalle de reservación.
+  if (sc.type === 'a-disposicion') return 'transfer';
   if (sc.type === 'tour') return 'city';
   if (sc.type === 'experiencia') return 'experience';
   return 'experience';
@@ -271,10 +316,14 @@ const vehicleSlotSpecs = (sc) => {
 const assignmentPairs = (sc) => {
   const a = sc.assignments || {};
   const slots = vehicleSlotCount(sc);
-  // En «a disposición» el chofer se captura en el campo de guía, no en el de conductor, así que
-  // la pareja NUNCA debe pedir chofer ahí: si lo hiciera, diría «Chofer por confirmar» con el
-  // chofer ya asignado en el renglón de abajo. Ese rol lo cubre assignmentRoles.
+  // ¿La plaza ofrece chofer? Mismo criterio que el detalle interno: el checkbox de la cotización se
+  // llama "Guía + Chofer" y lo que contrata es el CHOFER.
+  //   traslado      → siempre: sin chofer no hay traslado.
+  //   tour          → solo con "Guía + Chofer": el tour ya trae guía propio y el chofer es el extra.
+  //   a disposición → nunca en la plaza: ahí el chofer se captura en el campo de guía.
   const isAtDisposal = sc.type === 'a-disposicion';
+  const isTransport = sc.type === 'transport' || sc.type === 'traslado';
+  const offersDriver = isAtDisposal ? false : (isTransport ? true : !!sc.includeGuide);
   const pairs = [];
   const push = (driver, vehicle, segmentName, segmentColor) => {
     const hasDriver = !!(driver && driver.fullName);
@@ -283,10 +332,9 @@ const assignmentPairs = (sc) => {
     pairs.push({
       driver: hasDriver ? driver : null,
       vehicle: hasVehicle ? vehicle : null,
-      needsDriver: !hasDriver && !isAtDisposal,
-      // La mitad que falta solo se marca si el servicio de verdad lleva vehículo: un tour
-      // caminando con guía no debe pedir camioneta.
-      needsVehicle: !hasVehicle && slots > 0,
+      offersDriver,
+      needsDriver: hasVehicle && !hasDriver && offersDriver,
+      needsVehicle: hasDriver && !hasVehicle && slots > 0,
       segmentName: segmentName || '',
       segmentColor: segmentColor || '',
     });
@@ -311,6 +359,7 @@ const assignmentPairs = (sc) => {
       driver: null,
       vehicle: null,
       pending: true,
+      offersDriver,
       label: spec.type || 'Vehículo',
       segmentName: spec.segment || sc.categoryName || '',
       segmentColor: spec.color || sc.categoryColor || '',
@@ -326,14 +375,17 @@ const assignmentPairs = (sc) => {
 const assignmentRoles = (sc) => {
   const a = sc.assignments || {};
   const isAtDisposal = sc.type === 'a-disposicion';
+  const isTour = sc.type === 'tour';
   const guideRole = isAtDisposal ? 'Chofer' : 'Guía';
   const rows = [
-    { person: a.guide, role: guideRole, expected: !!sc.includeGuide },
+    // Un tour SIEMPRE trae guía propio y un «a disposición» siempre trae chofer: no dependen del
+    // checkbox. En traslados y experiencias sí, porque ahí el guía es el extra que se contrata.
+    { person: a.guide, role: guideRole, expected: !!sc.includeGuide, always: isTour || isAtDisposal },
     { person: a.greeter, role: 'Greeter', expected: !!sc.includeGreeter },
     { person: a.serviceCustomer, role: 'Customer Support', expected: false },
   ];
   return rows
-    .filter((r) => (r.person && r.person.fullName) || r.expected)
+    .filter((r) => r.always || (r.person && r.person.fullName) || r.expected)
     .map((r) => (r.person && r.person.fullName
       ? { role: r.role, person: r.person }
       : { role: r.role, person: null, pending: true }));
@@ -378,15 +430,29 @@ const segmentBit = (p) => {
   return `${dot}${escapeHtml(p.segmentName)}`;
 };
 
-const pairDetailLine = (p) => {
-  const bits = [];
+// Una línea por DUEÑO. Antes iba todo en una sola cadena —segmento, placa y teléfono separados por
+// el mismo `·`— y no se distinguía de quién era qué: la placa es del vehículo y el teléfono de la
+// persona. Ahora cada dato va pegado a quien le corresponde, y el segmento queda solo al final
+// porque no es de ninguno de los dos: es de la plaza.
+const pairLines = (p) => {
+  const out = [];
+  if (p.driver) {
+    const tel = p.driver.phone ? ` · ${escapeHtml(p.driver.phone)}` : '';
+    out.push(`<div class="n">${escapeHtml(p.driver.fullName)}${tel}</div>`);
+  } else if (p.needsDriver) {
+    out.push('<div class="itin-pend-txt">Chofer por confirmar</div>');
+  }
+  if (p.vehicle) {
+    // La placa va en cápsula monoespaciada en vez de con la palabra "Placas": la forma dice que es
+    // un identificador y aguanta placas que no parecen placa.
+    const plate = p.vehicle.plate ? ` <span class="itin-plate">${escapeHtml(p.vehicle.plate)}</span>` : '';
+    out.push(`<div><span class="itin-veh-name">${escapeHtml(p.vehicle.name)}</span>${plate}</div>`);
+  } else if (p.needsVehicle) {
+    out.push('<div class="itin-pend-txt">Vehículo por confirmar</div>');
+  }
   const seg = segmentBit(p);
-  if (seg) bits.push(seg);
-  if (p.needsDriver) bits.push('<span class="itin-pend-txt">Chofer por confirmar</span>');
-  if (p.needsVehicle) bits.push('<span class="itin-pend-txt">Vehículo por confirmar</span>');
-  if (p.vehicle && p.vehicle.plate) bits.push(`Placas ${escapeHtml(p.vehicle.plate)}`);
-  if (p.driver && p.driver.phone) bits.push(escapeHtml(p.driver.phone));
-  return bits.join(' · ');
+  if (seg) out.push(`<div>${seg}</div>`);
+  return out.join('');
 };
 %>
 <!DOCTYPE html>
@@ -498,11 +564,26 @@ const pairDetailLine = (p) => {
     .itin-sub { color: #6c757d; margin-top: 2px; }
 
     /* Flight detail table */
-    .itin-flight { display: grid; grid-template-columns: repeat(4, auto); gap: 2px 28px; margin-top: 8px; }
+    .itin-flight { display: grid; grid-template-columns: repeat(5, auto); gap: 2px 28px; margin-top: 8px; }
     .itin-flight .h { font-size: 0.7rem; color: #8a8a8a; }
     .itin-flight .v { font-size: 0.9rem; color: #1b1b1b; font-weight: 600; }
 
     .itin-desc { margin-top: 8px; color: #555; line-height: 1.55; white-space: pre-line; text-align: justify; }
+
+    /* Incluye / no incluye. Los marcadores son glifos de TEXTO (✓ / ×) y no íconos de fuente: en el
+       PDF de puppeteer un ::before con font-family de iconos depende del codepoint y se rompe callado,
+       mientras que estos renderizan con cualquier tipografía. */
+    .itin-inc { display: flex; flex-wrap: wrap; gap: 10px 34px; margin-top: 12px; }
+    .itin-inc-col { min-width: 180px; }
+    .itin-inc-lbl {
+      font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em;
+      font-weight: 700; color: #8a8f78; margin-bottom: 3px;
+    }
+    .itin-inc-list { margin: 0; padding: 0; list-style: none; }
+    .itin-inc-list li { position: relative; padding-left: 15px; line-height: 1.5; color: #555; }
+    .itin-inc-list li::before { position: absolute; left: 0; font-weight: 700; }
+    .itin-inc-list.is-yes li::before { content: '\2713'; color: #6f7459; }
+    .itin-inc-list.is-no li::before { content: '\00D7'; color: #a09c8d; }
 
     /* Per-service assignments: driver + vehicle paired, unattached roles below */
     .itin-assign { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
@@ -530,8 +611,85 @@ const pairDetailLine = (p) => {
     /* El tipo esperado de una plaza vacía conserva la negrita —ES el sujeto del renglón— pero
        apagado, y sin itálica: es un dato, no un estado. Encadenada por lo mismo que la de arriba. */
     .itin-assign-meta .n.itin-pend-name { color: #8a8f78; }
+    /* El vehículo es un sujeto igual que la persona, pero una cosa: mismo cuerpo, menos peso que el
+       nombre, para que la jerarquía diga "a quién" antes que "en qué". */
+    .itin-veh-name { font-weight: 600; color: #1b1b1b; }
+    /* Placa en cápsula monoespaciada, en vez de la palabra "Placas": la forma dice que es un
+       identificador y aguanta placas que no parecen placa ("A", "AUDICALSEA"). */
+    .itin-plate {
+      display: inline-block;
+      margin-left: 4px;
+      padding: 0 5px;
+      border: 1px solid #dcdccf;
+      border-radius: 4px;
+      background: #fbfaf6;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.76rem;
+      letter-spacing: 0.04em;
+      color: #4a4a44;
+      white-space: nowrap;
+    }
     .itin-assign-role { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 700; color: #8a8f78; }
     .itin-seg-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
+
+    /* Botón flotante de descarga. Vive DENTRO del documento porque esta vista es una ruta PÚBLICA:
+       quien recibe el link no entra al detalle de la reservación, así que sin esto su única forma de
+       obtener el PDF sería imprimir desde el navegador. Fijo y no pegado al encabezado: el itinerario
+       son varias páginas y la decisión de descargarlo suele tomarse después de leerlo, no antes.
+       Con etiqueta y no un ícono pelón: un glifo de descarga solo, sobre un documento de viaje, se
+       puede leer como cualquier cosa. */
+    .itin-fab {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      z-index: 50;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 18px;
+      border-radius: 999px;
+      background: #6f7459;
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      line-height: 1;
+      box-shadow: 0 6px 20px rgba(43, 43, 43, 0.22);
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+    .itin-fab:hover { background: #566040; color: #fff; transform: translateY(-1px); }
+    .itin-fab:focus-visible { outline: 3px solid #b7c39a; outline-offset: 2px; }
+    .itin-fab.is-busy { pointer-events: none; background: #8a8f78; }
+    .itin-fab i { font-size: 1.1rem; }
+    /* Girito propio, sin depender de que Bootstrap haya cargado.
+       `display: inline-block` es obligatorio: es un <span>, y width/height NO aplican a un elemento
+       inline —colapsaba a la altura de la línea y se veía como una tirita vertical—. `flex: none`
+       para que el contenedor flex tampoco lo comprima. */
+    .itin-fab-spin {
+      display: inline-block;
+      flex: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      border-top-color: #fff;
+      animation: itin-spin 0.7s linear infinite;
+    }
+    /* El contenedor del ícono también es un <span> inline: en flex se comporta bien, pero se declara
+       para que el spinner quede centrado igual que el ícono al que sustituye. */
+    #itinPdfFabIco { display: inline-flex; align-items: center; }
+    @keyframes itin-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .itin-fab { transition: none; }
+      .itin-fab:hover { transform: none; }
+    }
+    /* En pantallas angostas se queda solo el ícono, para no tapar el documento. */
+    @media (max-width: 560px) {
+      .itin-fab-txt { display: none; }
+      .itin-fab { padding: 14px; right: 14px; bottom: 14px; }
+    }
+    /* NUNCA en el PDF: esta misma plantilla es la que imprime puppeteer. */
+    @media print { .itin-fab { display: none !important; } }
 
     @media print { body { font-size: 12px; } }
     .itin-notes-list { margin: 6px 0 0; padding-left: 1.2em; }
@@ -584,10 +742,10 @@ const pairDetailLine = (p) => {
           </div>
           <div class="itin-body">
 
-            <% const _dur = durationLabel(sc); %>
-            <% if (sc.time || _dur) { %>
+            <% const _dur = durationLabel(sc); const _start = serviceStartTime(sc); %>
+            <% if (_start || _dur) { %>
               <div class="itin-time">
-                <% if (sc.time) { %><%= sc.time %><% } %><% if (sc.time && _dur) { %> - <% } %><%= _dur %>
+                <% if (_start) { %><%= _start %><% } %><% if (_start && _dur) { %> - <% } %><%= _dur %>
               </div>
             <% } %>
 
@@ -605,10 +763,15 @@ const pairDetailLine = (p) => {
             <% } %>
 
             <% if (sc.airline || sc.flightNumber) { %>
+              <%# La HORA del vuelo faltaba. Es un dato distinto al de la línea de arriba: ahí va la
+                  hora del SERVICIO —que en una salida a aeropuerto es la del pick-up—, y aquí la del
+                  avión. Se extrae con la misma regla que el detalle. %>
+              <% const _fh = String(sc.time || sc.selectedSchedule || '').match(/^(\d{1,2}:\d{2})/); %>
               <div class="itin-flight">
-                <div class="h">Airline</div><div class="h">Flight Number</div><div class="h">Terminal</div><div class="h">Gate</div>
+                <div class="h">Airline</div><div class="h">Flight Number</div><div class="h">Hora</div><div class="h">Terminal</div><div class="h">Gate</div>
                 <div class="v"><%= sc.airline || '—' %></div>
                 <div class="v"><%= sc.flightNumber || '—' %></div>
+                <div class="v"><%= _fh ? _fh[1] : '—' %></div>
                 <div class="v">—</div>
                 <div class="v">—</div>
               </div>
@@ -619,11 +782,42 @@ const pairDetailLine = (p) => {
             <% const attLine = attendeesLine(sc); %>
             <% if (attLine) { %><div class="itin-sub"><%- attLine %></div><% } %>
 
+            <%# La descripción del CATÁLOGO va primero: describe qué es el tour o la experiencia, y las
+                notas de abajo son lo particular de esta reservación. Se verificó que no se duplican:
+                de 76 servicios con descripción, ninguna coincide con la nota que ya se mostraba. %>
+            <% if (sc.catalogDescription) { %>
+              <div class="itin-desc"><%- renderNotes(sc.catalogDescription) %></div>
+            <% } %>
             <% const desc = sc.clientNotes || sc.notes || ''; if (desc) { %>
               <div class="itin-desc"><%- renderNotes(desc) %></div>
             <% } %>
             <% const agencyD = (sc.agencyNotes || '').trim(); if (agencyD) { %>
               <div class="itin-desc"><%- renderNotes(agencyD) %></div>
+            <% } %>
+
+            <%# Incluye / no incluye, en dos columnas: al pasajero le sirve leerlas una al lado de la
+                otra —qué sí y qué no por su cuenta—, y apiladas duplicarían el alto en un PDF donde
+                cada entrada lleva break-inside: avoid. %>
+            <% const _inc = includeLists(sc); %>
+            <% if (_inc.includes.length || _inc.notIncludes.length) { %>
+              <div class="itin-inc">
+                <% if (_inc.includes.length) { %>
+                  <div class="itin-inc-col">
+                    <div class="itin-inc-lbl">Incluye</div>
+                    <ul class="itin-inc-list is-yes">
+                      <% _inc.includes.forEach((item) => { %><li><%= item %></li><% }) %>
+                    </ul>
+                  </div>
+                <% } %>
+                <% if (_inc.notIncludes.length) { %>
+                  <div class="itin-inc-col">
+                    <div class="itin-inc-lbl">No incluye</div>
+                    <ul class="itin-inc-list is-no">
+                      <% _inc.notIncludes.forEach((item) => { %><li><%= item %></li><% }) %>
+                    </ul>
+                  </div>
+                <% } %>
+              </div>
             <% } %>
 
             <%# Quién opera el servicio. Sustituye al bloque con la dirección de Amexing, que se
@@ -636,7 +830,7 @@ const pairDetailLine = (p) => {
                   <div class="itin-assign-row">
                     <div class="itin-duo">
                       <% if (p.driver) { %><%- personAvatar(p.driver) %>
-                      <% } else if (p.pending || p.needsDriver) { %><%- pendingAvatar('user') %><% } %>
+                      <% } else if ((p.pending || p.needsDriver) && p.offersDriver !== false) { %><%- pendingAvatar('steering-wheel') %><% } %>
                       <% if (p.vehicle) { %><%- vehicleAvatar(p.vehicle) %>
                       <% } else if (p.pending || p.needsVehicle) { %><%- pendingAvatar('car') %><% } %>
                     </div>
@@ -648,8 +842,7 @@ const pairDetailLine = (p) => {
                           <span class="itin-pend-txt">Por confirmar</span>
                         </div>
                       <% } else { %>
-                        <div class="n"><%= [p.driver && p.driver.fullName, p.vehicle && p.vehicle.name].filter(Boolean).join(' · ') %></div>
-                        <% const _line = pairDetailLine(p); if (_line) { %><div><%- _line %></div><% } %>
+                        <%- pairLines(p) %>
                       <% } %>
                     </div>
                   </div>
@@ -660,8 +853,7 @@ const pairDetailLine = (p) => {
                     <div class="itin-assign-meta">
                       <div class="itin-assign-role"><%= r.role %></div>
                       <% if (r.person) { %>
-                        <div class="n"><%= r.person.fullName %></div>
-                        <% if (r.person.phone) { %><div><%= r.person.phone %></div><% } %>
+                        <div class="n"><%= r.person.fullName %><% if (r.person.phone) { %> · <%= r.person.phone %><% } %></div>
                       <% } else { %>
                         <div class="n itin-pend-txt">Por confirmar</div>
                       <% } %>
@@ -700,5 +892,58 @@ const pairDetailLine = (p) => {
       }
     })();
   </script>
+
+  <% if (q.folio) { %>
+  <a class="itin-fab" id="itinPdfFab" href="/reservations/<%= encodeURIComponent(q.folio) %>/pdf"
+     aria-label="Descargar el itinerario en PDF">
+    <span id="itinPdfFabIco" aria-hidden="true"><i class="ti ti-download"></i></span>
+    <span class="itin-fab-txt" id="itinPdfFabTxt">Descargar PDF</span>
+  </a>
+  <script>
+    // La descarga se hace por fetch y no dejando navegar el <a>: armar el PDF toma ~10 segundos y una
+    // descarga por navegación no avisa cuándo empieza ni cuándo termina, así que el botón parecería
+    // muerto todo ese rato. El href se conserva para que "abrir en pestaña nueva" siga funcionando.
+    (function () {
+      var fab = document.getElementById('itinPdfFab');
+      if (!fab) return;
+      var ico = document.getElementById('itinPdfFabIco');
+      var txt = document.getElementById('itinPdfFabTxt');
+      var folio = <%- JSON.stringify(String(q.folio)) %>;
+      fab.addEventListener('click', function (ev) {
+        if (fab.classList.contains('is-busy')) return;
+        ev.preventDefault();
+        var icoHtml = ico.innerHTML;
+        var txtHtml = txt.innerHTML;
+        fab.classList.add('is-busy');
+        ico.innerHTML = '<span class="itin-fab-spin"></span>';
+        txt.textContent = 'Generando…';
+        var blobUrl = '';
+        var restore = function () {
+          fab.classList.remove('is-busy');
+          ico.innerHTML = icoHtml;
+          txt.innerHTML = txtHtml;
+          // Revocar de inmediato cancela la descarga en navegadores que leen el blob tras el click.
+          if (blobUrl) setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 60000);
+        };
+        fetch(fab.href)
+          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+          .then(function (blob) {
+            blobUrl = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = folio + '.pdf';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          })
+          .catch(function (err) {
+            console.error('PDF download failed:', err);
+            alert('No se pudo generar el PDF. Intenta de nuevo.');
+          })
+          .then(restore, restore);
+      });
+    })();
+  </script>
+  <% } %>
 </body>
 </html>

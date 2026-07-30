@@ -129,15 +129,49 @@ async function serveEmployeePhotoRoute(req, res) {
         }
       }
 
-      // Set appropriate headers
+      // Las fotos de perfil NO pasan por el pipeline de optimización que sí tienen vehículos, tours y
+      // experiencias, así que se servía el original tal cual: una foto de 4288x2848 (12 MP, 1 MB) para
+      // pintar un círculo de 54 px. En el PDF del itinerario eso pesaba 16.2 MB —el 94% del archivo—
+      // porque Chrome la decodifica completa y la re-empaqueta sin pérdida.
+      //
+      // Se redimensiona al vuelo. `fit: 'inside'` y no 'cover' a propósito: recortar a cuadrado es una
+      // decisión de encuadre que puede cortar cabezas, y el recorte circular ya lo hace el navegador
+      // con object-fit. Si sharp falla por lo que sea, se manda el original: una optimización nunca
+      // debe tumbar el endpoint.
+      const maxSide = Math.min(Math.max(parseInt(req.query.w, 10) || 256, 32), 1600);
+      let outBuffer = fileBuffer;
+      let outType = contentType;
+      try {
+        // eslint-disable-next-line global-require
+        const sharp = require('sharp');
+        outBuffer = await sharp(fileBuffer)
+          .rotate() // respeta la orientación EXIF antes de redimensionar
+          .resize({
+            width: maxSide,
+            height: maxSide,
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
+          .webp({ quality: 82 })
+          .toBuffer();
+        outType = 'image/webp';
+      } catch (resizeError) {
+        logger.warn('Could not resize employee photo; serving original', {
+          employeeId,
+          error: resizeError.message,
+        });
+      }
+
       res.set({
-        'Content-Type': contentType,
+        'Content-Type': outType,
         'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
-        ETag: `"${employeeId}-${Date.now()}"`, // Simple ETag
+        // El ETag llevaba Date.now(), así que cambiaba en CADA respuesta y ningún cliente podía
+        // revalidar: la cabecera de caché de arriba no servía de nada. Ahora depende del archivo y
+        // del tamaño pedido, que es lo que de verdad identifica al contenido.
+        ETag: `"${actualS3Key}-${maxSide}-${outBuffer.length}"`,
       });
 
-      // Send the file
-      res.send(fileBuffer);
+      res.send(outBuffer);
     } catch (downloadError) {
       logger.error('Failed to download employee photo from S3', {
         employeeId,
