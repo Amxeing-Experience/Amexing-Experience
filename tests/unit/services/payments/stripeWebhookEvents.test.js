@@ -100,26 +100,65 @@ describe('stripeWebhookEvents.translateEvent (pure)', () => {
     });
   });
 
-  describe('allowedSourceStatuses (Capa B monotonic guard)', () => {
-    it('is exactly {requires_payment, processing}', () => {
-      expect(allowedSourceStatuses().sort()).toEqual(['processing', 'requires_payment']);
+  describe('allowedSourceStatuses (Capa B monotonic guard, per destination)', () => {
+    it("'failed' accepts exactly {requires_payment, processing}", () => {
+      expect(allowedSourceStatuses('failed').sort()).toEqual(['processing', 'requires_payment']);
     });
 
-    it("keeps 'processing' even though nothing produces it today (future payment_intent.processing)", () => {
-      expect(allowedSourceStatuses()).toContain('processing');
+    it("'expired' accepts exactly {requires_payment, processing}", () => {
+      expect(allowedSourceStatuses('expired').sort()).toEqual(['processing', 'requires_payment']);
     });
 
-    it('excludes every terminal/other status, which IS the anti-regression guard', () => {
-      const list = allowedSourceStatuses();
-      for (const terminal of ['succeeded', 'failed', 'expired', 'refunded', 'disputed', 'dispute_lost']) {
-        expect(list).not.toContain(terminal);
+    it("'succeeded' ALSO accepts failed/expired: a declined card can be retried in the same session", () => {
+      // A failed attempt does not close the PaymentIntent (its machine ends in succeeded or canceled),
+      // and the Checkout Session stays open/unpaid, so the payer retries with another card reusing the
+      // same paymentId. Without 'failed' here, Stripe charges and the CRM never learns.
+      expect(allowedSourceStatuses('succeeded').sort())
+        .toEqual(['expired', 'failed', 'processing', 'requires_payment']);
+    });
+
+    it("keeps 'processing' for every destination (future payment_intent.processing)", () => {
+      for (const destination of ['succeeded', 'failed', 'expired']) {
+        expect(allowedSourceStatuses(destination)).toContain('processing');
       }
     });
 
+    it('NO destination accepts the money-terminal states of other PRs (the part never to relax)', () => {
+      for (const destination of ['succeeded', 'failed', 'expired']) {
+        const list = allowedSourceStatuses(destination);
+        for (const terminal of ['refunded', 'disputed', 'dispute_lost']) {
+          expect(list).not.toContain(terminal);
+        }
+      }
+    });
+
+    it('a non-money destination never accepts succeeded as a source (no walking backwards)', () => {
+      expect(allowedSourceStatuses('failed')).not.toContain('succeeded');
+      expect(allowedSourceStatuses('expired')).not.toContain('succeeded');
+    });
+
+    it("'succeeded' does not accept itself as a source (the convergence guard stays intact)", () => {
+      expect(allowedSourceStatuses('succeeded')).not.toContain('succeeded');
+    });
+
+    it.each([
+      ['no argument', undefined],
+      ['an unknown destination', 'refunded'],
+      ['an empty string', ''],
+      ['a non-string', 12345],
+      ['null', null],
+      ['a prototype key', 'constructor'],
+    ])('%s falls back to the NARROWEST guard, never the widest', (_label, value) => {
+      expect(allowedSourceStatuses(value).sort()).toEqual(['processing', 'requires_payment']);
+    });
+
     it('returns a fresh array each call (mutating it cannot widen the guard)', () => {
-      const a = allowedSourceStatuses();
+      const a = allowedSourceStatuses('succeeded');
       a.push('refunded');
-      expect(allowedSourceStatuses()).not.toContain('refunded');
+      expect(allowedSourceStatuses('succeeded')).not.toContain('refunded');
+      const b = allowedSourceStatuses('failed');
+      b.push('succeeded');
+      expect(allowedSourceStatuses('failed')).not.toContain('succeeded');
     });
   });
 });

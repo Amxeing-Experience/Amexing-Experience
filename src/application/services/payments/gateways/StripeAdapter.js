@@ -405,11 +405,11 @@ class StripeAdapter extends PaymentGatewayService {
     try {
       const client = this.client();
       webhooks = client && client.webhooks;
-    } catch {
+    } catch (err) {
       // No usable SDK client (missing/crossed API key): still a configuration problem, not a rejection.
       throw new PaymentGatewayError(
         PaymentGatewayError.CODES.NOT_CONFIGURED,
-        'Stripe client is not available to verify the webhook signature',
+        `Stripe client is not available to verify the webhook signature: ${err && err.message ? err.message : 'unknown error'}`,
         { gateway: GATEWAY_ID }
       );
     }
@@ -422,6 +422,7 @@ class StripeAdapter extends PaymentGatewayService {
     }
 
     let lastError = null;
+    // eslint-disable-next-line no-restricted-syntax
     for (const secret of secrets) {
       try {
         // Default tolerance (5 min) on purpose: never pass a custom one, never 0.

@@ -337,13 +337,18 @@ describe('POST /api/webhooks/stripe (integration)', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
-  describe('convergence — the two success events must recalculate exactly once', () => {
-    it('payment_intent.succeeded AFTER checkout.session.completed: no regression, no second recalculate', async () => {
+  // Exactly ONE rollup write for the whole convergence, and it is not a matter of luck: the losing
+  // event does not recalculate, it VERIFIES. recalculateIfStale runs inside the same per-reservation
+  // lock recalculate uses, so the loser queues behind the winner, re-reads what the winner persisted,
+  // finds it current and writes nothing (healed:false).
+  describe('convergence — the two success events transition and recalculate exactly once', () => {
+    it('payment_intent.succeeded AFTER checkout.session.completed: no second transition, no second write', async () => {
       const reservationId = await createReservation(1000);
       const payment = await createPendingOnline(reservationId, 1000);
 
-      // Spy WITHOUT replacing the implementation: the real rollup still runs, we only count calls.
+      // Spies WITHOUT replacing the implementation: the real rollup still runs, we only count calls.
       const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale');
       try {
         await postEvent(makeEvent({ paymentId: payment.id, reservationId, eventId: nextEventId('conv1') }));
         expect(recalcSpy).toHaveBeenCalledTimes(1);
@@ -352,17 +357,24 @@ describe('POST /api/webhooks/stripe (integration)', () => {
           type: 'payment_intent.succeeded', paymentId: payment.id, reservationId, eventId: nextEventId('conv2'),
         }));
         expect(second.status).toBe(200);
-        // Distinct eventId => it clears Capa A; Capa B is what stops it.
+        // Distinct eventId => it clears Capa A; Capa B is what stops the TRANSITION.
         expect(second.body).toEqual({ received: true, handled: false });
         expect(recalcSpy).toHaveBeenCalledTimes(1);
+        expect(recalcSpy.mock.calls.map(([id]) => id)).toEqual([reservationId]);
+        // The sibling only verified, and found nothing to repair.
+        expect(healSpy).toHaveBeenCalledTimes(1);
+        expect(healSpy).toHaveBeenCalledWith(reservationId);
+        await expect(healSpy.mock.results[0].value).resolves.toMatchObject({ healed: false });
       } finally {
         recalcSpy.mockRestore();
+        healSpy.mockRestore();
       }
 
       const reloaded = await reloadPayment(payment.id);
       expect(reloaded.get('gatewayStatus')).toBe('succeeded');
       const reservation = await reloadReservation(reservationId);
-      expect(reservation.get('paidAmount')).toBe(1000);
+      expect(reservation.get('paidAmount')).toBe(1000); // never 2000
+      expect(reservation.get('balance')).toBe(0);
       expect(reservation.get('paymentStatus')).toBe('paid');
     });
 
@@ -380,6 +392,95 @@ describe('POST /api/webhooks/stripe (integration)', () => {
         recalcSpy.mockRestore();
       }
       expect((await reloadReservation(reservationId)).get('paidAmount')).toBe(1000);
+    });
+
+    it('the sibling event does not REWRITE the reservation (updatedAt is untouched)', async () => {
+      // Spy-independent proof of "one write": if the loser persisted the same values again, Parse would
+      // still bump _updated_at. This is the assertion that would catch a regression to an unconditional
+      // recalculate even if someone deleted the call-count expectations above.
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000);
+      await postEvent(makeEvent({ paymentId: payment.id, reservationId, eventId: nextEventId('nowrite1') }));
+      const afterFirst = await reloadReservation(reservationId);
+      const stamp = afterFirst.updatedAt.getTime();
+
+      // A second of separation, so an actual rewrite could not be mistaken for the same timestamp.
+      await new Promise((resolve) => { setTimeout(resolve, 1100); });
+      const sibling = await postEvent(makeEvent({
+        type: 'payment_intent.succeeded', paymentId: payment.id, reservationId, eventId: nextEventId('nowrite2'),
+      }));
+      expect(sibling.body).toEqual({ received: true, handled: false });
+
+      const afterSibling = await reloadReservation(reservationId);
+      expect(afterSibling.updatedAt.getTime()).toBe(stamp);
+      expect(afterSibling.get('paidAmount')).toBe(1000);
+    });
+
+    it('a PARTIAL rollup is also recognized as current (the check does not assume balance 0)', async () => {
+      // 400 of 1000: the sibling must find paidAmount/balance/paymentStatus='partial' all current and
+      // write nothing. A comparison that only looked at "is it paid?" would repair this one forever.
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 400);
+      const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale');
+      try {
+        await postEvent(makeEvent({ paymentId: payment.id, reservationId, eventId: nextEventId('part1') }));
+        const reservation = await reloadReservation(reservationId);
+        expect(reservation.get('paymentStatus')).toBe('partial');
+        const stamp = reservation.updatedAt.getTime();
+        await new Promise((resolve) => { setTimeout(resolve, 1100); });
+
+        await postEvent(makeEvent({
+          type: 'payment_intent.succeeded', paymentId: payment.id, reservationId, eventId: nextEventId('part2'),
+        }));
+        expect(recalcSpy).toHaveBeenCalledTimes(1);
+        expect(healSpy).toHaveBeenCalledTimes(1);
+        await expect(healSpy.mock.results[0].value).resolves.toMatchObject({ healed: false });
+
+        const after = await reloadReservation(reservationId);
+        expect(after.updatedAt.getTime()).toBe(stamp);
+        expect(after.get('paidAmount')).toBe(400);
+        expect(after.get('balance')).toBe(600);
+        expect(after.get('paymentStatus')).toBe('partial');
+      } finally {
+        recalcSpy.mockRestore();
+        healSpy.mockRestore();
+      }
+    });
+
+    it('FIVE more success events after the first change nothing (idempotent, never accumulative)', async () => {
+      // Adversarial version of the same invariant: whatever Stripe re-sends, paidAmount stays 1000 and
+      // the rollup is written exactly once no matter how many deliveries verify it.
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000);
+      const types = [
+        'checkout.session.completed', 'payment_intent.succeeded', 'checkout.session.completed',
+        'payment_intent.succeeded', 'checkout.session.completed', 'payment_intent.succeeded',
+      ];
+      const bodies = [];
+      const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale');
+      try {
+        for (const [i, type] of types.entries()) {
+          // eslint-disable-next-line no-await-in-loop
+          const r = await postEvent(makeEvent({
+            type, paymentId: payment.id, reservationId, eventId: nextEventId(`flood${i}`),
+          }));
+          bodies.push(r.body);
+        }
+        expect(recalcSpy).toHaveBeenCalledTimes(1);
+        expect(healSpy).toHaveBeenCalledTimes(5);
+        const outcomes = await Promise.all(healSpy.mock.results.map((r) => r.value));
+        expect(outcomes.filter((o) => o.healed)).toHaveLength(0); // nothing was ever stale
+      } finally {
+        recalcSpy.mockRestore();
+        healSpy.mockRestore();
+      }
+      expect(bodies.filter((b) => b.handled === true)).toHaveLength(1); // exactly ONE transition
+      const reservation = await reloadReservation(reservationId);
+      expect(reservation.get('paidAmount')).toBe(1000);
+      expect(reservation.get('balance')).toBe(0);
+      expect((await reloadPayment(payment.id)).get('gatewayStatus')).toBe('succeeded');
     });
   });
 
@@ -410,25 +511,146 @@ describe('POST /api/webhooks/stripe (integration)', () => {
       expect(summary.balance).toBe(1000);
     });
 
-    it('a failed payment that later "succeeds" is NOT resurrected (failed is terminal here)', async () => {
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // A declined card does NOT end the story: the Checkout Session stays open/unpaid and the payer can
+  // retry with another card in the SAME session, on the same PaymentIntent and the same
+  // metadata.paymentId. Treating 'failed' as terminal made Stripe charge the card while the CRM kept a
+  // failed row and answered 200 (no retry) — real money, silently lost. These are the cases that pin the
+  // per-destination source allowlist.
+  describe('a declined card retried successfully in the same session', () => {
+    it('failed -> succeeded transitions, stamps confirmedAt and recalculates exactly once', async () => {
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000);
+
+      const failed = await postEvent(makeEvent({
+        type: 'payment_intent.payment_failed', paymentId: payment.id, reservationId, eventId: nextEventId('dec1'),
+      }));
+      expect(failed.body).toEqual({ received: true, handled: true });
+      expect((await reloadPayment(payment.id)).get('gatewayStatus')).toBe('failed');
+      expect((await PaymentService.summarize(reservationId)).paidAmount).toBe(0);
+
+      const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      try {
+        const retried = await postEvent(makeEvent({
+          type: 'payment_intent.succeeded', paymentId: payment.id, reservationId, eventId: nextEventId('dec2'),
+        }));
+        expect(retried.status).toBe(200);
+        expect(retried.body).toEqual({ received: true, handled: true }); // a REAL transition, not a no-op
+        expect(recalcSpy).toHaveBeenCalledTimes(1);
+        expect(recalcSpy).toHaveBeenCalledWith(reservationId);
+      } finally {
+        recalcSpy.mockRestore();
+      }
+
+      const reloaded = await reloadPayment(payment.id);
+      expect(reloaded.get('gatewayStatus')).toBe('succeeded');
+      expect(reloaded.get('confirmedAt')).toBeInstanceOf(Date);
+      const reservation = await reloadReservation(reservationId);
+      expect(reservation.get('paidAmount')).toBe(1000);
+      expect(reservation.get('balance')).toBe(0);
+      expect(reservation.get('paymentStatus')).toBe('paid');
+    });
+
+    it('the same works through checkout.session.completed (either success event may carry the retry)', async () => {
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000, 'failed');
+      const r = await postEvent(makeEvent({
+        paymentId: payment.id, reservationId, eventId: nextEventId('dec3'),
+      }));
+      expect(r.body).toEqual({ received: true, handled: true });
+      expect((await reloadPayment(payment.id)).get('gatewayStatus')).toBe('succeeded');
+      expect((await reloadReservation(reservationId)).get('paidAmount')).toBe(1000);
+    });
+
+    it('two failed attempts before the successful one still converge on a single confirmation', async () => {
       const reservationId = await createReservation(1000);
       const payment = await createPendingOnline(reservationId, 1000);
       await postEvent(makeEvent({
-        type: 'payment_intent.payment_failed', paymentId: payment.id, reservationId, eventId: nextEventId('f1'),
+        type: 'payment_intent.payment_failed', paymentId: payment.id, reservationId, eventId: nextEventId('dec4a'),
       }));
+      // The second failure no longer matches (already 'failed'): a clean no-op, not an error.
+      const secondFailure = await postEvent(makeEvent({
+        type: 'payment_intent.payment_failed', paymentId: payment.id, reservationId, eventId: nextEventId('dec4b'),
+      }));
+      expect(secondFailure.body).toEqual({ received: true, handled: false });
+
+      const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      try {
+        await postEvent(makeEvent({
+          type: 'payment_intent.succeeded', paymentId: payment.id, reservationId, eventId: nextEventId('dec4c'),
+        }));
+        expect(recalcSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        recalcSpy.mockRestore();
+      }
+      expect((await reloadReservation(reservationId)).get('paymentStatus')).toBe('paid');
+    });
+
+    it('an EXPIRED pending that turns out to be paid is confirmed too (real money beats housekeeping)', async () => {
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000, 'expired');
+      const r = await postEvent(makeEvent({
+        type: 'payment_intent.succeeded', paymentId: payment.id, reservationId, eventId: nextEventId('exp2ok'),
+      }));
+      expect(r.body).toEqual({ received: true, handled: true });
+      const reloaded = await reloadPayment(payment.id);
+      expect(reloaded.get('gatewayStatus')).toBe('succeeded');
+      expect(reloaded.get('confirmedAt')).toBeInstanceOf(Date);
+      expect((await reloadReservation(reservationId)).get('paidAmount')).toBe(1000);
+    });
+
+    it('a late failure NEVER walks a confirmed Payment backwards (the guard that must not loosen)', async () => {
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000);
+      await postEvent(makeEvent({ paymentId: payment.id, reservationId, eventId: nextEventId('back1') }));
+      expect((await reloadPayment(payment.id)).get('gatewayStatus')).toBe('succeeded');
+
       const late = await postEvent(makeEvent({
-        paymentId: payment.id, reservationId, eventId: nextEventId('f2'),
+        type: 'payment_intent.payment_failed', paymentId: payment.id, reservationId, eventId: nextEventId('back2'),
       }));
       expect(late.status).toBe(200);
-      expect(late.body.handled).toBe(false);
-      expect((await reloadPayment(payment.id)).get('gatewayStatus')).toBe('failed');
-      expect((await PaymentService.summarize(reservationId)).paidAmount).toBe(0);
+      expect(late.body).toEqual({ received: true, handled: false });
+      expect((await reloadPayment(payment.id)).get('gatewayStatus')).toBe('succeeded');
+      const reservation = await reloadReservation(reservationId);
+      expect(reservation.get('paidAmount')).toBe(1000);
+      expect(reservation.get('paymentStatus')).toBe('paid');
     });
+
+    it('a late expiration NEVER walks a confirmed Payment backwards either', async () => {
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000);
+      await postEvent(makeEvent({ paymentId: payment.id, reservationId, eventId: nextEventId('back3') }));
+      const late = await postEvent(makeEvent({
+        type: 'checkout.session.expired', paymentId: payment.id, reservationId, eventId: nextEventId('back4'),
+      }));
+      expect(late.body).toEqual({ received: true, handled: false });
+      expect((await reloadPayment(payment.id)).get('gatewayStatus')).toBe('succeeded');
+      expect((await reloadReservation(reservationId)).get('paidAmount')).toBe(1000);
+    });
+
+    it.each(['refunded', 'dispute_lost', 'disputed'])(
+      'a Payment at %p is NEVER re-confirmed by a success event (money-terminal states stay excluded)',
+      async (terminal) => {
+        const reservationId = await createReservation(1000);
+        const payment = await createPendingOnline(reservationId, 1000, terminal);
+        const r = await postEvent(makeEvent({
+          type: 'payment_intent.succeeded', paymentId: payment.id, reservationId, eventId: nextEventId(`nores_${terminal}`),
+        }));
+        expect(r.body).toEqual({ received: true, handled: false });
+        const reloaded = await reloadPayment(payment.id);
+        expect(reloaded.get('gatewayStatus')).toBe(terminal);
+        expect(reloaded.get('confirmedAt')).toBeUndefined();
+      }
+    );
   });
 
   // ---------------------------------------------------------------------------------------------
   describe('order is not guaranteed — a late succeeded never walks a terminal state backwards', () => {
-    it.each(['refunded', 'dispute_lost', 'expired', 'disputed', 'succeeded'])(
+    // 'expired' is deliberately NOT here: it is a legitimate source for 'succeeded' (the payer paid a
+    // session our housekeeping had given up on), covered in the declined-card describe above.
+    it.each(['refunded', 'dispute_lost', 'disputed'])(
       'a Payment fixed at %p ignores a late checkout.session.completed (matchedCount 0, no recalculate)',
       async (terminal) => {
         const reservationId = await createReservation(1000);
@@ -450,6 +672,65 @@ describe('POST /api/webhooks/stripe (integration)', () => {
         expect(reloaded.get('confirmedAt')).toBeUndefined();
       }
     );
+
+    it('a Payment ALREADY at succeeded is not re-transitioned, but its stale rollup IS repaired', async () => {
+      // Same "matchedCount 0" as the terminal states above, opposite meaning: the destination of this
+      // event is exactly where the Payment already is, which is the fingerprint of a rollup that never
+      // completed (a delivery that died between Capa B and the recalculate). The fixture reproduces
+      // that end state literally: a succeeded Payment on a reservation whose rollup was never written.
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000, 'succeeded');
+      expect((await reloadReservation(reservationId)).get('paidAmount')).toBeUndefined();
+
+      const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale');
+      let r;
+      try {
+        r = await postEvent(makeEvent({
+          paymentId: payment.id, reservationId, eventId: nextEventId('healstale'),
+        }));
+        // The repair goes through the verifying path, never through a blind recalculate.
+        expect(recalcSpy).not.toHaveBeenCalled();
+        expect(healSpy).toHaveBeenCalledTimes(1);
+        expect(healSpy).toHaveBeenCalledWith(reservationId);
+        await expect(healSpy.mock.results[0].value).resolves.toMatchObject({ healed: true });
+      } finally {
+        recalcSpy.mockRestore();
+        healSpy.mockRestore();
+      }
+
+      expect(r.status).toBe(200);
+      expect(r.body).toEqual({ received: true, handled: false }); // no NEW transition
+      const reloaded = await reloadPayment(payment.id);
+      expect(reloaded.get('gatewayStatus')).toBe('succeeded');
+      expect(reloaded.get('confirmedAt')).toBeUndefined(); // the row itself was not rewritten
+      const reservation = await reloadReservation(reservationId);
+      expect(reservation.get('paidAmount')).toBe(1000);
+      expect(reservation.get('balance')).toBe(0);
+      expect(reservation.get('paymentStatus')).toBe('paid');
+    });
+
+    it('a Payment already at failed ignores a second failure event without recomputing anything', async () => {
+      // The counterpart of the case above: 'failed' does not cross the rollup line, so "already at the
+      // destination" must NOT buy a recompute — not even a harmless verification.
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000, 'failed');
+      const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale');
+      try {
+        const r = await postEvent(makeEvent({
+          type: 'payment_intent.payment_failed', paymentId: payment.id, reservationId, eventId: nextEventId('reFail'),
+        }));
+        expect(r.status).toBe(200);
+        expect(r.body).toEqual({ received: true, handled: false });
+        expect(recalcSpy).not.toHaveBeenCalled();
+        expect(healSpy).not.toHaveBeenCalled();
+      } finally {
+        recalcSpy.mockRestore();
+        healSpy.mockRestore();
+      }
+      expect((await reloadReservation(reservationId)).get('paidAmount')).toBeUndefined();
+    });
 
     it('a SOFT-DELETED pending is still reachable and confirmable (queryAll, not queryExisting)', async () => {
       // The future TTL sweep of PR6 will soft-delete abandoned pendings; the money moving afterwards
@@ -502,6 +783,152 @@ describe('POST /api/webhooks/stripe (integration)', () => {
       const retry = await postEvent(event);
       expect(retry.body).toEqual({ received: true, duplicate: true });
       expect((await reloadReservation(reservationId)).get('paidAmount')).toBe(1000);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  describe('a rollup that dies after Capa B — the compensation retry must finish the job', () => {
+    /**
+     * Make PaymentService.recalculate fail its first `times` invocations and then run for real.
+     * Reproduces the one interleaving that strands money: the Payment transitions, the rollup blows up,
+     * the GatewayEvent is retracted, and the retry arrives to find nothing left to transition.
+     * @param {number} times - How many leading invocations must throw.
+     * @returns {object} The jest spy (restore it in a finally).
+     */
+    const failRecalculate = (times) => {
+      const real = PaymentService.recalculate.bind(PaymentService);
+      let calls = 0;
+      return jest.spyOn(PaymentService, 'recalculate').mockImplementation(async (id) => {
+        calls += 1;
+        if (calls <= times) throw new Error('rollup caido (simulado)');
+        return real(id);
+      });
+    };
+
+    it('the retry of the SAME event completes the rollup even though Capa B no longer matches', async () => {
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000);
+      const eventId = nextEventId('heal');
+      const event = makeEvent({ paymentId: payment.id, reservationId, eventId });
+
+      const recalcSpy = failRecalculate(1);
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale');
+      try {
+        const first = await postEvent(event);
+        expect(first.status).toBe(500); // OUR failure => Stripe will retry
+
+        // Capa B DID move the status (the money is confirmed)...
+        expect((await reloadPayment(payment.id)).get('gatewayStatus')).toBe('succeeded');
+        // ...the reservation never learned about it (this is the stranded state)...
+        expect((await reloadReservation(reservationId)).get('paidAmount')).toBeUndefined();
+        // ...and the Capa A marker was retracted, so the retry is not swallowed as a duplicate.
+        expect(await countEvents(eventId)).toBe(0);
+
+        const retry = await postEvent(event);
+        expect(retry.status).toBe(200);
+        // handled:false — there was nothing left to transition; what the retry repaired is the rollup.
+        expect(retry.body).toEqual({ received: true, handled: false });
+        // The stranded rollup is the unambiguous evidence, so THIS one really does write.
+        expect(recalcSpy).toHaveBeenCalledTimes(1); // only the failed first attempt
+        expect(healSpy).toHaveBeenCalledTimes(1);
+        await expect(healSpy.mock.results[0].value).resolves.toMatchObject({ healed: true });
+      } finally {
+        recalcSpy.mockRestore();
+        healSpy.mockRestore();
+      }
+
+      expect(await countEvents(eventId)).toBe(1); // the successful retry keeps its Capa A row
+      const reservation = await reloadReservation(reservationId);
+      expect(reservation.get('paidAmount')).toBe(1000);
+      expect(reservation.get('balance')).toBe(0);
+      expect(reservation.get('paymentStatus')).toBe('paid');
+    });
+
+    it('a failed rollup AND a failed repair still converge on the third delivery (repeatable)', async () => {
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000);
+      const eventId = nextEventId('heal2');
+      const event = makeEvent({ paymentId: payment.id, reservationId, eventId });
+
+      // The second delivery no longer reaches recalculate (Capa B does not match any more): it reaches
+      // the repair, which must fail there too for the third one to still have work to do.
+      const recalcSpy = failRecalculate(1);
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale')
+        .mockRejectedValueOnce(new Error('repair caida (simulada)'));
+      try {
+        expect((await postEvent(event)).status).toBe(500);
+        expect((await postEvent(event)).status).toBe(500);
+        expect(await countEvents(eventId)).toBe(0); // retracted every time
+        const third = await postEvent(event);
+        expect(third.status).toBe(200);
+        expect(recalcSpy).toHaveBeenCalledTimes(1);
+        expect(healSpy).toHaveBeenCalledTimes(2); // one rejected, one real
+        await expect(healSpy.mock.results[1].value).resolves.toMatchObject({ healed: true });
+      } finally {
+        recalcSpy.mockRestore();
+        healSpy.mockRestore();
+      }
+
+      const reservation = await reloadReservation(reservationId);
+      expect(reservation.get('paidAmount')).toBe(1000);
+      expect(reservation.get('paymentStatus')).toBe('paid');
+    });
+
+    it('a DIFFERENT success event repairs it too (the heal keys on the Payment, not on the event id)', async () => {
+      // Stripe does not promise that the retry is the only thing that arrives next: the sibling event
+      // (payment_intent.succeeded) may show up first and must be able to finish the abandoned rollup.
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000);
+
+      const recalcSpy = failRecalculate(1);
+      try {
+        const first = await postEvent(makeEvent({
+          paymentId: payment.id, reservationId, eventId: nextEventId('healA'),
+        }));
+        expect(first.status).toBe(500);
+        expect((await reloadReservation(reservationId)).get('paidAmount')).toBeUndefined();
+
+        const sibling = await postEvent(makeEvent({
+          type: 'payment_intent.succeeded', paymentId: payment.id, reservationId, eventId: nextEventId('healB'),
+        }));
+        expect(sibling.status).toBe(200);
+        expect(sibling.body).toEqual({ received: true, handled: false });
+      } finally {
+        recalcSpy.mockRestore();
+      }
+
+      const reservation = await reloadReservation(reservationId);
+      expect(reservation.get('paidAmount')).toBe(1000);
+      expect(reservation.get('paymentStatus')).toBe('paid');
+    });
+
+    it('a rollup failure on a NON-counting event is not healed later (nothing to heal)', async () => {
+      // checkout.session.expired never touches the rollup, so a failure there cannot strand money and
+      // the retry must not manufacture a recompute for it.
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000);
+      const event = makeEvent({
+        type: 'checkout.session.expired', paymentId: payment.id, reservationId, eventId: nextEventId('healExp'),
+      });
+
+      const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale');
+      try {
+        expect((await postEvent(event)).status).toBe(200);
+        const retry = await postEvent(event); // same id => Capa A duplicate
+        expect(retry.body).toEqual({ received: true, duplicate: true });
+        const sibling = await postEvent(makeEvent({
+          type: 'checkout.session.expired', paymentId: payment.id, reservationId, eventId: nextEventId('healExp2'),
+        }));
+        expect(sibling.body).toEqual({ received: true, handled: false });
+        expect(recalcSpy).not.toHaveBeenCalled();
+        expect(healSpy).not.toHaveBeenCalled(); // not even the verification
+      } finally {
+        recalcSpy.mockRestore();
+        healSpy.mockRestore();
+      }
+      expect((await reloadPayment(payment.id)).get('gatewayStatus')).toBe('expired');
+      expect((await reloadReservation(reservationId)).get('paidAmount')).toBeUndefined();
     });
   });
 

@@ -151,6 +151,56 @@ describe('StripeAdapter.verifyWebhook (real signature mechanism)', () => {
       }
     });
 
+    it('the thrown message carries WHY the client is unusable (a crossed key is not "missing")', () => {
+      // Two very different deployment mistakes share the NOT_CONFIGURED code, so the message is the
+      // only thing that tells an operator which one to fix. A bare catch {} threw the same sentence
+      // for both and the real cause died inside the SDK/stripeClient error.
+      stripeClient.resetForTests();
+      const savedKey = process.env.STRIPE_SECRET_KEY_TEST;
+      process.env.STRIPE_SECRET_KEY_TEST = 'sk_live_llave_de_produccion_por_error';
+      try {
+        const isolated = new StripeAdapter();
+        const payload = buildPayload();
+        let thrown;
+        try {
+          isolated.verifyWebhook(payload, sign(payload, SECRET_A));
+        } catch (err) {
+          thrown = err;
+        }
+        expect(thrown).toBeInstanceOf(PaymentGatewayError);
+        expect(thrown.code).toBe(PaymentGatewayError.CODES.NOT_CONFIGURED);
+        expect(thrown.message).toMatch(/LIVE secret key/i);
+        // ...and the credential itself never travels in the message.
+        expect(thrown.message).not.toContain('sk_live_llave_de_produccion_por_error');
+      } finally {
+        if (savedKey === undefined) delete process.env.STRIPE_SECRET_KEY_TEST;
+        else process.env.STRIPE_SECRET_KEY_TEST = savedKey;
+        stripeClient.setClientForTests({ webhooks: signer.webhooks });
+      }
+    });
+
+    it('the thrown message says "not configured" when there is no key at all (different cause, same code)', () => {
+      stripeClient.resetForTests();
+      const savedKey = process.env.STRIPE_SECRET_KEY_TEST;
+      delete process.env.STRIPE_SECRET_KEY_TEST;
+      try {
+        const isolated = new StripeAdapter();
+        const payload = buildPayload();
+        let thrown;
+        try {
+          isolated.verifyWebhook(payload, sign(payload, SECRET_A));
+        } catch (err) {
+          thrown = err;
+        }
+        expect(thrown.code).toBe(PaymentGatewayError.CODES.NOT_CONFIGURED);
+        expect(thrown.message).toMatch(/secret key is not configured/i);
+        expect(thrown.message).not.toMatch(/LIVE secret key/i); // distinguishable from the case above
+      } finally {
+        if (savedKey !== undefined) process.env.STRIPE_SECRET_KEY_TEST = savedKey;
+        stripeClient.setClientForTests({ webhooks: signer.webhooks });
+      }
+    });
+
     it('isWebhookConfigured() agrees with the thrown code', () => {
       process.env.STRIPE_WEBHOOK_SECRETS = 'junk-only';
       expect(adapter.isWebhookConfigured()).toBe(false);

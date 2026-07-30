@@ -190,6 +190,51 @@ describe('paymentAtomicStore', () => {
       findOneAndUpdateImpl = () => Promise.resolve({ value: null, ok: 1 });
       expect(await transition()).toEqual({ matchedCount: 0, updatedDoc: null });
     });
+
+    it('the FULL legacy wrapper (value + lastErrorObject + ok) unwraps to the document', async () => {
+      const doc = { _id: 'p', gatewayStatus: 'succeeded' };
+      findOneAndUpdateImpl = () => Promise.resolve({
+        value: doc, lastErrorObject: { n: 1, updatedExisting: true }, ok: 1,
+      });
+      expect(await transition()).toEqual({ matchedCount: 1, updatedDoc: doc });
+    });
+
+    it('the legacy wrapper is recognized by lastErrorObject alone (no ok field)', async () => {
+      findOneAndUpdateImpl = () => Promise.resolve({ value: { _id: 'p' }, lastErrorObject: { n: 1 } });
+      expect(await transition()).toEqual({ matchedCount: 1, updatedDoc: { _id: 'p' } });
+    });
+
+    it('the legacy wrapper that matched nothing (value null + lastErrorObject) => matchedCount 0', async () => {
+      findOneAndUpdateImpl = () => Promise.resolve({
+        value: null, lastErrorObject: { n: 0, updatedExisting: false }, ok: 1,
+      });
+      expect(await transition()).toEqual({ matchedCount: 0, updatedDoc: null });
+    });
+
+    // The wrapper is detected by lastErrorObject/ok — metadata that belongs ONLY to the driver's
+    // legacy envelope — never by the presence of 'value', which is an ordinary word a Payment could
+    // legitimately own one day. Keyed on 'value', a document carrying a FALSY one would unwrap to
+    // that falsy value and report matchedCount 0 for a transition that really happened: the rollup
+    // would be skipped and the reservation would keep showing a balance for money already collected.
+    it.each([
+      ['a string', 'algo-no-relacionado'],
+      ['null', null],
+      ['zero', 0],
+      ['false', false],
+      ['an empty string', ''],
+      ['an object', { anidado: true }],
+    ])('a modern document owning a field named "value" (%s) is still read as the document', async (_label, value) => {
+      const doc = {
+        _id: 'p', gatewayStatus: 'succeeded', amount: 1000, value,
+      };
+      findOneAndUpdateImpl = () => Promise.resolve(doc);
+      expect(await transition()).toEqual({ matchedCount: 1, updatedDoc: doc });
+    });
+
+    it('undefined (a driver that returns nothing at all) => matchedCount 0, never a crash', async () => {
+      findOneAndUpdateImpl = () => Promise.resolve(undefined);
+      expect(await transition()).toEqual({ matchedCount: 0, updatedDoc: null });
+    });
   });
 
   describe('argument validation (a malformed call must never become an unguarded write)', () => {

@@ -107,10 +107,16 @@ async function atomicTransitionPayment(paymentId, options) {
     { returnDocument: 'after' }
   );
 
-  // mongodb@6 returns the document directly; older drivers wrap it in { value }. Handle both so a
-  // driver bump can never silently turn a real transition into "matchedCount 0" (which would skip
-  // the rollup recalculation and leave a paid reservation showing a balance).
-  const updatedDoc = result && Object.prototype.hasOwnProperty.call(result, 'value') ? result.value : result;
+  // mongodb@6 returns the document directly; older drivers wrap it in { value, lastErrorObject, ok }.
+  // Discriminate on 'lastErrorObject'/'ok' — fields that belong ONLY to the legacy wrapper and never to a
+  // Payment document — rather than on 'value': a Payment that ever grew its own field literally named
+  // 'value' would make a 'value'-based check misread the whole document as the wrapper, silently turning
+  // a real transition into "matchedCount 0" (which would skip the rollup recalculation and leave a paid
+  // reservation showing a balance).
+  const isLegacyWrapper = !!result
+    && (Object.prototype.hasOwnProperty.call(result, 'lastErrorObject')
+      || Object.prototype.hasOwnProperty.call(result, 'ok'));
+  const updatedDoc = isLegacyWrapper ? result.value : result;
   return { matchedCount: updatedDoc ? 1 : 0, updatedDoc: updatedDoc || null };
 }
 

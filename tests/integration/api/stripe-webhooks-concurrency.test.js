@@ -7,9 +7,17 @@
  * conditional update (Capa B), with real Stripe signatures.
  *
  * The single most important assertion in the whole PR lives here: two DIFFERENT legitimate success
- * events for the SAME Payment, arriving in the same millisecond window, must recalculate the
- * reservation EXACTLY once — not zero (a lost confirmation, the client's money vanishes from the CRM)
- * and not twice (a guard with a hole).
+ * events for the SAME Payment, arriving in the same millisecond window, must transition it EXACTLY
+ * once and write the rollup EXACTLY once — never zero (a lost confirmation, the client's money
+ * vanishes from the CRM) and never twice (a guard with a hole). The loser does not recalculate: it
+ * verifies (recalculateIfStale) inside the same per-reservation lock the winner's recalculate holds, so
+ * it queues behind the winner, re-reads what the winner persisted and finds nothing to repair. The
+ * queueing order is what makes the count exactly one: the loser cannot even reach the lock until an
+ * extra Parse read (the "is it already at the destination?" check) completes, while the winner goes
+ * straight from its own conditional update into the lock. What is STRUCTURAL — order-independent — is
+ * that every rollup write for a reservation is serialized by that lock and that the verification only
+ * writes when the persisted values differ, so the worst case of an inverted order is one redundant
+ * write of the SAME absolute values, never a wrong or double-counted amount (pinned below too).
  */
 
 const request = require('supertest');
@@ -68,7 +76,7 @@ describe('POST /api/webhooks/stripe — concurrency (integration)', () => {
     return reservation.id;
   };
 
-  const createPendingOnline = async (reservationId, amount = 1000) => {
+  const createPendingOnline = async (reservationId, amount = 1000, gatewayStatus = 'requires_payment') => {
     const p = new Parse.Object('Payment');
     p.set('reservationPtr', reservationPtr(reservationId));
     p.set('amount', amount);
@@ -77,7 +85,7 @@ describe('POST /api/webhooks/stripe — concurrency (integration)', () => {
     p.set('method', 'tarjeta');
     p.set('channel', 'online');
     p.set('gateway', 'stripe');
-    p.set('gatewayStatus', 'requires_payment');
+    p.set('gatewayStatus', gatewayStatus);
     p.set('expiresAt', new Date(Date.now() + 30 * 60 * 1000));
     p.set('active', true);
     p.set('exists', true);
@@ -245,6 +253,7 @@ describe('POST /api/webhooks/stripe — concurrency (integration)', () => {
       const idB = nextEventId('bB');
 
       const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale');
       const startedAt = Date.now();
       let responses;
       try {
@@ -255,8 +264,13 @@ describe('POST /api/webhooks/stripe — concurrency (integration)', () => {
         // Not zero (the confirmation would be lost) and not two (the guard would have a hole).
         expect(recalcSpy).toHaveBeenCalledTimes(1);
         expect(recalcSpy).toHaveBeenCalledWith(reservationId);
+        // The loser only verified: it queued behind the winner's recalculate on the same lock, re-read
+        // what the winner had just persisted, and found nothing to repair.
+        expect(healSpy).toHaveBeenCalledTimes(1);
+        await expect(healSpy.mock.results[0].value).resolves.toMatchObject({ healed: false });
       } finally {
         recalcSpy.mockRestore();
+        healSpy.mockRestore();
       }
       const elapsed = Date.now() - startedAt;
 
@@ -317,14 +331,21 @@ describe('POST /api/webhooks/stripe — concurrency (integration)', () => {
       ];
 
       const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale');
       let responses;
       try {
         responses = await Promise.all(types.map((type, i) => postEvent(makeEvent({
           type, eventId: nextEventId(`quad${i}`), paymentId: payment.id, reservationId,
         }))));
+        // One winner writes; the three losers verify and all find the rollup current.
         expect(recalcSpy).toHaveBeenCalledTimes(1);
+        expect(recalcSpy).toHaveBeenCalledWith(reservationId);
+        expect(healSpy).toHaveBeenCalledTimes(3);
+        const outcomes = await Promise.all(healSpy.mock.results.map((r) => r.value));
+        expect(outcomes.filter((o) => o.healed)).toHaveLength(0);
       } finally {
         recalcSpy.mockRestore();
+        healSpy.mockRestore();
       }
 
       expect(responses.filter((r) => r.body.handled === true)).toHaveLength(1);
@@ -332,6 +353,48 @@ describe('POST /api/webhooks/stripe — concurrency (integration)', () => {
       const reservation = await reloadReservation(reservationId);
       expect(reservation.get('paidAmount')).toBe(1000); // never 2000/4000
       expect(reservation.get('balance')).toBe(0);
+      expect(reservation.get('paymentStatus')).toBe('paid');
+    }, 30000);
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  describe('the repair under concurrency — three checks, one write', () => {
+    it('three simultaneous events on an ALREADY-succeeded Payment repair it exactly once', async () => {
+      // The stranded state (succeeded Payment, rollup never written) hit by three deliveries at once.
+      // All three legitimately reach the repair, but the lock serializes them: the first one finds the
+      // rollup stale and writes, the other two then find it current. Exactly one healed:true.
+      const reservationId = await createReservation(1000);
+      const payment = await createPendingOnline(reservationId, 1000, 'succeeded');
+      expect((await reloadReservation(reservationId)).get('paidAmount')).toBeUndefined();
+
+      const types = [
+        'checkout.session.completed',
+        'payment_intent.succeeded',
+        'checkout.session.completed',
+      ];
+      const recalcSpy = jest.spyOn(PaymentService, 'recalculate');
+      const healSpy = jest.spyOn(PaymentService, 'recalculateIfStale');
+      let responses;
+      try {
+        responses = await Promise.all(types.map((type, i) => postEvent(makeEvent({
+          type, eventId: nextEventId(`healR${i}`), paymentId: payment.id, reservationId,
+        }))));
+        expect(recalcSpy).not.toHaveBeenCalled(); // no transition happened at all
+        expect(healSpy).toHaveBeenCalledTimes(3);
+        const outcomes = await Promise.all(healSpy.mock.results.map((r) => r.value));
+        expect(outcomes.filter((o) => o.healed)).toHaveLength(1);
+      } finally {
+        recalcSpy.mockRestore();
+        healSpy.mockRestore();
+      }
+
+      // Nothing transitioned (it was already at the destination) yet the rollup got repaired.
+      expect(responses.every((r) => r.status === 200 && r.body.handled === false)).toBe(true);
+      const reservation = await reloadReservation(reservationId);
+      expect(reservation.get('paidAmount')).toBe(1000); // never 3000
+      expect(reservation.get('balance')).toBe(0);
+      expect(reservation.get('paymentStatus')).toBe('paid');
+      expect((await reloadPayment(payment.id)).get('confirmedAt')).toBeUndefined();
     }, 30000);
   });
 
