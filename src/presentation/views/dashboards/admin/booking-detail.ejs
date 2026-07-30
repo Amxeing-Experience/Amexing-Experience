@@ -50,6 +50,8 @@
         text-decoration:none;font-family:inherit;transition:background .12s,color .12s;}
       .hdr-seg-btn:hover{background:#fff;color:#4f5838;}
       .hdr-seg-btn:disabled{color:#b3b7a5;cursor:not-allowed;}
+      /* Generando el PDF: el botón deja de aceptar clics y muestra el progreso en su propio lugar. */
+      .hdr-seg-btn.is-busy{pointer-events:none;color:#8a8f78;}
       .hdr-seg-btn:disabled:hover{background:transparent;color:#b3b7a5;}
       /* Exportación suelta (cuando solo hay una): mismo peso visual que un elemento del segmento. */
       .hdr-btn{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#6b7256;
@@ -208,10 +210,7 @@
                 </div>
                 <div class="bkg-cs">
                     <span class="bkg-cs-lbl"><i class="ti ti-headset me-1"></i>Customer Support</span>
-                    <div class="d-flex align-items-center gap-2" id="serviceCustomerRow">
-                        <span id="infoServiceCustomer">&mdash;</span>
-                        <button class="btn btn-sm btn-outline-primary d-none py-0 px-1" id="changeServiceCustomerBtn" title="Cambiar"><i class="ti ti-edit"></i></button>
-                    </div>
+                    <div id="serviceCustomerRow"><span id="infoServiceCustomer">&mdash;</span></div>
                 </div>
             </div>
             <div class="bkg-status" id="infoStatus">&mdash;</div>
@@ -304,9 +303,15 @@
     <div class="svc-wrap">
         <div class="fin-section-head">
             <h5 class="fin-section-title"><i class="ti ti-list-details me-2"></i>Servicios</h5>
-            <a class="btn btn-sm btn-outline-secondary d-none" id="exportItineraryBtn" href="#" target="_blank" rel="noopener" title="Abrir itinerario de viaje (exportable a PDF)">
-                <i class="ti ti-file-export me-1"></i>Exportar itinerario
-            </a>
+            <!-- Dos acciones sobre el mismo documento, en el segmento que la página ya usa para
+                 exportar: ver en pantalla y descargar. Antes era un solo control, así que solo se
+                 podía hacer una de las dos. -->
+            <span class="hdr-seg d-none" id="exportItinerarySeg" role="group" aria-label="Itinerario">
+                <a class="hdr-seg-btn" id="previewItineraryBtn" href="#" target="_blank" rel="noopener"
+                   title="Ver el itinerario en pantalla"><i class="ti ti-eye"></i>Ver itinerario</a>
+                <a class="hdr-seg-btn" id="downloadItineraryBtn" href="#"
+                   title="Descargar el itinerario en PDF"><i class="ti ti-download"></i>PDF</a>
+            </span>
         </div>
         <div id="servicesContainer">
             <!-- Services will be rendered here -->
@@ -315,56 +320,13 @@
 </div>
 
 <!-- Assign Employee Modal -->
-<div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-light">
-                <div>
-                    <h6 class="modal-title fw-bold mb-0" id="assignModalTitle">Asignar Personal</h6>
-                    <small class="text-muted" id="assignModalSubtitle"></small>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body" id="assignModalBody">
-                <input type="hidden" id="assignServiceId">
-                <!-- Dynamic content rendered by JS -->
-            </div>
-            <div class="modal-footer border-top">
-                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-sm btn-primary px-4" id="saveAssignmentBtn">
-                    <i class="ti ti-check me-1"></i>Guardar
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- El formulario completo de asignación se retiró: permitía asignar guía, greeter o chofer que el
+     servicio NO contrató, y esa es una regla del negocio, no una comodidad. Los círculos de la lista
+     solo ofrecen lo contratado, así que ahora son la única vía y la regla queda impuesta en la UI.
+     Lo ya asignado fuera de contrato sigue siendo visible y corregible desde su propio círculo. -->
 
-<!-- Service Customer Modal -->
-<div class="modal fade" id="serviceCustomerModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-light">
-                <h6 class="modal-title fw-bold mb-0">Customer Support</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="assign-icon bg-primary-subtle text-primary"><i class="ti ti-headset"></i></span>
-                    <label class="form-label mb-0 fw-semibold">Empleado Amexing</label>
-                </div>
-                <select id="resServiceCustomerSelect" class="form-select form-select-sm">
-                    <option value="">Sin asignar</option>
-                </select>
-            </div>
-            <div class="modal-footer border-top">
-                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-sm btn-primary px-4" id="saveResServiceCustomerBtn">
-                    <i class="ti ti-check me-1"></i>Guardar
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- El modal de Customer Support se retiró: el chip del encabezado usa el mismo selector que los
+     círculos de los servicios (slot-kind="res-support"), así que había dos formas de hacer lo mismo. -->
 
 <!-- Pagos — Offcanvas (Bootstrap 5 nativo). Reemplaza la antigua #paymentsCard: chips por método,
      cobertura, saldo restante por método, énfasis de descuento, historial y (admin) el formulario de
@@ -988,9 +950,29 @@
 }
 .svc-notes-list { margin: 6px 0 0; padding-left: 1.2em; }
 .svc-notes-list li { list-style: disc; margin: 2px 0; }
-.svc-vehicle { margin-top: 2px; font-size: 0.8rem; color: #8a8f78; }
+/* .svc-vehicle (el tipo de vehículo bajo el conteo de personas) se retiró: el bloque de
+   asignaciones ya nombra el tipo en cada plaza, asignada o pendiente. */
 .svc-side { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
-.svc-price { font-weight: 700; color: #2b2b2b; white-space: nowrap; text-align: right; min-width: 90px; }
+/* .svc-price se retiró: el dinero vive en el Resumen Financiero y en el carrito de pagos; esta lista
+   es la vista de operación. */
+/* Incluye / no incluye, en dos columnas. Mismo formato que .itin-inc del itinerario: al lector le
+   sirve leer qué sí y qué no de un tiro, no una lista debajo de la otra. */
+.svc-inc { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; margin-top: 0.5rem; }
+.svc-inc-col { min-width: 170px; }
+.svc-inc-lbl {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    color: #8a8f78;
+    margin-bottom: 2px;
+}
+.svc-inc-list { margin: 0; padding: 0; list-style: none; font-size: 0.86rem; }
+.svc-inc-list li { position: relative; padding-left: 15px; line-height: 1.5; color: #6b6656; }
+.svc-inc-list li::before { position: absolute; left: 0; font-weight: 700; }
+/* Glifos de TEXTO (✓ / ×) y no íconos de fuente, igual que en el itinerario. */
+.svc-inc-list.is-yes li::before { content: '\2713'; color: #6f7459; }
+.svc-inc-list.is-no li::before { content: '\00D7'; color: #a09c8d; }
 /* Asignaciones en el formato del itinerario (opción B): un renglón por pareja chofer+vehículo y
    los roles al final. Sin marco ni filete lateral: los avatares ya forman su propia columna y el
    bloque queda alineado con el título y la ruta del servicio, como en el itinerario. */
@@ -1000,7 +982,82 @@
     flex-direction: column;
     gap: 0.55rem;
 }
-.svc-assign-empty { font-size: 0.8rem; color: #a8ac98; font-style: italic; }
+/* Sin renglones no se dibuja el contenedor: un .svc-assign vacío no mide alto pero sí aporta su
+   margin-top, y dejaba un hueco muerto en los servicios que no piden a nadie. */
+/* Cobertura de asignación: no es un control, es una lectura. Letra a 0.86rem —igual que .svc-route y
+   .svc-people— porque a 0.72 se leía como una nota al pie de algo que se consulta a cada rato.
+   Resalta el estado COMPLETO, que hoy es el raro; el incompleto va en gris para no volver a levantar
+   un muro de advertencias en cada renglón. */
+.svc-cov {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #8a8f78;
+    white-space: nowrap;
+}
+.svc-cov.is-done { color: #4b6b3f; }
+/* Conceptos: ocupan el mismo lugar que la cobertura de los demás servicios y explican por qué no la
+   tienen. Sustituyen a la píldora verde "Lista", que solo quería decir "no está cancelada" —se
+   prendía en los 30 conceptos de la base— y en verde saturado era lo más llamativo del renglón. */
+.svc-cov.is-none { font-weight: 400; color: #a8ac98; font-style: italic; }
+.svc-cov i { font-size: 1.05rem; }
+
+/* El control de estado dice lo que hace. Antes era un círculo sin palabras cuyo ícono y color
+   cambiaban con el estado, pegado a los círculos de asignación y del mismo tamaño: dos lenguajes
+   encimados para cosas de distinta categoría —uno asigna a una persona, el otro declara un hecho
+   operativo—. Y su ícono de "completada" era `ti-circle-check-filled`, que NO existe en este icon
+   font, así que un servicio completado pintaba una caja vacía. */
+.svc-status-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid #dcdccf;
+    background: #fff;
+    color: #6b6656;
+    border-radius: 999px;
+    padding: 0.26rem 0.7rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+.svc-status-btn:hover { background: #f4f5ef; border-color: #c9cab6; color: #2b2b2b; }
+.svc-status-btn:disabled { opacity: 0.55; cursor: default; }
+.svc-status-btn i { font-size: 0.95rem; }
+/* Revertir va más callado: la píldora "Completada" ya cuenta el estado, esto solo lo deshace. */
+.svc-status-btn.is-revert { border-color: #ece8dd; color: #a09c8d; font-weight: 400; }
+.svc-status-btn.is-revert:hover { color: #6b6656; }
+
+/* Punto de entrada callado: el círculo chico y apagado, y su rótulo escondido hasta que el mouse
+   entra al servicio. En reposo casi no pesa —era la repetición que sobraba—; al querer editar, dice
+   qué es. El rótulo conserva su espacio (opacity y no display) para que no haya salto de layout. */
+.svc-assign-row.is-quiet .svc-av {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+    opacity: 0.3;
+    transition: opacity 0.12s;
+}
+.svc-quiet-lbl {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    color: #a8ac98;
+    opacity: 0;
+    transition: opacity 0.12s;
+    /* El clic es del círculo, como en todos los demás renglones: el rótulo es una pista, no un
+       control, y sin esto se vería pulsable sin serlo. */
+    pointer-events: none;
+}
+.svc-entry:hover .svc-assign-row.is-quiet .svc-av,
+.svc-assign-row.is-quiet .svc-av:hover,
+.svc-assign-row.is-quiet .svc-av:focus-visible { opacity: 1; }
+.svc-entry:hover .svc-quiet-lbl,
+.svc-assign-row.is-quiet:focus-within .svc-quiet-lbl { opacity: 1; }
 .svc-assign-row { display: flex; align-items: center; gap: 0.7rem; }
 .svc-av {
     position: relative;
@@ -1028,10 +1085,42 @@
 .svc-duo .svc-av + .svc-av { margin-left: -13px; box-shadow: 0 0 0 2px #fff; }
 .svc-assign-meta { font-size: 0.86rem; line-height: 1.45; color: #6b6656; min-width: 0; }
 .svc-assign-meta .n { font-size: 0.94rem; font-weight: 700; color: #2b2b2b; }
+/* El vehículo es un sujeto igual que la persona, pero una cosa: mismo tamaño de cuerpo y menos peso
+   que el nombre, para que la jerarquía diga "a quién" antes que "en qué". */
+.svc-veh-name { font-weight: 600; color: #2b2b2b; }
+/* Placa: cápsula monoespaciada, como se ven las matrículas. Sustituye a la palabra "Placas" —la
+   forma comunica que es un identificador y funciona igual con "A" que con "EXY-3452-1"—. Ancho de
+   dígito fijo para que varias placas se alineen al recorrer la lista. */
+.svc-plate {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid #dcdccf;
+    border-radius: 5px;
+    background: #fbfaf6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    color: #4a4a44;
+    white-space: nowrap;
+}
 /* Va después de `.n` y con la clase encadenada: si no, `.svc-assign-meta .n` le gana el peso y
    el color, y el renglón pendiente se vería igual que uno asignado. */
 .svc-assign-meta .svc-pend-txt,
 .svc-assign-meta .n.svc-pend-txt { font-style: italic; font-weight: 400; color: #a09c8d; }
+/* "Opcional" va más callado que "Pendiente": uno es un hueco que hay que llenar y el otro solo una
+   posibilidad. Si se vieran igual, un servicio sin guía contratado se leería como un pendiente. */
+.svc-assign-meta .svc-opt-txt,
+.svc-assign-meta .n.svc-opt-txt { font-style: normal; font-weight: 400; color: #bdbcae; }
+/* De dónde sale la persona del renglón: "de la reservación" o "solo este servicio". */
+.svc-assign-src { font-size: 0.78rem; color: #a09c8d; font-style: italic; }
+/* Variante chica, para el chip del encabezado: ahí 52px se comerían la barra. */
+.svc-av.is-sm { width: 34px; height: 34px; font-size: 0.72rem; }
+.svc-av.is-sm.svc-av-pend { font-size: 0.95rem; }
+.bkg-cs-row { display: inline-flex; align-items: center; gap: 8px; }
+/* El avatar tenue del estado "heredado" se retiró con ese estado: el renglón de Customer Support solo
+   se dibuja cuando DIVERGE del global, así que nunca muestra a alguien no capturado en el servicio. */
 /* El tipo esperado de una plaza vacía: conserva la negrita porque ES el sujeto del renglón, pero
    apagado para que no compita con un vehículo ya asignado. Sin itálica: es un dato, no un estado.
    Encadenada por lo mismo que la regla de arriba — `.svc-assign-meta .n` le ganaría el color. */
@@ -1040,6 +1129,116 @@
 .svc-assign-tel { color: #6b6656; text-decoration: none; }
 .svc-assign-tel:hover { color: #566040; text-decoration: underline; }
 .svc-seg-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+/* El CÍRCULO es el punto de asignación: cada avatar representa a una persona o a un vehículo, así
+   que tocar el del chofer para cambiar al chofer es inequívoco, y cada uno abre su propio selector.
+   Al pasar el mouse el círculo se adelanta (z-index): los dos de una pareja se solapan 13px y sin
+   eso la mitad del de la izquierda quedaría debajo y sería difícil de apuntar. */
+.svc-av.is-pick { cursor: pointer; }
+.svc-av.is-pick:hover,
+.svc-av.is-pick:focus-visible {
+    z-index: 2;
+    outline: none;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #6e7a50;
+}
+/* En la segunda mitad de una pareja el aro blanco separador ya vive en box-shadow, y el de hover lo
+   reemplazaría; se declara después para que gane, conservando el aro blanco como primera capa. */
+.svc-duo .svc-av.is-pick + .svc-av.is-pick:hover,
+.svc-duo .svc-av.is-pick + .svc-av.is-pick:focus-visible {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #6e7a50;
+}
+
+/* Selector de asignación.
+   `fixed` y no `absolute`: el que hace scroll en este dashboard es `.dashboard-content`
+   (overflow-y: auto), no la ventana. Con absolute, window.scrollY vale siempre 0 mientras
+   getBoundingClientRect() devuelve coordenadas del viewport, así que el panel aterrizaba al inicio
+   de la página — y ese mismo overflow lo habría recortado. Con fixed las coordenadas del rect se
+   usan tal cual, sin aritmética de scroll y sin importar qué contenedor scrollea. */
+.assign-pop {
+    position: fixed;
+    z-index: 1080;
+    width: 320px;
+    max-width: calc(100vw - 24px);
+    background: #fff;
+    border: 1px solid #dcdccf;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(43, 43, 43, 0.16);
+    overflow: hidden;
+}
+.assign-pop-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid #f0eee7;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    color: #8a8f78;
+}
+.assign-pop-x {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: #8a8f78;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+}
+.assign-pop-x:hover { color: #2b2b2b; }
+.assign-pop-search {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid #f0eee7;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.9rem;
+    outline: none;
+}
+.assign-pop-body { max-height: 320px; overflow-y: auto; padding: 0.35rem; }
+.assign-pop-grp {
+    padding: 0.4rem 0.4rem 0.2rem;
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    color: #a8ac98;
+}
+.assign-pop-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0.4rem 0.45rem;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: #2b2b2b;
+}
+.assign-pop-opt:hover { background: #f4f5ef; }
+.assign-pop-opt.is-current { background: #eef0e6; font-weight: 600; }
+.assign-pop-opt .sub { font-size: 0.76rem; color: #8a8f78; }
+.assign-pop-opt .tick { margin-left: auto; color: #6e7a50; }
+.assign-pop-opt.is-clear { color: #a1443a; }
+.assign-pop-empty, .assign-pop-loading { padding: 0.8rem 0.6rem; font-size: 0.86rem; color: #8a8f78; font-style: italic; }
+/* Al elegir, el panel se cierra de inmediato y la espera se muestra EN EL CÍRCULO correspondiente,
+   para poder seguir eligiendo —el chofer, luego el vehículo— sin esperar a que termine el anterior.
+   `.svc-av` ya es position:relative con overflow:hidden, así que el velo cubre justo el círculo. */
+.svc-av.is-saving { pointer-events: none; }
+.svc-av-busy {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.78);
+    color: #6e7a50;
+}
 @media (max-width: 576px) {
     .svc-timeline { --svc-gutter: 14px; --svc-icon: 44px; }
     .svc-side { width: 100%; justify-content: flex-end; }
@@ -1145,11 +1344,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     function getServicePriceByType(svc, paymentType) {
         return PaymentBreakdownHelpers.getServicePriceByType(svc, paymentType);
     }
-    // Precio REAL para la LÍNEA del servicio: no pone $0 en "Pago externo" (includeInTotal:false); la
-    // exclusión del Total/Saldo la sigue haciendo getServicePriceByType en el agregado financiero.
-    function getServicePriceByTypeGross(svc, paymentType) {
-        return PaymentBreakdownHelpers.getServicePriceByTypeGross(svc, paymentType);
-    }
+    // getServicePriceByTypeGross se retiró de aquí con el precio por servicio: era el precio REAL de
+    // la LÍNEA, para no aparentar $0 en un "Pago externo". Sigue en paymentBreakdownHelpers, que lo
+    // usan agencia y agente, y el agregado financiero sigue con getServicePriceByType.
     function getServiceDiscountByType(svc, paymentType) {
         return PaymentBreakdownHelpers.getServiceDiscountByType(svc, paymentType);
     }
@@ -1158,27 +1355,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         return PaymentBreakdownHelpers.computeServicesSubtotalByType(services, paymentType, currency);
     }
 
-    function buildPersonCard(person, roleLabel, roleIcon, colorClass) {
-        if (!person) return '';
-        const name = person.fullName || 'Sin nombre';
-        const phone = person.phone || '';
-        const photo = person.profilePhotoUrl || '';
-        const initials = getInitials(name);
-        const photoHtml = photo
-            ? `<img src="${photo}" class="rounded-circle photo-preview-trigger" width="36" height="36" style="object-fit:cover;cursor:pointer" data-photo="${photo}" data-name="${name.replace(/"/g, '&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-            : '';
-        const initialsDisplay = photo ? 'display:none' : 'display:flex';
-        return `
-            <div class="d-flex align-items-center gap-2 mb-2">
-                ${photoHtml}
-                <span class="rounded-circle bg-${colorClass}-subtle text-${colorClass} align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;${initialsDisplay};font-size:0.8rem;font-weight:600">${initials}</span>
-                <div>
-                    <div class="fw-semibold small">${name}</div>
-                    <small class="text-${colorClass}"><i class="ti ${roleIcon} me-1"></i>${roleLabel}</small>
-                    ${phone ? `<a href="tel:${phone}" class="text-muted small d-block"><i class="ti ti-phone me-1"></i>${phone}</a>` : ''}
-                </div>
-            </div>`;
-    }
+// buildPersonCard se retiró: su último uso era la tarjeta del Customer Support a nivel reservación,
+    // que ahora es un avatar con el mismo selector que los servicios. getInitials sigue vivo (svcAvatar).
 
     // ------------------------------------------------------------------
     // Asignaciones en el formato del itinerario (opción B): chofer y vehículo van EMPAREJADOS
@@ -1202,30 +1380,49 @@ document.addEventListener('DOMContentLoaded', async function() {
         return looksLikeObjectId ? '' : v;
     }
 
+    // "Incluye / no incluye" de tours y experiencias, en dos columnas. Las trae el API desde el
+    // catálogo (el subconcepto guardado no las tiene), así que pueden faltar, venir vacías o traer
+    // entradas en blanco. Mismo formato que el itinerario del cliente.
+    function svcIncludesHtml(svc) {
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        const pick = (list) => (Array.isArray(list) ? list.filter(Boolean) : []);
+        const yes = pick(svc.includes);
+        const no = pick(svc.notIncludes);
+        if (!yes.length && !no.length) return '';
+        const col = (label, items, cls) => (items.length ? `
+            <div class="svc-inc-col">
+                <div class="svc-inc-lbl">${label}</div>
+                <ul class="svc-inc-list ${cls}">${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
+            </div>` : '');
+        return `<div class="svc-inc">${col('Incluye', yes, 'is-yes')}${col('No incluye', no, 'is-no')}</div>`;
+    }
+
     // La foto va ENCIMA de las iniciales, así que si la URL falla quedan las iniciales visibles
     // en vez de un círculo vacío (el patrón anterior alternaba display y dependía del hermano).
-    function svcAvatar(person) {
+    function svcAvatar(person, pick, extraCls) {
         const esc = PaymentBreakdownHelpers.escapeHtml;
         const name = (person && person.fullName) || '';
         const photo = (person && person.profilePhotoUrl) || '';
+        // Sin `pick` la foto conserva su clic para ampliarse; con `pick` el círculo asigna, y una
+        // misma zona no puede hacer las dos cosas.
         const img = photo
-            ? `<img src="${esc(photo)}" class="photo-preview-trigger" data-photo="${esc(photo)}" data-name="${esc(name)}" onerror="this.remove()">`
+            ? `<img src="${esc(photo)}"${pick ? '' : ` class="photo-preview-trigger" data-photo="${esc(photo)}" data-name="${esc(name)}"`} onerror="this.remove()">`
             : '';
-        return `<span class="svc-av">${esc(getInitials(name) || '·')}${img}</span>`;
+        return `<span class="svc-av${pick ? ' is-pick' : ''}${extraCls ? ` ${extraCls}` : ''}" ${pick || ''}>${esc(getInitials(name) || '·')}${img}</span>`;
     }
 
-    function svcVehicleAvatar(vehicle) {
+    function svcVehicleAvatar(vehicle, pick) {
         const esc = PaymentBreakdownHelpers.escapeHtml;
         const name = (vehicle && vehicle.name) || '';
         const photo = (vehicle && vehicle.imageUrl) || '';
         const img = photo
-            ? `<img src="${esc(photo)}" class="photo-preview-trigger" data-photo="${esc(photo)}" data-name="${esc(name)}" onerror="this.remove()">`
+            ? `<img src="${esc(photo)}"${pick ? '' : ` class="photo-preview-trigger" data-photo="${esc(photo)}" data-name="${esc(name)}"`} onerror="this.remove()">`
             : '';
-        return `<span class="svc-av svc-av-veh"><i class="ti ti-car"></i>${img}</span>`;
+        return `<span class="svc-av svc-av-veh${pick ? ' is-pick' : ''}" ${pick || ''}><i class="ti ti-car"></i>${img}</span>`;
     }
 
-    function svcPendingAvatar(icon) {
-        return `<span class="svc-av svc-av-pend"><i class="ti ti-${icon}"></i></span>`;
+    function svcPendingAvatar(icon, pick) {
+        return `<span class="svc-av svc-av-pend${pick ? ' is-pick' : ''}" ${pick || ''}><i class="ti ti-${icon}"></i></span>`;
     }
 
     // Punto del segmento: el color se VALIDA en vez de escaparse, porque entra a un style inline.
@@ -1238,63 +1435,122 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `${dot}${esc(pair.segmentName)}`;
     }
 
-    // Segunda línea: segmento, plaza, lo que falta, placas y teléfono. La mitad faltante va antes
-    // de las placas porque es la información accionable para quien está asignando.
-    function svcPairDetail(pair) {
+    // El objetivo del clic es el CÍRCULO, no el renglón: cada avatar representa a una persona o a un
+    // vehículo, así que tocar el del chofer para cambiar al chofer es inequívoco. Cada uno abre su
+    // propio selector —uno para el chofer, otro para el vehículo— en vez de un panel con los dos.
+    //
+    // Devuelve los atributos que van DENTRO de la etiqueta del avatar; vacío cuando no se puede
+    // asignar, y entonces el avatar queda inerte.
+    function svcPickAttrs(ctx, extra, title) {
+        if (!ctx || !ctx.canAssign) return '';
         const esc = PaymentBreakdownHelpers.escapeHtml;
-        const bits = [];
-        const seg = svcSegmentBit(pair);
-        if (seg) bits.push(seg);
-        if (pair.slotLabel) bits.push(esc(pair.slotLabel));
-        if (pair.needsDriver) bits.push('<span class="svc-pend-txt">Conductor pendiente</span>');
-        if (pair.needsVehicle) {
-            bits.push(`<span class="svc-pend-txt">${pair.expectedVehicleName
-                ? `${esc(pair.expectedVehicleName)} pendiente` : 'Vehículo pendiente'}</span>`);
-        }
-        if (pair.vehicle && pair.vehicle.plate) bits.push(`Placas ${esc(pair.vehicle.plate)}`);
-        if (pair.driver && pair.driver.phone) {
-            bits.push(`<a href="tel:${esc(pair.driver.phone)}" class="svc-assign-tel">${esc(pair.driver.phone)}</a>`);
-        }
-        return bits.join(' · ');
+        const parts = [`data-service-id="${esc(ctx.serviceId)}"`, 'role="button" tabindex="0"'];
+        if (title) parts.push(`title="${esc(title)}"`);
+        Object.entries(extra || {}).forEach(([k, v]) => {
+            if (v === null || v === undefined || v === '') return;
+            parts.push(`data-${k}="${esc(v)}"`);
+        });
+        return parts.join(' ');
     }
 
-    function svcPairRow(pair) {
+    // Teléfono como enlace, solo si existe.
+    function svcTelLink(phone) {
         const esc = PaymentBreakdownHelpers.escapeHtml;
+        return phone ? ` · <a href="tel:${esc(phone)}" class="svc-assign-tel">${esc(phone)}</a>` : '';
+    }
+
+    function svcPairRow(pair, ctx) {
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        // Lo común a las dos mitades de la pareja: de qué plaza son y dónde escribe.
+        const slot = {
+            'slot-index': pair.slotIndex,
+            'extra-index': pair.extraIndex === null ? '' : pair.extraIndex,
+            'slot-label': pair.slotLabel,
+        };
+        // El círculo del chofer solo existe si la plaza lo ofrece (ver pairOffersDriver): un tour sin
+        // "Guía + Chofer" muestra únicamente el vehículo, y en «a disposición» el chofer es un rol.
+        //
+        // Excepción: si YA hay alguien asignado, el círculo sigue siendo clicable aunque el servicio
+        // no lo contrate. La regla es no poder asignar fuera de lo contratado, no quedarse sin poder
+        // corregir lo que ya está mal —hay un tour en la base justo así.
+        const driverPickable = pair.offersDriver !== false || !!pair.driver;
+        const driverPick = !driverPickable ? '' : svcPickAttrs(ctx,
+            { ...slot, 'slot-kind': 'driver', 'current-id': pair.driverId },
+            pair.driver ? 'Cambiar chofer' : 'Asignar chofer');
+        const vehiclePick = svcPickAttrs(ctx,
+            { ...slot, 'slot-kind': 'vehicle', 'current-id': pair.vehicleId, 'expected-type': pair.expectedType },
+            pair.vehicle ? 'Cambiar vehículo' : `Asignar vehículo${pair.expectedType ? ` (${pair.expectedType})` : ''}`);
         const duo = `<span class="svc-duo">${
-            pair.driver ? svcAvatar(pair.driver) : (pair.pending || pair.needsDriver ? svcPendingAvatar('steering-wheel') : '')
+            pair.driver ? svcAvatar(pair.driver, driverPick)
+                : ((pair.pending || pair.needsDriver) && pair.offersDriver !== false
+                    ? svcPendingAvatar('steering-wheel', driverPick) : '')
         }${
-            pair.vehicle ? svcVehicleAvatar(pair.vehicle) : (pair.pending || pair.needsVehicle ? svcPendingAvatar('car') : '')
+            pair.vehicle ? svcVehicleAvatar(pair.vehicle, vehiclePick)
+                : (pair.pending || pair.needsVehicle ? svcPendingAvatar('car', vehiclePick) : '')
         }</span>`;
+        const attrs = 'class="svc-assign-row"';
         if (pair.pending) {
             // La negrita lleva el tipo esperado; el estado baja a la segunda línea, junto al
             // segmento y a la plaza que ocupa.
             const bits = [];
             const seg = svcSegmentBit(pair);
             if (seg) bits.push(seg);
-            if (pair.slotLabel) bits.push(esc(pair.slotLabel));
             bits.push('<span class="svc-pend-txt">Pendiente</span>');
-            return `<div class="svc-assign-row">${duo}<div class="svc-assign-meta">
+            return `<div ${attrs}>${duo}<div class="svc-assign-meta">
                 <div class="n svc-pend-name">${esc(pair.label)}</div>
                 <div>${bits.join(' · ')}</div>
             </div></div>`;
         }
-        const name = [pair.driver && pair.driver.fullName, pair.vehicle && pair.vehicle.name]
-            .filter(Boolean).map(esc).join(' · ');
-        const detail = svcPairDetail(pair);
-        return `<div class="svc-assign-row">${duo}<div class="svc-assign-meta">
-            <div class="n">${name}</div>${detail ? `<div>${detail}</div>` : ''}
-        </div></div>`;
+        // Una línea por DUEÑO. Antes iba todo en una sola cadena —"Juan Empleado · Audi Clase A" y
+        // debajo "Premium · Placas AUDICALSEA · 4423155632"— y con el mismo separador entre cosas de
+        // personas y de vehículos no se distinguía de quién era qué. Ahora el teléfono va pegado a
+        // quien lo contesta y la placa al vehículo que la lleva; el segmento queda solo al final
+        // porque no es de ninguno de los dos: es de la plaza.
+        const lines = [];
+        if (pair.driver) {
+            lines.push(`<div class="n">${esc(pair.driver.fullName)}${svcTelLink(pair.driver.phone)}</div>`);
+        } else if (pair.needsDriver) {
+            lines.push('<div class="svc-pend-txt">Conductor pendiente</div>');
+        }
+        if (pair.vehicle) {
+            // La placa va en cápsula monoespaciada en vez de con la palabra "Placas" delante: la forma
+            // dice que es un identificador, y eso aguanta datos que la palabra tenía que rescatar —de
+            // 9 placas capturadas, 5 no parecen placa ("A", "E", "AUDICALSEA") y sin recuadro se leían
+            // como parte del nombre del vehículo.
+            const plate = pair.vehicle.plate
+                ? ` <span class="svc-plate">${esc(pair.vehicle.plate)}</span>` : '';
+            lines.push(`<div><span class="svc-veh-name">${esc(pair.vehicle.name)}</span>${plate}</div>`);
+        } else if (pair.needsVehicle) {
+            lines.push(`<div class="svc-pend-txt">${pair.expectedVehicleName
+                ? `${esc(pair.expectedVehicleName)} pendiente` : 'Vehículo pendiente'}</div>`);
+        }
+        const segBit = svcSegmentBit(pair);
+        if (segBit) lines.push(`<div>${segBit}</div>`);
+        return `<div ${attrs}>${duo}<div class="svc-assign-meta">${lines.join('')}</div></div>`;
     }
 
-    function svcRoleRow(row) {
+    function svcRoleRow(row, ctx) {
         const esc = PaymentBreakdownHelpers.escapeHtml;
         const p = row.person;
-        const avatar = p ? svcAvatar(p) : svcPendingAvatar('user');
+        // `ownId` es lo que de verdad guarda el campo del servicio, y NO el id de quien se muestra:
+        // en un renglón heredado se muestra a la persona de la reservación mientras el campo está
+        // vacío. Confundirlos haría que el selector la marcara como actual y ofreciera "quitar" algo
+        // que no existe.
+        const pick = svcPickAttrs(ctx, {
+            'slot-kind': 'role',
+            'role-field': row.field,
+            'role-pool': row.pool,
+            'role-label': row.role,
+            'current-id': row.ownId || '',
+            'inherit-label': row.inheritLabel || '',
+        }, `${row.ownId ? 'Cambiar' : 'Asignar'} ${String(row.role).toLowerCase()}`);
+        const attrs = 'class="svc-assign-row"';
+        const avatar = p ? svcAvatar(p, pick) : svcPendingAvatar('user', pick);
+        const note = row.note ? `<div class="svc-assign-src">${esc(row.note)}</div>` : '';
         const body = p
-            ? `<div class="n">${esc(p.fullName)}</div>${p.phone
-                ? `<div><a href="tel:${esc(p.phone)}" class="svc-assign-tel">${esc(p.phone)}</a></div>` : ''}`
-            : '<div class="n svc-pend-txt">Pendiente</div>';
-        return `<div class="svc-assign-row">${avatar}<div class="svc-assign-meta">
+            ? `<div class="n">${esc(p.fullName)}${svcTelLink(p.phone)}</div>${note}`
+            : `<div class="n ${row.optional ? 'svc-opt-txt' : 'svc-pend-txt'}">${row.optional ? 'Opcional' : 'Pendiente'}</div>`;
+        return `<div ${attrs}>${avatar}<div class="svc-assign-meta">
             <div class="svc-assign-role">${esc(row.role)}</div>${body}
         </div></div>`;
     }
@@ -1397,6 +1653,27 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `<span class="badge ${s.cls}" title="Estado operacional de reservación">${s.label}</span>`;
     }
 
+    // La píldora del renglón, solo para los estados que son EXCEPCIÓN.
+    //
+    // `pending` ("Asignaciones pendientes") y `assigned` ("Asignada") se retiraron. Medido sobre la
+    // base: pending es el 67% de los servicios y assigned el 3%, y en 68 de 76 reservaciones TODOS
+    // los renglones traían la misma píldora —96% en una de 57 servicios—. Una señal que se prende en
+    // casi todo no discrimina nada, y en ámbar hacía ver como advertencia el estado normal de
+    // arranque de una reservación.
+    //
+    // Lo que decían ya lo dicen mejor los círculos de asignación: punteado y pálido = falta, foto o
+    // iniciales = cubierto, y por PLAZA en vez de por servicio. `assigned` además podía mentir: el
+    // API lo pone en cuanto existe UN chofer, sin mirar vehículos ni plazas extra, así que un
+    // traslado de tres vehículos con un chofer se anunciaba "Asignada" con dos plazas pendientes.
+    //
+    // Completada / Cancelada / Confirmada sí se quedan: son hechos que ningún otro elemento del
+    // renglón muestra, y al ser raros la píldora vuelve a saltar. El estado NO cambia: se sigue
+    // guardando igual y sigue alimentando el estado general de la reservación y el botón de toggle.
+    const SVC_EXCEPTION_STATUSES = new Set(['completed', 'cancelled', 'confirmed', 'in_progress', 'hold']);
+    function svcExceptionBadge(status) {
+        return SVC_EXCEPTION_STATUSES.has(status) ? getReservationStatusBadge(status) : '';
+    }
+
     // Estado GENERAL de la reservación: mismo modelo (y colores) que el segmented
     // control en el detalle de cotización. 'assigned'/'in_progress' = Confirmada
     // (definición del negocio: todo asignado = confirmada). No usar por-servicio.
@@ -1494,7 +1771,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         const icons = {
             transport: 'ti-car',
             tour: 'ti-map-pin',
-            experience: 'ti-sparkles',
+            // `ti-sparkles` no existe en este icon font (verificado contra los 3000 del CSS): pintaba
+            // una caja vacía para toda experiencia. `ti-stars` sí, y es el mismo sentido.
+            experience: 'ti-stars',
             concepto: 'ti-tag',
             'a-disposicion': 'ti-clock',
         };
@@ -1535,7 +1814,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const parts = [];
         const push = (n, sing, plur) => { const v = Number(n) || 0; if (v > 0) parts.push(`${v} ${v === 1 ? sing : plur}`); };
 
-        if (svc.type === 'transport') {
+        if (isTransportType(svc)) {
             push(sub.transportAdults, 'adulto', 'adultos');
             push(sub.transportChildren, 'niño', 'niños');
             push(sub.transportInfants, 'infante', 'infantes');
@@ -1566,7 +1845,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const v = String(value == null ? '' : value).trim();
             if (v) lines.push({ label, value: v });
         };
-        if (svc.type === 'transport') {
+        if (isTransportType(svc)) {
             if (sub.tripType === 'round-trip') {
                 add('Pick-up (ida)', sub.pickupAddressIda);
                 add('Drop-off (ida)', sub.dropoffAddressIda);
@@ -1605,7 +1884,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // sola —el chofer pasa cuando aterriza el avión—, así que ahí no cambia nada.
     function servicePickupTime(svc) {
         const sub = svc.subconcept || {};
-        if (svc.type === 'transport' && sub.transportType === 'aeropuerto' && sub.directionType === 'departure') {
+        if (isTransportType(svc) && sub.transportType === 'aeropuerto' && sub.directionType === 'departure') {
             const suggested = svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested;
             if (suggested) return roundTimeToNearest15(suggested) || suggested;
         }
@@ -1634,12 +1913,20 @@ document.addEventListener('DOMContentLoaded', async function() {
     //   concepto           -> ninguna
     // El orden importa: los subconceptos arrastran un `duration: 1` espurio en todo lo que no es tour,
     // así que con `duration` primero un a-disposición de 6 h se anunciaba como "1 h".
-    // El texto sigue el mismo formato que durationLabel() del itinerario ("4 hours", "1 h 45 min"),
-    // pero con la palabra en español: aquella plantilla es de cara al cliente y está en inglés, esta
-    // vista es interna. Misma forma, mismo idioma que el resto de la pantalla.
+    // El texto usa el MISMO formato que durationLabel() del itinerario: "4 hrs", "1 hr 45 min". Antes
+    // divergían —aquí "4 horas", allá "4 hours"— y no había razón: es el mismo dato para el mismo
+    // negocio, solo que en dos pantallas.
+    // Horas en una sola forma: "1 hr", "6 hrs". La usan la duración y los tiempos de espera.
+    function hoursText(h) {
+        const n = Number(h) || 0;
+        return `${n} hr${n === 1 ? '' : 's'}`;
+    }
+
     function serviceDurationLabel(svc) {
         const sub = svc.subconcept || {};
-        const hoursLabel = (h) => `${h} hora${h === 1 ? '' : 's'}`;
+        // "hr/hrs" en todo lo que sean horas, en las dos vistas. Antes convivían "hora/horas" aquí,
+        // "hour/hours" en el itinerario y un "6h" pegado en Espera: tres formas del mismo dato.
+        const hoursLabel = (h) => `${h} hr${h === 1 ? '' : 's'}`;
         if (svc.type === 'a-disposicion') {
             const h = Number(sub.hours || 0);
             return h > 0 ? hoursLabel(h) : '';
@@ -1648,13 +1935,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             const h = Number(sub.duration || sub.hours || 0);
             return h > 0 ? hoursLabel(h) : '';
         }
-        if (svc.type === 'transport') {
+        if (isTransportType(svc)) {
             const min = Number(sub.routeDuration || 0);
             if (min <= 0) return '';
             const h = Math.floor(min / 60);
             const m = min % 60;
             if (h === 0) return `${m} min`;
-            return m ? `${h} h ${m} min` : hoursLabel(h);
+            return m ? `${hoursLabel(h)} ${m} min` : hoursLabel(h);
         }
         return '';
     }
@@ -1682,11 +1969,19 @@ document.addEventListener('DOMContentLoaded', async function() {
     // la fuente Tabler (que además no tenía glifo para todos los tipos).
     // Los tipos que el itinerario no distingue caen en su mismo default ('experience'), salvo
     // a-disposición: es transporte con vehículo, así que comparte el ícono de traslado.
+    // `traslado` es un valor de type LEGADO que sigue vivo: 28 servicios en la base, del 9 de marzo al
+    // 24 de julio, en 24 reservaciones. Vive en UN predicado porque lo consultan seis funciones y con
+    // que una se olvide, ese traslado pierde su dirección de pick-up, su duración o su conteo de
+    // pasajeros sin que nada avise. El template del itinerario ya trataba los dos valores.
+    function isTransportType(svc) {
+        return svc && (svc.type === 'transport' || svc.type === 'traslado');
+    }
+
     function getServiceIconKey(svc) {
         const sub = svc.subconcept || {};
         const transportType = sub.transportType || svc.transportType;
         const directionType = sub.directionType || svc.directionType;
-        if (svc.type === 'transport' || svc.type === 'traslado') {
+        if (isTransportType(svc)) {
             if (transportType === 'aeropuerto') return directionType === 'departure' ? 'departure' : 'arrival';
             return 'transfer';
         }
@@ -1758,7 +2053,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             renderReservation();
         } catch (error) {
             console.error('Error rendering reservation:', error);
+            // #loadingState queda en display:none desde la primera carga, así que escribir SOLO ahí
+            // volvía invisible cualquier fallo de render posterior: la lista vieja se quedaba en
+            // pantalla y parecía que la acción no había hecho nada. El toast sí se ve siempre.
             document.getElementById('loadingState').innerHTML = '<p class="text-danger">Error al mostrar la reservacion. Revisa la consola para el detalle.</p>';
+            pmToast('No se pudo actualizar la vista. Recarga la página; el guardado sí se hizo.', 'warning');
         }
     }
 
@@ -1869,19 +2168,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
 
         const scEl = document.getElementById('infoServiceCustomer');
-        if (d.serviceCustomer) {
-            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Customer Support', 'ti-headset', 'primary');
-        } else {
-            scEl.innerHTML = '<span class="text-muted">Sin asignar</span>';
-        }
+        // Mismo selector que los círculos de los servicios, con su propia clase de plaza: el chip ya
+        // dice "Customer Support" arriba, así que el renglón no repite el rótulo.
+        const scPerson = d.serviceCustomer || null;
+        const scCanAssign = d.status !== 'cancelled' && d.status !== 'completed';
+        const scPick = svcPickAttrs({ serviceId: '', canAssign: scCanAssign }, {
+            'slot-kind': 'res-support',
+            'role-label': 'Customer Support',
+            'role-pool': 'admins',
+            'current-id': scPerson ? scPerson.id : '',
+        }, `${scPerson ? 'Cambiar' : 'Asignar'} Customer Support`);
+        scEl.innerHTML = `<span class="bkg-cs-row">${
+            scPerson ? svcAvatar(scPerson, scPick, 'is-sm') : svcPendingAvatar('user', scPick)
+        }<span>${scPerson
+            ? PaymentBreakdownHelpers.escapeHtml(scPerson.fullName) + svcTelLink(scPerson.phone)
+            : 'Sin asignar'}</span></span>`;
 
-        const canAssign = d.status !== 'cancelled' && d.status !== 'completed';
-        const changeScBtn = document.getElementById('changeServiceCustomerBtn');
-        if (canAssign) {
-            changeScBtn.classList.remove('d-none');
-        } else {
-            changeScBtn.classList.add('d-none');
-        }
+        const canAssign = scCanAssign;
 
         const actions = document.getElementById('headerActions');
         const folio = encodeURIComponent(d.folio || '');
@@ -1911,11 +2214,56 @@ document.addEventListener('DOMContentLoaded', async function() {
             cancelBtnHtml = `<button type="button" class="hdr-danger" id="cancelResBtn"><i class="ti ti-x"></i>Cancelar reservación</button>`;
         }
         actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportSegHtml}${cancelBtnHtml}</div>`;
-        // Botón "Exportar itinerario" del header de Servicios → página de itinerario (exportable a PDF).
-        const itinBtn = document.getElementById('exportItineraryBtn');
-        if (itinBtn && folio) {
-            itinBtn.href = `/reservations/${folio}/itinerary`;
-            itinBtn.classList.remove('d-none');
+        // Las dos rutas del itinerario son distintas y ambas hacen falta:
+        //   /itinerary → la vista HTML, para revisarlo en pantalla antes de mandarlo.
+        //   /pdf       → puppeteer sobre esa misma plantilla, devuelve application/pdf como adjunto.
+        // La de descarga NO lleva target="_blank": al ser un adjunto, abriría una pestaña que se cierra
+        // sola y en algunos navegadores parpadea.
+        const itinSeg = document.getElementById('exportItinerarySeg');
+        if (itinSeg && folio) {
+            document.getElementById('previewItineraryBtn').href = `/reservations/${folio}/itinerary`;
+            const dlBtn = document.getElementById('downloadItineraryBtn');
+            dlBtn.href = `/reservations/${folio}/pdf`;
+            itinSeg.classList.remove('d-none');
+            // El PDF lo arma puppeteer y tarda varios segundos. Como <a href> la descarga es una
+            // navegación: no avisa cuándo empieza ni cuándo termina, así que el botón parecía muerto.
+            // Se baja por fetch para poder mostrar el progreso; el archivo pesa ~1 MB, así que tenerlo
+            // en memoria un momento no es problema. El href se conserva para que el clic con el botón
+            // central o "abrir en pestaña nueva" siga funcionando.
+            if (!dlBtn.dataset.bound) {
+                dlBtn.dataset.bound = '1';
+                dlBtn.addEventListener('click', async (ev) => {
+                    ev.preventDefault();
+                    if (dlBtn.dataset.busy === '1') return;
+                    dlBtn.dataset.busy = '1';
+                    const original = dlBtn.innerHTML;
+                    dlBtn.classList.add('is-busy');
+                    dlBtn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;border-width:.14em;"></span>Generando…';
+                    let blobUrl = '';
+                    try {
+                        const resp = await fetch(dlBtn.href);
+                        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                        const blob = await resp.blob();
+                        blobUrl = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = blobUrl;
+                        a.download = `${folio}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                    } catch (err) {
+                        console.error('PDF download failed:', err);
+                        pmToast('No se pudo generar el PDF. Intenta de nuevo.', 'warning');
+                    } finally {
+                        dlBtn.innerHTML = original;
+                        dlBtn.classList.remove('is-busy');
+                        dlBtn.dataset.busy = '';
+                        // Revocar de inmediato cancelaría la descarga en algunos navegadores, que
+                        // leen el blob después del click.
+                        if (blobUrl) setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+                    }
+                });
+            }
         }
         // El listener solo aplica cuando se renderizó el botón (no en las etiquetas).
         document.getElementById('cancelResBtn')?.addEventListener('click', () => {
@@ -1983,13 +2331,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         // "Sencillo — Salida" salió de aquí: la DIRECCIÓN ya la dice el ícono del riel (arrival.png vs
         // departure.png en traslados de aeropuerto) y el REDONDO se ve en Ubicaciones, que en ese caso
         // desglosa pick-up y drop-off de ida y de regreso.
+        // El CONTEO de vehículos ("2 vehículos") también salió: el bloque de asignaciones dibuja una
+        // plaza por vehículo —con su tipo y segmento, asignada o pendiente—, así que contarlos aparte
+        // decía menos y en otro lugar.
         const servicioItems = [];
-        if (svc.type === 'a-disposicion' && sub.vehicleCount && sub.vehicleCount > 0) {
-            servicioItems.push(detailLine('car', `${sub.vehicleCount} vehículo${sub.vehicleCount > 1 ? 's' : ''}`));
-        }
-        if (svc.type !== 'a-disposicion' && sub.quantity && sub.quantity > 1) {
-            servicioItems.push(detailLine('car', `${sub.quantity} vehículos`));
-        }
         const guideLabel = svc.type === 'a-disposicion' ? 'Chofer' : 'Guía';
         if (sub.includeGuide === true) {
             servicioItems.push(detailLine('map-pin', `${guideLabel} incluido`));
@@ -2039,12 +2384,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         // La DURACIÓN (horas contratadas de a-disposición y duración de ruta de un traslado) ya se
         // muestra junto a la hora, arriba del título — ver serviceDurationLabel. Aquí se repetía.
         if (sub.waitingTimeHours) {
-            horarioItems.push(detailLine('clock-pause', `${sub.waitingTimeHours}h`, 'Espera'));
+            horarioItems.push(detailLine('clock-pause', hoursText(sub.waitingTimeHours), 'Espera'));
         }
         if (Array.isArray(sub.extraAdditionalVehicles)) {
             sub.extraAdditionalVehicles.forEach((v) => {
                 const wh = parseFloat(v && v.waitingHours) || 0;
-                if (wh > 0) horarioItems.push(detailLine('clock-pause', `${wh}h`, `Espera ${(v.vehicleTypeName || 'adicional')}`));
+                if (wh > 0) horarioItems.push(detailLine('clock-pause', hoursText(wh), `Espera ${(v.vehicleTypeName || 'adicional')}`));
             });
         }
 
@@ -2064,7 +2409,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Terminal y Puerta se incluyen por fidelidad, pero hoy siempre salen "—": el dato no existe en
         // el modelo, y el itinerario también los deja fijos en "—".
         const flightRows = [];
-        if (svc.type === 'transport') {
+        if (isTransportType(svc)) {
             if (sub.airline || sub.flightNumber) {
                 // Hora real del vuelo (llegada o salida del avión), distinta al pick-up del Horario.
                 const fm = String(svc.time || sub.selectedSchedule || sub.time || '').match(/^(\d{1,2}:\d{2})/);
@@ -2151,7 +2496,15 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>
         `).join('');
 
-        return sectionsHtml + notesHtml;
+        // La descripción del CATÁLOGO va antes de las notas: describe qué es el tour o la experiencia,
+        // y las notas son lo particular de esta reservación. La trae el API (el subconcepto no la
+        // guarda) y se verificó que no duplica ninguna nota ya mostrada.
+        const catalogDesc = String(svc.catalogDescription || '').trim();
+        const catalogDescHtml = catalogDesc
+            ? `<div class="svc-note"><div class="svc-note-body">${renderServiceNotes(catalogDesc)}</div></div>`
+            : '';
+
+        return sectionsHtml + catalogDescHtml + notesHtml;
     }
 
     function renderServices(services) {
@@ -2167,7 +2520,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
 
         // Order services within each day chronologically — same strategy used by the
-        // quote services list (sortSubconceptsByTime). Empty times go to the end.
+        // quote services list (sortSubconceptsByTime).
         const parseTimeToMinutes = (timeStr) => {
             if (!timeStr) return null;
             // Range format "HH:MM - HH:MM" → use the start of the range
@@ -2177,13 +2530,20 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (singleMatch) return parseInt(singleMatch[1], 10) * 60 + parseInt(singleMatch[2], 10);
             return null;
         };
+        // Los servicios SIN hora van PRIMERO, no al final: es el orden del itinerario del cliente, que
+        // es el documento de referencia, y así la misma reservación se lee igual en las dos vistas.
+        // Antes divergían en 9 de 93 grupos día —el 76% de los servicios no tiene hora capturada—.
+        //
+        // La comparación sigue siendo NUMÉRICA aunque el itinerario ordene por cadena en la base: con
+        // horas bien formadas dan lo mismo, y una hora sin cero a la izquierda ("9:00") el orden de
+        // cadena la mandaría después de "14:15". Se replica el resultado, no la fragilidad.
         Object.values(days).forEach((d) => {
             d.services.sort((a, b) => {
                 const ma = parseTimeToMinutes(a.time);
                 const mb = parseTimeToMinutes(b.time);
                 if (ma === null && mb === null) return 0;
-                if (ma === null) return 1;
-                if (mb === null) return -1;
+                if (ma === null) return -1;
+                if (mb === null) return 1;
                 return ma - mb;
             });
         });
@@ -2217,7 +2577,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                     || svc.subconcept?.requiresTransport
                     || svc.subconcept?.additionalVehicleId
                     || (Array.isArray(svc.subconcept?.extraAdditionalVehicles) && svc.subconcept.extraAdditionalVehicles.length > 0));
-                const needsVehicle = (svc.type === 'transport'
+                // isTransportType cubre `transport` y el legado `traslado`: sin eso esos 28 servicios
+                // no calculaban plazas y caían al texto suelto, 9 de ellos con datos de vehículo.
+                const needsVehicle = (isTransportType(svc)
                     || svc.type === 'a-disposicion'
                     || (svc.type === 'tour' && !isWalkingTour && hasVehicleData));
                 // For a-disposición the "quantity" field on the subconcept is the count of
@@ -2239,34 +2601,21 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // conductor, así que la pareja nunca debe pedirlo ahí: diría «Conductor pendiente»
                 // con el chofer ya asignado en el renglón de abajo.
                 const isAtDisposal = svc.type === 'a-disposicion';
-                const pairs = [];
-                const pushPair = (driver, vehicle, segmentName, segmentColor, expectedVehicleName) => {
-                    const hasDriver = !!(driver && driver.fullName);
-                    const hasVehicle = !!(vehicle && vehicle.name);
-                    if (!hasDriver && !hasVehicle) return;
-                    pairs.push({
-                        driver: hasDriver ? driver : null,
-                        vehicle: hasVehicle ? vehicle : null,
-                        needsDriver: !hasDriver && !isAtDisposal,
-                        needsVehicle: !hasVehicle && vehicleQty > 0,
-                        expectedVehicleName: expectedVehicleName || '',
-                        segmentName: segmentName || '',
-                        segmentColor: segmentColor || '',
-                    });
-                };
-                pushPair(svc.assignedDriver, svc.assignedVehicle,
-                    svc.subconcept?.categoryName, svc.subconcept?.categoryColor, svc.vehicleTypeName || '');
-                extras.forEach((ea) => {
-                    if (!ea.driverId && !ea.vehicleId) return;
-                    pushPair(
-                        ea.driverId ? { fullName: ea.driverName, phone: '', profilePhotoUrl: '' } : null,
-                        ea.vehicleId ? { name: ea.vehicleName, imageUrl: ea.vehicleImageUrl || '' } : null,
-                        ea.segmentName, ea.segmentColor, ea.vehicleName || ''
-                    );
-                });
+                const isTour = svc.type === 'tour';
+                // ¿La PLAZA ofrece chofer? El checkbox de la cotización se llama "Guía + Chofer" y lo
+                // que contrata es el CHOFER; el guía va aparte según el tipo (ver más abajo).
+                //   traslado      → siempre: sin chofer no hay traslado.
+                //   tour          → solo con "Guía + Chofer": el tour ya trae guía propio y el chofer
+                //                   es el extra. Sin marcar, la plaza muestra únicamente el vehículo.
+                //   a disposición → nunca en la plaza: ahí el chofer se captura en el campo de guía y
+                //                   se dibuja como renglón de rol.
+                //   resto         → como el tour.
+                const pairOffersDriver = isAtDisposal
+                    ? false
+                    : (isTransportType(svc) ? true : !!includeGuide);
 
                 // Tipo y segmento ESPERADOS de cada plaza. Es el mismo mapeo que arma el modal de
-                // asignación (ver slotSpecs en openAssignModal): plaza 0 = vehículo principal,
+                // asignación que se retiró: plaza 0 = vehículo principal,
                 // plaza 1 = adicional cuando venía marcado, 2+ = extras en orden. Se replica aquí
                 // para que la lista y el formulario nombren la misma plaza igual.
                 const sub = svc.subconcept || {};
@@ -2302,40 +2651,84 @@ document.addEventListener('DOMContentLoaded', async function() {
                     });
                 }
 
-                // Math.max: si hay más parejas asignadas —o más vehículos cotizados— que el
-                // `quantity` capturado, manda lo mayor. Nunca se oculta a nadie real ni una plaza
-                // que la cotización sí pidió. El piso por slotSpecs solo aplica cuando el servicio
-                // de verdad lleva vehículo: slotSpecs siempre tiene la plaza principal, y sin este
-                // guardia un tour caminando acabaría pidiendo camioneta.
+                // Cuántas plazas dibujar. Manda lo mayor entre lo que pide el conteo capturado, lo que
+                // pidió la cotización (slotSpecs) y lo que YA está asignado: un `quantity` mal
+                // capturado no debe ocultar a nadie real. Sin vehículo, solo se dibuja lo asignado —
+                // slotSpecs siempre trae la plaza principal y sin ese guardia un tour caminando
+                // acabaría pidiendo camioneta.
+                let lastFilledExtra = -1;
+                extras.forEach((ea, i) => { if (ea && (ea.driverId || ea.vehicleId)) lastFilledExtra = i; });
+                const impliedSlots = lastFilledExtra >= 0
+                    ? lastFilledExtra + 2
+                    : ((svc.assignedDriver || svc.assignedVehicle) ? 1 : 0);
                 const totalSlots = vehicleQty > 0
-                    ? Math.max(vehicleQty, pairs.length, slotSpecs.length)
-                    : pairs.length;
-                for (let i = pairs.length; i < totalSlots; i += 1) {
+                    ? Math.max(vehicleQty, slotSpecs.length, impliedSlots)
+                    : impliedSlots;
+
+                // Las plazas se construyen INDEXADAS POR PLAZA, no apilando lo asignado: es lo que
+                // permite que un clic en el renglón sepa dónde escribir. Los dos ejes comparten el
+                // mismo índice —slotSpecs[i] es lo que pidió la cotización, y lo asignado vive en
+                // top-level para la plaza 0 y en extras[i - 1] para las demás—, igual que el modal.
+                const pairs = [];
+                for (let i = 0; i < totalSlots; i += 1) {
                     const spec = slotSpecs[i] || {};
-                    // La negrita lleva el TIPO esperado (SEDAN, SUBURBAN) y «Pendiente» baja a la
-                    // segunda línea: así el renglón vacío se lee igual que uno asignado, donde la
-                    // negrita dice qué es y la línea de abajo el detalle y el estado.
-                    //
-                    // El segmento se hereda del servicio cuando la plaza no trae uno propio. Los
-                    // campos por plaza existen para poder DIFERIR del servicio y casi nunca están
-                    // capturados: sin la herencia, un traslado Premium de dos vehículos mostraba
-                    // "Premium" en la primera plaza y nada en la segunda, siendo las dos Premium.
+                    const ea = i === 0 ? null : (extras[i - 1] || null);
+                    const driverId = i === 0 ? (svc.assignedDriver?.id || '') : (ea?.driverId || '');
+                    const vehicleId = i === 0 ? (svc.assignedVehicle?.id || '') : (ea?.vehicleId || '');
+                    // Las plazas extra ya traen teléfono, foto y placa resueltos del catálogo (el blob
+                    // `extraAssignments` solo guarda ids y nombres), así que se leen igual que la
+                    // principal en vez de quedarse sin ellos.
+                    const driver = i === 0
+                        ? svc.assignedDriver
+                        : (ea?.driverId ? {
+                            fullName: ea.driverName,
+                            phone: ea.driverPhone || '',
+                            profilePhotoUrl: ea.driverPhotoUrl || '',
+                        } : null);
+                    const vehicle = i === 0
+                        ? svc.assignedVehicle
+                        : (ea?.vehicleId ? {
+                            name: ea.vehicleName,
+                            plate: ea.vehiclePlate || '',
+                            imageUrl: ea.vehicleImageUrl || '',
+                        } : null);
+                    const hasDriver = !!(driver && driver.fullName);
+                    const hasVehicle = !!(vehicle && vehicle.name);
                     pairs.push({
-                        pending: true,
+                        slotIndex: i,
+                        // null = la plaza escribe en los campos de primer nivel.
+                        extraIndex: i === 0 ? null : i - 1,
+                        driver: hasDriver ? driver : null,
+                        vehicle: hasVehicle ? vehicle : null,
+                        driverId,
+                        vehicleId,
+                        // Vacía por completo: la negrita lleva el TIPO esperado y «Pendiente» baja a la
+                        // segunda línea, así el renglón vacío se lee igual que uno asignado.
+                        pending: !hasDriver && !hasVehicle,
+                        // En «a disposición» el chofer se captura en el campo de guía, así que la
+                        // pareja nunca debe pedirlo: lo cubre el renglón de rol.
+                        offersDriver: pairOffersDriver,
+                        needsDriver: hasVehicle && !hasDriver && pairOffersDriver,
+                        needsVehicle: hasDriver && !hasVehicle,
                         label: spec.type || 'Vehículo',
+                        expectedType: spec.type || '',
+                        // El segmento se hereda del servicio cuando la plaza no trae uno propio: los
+                        // campos por plaza existen para poder DIFERIR y casi nunca están capturados,
+                        // así que un traslado Premium de dos vehículos anunciaba "Premium" solo en la
+                        // primera plaza.
                         segmentName: spec.segment || sub.categoryName || '',
                         segmentColor: spec.color || sub.categoryColor || '',
-                    });
-                }
-                // La etiqueta de plaza solo aparece cuando hay más de una: con una sola, "Vehículo
-                // principal" no distingue nada. Usa el vocabulario del modal para que coincidan.
-                if (totalSlots > 1) {
-                    pairs.forEach((p, i) => {
-                        p.slotLabel = i === 0
-                            ? 'Vehículo principal'
-                            : (i === 1 && hasPrimaryAdditional
-                                ? 'Vehículo adicional'
-                                : `Vehículo extra ${i - (hasPrimaryAdditional ? 1 : 0)}`);
+                        expectedVehicleName: spec.type || '',
+                        // Ya no se pinta en el renglón: ahí lo distinguen el tipo y el segmento. Sigue
+                        // vivo para el TÍTULO del selector, que es donde una vez abierto el panel no
+                        // hay otra pista de cuál de las plazas se está editando.
+                        slotLabel: totalSlots > 1
+                            ? (i === 0
+                                ? 'Vehículo principal'
+                                : (i === 1 && hasPrimaryAdditional
+                                    ? 'Vehículo adicional'
+                                    : `Vehículo extra ${i - (hasPrimaryAdditional ? 1 : 0)}`))
+                            : '',
                     });
                 }
 
@@ -2343,16 +2736,117 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // un rol contratado y sin asignar también se muestra pendiente. El Customer Support
                 // por servicio es OPCIONAL —siempre se puede asignar, pero no se contrata—, así que
                 // no lleva plaza pendiente: un «Pendiente» ahí haría creer que falta algo.
+                // Qué roles se dibujan:
+                //   Guía   → SIEMPRE en tours: un tour trae guía propio, no depende del checkbox.
+                //            En traslados y experiencias, solo con "Guía + Chofer" marcado, porque ahí
+                //            el guía es el extra que se contrata.
+                //   Chofer → SIEMPRE en «a disposición», que es el único tipo donde el chofer vive en
+                //            este campo en vez de en la plaza del vehículo. Por eso su pool es
+                //            `drivers` y no `guides`.
+                //   Greeter → solo con includeGreeter.
+                //   Customer Support → siempre por ahora; ninguna bandera lo contrata, así que su
+                //            renglón vacío dice "Opcional" y no "Pendiente": no falta nada, se ofrece.
+                //
+                // `field` es el campo del guardado y `pool` el conjunto de empleados que puede
+                // ocuparlo; los usa el selector por renglón.
+                // Customer Support: HERENCIA con override. La reservación tiene uno global y un servicio
+                // puede tener el suyo porque alguien más se encarga de ese en particular.
+                //
+                // El renglón se dibuja SOLO cuando diverge del global. Mostrarlo siempre repetía en
+                // cada servicio un dato que ya vive en el chip del encabezado —con el global puesto,
+                // los catorce servicios de una reservación decían lo mismo—, y donde no hay nadie el
+                // hueco es de la RESERVACIÓN, no del servicio. Mismo criterio que la píldora de estado:
+                // una señal que se prende en todos los renglones no señala nada.
+                //
+                // El mismo id capturado aparte no cuenta como divergencia: no difiere de nada.
+                const resSupport = reservationData.serviceCustomer || null;
+                const ownSupport = (svc.assignedServiceCustomer && svc.assignedServiceCustomer.fullName)
+                    ? svc.assignedServiceCustomer : null;
+                const supportDiverges = !!ownSupport
+                    && !(resSupport && ownSupport.id === resSupport.id);
                 const roles = [
-                    { person: svc.assignedGuide, role: isAtDisposal ? 'Chofer' : 'Guía', expected: !!includeGuide },
-                    { person: svc.assignedGreeter, role: 'Greeter', expected: !!includeGreeter },
-                    { person: svc.assignedServiceCustomer, role: 'Customer Support', expected: false },
-                ].filter((r) => (r.person && r.person.fullName) || r.expected)
-                 .map((r) => (r.person && r.person.fullName ? r : { role: r.role, person: null }));
+                    {
+                        person: svc.assignedGuide,
+                        role: isAtDisposal ? 'Chofer' : 'Guía',
+                        field: 'guideId',
+                        pool: isAtDisposal ? 'drivers' : 'guides',
+                        ownId: svc.assignedGuide ? svc.assignedGuide.id : '',
+                        always: isTour || isAtDisposal,
+                        expected: !!includeGuide,
+                    },
+                    {
+                        person: svc.assignedGreeter,
+                        ownId: svc.assignedGreeter ? svc.assignedGreeter.id : '',
+                        role: 'Greeter',
+                        field: 'greeterId',
+                        pool: 'greeters',
+                        expected: !!includeGreeter,
+                    },
+                    {
+                        person: supportDiverges ? ownSupport : null,
+                        ownId: ownSupport ? ownSupport.id : '',
+                        note: supportDiverges ? 'solo este servicio' : '',
+                        // Nombre del global, para que el selector ofrezca "Usar el de la reservación"
+                        // en vez de un "Quitar asignación" que no dice a qué se vuelve.
+                        inheritLabel: (supportDiverges && resSupport) ? resSupport.fullName : '',
+                        role: 'Customer Support',
+                        field: 'serviceCustomerId',
+                        pool: 'admins',
+                        always: supportDiverges,
+                        optional: true,
+                    },
+                ].filter((r) => r.always || (r.person && r.person.fullName) || r.expected)
+                 .map((r) => (r.person && r.person.fullName ? r : { ...r, person: null }));
 
-                const pairsHtml = pairs.map(svcPairRow).join('');
-                const rolesHtml = roles.map(svcRoleRow).join('');
-                const hasAssignments = pairsHtml || rolesHtml;
+                const slotCtx = { serviceId: svc.id, canAssign: canAssign && svc.status !== 'cancelled', isAtDisposal };
+                const pairsHtml = pairs.map((p) => svcPairRow(p, slotCtx)).join('');
+                const rolesHtml = roles.map((r) => svcRoleRow(r, slotCtx)).join('');
+
+                // Cobertura de la asignación, DERIVADA de las plazas y los roles contratados. Sustituye
+                // al botón de "Marcar completada": ese estado se ponía a mano y por eso podía mentir —en
+                // la base hay 3 servicios "assigned" y 1 "completed" sin nadie asignado—. Esto no se
+                // puede marcar, se calcula, así que contesta "sí o no" sin poder equivocarse.
+                //
+                // El Customer Support NO cuenta: es opcional por definición, y contarlo dejaría a todos
+                // los servicios incompletos para siempre.
+                let asgTotal = 0;
+                let asgDone = 0;
+                pairs.forEach((pair) => {
+                    asgTotal += 1;
+                    if (pair.vehicle) asgDone += 1;
+                    if (pair.offersDriver) {
+                        asgTotal += 1;
+                        if (pair.driver) asgDone += 1;
+                    }
+                });
+                roles.forEach((r) => {
+                    if (r.optional) return;
+                    asgTotal += 1;
+                    if (r.person) asgDone += 1;
+                });
+                const asgMissing = asgTotal - asgDone;
+                // Lo que RESALTA es la buena noticia, que hoy es la rara: 226 de 291 servicios están
+                // sin asignar, así que pintar el faltante en ámbar reconstruiría el muro de advertencias
+                // que quitamos de la píldora. El estado común va callado y el completo salta.
+                const coverageHtml = asgTotal === 0 ? '' : (asgMissing === 0
+                    ? '<span class="svc-cov is-done"><i class="ti ti-circle-check"></i>Asignación completa</span>'
+                    : `<span class="svc-cov">${asgDone} de ${asgTotal} asignado${asgTotal === 1 ? '' : 's'}</span>`);
+
+                // Punto de entrada CALLADO para darle un Customer Support propio a este servicio.
+                // Cuando no diverge del global no hay renglón —a propósito, para no repetir catorce
+                // veces un dato que ya vive en el encabezado—, pero sin él tampoco habría dónde hacer
+                // clic para crear el primer override. Así que va solo el círculo: chico, apagado, sin
+                // nombre ni rótulo, y a opacidad completa al pasar el mouse por el servicio. El ícono
+                // de audífonos es el mismo del chip del encabezado, así que se explica sin texto.
+                const supportQuietHtml = (!supportDiverges && slotCtx.canAssign)
+                    ? `<div class="svc-assign-row is-quiet">${svcPendingAvatar('headset', svcPickAttrs(slotCtx, {
+                        'slot-kind': 'role',
+                        'role-field': 'serviceCustomerId',
+                        'role-pool': 'admins',
+                        'role-label': 'Customer Support',
+                        'current-id': '',
+                    }, 'Asignar un Customer Support solo para este servicio'))}<span class="svc-quiet-lbl">Customer Support propio</span></div>`
+                    : '';
 
                 // Ubicaciones en renglones etiquetados, formato del itinerario (ver serviceLocationLines).
                 // Se escapan: son direcciones escritas a mano y antes se interpolaban crudas.
@@ -2376,10 +2870,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                     ? `<div class="svc-time"${timeTitle}>${pickupTime}${pickupTime && durLabel ? ' - ' : ''}${durLabel}</div>`
                     : '';
 
-                // El badge "Pago externo" (includeInTotal:false) se retiró del título en el rediseño de
-                // la lista. Lo que resolvía sigue en pie: el precio mostrado es el REAL (nunca $0), vía
-                // getServicePriceByTypeGross, para no aparentar un servicio gratis. Agencia y agente
-                // todavía lo pintan; se alinean al portar esta maqueta.
+                // El PRECIO por servicio salió de la línea: esta lista es la vista de OPERACIÓN —quién
+                // va, a qué hora, en qué vehículo—, y el dinero vive completo en el Resumen Financiero
+                // y en el carrito de pagos. Con él se fue también el badge "Pago externo", que existía
+                // para explicar por qué un precio aparecía en $0. Agencia y agente todavía pintan
+                // ambos; se alinean al portar esta maqueta.
 
                 html += `
                 <div class="svc-entry">
@@ -2392,43 +2887,22 @@ document.addEventListener('DOMContentLoaded', async function() {
                                 ${route}
                                 ${servicePeopleLabel(svc) ? `<div class="svc-people"><strong>${servicePeopleLabel(svc)}</strong></div>` : ''}
                                 ${serviceAttendeesLine(svc)}
-                                ${(svc.vehicleTypeName && needsVehicle && vehicleQty === 1) ? `<div class="svc-vehicle">${svc.vehicleTypeName}</div>` : ''}
                             </div>
                             <div class="svc-side">
-                        ${svc.type === 'concepto' && svc.status !== 'cancelled' ? '<span class="badge bg-success text-white">Lista</span>' : getReservationStatusBadge(svc.status)}
-                        <span class="svc-price">${formatCurrency(getServicePriceByTypeGross(svc, reservationData.paymentType), reservationData.currency)}</span>
-                        ${canAssign && svc.status !== 'cancelled' && svc.type !== 'concepto' ? `<button class="btn btn-sm ${svc.status === 'completed' ? 'btn-success' : (svc.status === 'assigned' ? 'btn-outline-success' : 'btn-outline-secondary')} status-toggle-btn" data-service-id="${svc.id}" data-current-status="${svc.status}" title="${svc.status === 'completed' ? 'Revertir a asignada' : (svc.status === 'assigned' ? 'Marcar completada' : 'Marcar asignada')}"><i class="ti ${svc.status === 'completed' ? 'ti-circle-check-filled' : (svc.status === 'assigned' ? 'ti-circle-check' : 'ti-circle')}"></i></button>` : ''}
-                        ${canAssign ? (() => {
-            // Build the extras payload merging the REQUESTED list (from subconcept blob — never
-            // overwritten by assignments) with any current assignment info already on the record.
-            // svc.extraAssignments was seeded at conversion from sub.extraAdditionalVehicles, but
-            // if a future flow only updates assignment fields we still want the requested type/
-            // segment to come from the snapshot.
-            const requestedExtras = Array.isArray(svc.subconcept?.extraAdditionalVehicles) ? svc.subconcept.extraAdditionalVehicles : [];
-            const existing = Array.isArray(svc.extraAssignments) ? svc.extraAssignments : [];
-            const mergedExtras = requestedExtras.length > 0
-                ? requestedExtras.map((v) => {
-                    const match = existing.find((ea) => ea.vehicleTypeId === (v.vehicleId || ''));
-                    return {
-                        vehicleTypeId: v.vehicleId || '',
-                        vehicleName: v.vehicleTypeName || '',
-                        segmentId: v.segment || '',
-                        segmentName: v.segmentName || '',
-                        segmentColor: v.segmentColor || '',
-                        driverId: match?.driverId || null,
-                        vehicleId: match?.vehicleId || null,
-                        vehicleImageUrl: match?.vehicleImageUrl || '',
-                    };
-                })
-                : existing;
-            return `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-service-type="${svc.type || ''}" data-service-concept="${getDisplayConcept(svc)}" data-service-route="${svc.originName && svc.destinationName ? `${svc.originName} → ${svc.destinationName}` : (svc.originName || svc.destinationName || '')}" data-include-guide="${includeGuide}" data-include-greeter="${includeGreeter}" data-vehicle-qty="${vehicleQty}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}" data-service-customer-id="${svc.assignedServiceCustomer?.id || ''}" data-vehicle-type-name="${svc.subconcept?.vehicleTypeName || svc.subconcept?.vehicleType || svc.vehicleTypeName || ''}" data-segment-name="${svc.subconcept?.categoryName || ''}" data-segment-color="${svc.subconcept?.categoryColor || ''}" data-additional-vehicle-type-name="${svc.subconcept?.additionalVehicleTypeName || svc.additionalVehicleTypeName || ''}" data-additional-segment-name="${svc.subconcept?.additionalVehicleSegmentName || svc.additionalVehicleSegmentName || ''}" data-additional-segment-color="${svc.subconcept?.additionalVehicleSegmentColor || ''}" data-extra='${JSON.stringify(mergedExtras)}'><i class="ti ti-user-plus"></i></button>`;
-        })() : ''}
+                        ${svc.type === 'concepto' && svc.status !== 'cancelled'
+                            ? '<span class="svc-cov is-none">No requiere asignación</span>'
+                            : svcExceptionBadge(svc.status)}
+                        ${svc.status !== 'cancelled' && svc.type !== 'concepto' ? coverageHtml : ''}
+                        ${canAssign && svc.status === 'completed'
+                            ? `<button class="svc-status-btn is-revert status-toggle-btn" data-service-id="${svc.id}" data-next-status="assigned"><i class="ti ti-arrow-back-up"></i>Revertir</button>`
+                            : ''}
                             </div>
                         </div>
                         ${getSubconceptDetails(svc)}
-                        ${hasAssignments
-                            ? `<div class="svc-assign">${pairsHtml}${rolesHtml}</div>`
-                            : `<div class="svc-assign"><span class="svc-assign-empty">${svc.type === 'concepto' ? 'No requiere asignación' : 'Sin asignar'}</span></div>`}
+                        ${svcIncludesHtml(svc)}
+                        ${pairsHtml || rolesHtml || supportQuietHtml
+                            ? `<div class="svc-assign">${pairsHtml}${rolesHtml}${supportQuietHtml}</div>`
+                            : ''}
                     </div>
                 </div>`;
             });
@@ -2438,21 +2912,38 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         container.innerHTML = html;
 
-        container.querySelectorAll('.assign-btn').forEach(btn => {
-            btn.addEventListener('click', () => openAssignModal(btn));
-        });
-
         container.querySelectorAll('.status-toggle-btn').forEach(btn => {
             btn.addEventListener('click', () => toggleServiceStatus(btn));
         });
     }
 
+    // El control de estado tiene UNA intención: declarar que el servicio ya se operó. Antes era un
+    // ciclo de tres posiciones (pending → assigned → completed → assigned) y las otras dos sobraban:
+    //
+    //   - `assigned` lo pone el API solo, en cuanto se asigna un chofer. Ponerlo a mano no asignaba a
+    //     nadie, solo cambiaba la etiqueta —y el endpoint valida que la cadena esté en una lista, no
+    //     que corresponda a la realidad. En la base quedaron 3 servicios "assigned" y 1 "completed"
+    //     SIN chofer, que es exactamente eso.
+    //   - "Marcar completada" no se puede deducir de nada, así que es la única que necesita un humano.
+    //
+    // Se disponible en cualquier estado no completado, y NO condicionado a `assigned`: un walking tour
+    // nunca tiene chofer, así que se quedaría en `pending` para siempre sin poder marcarse como operado.
     async function toggleServiceStatus(btn) {
         const serviceId = btn.dataset.serviceId;
-        const current = btn.dataset.currentStatus;
-        const nextMap = { pending: 'assigned', assigned: 'completed', completed: 'assigned' };
-        const newStatus = nextMap[current];
-        if (!newStatus) return;
+        const newStatus = btn.dataset.nextStatus;
+        if (!serviceId || !newStatus) return;
+
+        // Completar afirma un hecho del mundo real y no tenía confirmación de ningún tipo. Revertir no
+        // la pide: es reversible por definición.
+        if (newStatus === 'completed') {
+            const ok = await pmConfirm({
+                title: 'Marcar como completada',
+                message: `¿Confirmas que "${btn.dataset.serviceName || 'este servicio'}" ya se operó?`,
+                confirmText: 'Sí, ya se operó',
+                icon: 'ti-circle-check',
+            });
+            if (!ok) return;
+        }
 
         btn.disabled = true;
         try {
@@ -2465,11 +2956,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (result.success) {
                 await loadReservation();
             } else {
-                alert(result.error || 'Error al actualizar estado');
+                pmToast(result.error || 'No se pudo actualizar el estado', 'warning');
+                btn.disabled = false;
             }
         } catch (err) {
             console.error('Status toggle error:', err);
-            alert('Error al actualizar estado');
+            pmToast('No se pudo actualizar el estado', 'warning');
+            btn.disabled = false;
         }
         btn.disabled = false;
     }
@@ -2514,311 +3007,405 @@ document.addEventListener('DOMContentLoaded', async function() {
         return roleTranslations[role.toLowerCase()] || role;
     }
 
-    function buildOptionHtml(items, selectedId, nameField, showRole) {
-        let html = '<option value="">— Sin asignar —</option>';
-        items.forEach(item => {
-            const firstName = item.firstName || '';
-            const lastName = item.lastName || '';
-            const name = (firstName && lastName) ? `${firstName} ${lastName}` : (item[nameField] || item.fullName || item.username || item.name || 'Sin nombre');
-            const id = item.id || item.objectId;
-            let roleLabel = '';
-            if (showRole) {
-                let rolesText = '';
-                if (Array.isArray(item.futureRoles) && item.futureRoles.length > 0) {
-                    rolesText = item.futureRoles.map(r => translateRole(r)).join(', ');
-                } else {
-                    rolesText = translateRole(item.displayRole || item.role || '');
-                }
-                if (rolesText) roleLabel = ` · ${rolesText}`;
-            }
-            html += `<option value="${id}" ${id === selectedId ? 'selected' : ''}>${name}${roleLabel}</option>`;
-        });
-        return html;
-    }
+    // -----------------------------------------------------------------------
+    // Asignar desde el renglón
+    //
+    // Cada renglón de asignación es un punto de entrada: un clic abre un selector con búsqueda,
+    // filtrado por rol y —en vehículos— ordenado por el TIPO que pide esa plaza. Eso último el modal
+    // no lo hace: ofrece los 9 vehículos aunque la plaza pida SUBURBAN. No se ocultan los otros
+    // tipos, solo van después, bajo su propio encabezado.
+    //
+    // El modal SIGUE siendo el camino completo: un rol no contratado (includeGuide en falso) no
+    // dibuja renglón, así que no habría dónde hacer clic para agregarlo. Esto es el atajo.
+    //
+    // El guardado manda SOLO el campo que cambió. El endpoint protege cada campo con
+    // `if (x !== undefined)`, así que asignar un chofer ya no reescribe guía, greeter ni Customer
+    // Support: dos personas trabajando plazas distintas del mismo servicio dejan de pisarse. Las
+    // plazas extra son la excepción —extraAssignments se persiste como arreglo completo—, así que
+    // ahí se relee el estado fresco del servidor justo antes de mandar.
+    // -----------------------------------------------------------------------
+    let assignPopSlot = null;
 
-    function buildVehicleOptionHtml(vehicles, selectedId) {
-        let html = '<option value="">— Sin asignar —</option>';
-        vehicles.forEach(v => {
-            const id = v.id || v.objectId;
-            const typeName = v.vehicleTypeId?.name || '';
-            const label = `${v.brand || ''} ${v.model || ''}`.trim();
-            const plate = v.licensePlate ? ` (${v.licensePlate})` : '';
-            const cap = v.capacity ? ` · ${v.capacity} pax` : '';
-            const typePrefix = typeName ? `[${typeName}] ` : '';
-            const display = `${typePrefix}${label}${plate}${cap}`;
-            html += `<option value="${id}" data-name="${label}${plate}" ${id === selectedId ? 'selected' : ''}>${display}</option>`;
-        });
-        return html;
-    }
-
-    async function openAssignModal(btn) {
-        const serviceId = btn.dataset.serviceId;
-        const serviceType = btn.dataset.serviceType;
-        const serviceConcept = btn.dataset.serviceConcept;
-        const serviceRoute = btn.dataset.serviceRoute;
-        const includeGuide = btn.dataset.includeGuide;
-        const includeGreeter = btn.dataset.includeGreeter;
-        // Important: parse without the `|| 1` fallback because `parseInt('0') || 1` would
-        // coerce a legitimate 0 (service doesn't need vehicles) to 1.
-        const parsedQty = parseInt(btn.dataset.vehicleQty, 10);
-        const vehicleQty = Number.isNaN(parsedQty) ? 1 : parsedQty;
-        const driverId = btn.dataset.driverId;
-        const guideId = btn.dataset.guideId;
-        const greeterId = btn.dataset.greeterId;
-        const vehicleId = btn.dataset.vehicleId;
-        const serviceCustomerId = btn.dataset.serviceCustomerId;
-        const vehicleTypeName = btn.dataset.vehicleTypeName || '';
-        const segmentName = btn.dataset.segmentName || '';
-        const segmentColor = btn.dataset.segmentColor || '';
-        const additionalVehicleTypeName = btn.dataset.additionalVehicleTypeName || '';
-        const additionalSegmentName = btn.dataset.additionalSegmentName || '';
-        const additionalSegmentColor = btn.dataset.additionalSegmentColor || '';
-        let extraAssignments = [];
-        try { extraAssignments = JSON.parse(btn.dataset.extra || '[]'); } catch { extraAssignments = []; }
-
-        // Build per-slot expected vehicle type + segment so each pair label tells the operator
-        // exactly which type of vehicle and segment goes in that slot (Sprinter / Green Class):
-        //   slot 0 → main vehicle type + segment
-        //   slot 1 → primary additional vehicle type + segment (if checkbox was on)
-        //   slot 2+ → extras in order
-        const slotSpecs = [{ type: vehicleTypeName, segment: segmentName, color: segmentColor }];
-        if (additionalVehicleTypeName) {
-            slotSpecs.push({ type: additionalVehicleTypeName, segment: additionalSegmentName, color: additionalSegmentColor });
+    function closeAssignPop() {
+        document.getElementById('assignPop')?.classList.add('d-none');
+        assignPopSlot = null;
+        assignOptTaken = false;
+        // Recarga que se postergó por tener el selector abierto (ver flushAssignReload).
+        if (assignNeedsReload && assignPending === 0) {
+            assignNeedsReload = false;
+            loadReservation()
+                .catch((err) => {
+                    console.error('Deferred reload failed:', err);
+                    pmToast('No se pudo refrescar la lista. Recarga la página; el guardado sí se hizo.', 'warning');
+                })
+                .then(clearAssignSpinners);
         }
-        extraAssignments.forEach((ea) => {
-            slotSpecs.push({
-                type: ea?.vehicleName || '',
-                segment: ea?.segmentName || '',
-                color: ea?.segmentColor || '',
-            });
-        });
+    }
 
-        document.getElementById('assignServiceId').value = serviceId;
+    // Coordenadas del viewport tal cual (el panel es `fixed`). Si no cabe abajo, abre hacia arriba.
+    function positionAssignPop(pop, anchor) {
+        const r = anchor.getBoundingClientRect();
+        const vw = document.documentElement.clientWidth;
+        const vh = document.documentElement.clientHeight;
+        const w = pop.offsetWidth || 320;
+        const h = pop.offsetHeight || 260;
+        pop.style.left = `${Math.max(12, Math.min(r.left, vw - w - 12))}px`;
+        const below = r.bottom + 6;
+        pop.style.top = `${below + h > vh - 12 && r.top - h - 6 > 12 ? r.top - h - 6 : Math.min(below, Math.max(12, vh - h - 12))}px`;
+    }
 
-        // Modal header
-        const typeLabel = getServiceTypeLabel(serviceType);
-        const typeIcon = getServiceTypeIcon(serviceType);
-        document.getElementById('assignModalTitle').innerHTML = `<i class="ti ${typeIcon} me-2"></i>${serviceConcept || typeLabel}`;
-        const subtitleParts = [typeLabel];
-        if (serviceRoute) subtitleParts.push(serviceRoute);
-        document.getElementById('assignModalSubtitle').textContent = subtitleParts.join(' — ');
+    // El renglón se mueve con el scroll de su contenedor pero el panel es fixed, así que hay que
+    // reposicionarlo. `capture: true` para atrapar el scroll de cualquier contenedor, no solo la
+    // ventana. Si el renglón se salió de vista, se cierra.
+    function repositionAssignPopOnScroll() {
+        if (!assignPopSlot || !assignPopSlot.anchor) return;
+        const pop = document.getElementById('assignPop');
+        if (!pop || pop.classList.contains('d-none')) return;
+        const r = assignPopSlot.anchor.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > document.documentElement.clientHeight) { closeAssignPop(); return; }
+        positionAssignPop(pop, assignPopSlot.anchor);
+    }
+    document.addEventListener('scroll', repositionAssignPopOnScroll, { capture: true, passive: true });
+    window.addEventListener('resize', repositionAssignPopOnScroll);
+
+    function assignPopOption(kind, value, name, sub, isCurrent) {
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        return `<button type="button" class="assign-pop-opt${isCurrent ? ' is-current' : ''}"
+            data-kind="${esc(kind)}" data-value="${esc(value)}" data-name="${esc(name)}">
+            <span>${esc(name)}${sub ? `<span class="sub"> · ${esc(sub)}</span>` : ''}</span>
+            ${isCurrent ? '<i class="ti ti-check tick"></i>' : ''}</button>`;
+    }
+
+    // Vaciar el campo no siempre significa "nadie": en Customer Support significa volver al de la
+    // reservación, y decirlo así es la diferencia entre entender la acción y adivinarla.
+    function assignPopClearOption(kind, hasCurrent, inheritLabel) {
+        if (!hasCurrent) return '';
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        const label = inheritLabel
+            ? `Usar el de la reservación (${esc(inheritLabel)})`
+            : 'Quitar asignación';
+        return `<button type="button" class="assign-pop-opt is-clear" data-kind="${kind}" data-value="" data-name="">
+            <i class="ti ti-${inheritLabel ? 'arrow-back-up' : 'x'}"></i><span>${label}</span></button>`;
+    }
+
+    function assignPopPeopleGroup(label, kind, people, currentId, inheritLabel) {
+        if (!people.length) return `<div class="assign-pop-grp">${label}</div><div class="assign-pop-empty">Sin candidatos</div>`;
+        const roleOf = (e) => (Array.isArray(e.futureRoles) && e.futureRoles.length
+            ? e.futureRoles.map((r) => translateRole(r)).join(', ')
+            : translateRole(e.displayRole || e.role || ''));
+        return `<div class="assign-pop-grp">${label}</div>`
+            + assignPopClearOption(kind, !!currentId, inheritLabel)
+            + people.map((e) => assignPopOption(kind, e.id || e.objectId, employeeName(e), roleOf(e),
+                (e.id || e.objectId) === currentId)).join('');
+    }
+
+    function assignPopVehicleGroup(vehicles, expectedType, currentId) {
+        const label = (v) => `${v.brand || ''} ${v.model || ''}`.trim() || v.licensePlate || 'Vehículo';
+        const sub = (v) => [v.licensePlate, v.capacity ? `${v.capacity} pax` : ''].filter(Boolean).join(' · ');
+        const typeOf = (v) => (v.vehicleTypeId && v.vehicleTypeId.name) || '';
+        const match = expectedType ? vehicles.filter((v) => typeOf(v) === expectedType) : vehicles;
+        const rest = expectedType ? vehicles.filter((v) => typeOf(v) !== expectedType) : [];
+        const render = (list) => list.map((v) => assignPopOption('vehicle', v.id || v.objectId,
+            label(v), sub(v), (v.id || v.objectId) === currentId)).join('');
+        let html = `<div class="assign-pop-grp">Vehículo${expectedType ? ` · ${PaymentBreakdownHelpers.escapeHtml(expectedType)}` : ''}</div>`;
+        html += assignPopClearOption('vehicle', !!currentId);
+        html += match.length ? render(match) : '<div class="assign-pop-empty">Ningún vehículo de ese tipo</div>';
+        if (rest.length) html += `<div class="assign-pop-grp">Otros tipos</div>${render(rest)}`;
+        return html;
+    }
+
+    async function openAssignPop(row) {
+        const pop = document.getElementById('assignPop');
+        const body = document.getElementById('assignPopBody');
+        const search = document.getElementById('assignPopSearch');
+        assignPopSlot = { ...row.dataset, anchor: row };
+        assignOptTaken = false;
+        // Al body: `.dashboard-content` tiene overflow-y y recortaría el panel dentro de su caja.
+        if (pop.parentElement !== document.body) document.body.appendChild(pop);
+
+        const ttl = { driver: 'Chofer', vehicle: 'Vehículo' }[row.dataset.slotKind]
+            || row.dataset.roleLabel || 'Asignar';
+        document.getElementById('assignPopTitle').textContent = row.dataset.slotLabel
+            ? `${ttl} · ${row.dataset.slotLabel}`
+            : ttl;
+        body.innerHTML = '<div class="assign-pop-loading">Cargando…</div>';
+        search.value = '';
+        pop.classList.remove('d-none');
+        positionAssignPop(pop, row);
 
         const [employees, vehicles] = await Promise.all([loadEmployees(), loadVehicles()]);
+        // Otro renglón pudo abrirse mientras cargaba.
+        if (!assignPopSlot || assignPopSlot.serviceId !== row.dataset.serviceId) return;
+        const pools = employeePools(employees);
+        const ds = row.dataset;
 
-        const hasFutureRole = (e, role) => Array.isArray(e.futureRoles) && e.futureRoles.some(r => r.toLowerCase() === role);
-        const drivers = employees.filter(e => e.role === 'driver' || e.role === 'employee_amexing' || e.role === 'admin' || hasFutureRole(e, 'driver') || hasFutureRole(e, 'conductor'));
-        const guides = employees.filter(e => e.role === 'guia' || e.role === 'employee_amexing' || e.role === 'admin' || e.displayRole === 'guia' || hasFutureRole(e, 'guia') || hasFutureRole(e, 'guide'));
-        const greeters = employees.filter(e => e.role === 'greeter' || e.role === 'employee_amexing' || e.role === 'admin' || e.displayRole === 'greeter' || hasFutureRole(e, 'greeter'));
-        const amexingEmployees = employees;
-
-        // Build modal body dynamically
-        const body = document.getElementById('assignModalBody');
-        let html = '<input type="hidden" id="assignServiceId" value="' + serviceId + '">';
-
-        // Vehicle/Driver pairs section
-        if (vehicleQty > 1) {
-            html += `<div class="mb-2"><small class="text-muted fw-semibold"><i class="ti ti-car me-1"></i>${vehicleQty} vehículos requeridos</small></div>`;
-        } else if (vehicleTypeName || segmentName) {
-            const inlineTypeBadge = vehicleTypeName
-                ? `<span class="badge bg-secondary-subtle text-secondary ms-2"><i class="ti ti-car me-1"></i>${vehicleTypeName}</span>`
-                : '';
-            const inlineSegmentBadge = segmentName
-                ? `<span class="badge ms-1" style="background-color: ${segmentColor || '#6c757d'}; color: #fff;">${segmentName}</span>`
-                : '';
-            html += `<div class="mb-2"><small class="text-muted fw-semibold">Vehículo solicitado:</small>${inlineTypeBadge}${inlineSegmentBadge}</div>`;
+        // Un solo grupo por selector: el círculo que se tocó dice exactamente qué se está eligiendo.
+        let html = '';
+        if (ds.slotKind === 'res-support') {
+            html = assignPopPeopleGroup('Customer Support de la reservación', 'role',
+                pools.admins, ds.currentId || '');
+        } else if (ds.slotKind === 'driver') {
+            html = assignPopPeopleGroup('Chofer', 'driver', pools.drivers, ds.currentId || '');
+        } else if (ds.slotKind === 'vehicle') {
+            html = assignPopVehicleGroup(vehicles, ds.expectedType || '', ds.currentId || '');
+        } else {
+            html = assignPopPeopleGroup(ds.roleLabel || 'Persona', 'role',
+                pools[ds.rolePool] || pools.all, ds.currentId || '', ds.inheritLabel || '');
         }
-
-        // Primary additional vehicle had its own dedicated checkbox in the quote modal
-        // (separate from the "extras" list). To keep the slot order consistent (main → primary
-        // additional → extras), the primary-additional sits at slot index 1 when present.
-        const hasPrimaryAdditional = !!additionalVehicleTypeName;
-
-        for (let i = 0; i < vehicleQty; i++) {
-            // Slot mapping for assigned IDs:
-            //  - i === 0           → main driver/vehicle (driverId / vehicleId top-level)
-            //  - i === 1 && primary additional → no top-level legacy field; falls through to extras[0] if any
-            //  - i > 0             → extraAssignments at offset (i - 1 - primaryOffset)
-            const primaryOffset = hasPrimaryAdditional && i >= 1 ? 1 : 0;
-            const pairDriverId = i === 0 ? driverId : (extraAssignments[i - 1 - primaryOffset]?.driverId || '');
-            const pairVehicleId = i === 0 ? vehicleId : (extraAssignments[i - 1 - primaryOffset]?.vehicleId || '');
-            const spec = slotSpecs[i] || { type: '', segment: '', color: '' };
-            const slotLabelText = vehicleQty > 1
-                ? (i === 0 ? 'Vehículo principal' : (i === 1 && hasPrimaryAdditional ? 'Vehículo adicional' : `Vehículo extra ${i - (hasPrimaryAdditional ? 1 : 0)}`))
-                : '';
-            const slotTypeBadge = spec.type
-                ? `<span class="badge bg-secondary-subtle text-secondary ms-2"><i class="ti ti-car me-1"></i>${spec.type}</span>`
-                : '';
-            const slotSegmentBadge = spec.segment
-                ? `<span class="badge ms-1" style="background-color: ${spec.color || '#6c757d'}; color: #fff;">${spec.segment}</span>`
-                : '';
-
-            html += `<div class="${vehicleQty > 1 ? 'vehicle-pair-group' : ''}">`;
-            if (slotLabelText || slotTypeBadge || slotSegmentBadge) {
-                html += `<div class="pair-label d-flex align-items-center flex-wrap">${slotLabelText}${slotTypeBadge}${slotSegmentBadge}</div>`;
-            }
-            html += `
-                <div class="row g-2">
-                    <div class="col-md-6">
-                        <div class="assign-field-group mb-0">
-                            <div class="d-flex align-items-center gap-2 mb-1">
-                                <span class="assign-icon bg-info-subtle text-info"><i class="ti ti-steering-wheel"></i></span>
-                                <label class="form-label mb-0 fw-semibold small">Conductor</label>
-                            </div>
-                            <select class="form-select form-select-sm assign-driver-select" data-pair-index="${i}">
-                                ${buildOptionHtml(drivers, pairDriverId, 'fullName', true)}
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="assign-field-group mb-0">
-                            <div class="d-flex align-items-center gap-2 mb-1">
-                                <span class="assign-icon bg-secondary-subtle text-secondary"><i class="ti ti-car"></i></span>
-                                <label class="form-label mb-0 fw-semibold small">Vehiculo</label>
-                            </div>
-                            <select class="form-select form-select-sm assign-vehicle-select" data-pair-index="${i}">
-                                ${buildVehicleOptionHtml(vehicles, pairVehicleId)}
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-        }
-
-        // Guide (conditionally shown) — labeled "Chofer" for a-disposición services,
-        // "Guia" otherwise. Same underlying assignment field, just a clearer label.
-        if (includeGuide !== 'false') {
-            const guideFieldLabel = serviceType === 'a-disposicion' ? 'Chofer' : 'Guia';
-            html += `
-            <div class="assign-field-group" id="guideGroup">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="assign-icon bg-success-subtle text-success"><i class="ti ti-map-pin"></i></span>
-                    <label class="form-label mb-0 fw-semibold small">${guideFieldLabel}</label>
-                </div>
-                <select class="form-select form-select-sm" id="assignGuide">
-                    ${buildOptionHtml(guides, guideId, 'fullName', true)}
-                </select>
-            </div>`;
-        }
-
-        // Greeter (conditionally shown)
-        if (includeGreeter !== 'false') {
-            html += `
-            <div class="assign-field-group" id="greeterGroup">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="assign-icon bg-warning-subtle text-warning"><i class="ti ti-hand-stop"></i></span>
-                    <label class="form-label mb-0 fw-semibold small">Greeter</label>
-                </div>
-                <select class="form-select form-select-sm" id="assignGreeter">
-                    ${buildOptionHtml(greeters, greeterId, 'fullName', true)}
-                </select>
-            </div>`;
-        }
-
-        // Service Customer
-        html += `
-        <div class="assign-field-group mb-0" id="serviceCustomerGroup">
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="assign-icon bg-primary-subtle text-primary"><i class="ti ti-user"></i></span>
-                <label class="form-label mb-0 fw-semibold small">Customer Support</label>
-            </div>
-            <select class="form-select form-select-sm" id="assignServiceCustomer">
-                ${buildOptionHtml(amexingEmployees, serviceCustomerId, 'fullName', true)}
-            </select>
-        </div>`;
-
         body.innerHTML = html;
-
-        const modal = new bootstrap.Modal(document.getElementById('assignModal'));
-        modal.show();
+        positionAssignPop(pop, row);
+        search.focus();
     }
 
-    document.getElementById('saveAssignmentBtn')?.addEventListener('click', async function() {
-        const serviceId = document.getElementById('assignServiceId')?.value
-            || document.querySelector('#assignModalBody input[type="hidden"]')?.value;
-        if (!serviceId) return;
-
-        const driverSelects = document.querySelectorAll('.assign-driver-select');
-        const vehicleSelects = document.querySelectorAll('.assign-vehicle-select');
-
-        // Primary assignment (index 0)
-        const driverId = driverSelects[0]?.value || '';
-        const vehicleId = vehicleSelects[0]?.value || '';
-        const guideId = document.getElementById('assignGuide')?.value || '';
-        const greeterId = document.getElementById('assignGreeter')?.value || '';
-        const serviceCustomerId = document.getElementById('assignServiceCustomer')?.value || '';
-
-        // Extra assignments (index 1+)
-        const extraAssignments = [];
-        for (let i = 1; i < driverSelects.length; i++) {
-            const eDriverId = driverSelects[i]?.value || '';
-            const eVehicleId = vehicleSelects[i]?.value || '';
-            const driverOpt = driverSelects[i]?.selectedOptions[0];
-            const vehicleOpt = vehicleSelects[i]?.selectedOptions[0];
-            extraAssignments.push({
-                driverId: eDriverId,
-                vehicleId: eVehicleId,
-                driverName: eDriverId ? (driverOpt?.textContent?.split(' · ')[0]?.trim() || '') : '',
-                vehicleName: eVehicleId ? (vehicleOpt?.dataset?.name || vehicleOpt?.textContent?.trim() || '') : '',
-            });
-        }
-
+    // Relee el arreglo de extras del servidor: extraAssignments se persiste completo, así que
+    // escribirlo con una copia vieja borraría lo que otro haya asignado mientras.
+    async function fetchServiceExtras(serviceId) {
         try {
-            const response = await fetch(`/api/reservations/${reservationId}/services/${serviceId}/assign`, {
+            const r = await fetch(`/api/reservations/${reservationId}`, {
+                headers: { 'Authorization': `Bearer ${authToken()}` },
+            });
+            if (!r.ok) return null;
+            const j = await r.json();
+            const svc = (j.data?.services || []).find((x) => x.id === serviceId);
+            // Distinguir "no encontré el servicio" de "el servicio no tiene extras" es crítico: este
+            // arreglo se persiste COMPLETO, así que devolver [] ante una respuesta inesperada haría
+            // que el guardado siguiente borrara todas las asignaciones extra sin que nadie se entere.
+            // null aborta el guardado y avisa; [] solo cuando de verdad no hay ninguna.
+            if (!svc) return null;
+            return Array.isArray(svc.extraAssignments) ? svc.extraAssignments : [];
+        } catch { return null; }
+    }
+
+    // -------------------------------------------------------------------
+    // Cola de guardados
+    //
+    // Al elegir una opción el panel se cierra al instante y la espera se muestra en el círculo, así
+    // que se pueden encolar varias asignaciones seguidas. La cola las SERIALIZA por dos razones:
+    //
+    //   1. Las plazas extra se persisten como `extraAssignments` COMPLETO. Dos guardados a la vez
+    //      sobre el mismo servicio leerían el arreglo antes de que el otro escribiera, y el segundo
+    //      borraría el primero.
+    //   2. La lista se vuelve a pintar UNA vez, cuando la cola se vacía, en vez de una por selección.
+    //
+    // Si queda un selector abierto al vaciarse, la recarga se posterga hasta cerrarlo: repintar
+    // borraría los círculos que el usuario tiene debajo del cursor.
+    // -------------------------------------------------------------------
+    let assignQueue = Promise.resolve();
+    let assignPending = 0;
+    let assignNeedsReload = false;
+    let assignOptTaken = false;
+
+    // Los círculos que están girando. Se llevan en un conjunto para poder apagarlos TODOS cuando la
+    // lista se repinta —o cuando la recarga falla—, en vez de apagar cada uno al terminar su tarea.
+    const assignSpinners = new Set();
+
+    function clearAssignSpinners() {
+        assignSpinners.forEach((el) => unmarkAvatarSaving(el));
+        assignSpinners.clear();
+    }
+
+    function markAvatarSaving(el) {
+        if (!el) return;
+        assignSpinners.add(el);
+        el.classList.add('is-saving');
+        el.insertAdjacentHTML('beforeend',
+            '<span class="svc-av-busy"><span class="spinner-border spinner-border-sm" style="width:1rem;height:1rem;border-width:.14em;"></span></span>');
+    }
+
+    function unmarkAvatarSaving(el) {
+        if (!el) return;
+        assignSpinners.delete(el);
+        el.classList.remove('is-saving');
+        el.querySelector('.svc-av-busy')?.remove();
+    }
+
+    function assignPopIsOpen() {
+        const pop = document.getElementById('assignPop');
+        return !!pop && !pop.classList.contains('d-none');
+    }
+
+    async function flushAssignReload() {
+        if (assignPending > 0) return;
+        if (assignPopIsOpen()) { assignNeedsReload = true; return; }
+        assignNeedsReload = false;
+        try {
+            await loadReservation();
+        } catch (err) {
+            console.error('Reload after assignment failed:', err);
+            pmToast('No se pudo refrescar la lista. Recarga la página; el guardado sí se hizo.', 'warning');
+        }
+        // Se haya repintado o no, ningún círculo puede quedar girando. Si repintó, estos nodos ya
+        // están fuera del DOM y apagarlos no cuesta nada; si falló, evita spinners eternos.
+        clearAssignSpinners();
+    }
+
+    // Arma el payload de UNA asignación. Devuelve null si no hay nada que mandar.
+    async function buildAssignPayload(slot, value, name) {
+        if (slot.slotKind === 'role') return { [slot.roleField]: value };
+        if (slot.extraIndex === undefined || slot.extraIndex === '') {
+            return slot.slotKind === 'driver' ? { driverId: value } : { vehicleId: value };
+        }
+        const idx = Number(slot.extraIndex);
+        // Se relee AQUÍ, ya dentro de la cola, para que traiga lo que escribió el guardado anterior.
+        const fresh = await fetchServiceExtras(slot.serviceId);
+        if (fresh === null) return null;
+        const arr = fresh.map((e) => ({ ...e }));
+        while (arr.length <= idx) arr.push({ driverId: '', vehicleId: '', driverName: '', vehicleName: '' });
+        if (slot.slotKind === 'driver') {
+            arr[idx].driverId = value;
+            arr[idx].driverName = value ? name : '';
+        } else {
+            arr[idx].vehicleId = value;
+            arr[idx].vehicleName = value ? name : '';
+        }
+        return { extraAssignments: arr };
+    }
+
+    async function runAssignTask(slot, value, name, anchor) {
+        try {
+            // El Customer Support de la RESERVACIÓN vive en otro endpoint: no es una asignación por
+            // servicio, es el global del que heredan todos.
+            const isReservationLevel = slot.slotKind === 'res-support';
+            const payload = isReservationLevel
+                ? { serviceCustomerId: value }
+                : await buildAssignPayload(slot, value, name);
+            if (payload === null) {
+                unmarkAvatarSaving(anchor);
+                alert('No se pudo leer el estado actual del servicio. Intenta de nuevo.');
+                return;
+            }
+            const url = isReservationLevel
+                ? `/api/reservations/${reservationId}/service-customer`
+                : `/api/reservations/${reservationId}/services/${slot.serviceId}/assign`;
+            const response = await fetch(url, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${authToken()}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ driverId, guideId, greeterId, vehicleId, serviceCustomerId, extraAssignments }),
+                body: JSON.stringify(payload),
             });
-
             const result = await response.json();
-            if (result.success) {
-                bootstrap.Modal.getInstance(document.getElementById('assignModal'))?.hide();
-                await loadReservation();
-            } else {
-                alert(result.error || 'Error al guardar asignacion');
+            if (!response.ok || result.success === false) {
+                unmarkAvatarSaving(anchor);
+                alert(result.error || 'No se pudo guardar la asignación');
             }
-        } catch (err) {
-            console.error('Assignment error:', err);
-            alert('Error al guardar asignacion');
+        } catch (e) {
+            unmarkAvatarSaving(anchor);
+            alert('No se pudo guardar la asignación');
         }
+        // OJO: en el camino feliz el spinner NO se quita aquí. Quitarlo al terminar cada tarea dejaba
+        // ver el avatar viejo —punteado— hasta que la lista se repintara al vaciarse la cola, y ese
+        // instante se lee como "no se asignó". Dejándolo girando, el círculo pasa de girando a
+        // asignado sin pasar por vacío. Los apaga clearAssignSpinners cuando la lista ya se repintó.
+    }
+
+    function enqueueSlotAssignment(opt) {
+        const slot = assignPopSlot;
+        // Una sola opción por apertura: un doble clic rápido alcanza a disparar dos eventos antes de
+        // que el panel se oculte.
+        if (!slot || assignOptTaken) return;
+        assignOptTaken = true;
+
+        const value = opt.dataset.value || '';
+        const name = opt.dataset.name || '';
+        const anchor = slot.anchor;
+        const payloadSlot = { ...slot };
+        delete payloadSlot.anchor;
+
+        // ORDEN: primero se contabiliza el pendiente y se marca el círculo, y hasta después se cierra
+        // el panel. Al revés, `closeAssignPop` veía `assignPending === 0` y disparaba la recarga que
+        // estaba postergada por tener el selector abierto: la lista se repintaba en ese instante y el
+        // avatar que iba a girar quedaba fuera del DOM, así que la segunda selección parecía detener
+        // la primera. Con este orden, la recarga solo puede correr cuando la cola queda vacía.
+        assignPending += 1;
+        markAvatarSaving(anchor);
+        closeAssignPop();
+        // El contador baja en `finally` y la cadena lleva `catch`: sin eso, un rechazo en cualquier
+        // eslabón dejaba `assignQueue` en estado rechazado, los `.then` siguientes se saltaban y
+        // `assignPending` se quedaba en >0 para siempre — con lo cual flushAssignReload salía temprano
+        // en cada intento y la lista no volvía a repintarse nunca, aunque los guardados sí ocurrieran.
+        assignQueue = assignQueue
+            .then(async () => {
+                try {
+                    await runAssignTask(payloadSlot, value, name, anchor);
+                } finally {
+                    assignPending -= 1;
+                }
+                await flushAssignReload();
+            })
+            .catch((err) => {
+                console.error('Assign queue error:', err);
+                pmToast('No se pudo completar una asignación. Recarga la página para ver el estado real.', 'warning');
+            });
+    }
+
+    // Delegación en document: la lista de servicios se re-renderiza completa en cada guardado, así
+    // que enlazar sobre los renglones se perdería.
+    document.addEventListener('click', (ev) => {
+        const opt = ev.target.closest('.assign-pop-opt');
+        if (opt) { enqueueSlotAssignment(opt); return; }
+        if (ev.target.closest('#assignPopClose')) { closeAssignPop(); return; }
+        if (ev.target.closest('#assignPop')) return;
+        const av = ev.target.closest('.svc-av.is-pick');
+        if (av) { openAssignPop(av); return; }
+        closeAssignPop();
     });
+
+    document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') { closeAssignPop(); return; }
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        const av = ev.target.closest?.('.svc-av.is-pick');
+        if (av && document.activeElement === av) { ev.preventDefault(); openAssignPop(av); }
+    });
+
+    document.getElementById('assignPopSearch')?.addEventListener('input', (ev) => {
+        const q = ev.target.value.trim().toLowerCase();
+        document.querySelectorAll('#assignPopBody .assign-pop-opt').forEach((el) => {
+            if (el.classList.contains('is-clear')) return;
+            el.style.display = !q || el.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    });
+
+    // Quién puede ocupar cada rol. Vive en una sola función porque la usan el modal y el selector
+    // por renglón: si divergieran, el mismo servicio ofrecería listas distintas según por dónde entres.
+    function employeePools(employees) {
+        const hasFutureRole = (e, role) => Array.isArray(e.futureRoles)
+            && e.futureRoles.some((r) => String(r).toLowerCase() === role);
+        return {
+            drivers: employees.filter((e) => e.role === 'driver' || e.role === 'employee_amexing' || e.role === 'admin' || hasFutureRole(e, 'driver') || hasFutureRole(e, 'conductor')),
+            guides: employees.filter((e) => e.role === 'guia' || e.role === 'employee_amexing' || e.role === 'admin' || e.displayRole === 'guia' || hasFutureRole(e, 'guia') || hasFutureRole(e, 'guide')),
+            greeters: employees.filter((e) => e.role === 'greeter' || e.role === 'employee_amexing' || e.role === 'admin' || e.displayRole === 'greeter' || hasFutureRole(e, 'greeter')),
+            // Customer Support solo lo pueden ocupar administradores. `role` aquí es el NOMBRE del
+            // Role resuelto (ver UserManagementService: `role: roleName || 'guest'`), el mismo campo
+            // con el que ya se filtran choferes y guías. /api/employees los incluye porque mezcla
+            // employee_amexing/driver con getAmexingUsers.
+            admins: employees.filter((e) => e.role === 'admin' || e.role === 'superadmin'),
+            all: employees,
+        };
+    }
+
+    // Nombre visible de un empleado, con el mismo orden de respaldos que usaba el formulario.
+    function employeeName(e) {
+        const fn = e.firstName || '';
+        const ln = e.lastName || '';
+        return (fn && ln) ? `${fn} ${ln}` : (e.fullName || e.username || e.name || 'Sin nombre');
+    }
+
+    // buildOptionHtml y buildVehicleOptionHtml se retiraron: solo alimentaban los <select> de ese
+    // formulario. El selector por círculo arma sus opciones en assignPopPeopleGroup/VehicleGroup.
+
+
+
+
+    // openAssignModal se retiró con el formulario completo (ver el comentario del markup).
+
+
+    // El guardado del formulario completo se fue con él: cada círculo guarda su propio campo.
 
     // Service Customer at reservation level
-    document.getElementById('changeServiceCustomerBtn')?.addEventListener('click', async function() {
-        const employees = await loadEmployees();
-        const currentId = reservationData.serviceCustomer?.id || '';
-        const select = document.getElementById('resServiceCustomerSelect');
-        select.innerHTML = buildOptionHtml(employees, currentId, 'fullName', true);
-
-        const modal = new bootstrap.Modal(document.getElementById('serviceCustomerModal'));
-        modal.show();
-    });
-
-    document.getElementById('saveResServiceCustomerBtn')?.addEventListener('click', async function() {
-        const serviceCustomerId = document.getElementById('resServiceCustomerSelect').value;
-        try {
-            const response = await fetch(`/api/reservations/${reservationId}/service-customer`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${authToken()}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ serviceCustomerId }),
-            });
-            const result = await response.json();
-            if (result.success) {
-                bootstrap.Modal.getInstance(document.getElementById('serviceCustomerModal'))?.hide();
-                await loadReservation();
-            } else {
-                alert(result.error || 'Error al asignar seguidor');
-            }
-        } catch (err) {
-            console.error('Service customer error:', err);
-            alert('Error al asignar seguidor');
-        }
-    });
+    // Los manejadores del modal de Customer Support se retiraron con el modal: ahora el chip abre el
+    // mismo selector que los servicios y el guardado va por la cola (ver runAssignTask).
 
     // ===== FINANCIAL SUMMARY =====
 
@@ -3895,7 +4482,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     const pmEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
         { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-    function pmConfirm({ title = 'Confirmar', message = '', confirmText = 'Aceptar', danger = false } = {}) {
+    // `icon` deja que quien confirma use el mismo símbolo de su botón, en vez del genérico.
+    // El default era `ti-help-circle`, que NO existe en este icon font: el círculo del modal salía
+    // vacío en TODA confirmación no destructiva, no solo en las nuevas. El que existe es `ti-help`.
+    function pmConfirm({
+        title = 'Confirmar', message = '', confirmText = 'Aceptar', danger = false, icon: iconName = '',
+    } = {}) {
         return new Promise((resolve) => {
             let el = document.getElementById('pmConfirmModal');
             if (!el) {
@@ -3922,7 +4514,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             const icon = el.querySelector('[data-pm-icon]');
             icon.classList.remove('bg-danger-subtle', 'text-danger', 'bg-primary-subtle', 'text-primary');
             icon.classList.add(danger ? 'bg-danger-subtle' : 'bg-primary-subtle', danger ? 'text-danger' : 'text-primary');
-            icon.innerHTML = `<i class="ti ${danger ? 'ti-alert-triangle' : 'ti-help-circle'}" style="font-size:1.75rem"></i>`;
+            icon.innerHTML = `<i class="ti ${pmEsc(iconName || (danger ? 'ti-alert-triangle' : 'ti-help'))}" style="font-size:1.75rem"></i>`;
             const old = el.querySelector('[data-pm-ok]');
             const ok = old.cloneNode(true);
             ok.textContent = confirmText;
@@ -4148,6 +4740,18 @@ document.addEventListener('click', function(e) {
     new bootstrap.Modal(document.getElementById('photoPreviewModal')).show();
 });
 </script>
+
+<!-- Selector de asignación por plaza. Uno solo para toda la página: se reposiciona junto al renglón
+     en el que se hizo clic. No usa el Popover de Bootstrap porque su `sanitize` elimina el input de
+     búsqueda y el manejo de foco pelea con el offcanvas de pagos. -->
+<div id="assignPop" class="assign-pop d-none" role="dialog" aria-modal="false" aria-labelledby="assignPopTitle">
+    <div class="assign-pop-head">
+        <span id="assignPopTitle"></span>
+        <button type="button" class="assign-pop-x" id="assignPopClose" aria-label="Cerrar"><i class="ti ti-x"></i></button>
+    </div>
+    <input type="text" class="assign-pop-search" id="assignPopSearch" placeholder="Buscar…" autocomplete="off" aria-label="Buscar">
+    <div class="assign-pop-body" id="assignPopBody"></div>
+</div>
 
 <!-- Photo Preview Modal -->
 <div class="modal fade" id="photoPreviewModal" tabindex="-1">

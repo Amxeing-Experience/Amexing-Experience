@@ -913,6 +913,97 @@ class ReservationController {
         }
       }
 
+      // Detalle de catálogo de tours y experiencias: descripción y las listas de "incluye / no
+      // incluye". El subconcepto guardado NO los trae —de 115 servicios de tour/experiencia en la
+      // base, cero guardan descripción y cero guardan las listas—, así que se resuelven del catálogo
+      // por id. Un solo par de consultas para toda la reservación, antes de armar la respuesta,
+      // porque services.map() es síncrono.
+      //
+      // La descripción se expone como `catalogDescription` a propósito: `description` a secas se
+      // leería como texto propio del servicio y choca con las notas que la vista ya pinta.
+      const catalogDetailById = {};
+      try {
+        const tourIds = [];
+        const experienceIds = [];
+        services.forEach((svc) => {
+          const sub = svc.get('subconcept') || {};
+          if (sub.tourId) tourIds.push(sub.tourId);
+          if (sub.experienceId) experienceIds.push(sub.experienceId);
+        });
+        const cleanList = (list) => (Array.isArray(list)
+          ? list.map((item) => String(item == null ? '' : item).trim()).filter(Boolean)
+          : []);
+        const loadDetail = async (className, ids) => {
+          if (ids.length === 0) return;
+          const q = new Parse.Query(className);
+          q.containedIn('objectId', ids);
+          q.limit(ids.length);
+          const rows = await q.find({ useMasterKey: true });
+          rows.forEach((row) => {
+            const desc = row.get('description');
+            catalogDetailById[row.id] = {
+              description: String(desc == null ? '' : desc).trim(),
+              includes: cleanList(row.get('includes')),
+              notIncludes: cleanList(row.get('notincludes')),
+            };
+          });
+        };
+        await Promise.all([
+          loadDetail('Tour', [...new Set(tourIds.filter(Boolean))]),
+          loadDetail('Experience', [...new Set(experienceIds.filter(Boolean))]),
+        ]);
+      } catch (catErr) {
+        logger.warn('Failed to fetch tour/experience catalog detail', { error: catErr.message });
+      }
+
+      // Un servicio de tour no hereda el detalle de una experiencia: si trae tourId, su entrada del
+      // mapa manda incluso cuando viene vacía.
+      const catalogDetailFor = (sub) => (sub
+        && (catalogDetailById[sub.tourId] || catalogDetailById[sub.experienceId]))
+        || { description: '', includes: [], notIncludes: [] };
+
+      // Teléfono del chofer y placa del vehículo de las plazas EXTRA. El blob `extraAssignments` solo
+      // guarda ids y nombres, así que sin esto la vista mostraba el teléfono vacío y ninguna placa en
+      // toda plaza que no fuera la principal. Mismo criterio que resolveExtraAssignments del
+      // controlador público: una consulta por clase para toda la reservación.
+      const extraDriverById = {};
+      const extraVehicleById = {};
+      try {
+        const exDriverIds = [];
+        const exVehicleIds = [];
+        services.forEach((svc) => {
+          (svc.get('extraAssignments') || []).forEach((ea) => {
+            if (ea && ea.driverId) exDriverIds.push(ea.driverId);
+            if (ea && ea.vehicleId) exVehicleIds.push(ea.vehicleId);
+          });
+        });
+        const uniqDrivers = [...new Set(exDriverIds)];
+        const uniqVehicles = [...new Set(exVehicleIds)];
+        const [drivers, vehicles] = await Promise.all([
+          uniqDrivers.length
+            ? new Parse.Query('AmexingUser').containedIn('objectId', uniqDrivers).limit(uniqDrivers.length).find({ useMasterKey: true })
+            : [],
+          uniqVehicles.length
+            ? new Parse.Query('Vehicle').containedIn('objectId', uniqVehicles).limit(uniqVehicles.length).find({ useMasterKey: true })
+            : [],
+        ]);
+        drivers.forEach((u) => {
+          extraDriverById[u.id] = {
+            fullName: u.get('fullName') || `${u.get('firstName') || ''} ${u.get('lastName') || ''}`.trim() || u.get('username') || '',
+            phone: u.get('phone') || '',
+            profilePhotoUrl: u.get('profilePhotoUrl') || '',
+          };
+        });
+        vehicles.forEach((v) => {
+          extraVehicleById[v.id] = {
+            name: `${v.get('brand') || ''} ${v.get('model') || ''}`.trim() || v.get('licensePlate') || '',
+            plate: v.get('plate') || v.get('licensePlate') || '',
+          };
+        });
+      } catch (exErr) {
+        logger.warn('Failed to resolve extra assignment details', { error: exErr.message });
+      }
+
       // Whether a <24h cancellation request is awaiting approval (the reservation
       // stays in its real status until approved). Surfaced so the detail shows the
       // "Pendiente de cancelación" label instead of the cancel button.
@@ -1035,6 +1126,7 @@ class ReservationController {
             const storedSub = svc.get('subconcept');
             const fallbackKey = `${svc.get('dayNumber') || 1}_${svc.get('concept') || ''}_${svc.get('time') || ''}`;
             const subconcept = enrichSubconceptSegments(storedSub || snapshotLookup[fallbackKey] || null);
+            const catalogDetail = catalogDetailFor(subconcept);
 
             return {
               id: svc.id,
@@ -1059,6 +1151,10 @@ class ReservationController {
               vehicleTypeName: svc.get('vehicleTypeName'),
               notes: svc.get('notes'),
               subconcept,
+              // Del catálogo Tour/Experience, no del subconcepto (ver catalogDetailById).
+              catalogDescription: catalogDetail.description,
+              includes: catalogDetail.includes,
+              notIncludes: catalogDetail.notIncludes,
               // Suggested departure time fields
               flightDepartureTimeSuggested: svc.get('flightDepartureTimeSuggested'),
               roundTripDepartureTimeSuggestedIda: svc.get('roundTripDepartureTimeSuggestedIda'),
@@ -1084,6 +1180,10 @@ class ReservationController {
               assignedVehicle: svc.get('assignedVehicle') ? {
                 id: svc.get('assignedVehicle').id,
                 name: `${svc.get('assignedVehicle').get('brand') || ''} ${svc.get('assignedVehicle').get('model') || ''}`.trim() || svc.get('assignedVehicle').get('licensePlate') || 'Vehiculo',
+                // La placa no viajaba: la vista la pedía y siempre le llegaba undefined, así que
+                // ningún vehículo asignado la mostraba. `plate` es el nombre en la clase Vehicle de
+                // algunos registros y `licensePlate` en otros.
+                plate: svc.get('assignedVehicle').get('plate') || svc.get('assignedVehicle').get('licensePlate') || '',
                 imageUrl: vehicleImageMap[svc.get('assignedVehicle').id] || '',
               } : null,
               assignedServiceCustomer: svc.get('assignedServiceCustomer') ? {
@@ -1101,10 +1201,19 @@ class ReservationController {
                   if (!segName) segName = r.name;
                   if (!segColor) segColor = r.color;
                 }
+                // El nombre guardado en el blob manda —es el que se capturó— y el catálogo solo
+                // rellena lo que ese blob no guarda: teléfono y placa.
+                const exDriver = ea.driverId ? extraDriverById[ea.driverId] : null;
+                const exVehicle = ea.vehicleId ? extraVehicleById[ea.vehicleId] : null;
                 return {
                   ...ea,
                   segmentName: segName,
                   segmentColor: segColor,
+                  driverName: ea.driverName || (exDriver ? exDriver.fullName : ''),
+                  driverPhone: exDriver ? exDriver.phone : '',
+                  driverPhotoUrl: exDriver ? exDriver.profilePhotoUrl : '',
+                  vehicleName: ea.vehicleName || (exVehicle ? exVehicle.name : ''),
+                  vehiclePlate: exVehicle ? exVehicle.plate : '',
                   vehicleImageUrl: ea.vehicleId ? (vehicleImageMap[ea.vehicleId] || '') : '',
                 };
               }),

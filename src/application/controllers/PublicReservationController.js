@@ -134,7 +134,13 @@ class PublicReservationController {
       this.logPublicAccess(reservation, req);
 
       const quoteShaped = await this.preparePublicReservationData(reservation, services);
-      await this.injectServiceImages(quoteShaped);
+      // En paralelo: son consultas a clases distintas y ninguna depende de la otra. Solo en el
+      // itinerario, que es la vista que muestra descripción e "incluye / no incluye"; agregarlo al
+      // resumen público costaría dos consultas que su plantilla no usa.
+      await Promise.all([
+        this.injectServiceImages(quoteShaped),
+        this.injectServiceCatalogDetails(quoteShaped),
+      ]);
 
       return res.render('dashboards/admin/reservation-itinerary', {
         quote: quoteShaped,
@@ -1010,6 +1016,83 @@ class PublicReservationController {
       });
     } catch (err) {
       logger.warn('Failed to inject service images for public reservation', { error: err.message });
+    }
+  }
+
+  /**
+   * Inject the catalog detail of tours and experiences: description plus the "incluye / no incluye"
+   * lists.
+   *
+   * The stored subconcept snapshots NONE of them — of 115 tour/experience services in the database,
+   * zero carry a description and zero carry the lists — so they have to be resolved from
+   * Tour/Experience by id. Same approach injectServiceImages already uses for the photos, kept as a
+   * separate pass because it queries different classes and must not fail the images if the catalog
+   * read breaks.
+   *
+   * The catalog fields are `description`, `includes` and `notincludes` (lowercase, the last two
+   * arrays of strings); they are exposed as `catalogDescription` / `includes` / `notIncludes`. The
+   * description is renamed on purpose: `description` alone would read as the service's own text and
+   * collide with the notes the view already renders.
+   * @param {object} quoteData - Reservation data shaped like a quote. Mutated in place.
+   * @returns {Promise<void>} Resolves once the catalog detail is attached to each subconcept.
+   * @example
+   *   await this.injectServiceCatalogDetails(quoteShaped);
+   */
+  async injectServiceCatalogDetails(quoteData) {
+    try {
+      const tourIds = [];
+      const experienceIds = [];
+      (quoteData.serviceItems?.days || []).forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          if (sc.tourId) tourIds.push(sc.tourId);
+          if (sc.experienceId) experienceIds.push(sc.experienceId);
+        });
+      });
+
+      const uniqueTourIds = [...new Set(tourIds.filter(Boolean))];
+      const uniqueExpIds = [...new Set(experienceIds.filter(Boolean))];
+      if (uniqueTourIds.length === 0 && uniqueExpIds.length === 0) return;
+
+      const clean = (list) => (Array.isArray(list)
+        ? list.map((item) => String(item == null ? '' : item).trim()).filter(Boolean)
+        : []);
+
+      const fetchLists = async (className, ids) => {
+        const map = {};
+        if (ids.length === 0) return map;
+        const q = new Parse.Query(className);
+        q.containedIn('objectId', ids);
+        q.limit(ids.length);
+        const rows = await q.find({ useMasterKey: true });
+        rows.forEach((row) => {
+          map[row.id] = {
+            description: String(row.get('description') == null ? '' : row.get('description')).trim(),
+            includes: clean(row.get('includes')),
+            notIncludes: clean(row.get('notincludes')),
+          };
+        });
+        return map;
+      };
+
+      const [tourMap, expMap] = await Promise.all([
+        fetchLists('Tour', uniqueTourIds),
+        fetchLists('Experience', uniqueExpIds),
+      ]);
+
+      quoteData.serviceItems.days.forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          // Un servicio de tour no debe heredar el detalle de una experiencia: si trae tourId, la
+          // entrada del mapa manda incluso cuando viene vacía.
+          const detail = (sc.tourId && tourMap[sc.tourId])
+            || (sc.experienceId && expMap[sc.experienceId]);
+          if (!detail) return;
+          if (detail.description) Object.assign(sc, { catalogDescription: detail.description });
+          if (detail.includes.length) Object.assign(sc, { includes: detail.includes });
+          if (detail.notIncludes.length) Object.assign(sc, { notIncludes: detail.notIncludes });
+        });
+      });
+    } catch (err) {
+      logger.warn('Failed to inject catalog detail for public reservation', { error: err.message });
     }
   }
 
