@@ -41,6 +41,26 @@
 <div id="reservationContent" style="display: none;">
     <!-- Info Card -->
     <style>
+      /* Acciones del encabezado. Las dos EXPORTACIONES van en un control segmentado (mismo patrón que
+         las pestañas del carrito): se leen como una cosa con dos variantes en vez de dos botones que
+         compiten por empezar igual. Nada se esconde: todo sigue a un clic. */
+      .hdr-seg{display:inline-flex;gap:3px;background:#f1f2ec;border:1px solid #e6e4dd;border-radius:10px;padding:3px;}
+      .hdr-seg-btn{display:inline-flex;align-items:center;gap:.35rem;border:none;background:transparent;border-radius:7px;
+        font-size:.8rem;font-weight:600;color:#6b7256;padding:.35rem .75rem;line-height:1.2;white-space:nowrap;
+        text-decoration:none;font-family:inherit;transition:background .12s,color .12s;}
+      .hdr-seg-btn:hover{background:#fff;color:#4f5838;}
+      .hdr-seg-btn:disabled{color:#b3b7a5;cursor:not-allowed;}
+      .hdr-seg-btn:disabled:hover{background:transparent;color:#b3b7a5;}
+      /* Exportación suelta (cuando solo hay una): mismo peso visual que un elemento del segmento. */
+      .hdr-btn{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#6b7256;
+        background:#fff;border:1px solid #dcdccf;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
+        white-space:nowrap;text-decoration:none;font-family:inherit;transition:all .12s ease;}
+      .hdr-btn:hover{background:#f1f2ec;border-color:#c9cdbb;color:#4f5838;}
+      /* La única acción irreversible NO debe ser lo más llamativo: arranca discreta y se tiñe al hover. */
+      .hdr-danger{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#8a8f78;
+        background:transparent;border:1px solid transparent;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
+        white-space:nowrap;font-family:inherit;cursor:pointer;transition:all .12s ease;}
+      .hdr-danger:hover{background:#f7ecea;border-color:#e6c9c4;color:#a1443a;}
       .bkg-info{border:1px solid #ece8dd;border-radius:14px;overflow:hidden;background:#fff;}
       .bkg-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
         padding:20px 26px;background:linear-gradient(135deg,#f7f6f1 0%,#ffffff 60%);border-bottom:1px solid #ece8dd;}
@@ -86,6 +106,11 @@
       .bkg-count-total{font-size:1.05rem;font-weight:600;color:#8a8f78;}
       .bkg-count-cap{font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;color:#8a8f78;font-weight:700;margin-left:7px;}
       .bkg-extra{padding:16px 26px;border-top:1px solid #ece8dd;}
+      /* Notas de la cotización: mismo patrón que los tiles (etiqueta en versalitas + valor), sin la
+         caja gris ni el filete ámbar que tenía. Ya vive en su propia franja separada por el borde
+         superior de .bkg-extra, así que el fondo solo sumaba un marco dentro de otro. Va a un cuerpo
+         de texto normal en vez del .bkg-val de los tiles: son párrafos, no un dato de una línea. */
+      .bkg-note{font-size:.95rem;color:#4a4a44;line-height:1.5;white-space:pre-line;word-break:break-word;}
       /* Resumen Financiero */
       .fin-hero{padding-bottom:18px;margin-bottom:16px;border-bottom:1px solid #ece8dd;}
       .fin-hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
@@ -229,13 +254,8 @@
 
         <!-- Notas de la cotización (solo cuando existen) -->
         <div class="bkg-extra d-none" id="infoQuoteNotesRow">
-            <div class="p-2 rounded" style="background:#f8f9fa;border-left:3px solid #b8894a;">
-                <div class="d-flex align-items-center mb-1">
-                    <i class="ti ti-notes me-1" style="color:#b8894a;"></i>
-                    <strong style="font-size:0.85rem;color:#6b5a3f;">Notas de la cotización</strong>
-                </div>
-                <div id="infoQuoteNotes" class="text-dark" style="white-space:pre-line;word-break:break-word;font-size:0.9rem;"></div>
-            </div>
+            <div class="bkg-lbl"><i class="ti ti-notes"></i> Notas de la cotización</div>
+            <div class="bkg-note" id="infoQuoteNotes"></div>
         </div>
     </div>
 
@@ -281,18 +301,14 @@
     </div>
 
     <!-- Services by Day -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
-            <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-list-details me-2"></i>Servicios
-                </h5>
-                <a class="btn btn-sm btn-light d-none" id="exportItineraryBtn" href="#" target="_blank" rel="noopener" title="Abrir itinerario de viaje (exportable a PDF)">
-                    <i class="ti ti-file-export me-1"></i>Exportar itinerario
-                </a>
-            </div>
+    <div class="svc-wrap">
+        <div class="fin-section-head">
+            <h5 class="fin-section-title"><i class="ti ti-list-details me-2"></i>Servicios</h5>
+            <a class="btn btn-sm btn-outline-secondary d-none" id="exportItineraryBtn" href="#" target="_blank" rel="noopener" title="Abrir itinerario de viaje (exportable a PDF)">
+                <i class="ti ti-file-export me-1"></i>Exportar itinerario
+            </a>
         </div>
-        <div class="card-body p-0" id="servicesContainer">
+        <div id="servicesContainer">
             <!-- Services will be rendered here -->
         </div>
     </div>
@@ -836,6 +852,198 @@
 @media (prefers-reduced-motion: reduce) {
     #paymentsOffcanvas .pay-skel { animation: none; }
 }
+/* Panel de Servicios: mismo contenedor que el Resumen Financiero (fin-wrap + fin-section-head) en vez
+   del card-header con gradiente verde, que era el único bloque de la página fuera de la paleta. La
+   lista sangra hasta el borde con margen negativo para que las bandas de día y los separadores de fila
+   sigan corriendo a todo lo ancho, como cuando el card-body llevaba p-0; overflow:hidden recorta la
+   última fila contra la esquina redondeada. */
+.svc-wrap {
+    border: 1px solid #ece8dd;
+    border-radius: 14px;
+    background: #fff;
+    padding: 20px 22px 0;
+    overflow: hidden;
+}
+.svc-wrap #servicesContainer { margin: 0 -22px; }
+/* El botón de exportar venía en btn-light (pensado para el header de color): sobre blanco se perdía. */
+.svc-wrap .btn-outline-secondary { border-color: #dcdccf; color: #6b7256; }
+.svc-wrap .btn-outline-secondary:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
+/* ===== Lista de servicios con la maqueta del itinerario =====
+   Misma línea de tiempo que /reservations/:folio/itinerary: barra de día, riel con ícono circular y
+   el cuerpo del servicio a la derecha. Lo que el itinerario YA acomoda (hora, título, Desde/Hacia)
+   toma su formato; lo que no contempla —detalles del subconcepto, asignaciones, estado, precio y las
+   acciones— se conserva dentro del mismo cuerpo, sin perder nada. */
+/* Misma tipografía que el itinerario: Myriad Pro en el cuerpo y Arpona en la barra de día (allá son
+   las variantes *PDF, incrustadas en base64 para el render de puppeteer; aquí las de /css/fonts.css).
+   Se limita a la lista de servicios: el resto del dashboard va en Inter y mezclar en toda la página
+   sería otro cambio, mucho mayor. */
+.svc-timeline {
+    --svc-pad: 15px;
+    --svc-icon: 56px;
+    --svc-gutter: 22px;
+    font-family: var(--font-myriad, 'Segoe UI', Tahoma, sans-serif);
+}
+/* Barra de día igual que .itin-day-bar del itinerario: franja gris sólida a todo lo ancho, texto
+   blanco, 0.8rem con peso 500 y letter-spacing de 1px. */
+.svc-day-bar {
+    background: #888888;
+    color: #fff;
+    font-family: var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 1px;
+    padding: 3px var(--svc-gutter, 22px);
+}
+.svc-entry {
+    position: relative;
+    display: flex;
+    gap: 14px;
+    padding: var(--svc-pad) var(--svc-gutter);
+}
+/* Sin realce al pasar el mouse: los PNG del riel no tienen canal alfa, así que su recuadro blanco se
+   recortaba contra el tinte de la fila. */
+/* La línea baja del ícono de este servicio al del siguiente: el tramo negativo cruza el relleno que
+   los separa. En el último de cada día no se dibuja, así el riel no cuelga sobre la barra siguiente. */
+.svc-entry:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: calc(var(--svc-gutter) + var(--svc-icon) / 2 - 0.75px);
+    top: calc(var(--svc-pad) + var(--svc-icon));
+    bottom: calc(-1 * var(--svc-pad));
+    width: 1.5px;
+    background: #e4e6d8;
+}
+/* Sin círculo propio: los PNG de /images/icons ya traen el suyo dibujado, así que un borde alrededor
+   duplicaba el aro. La imagen ocupa toda la casilla del riel.
+   El fondo se queda BLANCO —igual que .itin-icon en el itinerario— porque esos PNG no tienen canal
+   alfa: pintan un recuadro opaco. Coincidir con su blanco evita la costura y de paso tapa la línea
+   del riel, que es lo que hace que se vea perforada por cada ícono. */
+.svc-icon {
+    position: relative;
+    z-index: 1;
+    width: var(--svc-icon);
+    height: var(--svc-icon);
+    flex-shrink: 0;
+    background: #fff;
+}
+.svc-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.svc-body { flex: 1; min-width: 0; }
+.svc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.svc-head-main { min-width: 0; flex: 1; }
+/* Misma tipografía que .itin-time del itinerario: 0.95rem, peso 700, en un solo tono — la duración no
+   se distingue de la hora, se lee como una sola línea. */
+.svc-time { font-size: 0.95rem; font-weight: 700; color: #1b1b1b; }
+.svc-title { font-size: 1.02rem; font-weight: 700; color: #2b2b2b; line-height: 1.3; word-break: break-word; }
+.svc-route { margin-top: 2px; font-size: 0.86rem; color: #6b6656; line-height: 1.45; }
+.svc-route b { color: #2b2b2b; font-weight: 600; }
+.svc-route .lbl { color: #8a8f78; }
+/* Personas: línea destacada bajo el título, igual que el .itin-sub en negrita del itinerario. */
+.svc-people { margin-top: 6px; font-size: 0.86rem; color: #6c757d; }
+/* Nombres de las personas: mismo tono que el conteo, sin negrita — el conteo es el dato destacado. */
+.svc-names { margin-top: 2px; font-size: 0.86rem; color: #6c757d; }
+/* Vuelos: misma mini tabla que .itin-flight del itinerario — encabezado chico en gris y el valor en
+   negrita debajo. Con varios vuelos, cada uno añade un renglón de valores bajo el mismo encabezado
+   (el itinerario solo contempla uno). */
+.svc-flight {
+    display: grid;
+    grid-template-columns: repeat(5, auto);
+    justify-content: start;
+    gap: 2px 28px;
+    margin-top: 8px;
+}
+.svc-flight .h { font-size: 0.7rem; color: #8a8a8a; }
+.svc-flight .v { font-size: 0.9rem; color: #1b1b1b; font-weight: 600; }
+/* Notas: mismo tratamiento que .itin-desc — texto corrido justificado, sin caja ni filete de color.
+   El rótulo del canal se conserva en versalitas porque aquí sí hay que distinguir a quién va dirigida
+   cada nota (proveedor / equipo / interna), cosa que el itinerario no necesita.
+
+   El color del rótulo pasó de los cinco tonos de Bootstrap (cian, azul, verde, naranja, morado) a
+   tres de la paleta de marca, y los tres CODIFICAN algo cierto: quién puede leer la nota. Antes eran
+   cinco matices arbitrarios que además peleaban con el olivo del resto de la lista. */
+.svc-note { margin-top: 8px; }
+.svc-note-lbl {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    /* 0.09em, igual que .svc-assign-role: los dos son rótulos en versalitas del mismo nivel. */
+    letter-spacing: 0.09em;
+    color: #8a8f78;
+}
+/* Visible para el cliente. */
+.svc-note-lbl.is-client { color: #6e7a50; }
+/* Operación con terceros: proveedor y equipo. */
+.svc-note-lbl.is-ops { color: #b8894a; }
+/* Solo interno. */
+.svc-note-lbl.is-internal { color: #6b6656; }
+.svc-note-body {
+    margin-top: 2px;
+    color: #555;
+    line-height: 1.55;
+    white-space: pre-line;
+    text-align: justify;
+    word-break: break-word;
+}
+.svc-notes-list { margin: 6px 0 0; padding-left: 1.2em; }
+.svc-notes-list li { list-style: disc; margin: 2px 0; }
+.svc-vehicle { margin-top: 2px; font-size: 0.8rem; color: #8a8f78; }
+.svc-side { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+.svc-price { font-weight: 700; color: #2b2b2b; white-space: nowrap; text-align: right; min-width: 90px; }
+/* Asignaciones en el formato del itinerario (opción B): un renglón por pareja chofer+vehículo y
+   los roles al final. Sin marco ni filete lateral: los avatares ya forman su propia columna y el
+   bloque queda alineado con el título y la ruta del servicio, como en el itinerario. */
+.svc-assign {
+    margin-top: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+.svc-assign-empty { font-size: 0.8rem; color: #a8ac98; font-style: italic; }
+.svc-assign-row { display: flex; align-items: center; gap: 0.7rem; }
+.svc-av {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eef0e8;
+    color: #6f7459;
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+.svc-av img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
+.svc-av-veh { background: #f3f1ea; color: #a89a7a; font-size: 1.35rem; }
+/* Plaza vacía: punteada y sin relleno, para que el hueco se lea sin gritar. */
+.svc-av-pend { background: #fff; border: 1.5px dashed #d4d0c2; color: #b9b5a6; font-size: 1.35rem; }
+/* Los dos avatares se solapan para que la pareja se lea como una sola unidad. El aro blanco que
+   los separa va en box-shadow, NO en border: con border, este selector (más específico) le ganaba
+   a .svc-av-pend y le borraba el punteado al segundo círculo de una plaza vacía. */
+.svc-duo { display: flex; flex-shrink: 0; }
+.svc-duo .svc-av + .svc-av { margin-left: -13px; box-shadow: 0 0 0 2px #fff; }
+.svc-assign-meta { font-size: 0.86rem; line-height: 1.45; color: #6b6656; min-width: 0; }
+.svc-assign-meta .n { font-size: 0.94rem; font-weight: 700; color: #2b2b2b; }
+/* Va después de `.n` y con la clase encadenada: si no, `.svc-assign-meta .n` le gana el peso y
+   el color, y el renglón pendiente se vería igual que uno asignado. */
+.svc-assign-meta .svc-pend-txt,
+.svc-assign-meta .n.svc-pend-txt { font-style: italic; font-weight: 400; color: #a09c8d; }
+/* El tipo esperado de una plaza vacía: conserva la negrita porque ES el sujeto del renglón, pero
+   apagado para que no compita con un vehículo ya asignado. Sin itálica: es un dato, no un estado.
+   Encadenada por lo mismo que la regla de arriba — `.svc-assign-meta .n` le ganaría el color. */
+.svc-assign-meta .n.svc-pend-name { color: #8a8f78; }
+.svc-assign-role { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 700; color: #8a8f78; }
+.svc-assign-tel { color: #6b6656; text-decoration: none; }
+.svc-assign-tel:hover { color: #566040; text-decoration: underline; }
+.svc-seg-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+@media (max-width: 576px) {
+    .svc-timeline { --svc-gutter: 14px; --svc-icon: 44px; }
+    .svc-side { width: 100%; justify-content: flex-end; }
+}
 .service-row {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid #f0f0f0;
@@ -972,59 +1180,123 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
     }
 
-    function buildVehicleCard(vehicle) {
-        if (!vehicle) return '';
-        const name = vehicle.name || 'Vehiculo';
-        const photo = vehicle.imageUrl || '';
-        const initials = name.substring(0, 2).toUpperCase();
-        const photoHtml = photo
-            ? `<img src="${photo}" class="rounded-circle photo-preview-trigger" width="36" height="36" style="object-fit:cover;cursor:pointer" data-photo="${photo}" data-name="${name.replace(/"/g, '&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-            : '';
-        const initialsDisplay = photo ? 'display:none' : 'display:flex';
-        return `
-            <div class="d-flex align-items-center gap-2 mb-2">
-                ${photoHtml}
-                <span class="rounded-circle bg-secondary-subtle text-secondary align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;${initialsDisplay};font-size:0.8rem;font-weight:600">${initials}</span>
-                <div>
-                    <div class="fw-semibold small">${name}</div>
-                    <small class="text-secondary"><i class="ti ti-car me-1"></i>Vehiculo</small>
-                </div>
-            </div>`;
+    // ------------------------------------------------------------------
+    // Asignaciones en el formato del itinerario (opción B): chofer y vehículo van EMPAREJADOS
+    // porque se leen como una sola cosa —«Juan en la Hiace, placas ABC-12-34»—. En tarjetas o
+    // renglones separados la relación quedaba a merced de la adyacencia, y con dos vehículos
+    // dejaba de leerse. El segmento (Green Class / Premium) identifica cada unidad.
+    //
+    // A diferencia del itinerario, aquí se conservan las dos afordancias que el operador ya
+    // tenía: la foto se amplía al clic (photo-preview-trigger) y el teléfono es un enlace tel:.
+    // También se conserva su vocabulario: "pendiente", no el "por confirmar" del cliente.
+    // ------------------------------------------------------------------
+    // `vehicleType` guarda normalmente el objectId del catálogo, pero en algunos registros trae el
+    // NOMBRE ("SEDAN") en ese campo. Aprovecharlo sirve —el tipo se recupera sin tocar la base—,
+    // salvo que un objectId real se colaría a la pantalla como si fuera un modelo de camioneta.
+    // Los objectId de Parse son 10 alfanuméricos con mayúsculas y minúsculas mezcladas; ningún
+    // nombre del catálogo tiene esa forma (SEDAN, SUBURBAN, JAC Sunray, Van Turística…).
+    function vehicleTypeAsName(value) {
+        const v = String(value == null ? '' : value).trim();
+        if (!v) return '';
+        const looksLikeObjectId = /^[A-Za-z0-9]{10}$/.test(v) && /[a-z]/.test(v) && /[A-Z]/.test(v);
+        return looksLikeObjectId ? '' : v;
     }
 
-    // Group a driver and a vehicle into one visual unit so it's obvious which conductor
-    // is paired with which vehicle. The label sits on top (e.g. "Vehículo principal").
-    // If only one side is assigned, the other is shown as a muted "Pendiente" placeholder
-    // so the operator still sees the slot exists.
-    function buildPairCard(label, driver, vehicle, expectedVehicleName) {
-        const hasDriver = !!(driver && driver.fullName);
-        const hasVehicle = !!(vehicle && vehicle.name);
-        if (!hasDriver && !hasVehicle) return '';
+    // La foto va ENCIMA de las iniciales, así que si la URL falla quedan las iniciales visibles
+    // en vez de un círculo vacío (el patrón anterior alternaba display y dependía del hermano).
+    function svcAvatar(person) {
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        const name = (person && person.fullName) || '';
+        const photo = (person && person.profilePhotoUrl) || '';
+        const img = photo
+            ? `<img src="${esc(photo)}" class="photo-preview-trigger" data-photo="${esc(photo)}" data-name="${esc(name)}" onerror="this.remove()">`
+            : '';
+        return `<span class="svc-av">${esc(getInitials(name) || '·')}${img}</span>`;
+    }
 
-        const driverHtml = hasDriver
-            ? buildPersonCard(driver, 'Conductor', 'ti-steering-wheel', 'info')
-            : `<div class="d-flex align-items-center gap-2 mb-2 text-muted" style="opacity:0.6">
-                    <span class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;font-size:0.9rem"><i class="ti ti-steering-wheel"></i></span>
-                    <div>
-                        <div class="small fst-italic">Conductor pendiente</div>
-                    </div>
-               </div>`;
+    function svcVehicleAvatar(vehicle) {
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        const name = (vehicle && vehicle.name) || '';
+        const photo = (vehicle && vehicle.imageUrl) || '';
+        const img = photo
+            ? `<img src="${esc(photo)}" class="photo-preview-trigger" data-photo="${esc(photo)}" data-name="${esc(name)}" onerror="this.remove()">`
+            : '';
+        return `<span class="svc-av svc-av-veh"><i class="ti ti-car"></i>${img}</span>`;
+    }
 
-        const vehicleHtml = hasVehicle
-            ? buildVehicleCard(vehicle)
-            : `<div class="d-flex align-items-center gap-2 mb-2 text-muted" style="opacity:0.6">
-                    <span class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;font-size:0.9rem"><i class="ti ti-car"></i></span>
-                    <div>
-                        <div class="small fst-italic">${expectedVehicleName ? expectedVehicleName + ' pendiente' : 'Vehículo pendiente'}</div>
-                    </div>
-               </div>`;
+    function svcPendingAvatar(icon) {
+        return `<span class="svc-av svc-av-pend"><i class="ti ti-${icon}"></i></span>`;
+    }
 
-        return `
-            <div class="p-2 rounded" style="background: #f8f9fa; min-width: 230px; flex: 0 0 auto;">
-                ${label ? `<div class="small fw-semibold text-secondary mb-1">${label}</div>` : ''}
-                ${driverHtml}
-                ${vehicleHtml}
-            </div>`;
+    // Punto del segmento: el color se VALIDA en vez de escaparse, porque entra a un style inline.
+    function svcSegmentBit(pair) {
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        if (!pair.segmentName) return '';
+        const color = /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20})$/.test(String(pair.segmentColor || '').trim())
+            ? String(pair.segmentColor).trim() : '';
+        const dot = color ? `<span class="svc-seg-dot" style="background:${color};"></span>` : '';
+        return `${dot}${esc(pair.segmentName)}`;
+    }
+
+    // Segunda línea: segmento, plaza, lo que falta, placas y teléfono. La mitad faltante va antes
+    // de las placas porque es la información accionable para quien está asignando.
+    function svcPairDetail(pair) {
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        const bits = [];
+        const seg = svcSegmentBit(pair);
+        if (seg) bits.push(seg);
+        if (pair.slotLabel) bits.push(esc(pair.slotLabel));
+        if (pair.needsDriver) bits.push('<span class="svc-pend-txt">Conductor pendiente</span>');
+        if (pair.needsVehicle) {
+            bits.push(`<span class="svc-pend-txt">${pair.expectedVehicleName
+                ? `${esc(pair.expectedVehicleName)} pendiente` : 'Vehículo pendiente'}</span>`);
+        }
+        if (pair.vehicle && pair.vehicle.plate) bits.push(`Placas ${esc(pair.vehicle.plate)}`);
+        if (pair.driver && pair.driver.phone) {
+            bits.push(`<a href="tel:${esc(pair.driver.phone)}" class="svc-assign-tel">${esc(pair.driver.phone)}</a>`);
+        }
+        return bits.join(' · ');
+    }
+
+    function svcPairRow(pair) {
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        const duo = `<span class="svc-duo">${
+            pair.driver ? svcAvatar(pair.driver) : (pair.pending || pair.needsDriver ? svcPendingAvatar('steering-wheel') : '')
+        }${
+            pair.vehicle ? svcVehicleAvatar(pair.vehicle) : (pair.pending || pair.needsVehicle ? svcPendingAvatar('car') : '')
+        }</span>`;
+        if (pair.pending) {
+            // La negrita lleva el tipo esperado; el estado baja a la segunda línea, junto al
+            // segmento y a la plaza que ocupa.
+            const bits = [];
+            const seg = svcSegmentBit(pair);
+            if (seg) bits.push(seg);
+            if (pair.slotLabel) bits.push(esc(pair.slotLabel));
+            bits.push('<span class="svc-pend-txt">Pendiente</span>');
+            return `<div class="svc-assign-row">${duo}<div class="svc-assign-meta">
+                <div class="n svc-pend-name">${esc(pair.label)}</div>
+                <div>${bits.join(' · ')}</div>
+            </div></div>`;
+        }
+        const name = [pair.driver && pair.driver.fullName, pair.vehicle && pair.vehicle.name]
+            .filter(Boolean).map(esc).join(' · ');
+        const detail = svcPairDetail(pair);
+        return `<div class="svc-assign-row">${duo}<div class="svc-assign-meta">
+            <div class="n">${name}</div>${detail ? `<div>${detail}</div>` : ''}
+        </div></div>`;
+    }
+
+    function svcRoleRow(row) {
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        const p = row.person;
+        const avatar = p ? svcAvatar(p) : svcPendingAvatar('user');
+        const body = p
+            ? `<div class="n">${esc(p.fullName)}</div>${p.phone
+                ? `<div><a href="tel:${esc(p.phone)}" class="svc-assign-tel">${esc(p.phone)}</a></div>` : ''}`
+            : '<div class="n svc-pend-txt">Pendiente</div>';
+        return `<div class="svc-assign-row">${avatar}<div class="svc-assign-meta">
+            <div class="svc-assign-role">${esc(row.role)}</div>${body}
+        </div></div>`;
     }
 
     // Quote statuses — kept as an ORDERED array (lifecycle: cotizada → solicitada →
@@ -1229,6 +1501,200 @@ document.addEventListener('DOMContentLoaded', async function() {
         return icons[type] || 'ti-point';
     }
 
+    // Notas en el formato del itinerario (renderNotes): las líneas que empiezan con "-" se convierten
+    // en viñetas y el resto queda como párrafos. ESCAPA el texto — antes se interpolaba crudo en el
+    // innerHTML, así que una nota con HTML se ejecutaba (stored XSS, el mismo vector que los tests ya
+    // cubren para referencia de pago y descripción de ajuste).
+    function renderServiceNotes(text) {
+        const esc = PaymentBreakdownHelpers.escapeHtml;
+        const lines = String(text == null ? '' : text).split('\n');
+        if (!lines.some((l) => l.trim().startsWith('-'))) return esc(text);
+        let html = '';
+        let inList = false;
+        for (const raw of lines) {
+            const line = raw.trim();
+            if (line.startsWith('-')) {
+                if (!inList) { html += '<ul class="svc-notes-list">'; inList = true; }
+                html += `<li>${esc(line.replace(/^-\s*/, ''))}</li>`;
+            } else {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (line) html += `<div>${esc(line)}</div>`;
+            }
+        }
+        if (inList) html += '</ul>';
+        return html;
+    }
+
+    // Composición de personas en el formato del itinerario ("3 adultos, 1 niño"), para mostrarla como
+    // una línea destacada bajo el título en vez de un renglón perdido dentro de la sección PERSONAS.
+    // A diferencia de peopleLabel() del itinerario, respeta los campos POR TIPO que usa esta vista
+    // (un traslado guarda su conteo en transportAdults, no en adultsQuantity) y conserva la distinción
+    // de "sin alcohol", que el itinerario fusiona con los adultos.
+    function servicePeopleLabel(svc) {
+        const sub = svc.subconcept || {};
+        const parts = [];
+        const push = (n, sing, plur) => { const v = Number(n) || 0; if (v > 0) parts.push(`${v} ${v === 1 ? sing : plur}`); };
+
+        if (svc.type === 'transport') {
+            push(sub.transportAdults, 'adulto', 'adultos');
+            push(sub.transportChildren, 'niño', 'niños');
+            push(sub.transportInfants, 'infante', 'infantes');
+        } else if (svc.type === 'experience') {
+            push(sub.adultsQuantity, 'adulto', 'adultos');
+            push(sub.childrenQuantity, 'niño', 'niños');
+            push(sub.adultsNoAlcoholQuantity, 'sin alcohol', 'sin alcohol');
+        } else if (svc.type === 'tour' && sub.isWalkingTour) {
+            push(sub.adultsQuantity, 'adulto', 'adultos');
+            push(sub.childrenQuantity, 'niño', 'niños');
+            push(sub.infantsQuantity, 'infante', 'infantes');
+            if (!parts.length) push(sub.walkingTourPeopleCount, 'persona', 'personas');
+        }
+        // Respaldo común: el conteo plano del servicio (o el de la reservación) cuando no hay desglose.
+        if (!parts.length) push(sub.persons || sub.numberOfPeople, 'persona', 'personas');
+        return parts.join(', ');
+    }
+
+    // Ubicaciones del servicio, como renglones etiquetados bajo el título (el hueco que dejó
+    // "Desde/Hacia"). En los TRASLADOS son las DIRECCIONES exactas de pick-up y drop-off: la ruta ya la
+    // dice el título, pero la calle y el punto de encuentro no estaban a la vista — vivían enterrados en
+    // la sección UBICACIONES. En tours y experiencias se conserva el origen/destino por nombre, porque
+    // ahí el título es el nombre del servicio y no dice de dónde sale.
+    function serviceLocationLines(svc) {
+        const sub = svc.subconcept || {};
+        const lines = [];
+        const add = (label, value) => {
+            const v = String(value == null ? '' : value).trim();
+            if (v) lines.push({ label, value: v });
+        };
+        if (svc.type === 'transport') {
+            if (sub.tripType === 'round-trip') {
+                add('Pick-up (ida)', sub.pickupAddressIda);
+                add('Drop-off (ida)', sub.dropoffAddressIda);
+                add('Pick-up (regreso)', sub.pickupAddressVuelta);
+                add('Drop-off (regreso)', sub.dropoffAddressVuelta);
+            } else {
+                add('Pick-up', sub.pickupAddress);
+                add('Drop-off', sub.dropoffAddress);
+            }
+        } else {
+            add('Desde', svc.originName);
+            add('Hacia', svc.destinationName);
+            add('Pick-up', sub.pickupAddress);
+        }
+        return lines;
+    }
+
+    // Nombres de las personas del servicio, justo bajo el conteo: esa línea dice CUÁNTOS ("3 adultos,
+    // 1 niño"), esta QUIÉNES. Sin rótulo ni contador: apiladas se entiende la relación, y un segundo
+    // conteo junto al primero invitaba a leer un error cuando difieren (los nombres capturados no
+    // tienen por qué ser todos los pasajeros).
+    function serviceAttendeesLine(svc) {
+        const sub = svc.subconcept || {};
+        if (!Array.isArray(sub.attendees)) return '';
+        const names = sub.attendees.map((n) => String(n == null ? '' : n).trim()).filter(Boolean);
+        if (!names.length) return '';
+        return `<div class="svc-names">${PaymentBreakdownHelpers.escapeHtml(names.join(', '))}</div>`;
+    }
+
+    // Hora OPERATIVA del servicio: cuándo hay que estar ahí. En un traslado de SALIDA a aeropuerto hay
+    // DOS horas distintas y no son intercambiables:
+    //   svc.time                     -> hora del VUELO (18:00) — su lugar es la tabla de Vuelos
+    //   flightDepartureTimeSuggested -> hora de PICK-UP (14:15), calculada hacia atrás desde el vuelo
+    //                                   restando la ruta y la anticipación de aeropuerto
+    // Para el chofer manda la de pick-up, así que es la que encabeza el servicio. En LLEGADAS hay una
+    // sola —el chofer pasa cuando aterriza el avión—, así que ahí no cambia nada.
+    function servicePickupTime(svc) {
+        const sub = svc.subconcept || {};
+        if (svc.type === 'transport' && sub.transportType === 'aeropuerto' && sub.directionType === 'departure') {
+            const suggested = svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested;
+            if (suggested) return roundTimeToNearest15(suggested) || suggested;
+        }
+        let t = svc.time || sub.startTime || sub.time || '';
+        if (!t && sub.selectedSchedule) {
+            const m = String(sub.selectedSchedule).match(/^(\d{1,2}:\d{2})/);
+            if (m) [, t] = m;
+        }
+        return t;
+    }
+
+    // Hora del VUELO, cuando es un dato distinto al pick-up (solo salidas a aeropuerto). Sirve para
+    // aclarar en el encabezado que la hora mostrada NO es la del avión.
+    function serviceFlightTime(svc) {
+        const sub = svc.subconcept || {};
+        if (svc.type !== 'transport' || sub.transportType !== 'aeropuerto') return '';
+        const m = String(svc.time || sub.time || sub.selectedSchedule || '').match(/^(\d{1,2}:\d{2})/);
+        return m ? m[1] : '';
+    }
+
+    // Duración del servicio POR TIPO, mismo criterio que serviceDuration() del itinerario: cada tipo la
+    // guarda en un campo distinto y no son intercambiables.
+    //   a-disposición      -> hours          (horas contratadas)
+    //   tour / experiencia -> duration       (duración del catálogo, en horas)
+    //   traslado           -> routeDuration  (duración de la ruta, en MINUTOS)
+    //   concepto           -> ninguna
+    // El orden importa: los subconceptos arrastran un `duration: 1` espurio en todo lo que no es tour,
+    // así que con `duration` primero un a-disposición de 6 h se anunciaba como "1 h".
+    // El texto sigue el mismo formato que durationLabel() del itinerario ("4 hours", "1 h 45 min"),
+    // pero con la palabra en español: aquella plantilla es de cara al cliente y está en inglés, esta
+    // vista es interna. Misma forma, mismo idioma que el resto de la pantalla.
+    function serviceDurationLabel(svc) {
+        const sub = svc.subconcept || {};
+        const hoursLabel = (h) => `${h} hora${h === 1 ? '' : 's'}`;
+        if (svc.type === 'a-disposicion') {
+            const h = Number(sub.hours || 0);
+            return h > 0 ? hoursLabel(h) : '';
+        }
+        if (svc.type === 'tour' || svc.type === 'experience') {
+            const h = Number(sub.duration || sub.hours || 0);
+            return h > 0 ? hoursLabel(h) : '';
+        }
+        if (svc.type === 'transport') {
+            const min = Number(sub.routeDuration || 0);
+            if (min <= 0) return '';
+            const h = Math.floor(min / 60);
+            const m = min % 60;
+            if (h === 0) return `${m} min`;
+            return m ? `${h} h ${m} min` : hoursLabel(h);
+        }
+        return '';
+    }
+
+    // Etiqueta del día con el mismo formato que dayLabel() de reservation-itinerary.ejs
+    // ("Miércoles. Jul 29"), pero con los días en español: aquella plantilla es de cara al cliente y
+    // está en inglés, esta vista es interna y va en español (usa el mismo DOW_ES que ya declara).
+    const SVC_DOW = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const SVC_MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto',
+        'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    function itinDayLabel(dateStr) {
+        if (!dateStr) return '';
+        // "YYYY-MM-DD" se arma como fecha LOCAL (igual que toDate del itinerario): pasarla por
+        // new Date(str) la interpretaría como UTC y correría el día en zonas con offset negativo.
+        const plain = /^\d{4}-\d{2}-\d{2}$/.test(String(dateStr));
+        const d = plain
+            ? (() => { const [y, m, dd] = String(dateStr).split('-').map(Number); return new Date(y, m - 1, dd); })()
+            : new Date(dateStr);
+        if (Number.isNaN(d.getTime())) return '';
+        return `${SVC_DOW[d.getDay()]}. ${SVC_MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
+    }
+
+    // Ícono del riel de la línea de tiempo: MISMO criterio que iconKey() de reservation-itinerary.ejs,
+    // para que un servicio se vea igual en la lista y en el itinerario. Son PNG de /images/icons, no
+    // la fuente Tabler (que además no tenía glifo para todos los tipos).
+    // Los tipos que el itinerario no distingue caen en su mismo default ('experience'), salvo
+    // a-disposición: es transporte con vehículo, así que comparte el ícono de traslado.
+    function getServiceIconKey(svc) {
+        const sub = svc.subconcept || {};
+        const transportType = sub.transportType || svc.transportType;
+        const directionType = sub.directionType || svc.directionType;
+        if (svc.type === 'transport' || svc.type === 'traslado') {
+            if (transportType === 'aeropuerto') return directionType === 'departure' ? 'departure' : 'arrival';
+            return 'transfer';
+        }
+        if (svc.type === 'tour') return 'city';
+        if (svc.type === 'a-disposicion') return 'transfer';
+        return 'experience';
+    }
+
     function getServiceTypeLabel(type) {
         const labels = {
             transport: 'Transporte',
@@ -1404,7 +1870,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const scEl = document.getElementById('infoServiceCustomer');
         if (d.serviceCustomer) {
-            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Seguidor', 'ti-headset', 'primary');
+            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Customer Support', 'ti-headset', 'primary');
         } else {
             scEl.innerHTML = '<span class="text-muted">Sin asignar</span>';
         }
@@ -1419,12 +1885,19 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const actions = document.getElementById('headerActions');
         const folio = encodeURIComponent(d.folio || '');
-        const exportBtnHtml = folio
-            ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir la confirmación (vista pública, exportable a PDF)"><i class="ti ti-file-export me-1"></i>Exportar confirmación</a>`
-            : '';
-        // Placeholder: la vista/ruta del contrato aún no existe; se cablea después.
-        const contractBtnHtml = folio
-            ? `<button type="button" class="btn btn-sm btn-outline-secondary" id="exportContractBtn" title="Contrato de servicio (próximamente)" disabled><i class="ti ti-file-text me-1"></i>Exportar contrato de servicio</button>`
+        // Las dos exportaciones van juntas en un control segmentado: son la misma acción con dos
+        // variantes, así que "Exportar" queda implícito en el grupo y cada botón solo nombra el
+        // documento. El aria-label/title conserva la frase completa para lector de pantalla y hover.
+        // El contrato es un placeholder: la vista/ruta aún no existe; se cablea después.
+        const exportSegHtml = folio
+            ? `<span class="hdr-seg" role="group" aria-label="Exportar">
+                <a class="hdr-seg-btn" href="/reservations/${folio}" target="_blank" rel="noopener"
+                   title="Exportar confirmación — abre la vista pública, exportable a PDF"
+                   aria-label="Exportar confirmación"><i class="ti ti-file-export"></i>Confirmación</a>
+                <button type="button" class="hdr-seg-btn" id="exportContractBtn"
+                   title="Exportar contrato de servicio — próximamente"
+                   aria-label="Exportar contrato de servicio" disabled><i class="ti ti-file-text"></i>Contrato</button>
+              </span>`
             : '';
         // En vez del botón de cancelar: si ya está cancelada, mostrar etiqueta
         // "Cancelada"; si tiene una solicitud de cancelación pendiente, mostrar
@@ -1435,9 +1908,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         } else if (d.hasPendingCancellation) {
             cancelBtnHtml = `<span class="badge bg-warning text-dark border border-danger-subtle" title="Tiene una solicitud de cancelación pendiente de aprobación"><i class="ti ti-clock me-1"></i>Pendiente de cancelación</span>`;
         } else if (canAssign) {
-            cancelBtnHtml = `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservacion</button>`;
+            cancelBtnHtml = `<button type="button" class="hdr-danger" id="cancelResBtn"><i class="ti ti-x"></i>Cancelar reservación</button>`;
         }
-        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${contractBtnHtml}${cancelBtnHtml}</div>`;
+        actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportSegHtml}${cancelBtnHtml}</div>`;
         // Botón "Exportar itinerario" del header de Servicios → página de itinerario (exportable a PDF).
         const itinBtn = document.getElementById('exportItineraryBtn');
         if (itinBtn && folio) {
@@ -1506,13 +1979,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         // ===== Sections (replaces the legacy badge row) =====
         // Build categorized detail lines so the operator can scan the info quickly.
 
-        // SERVICIO — trip type / direction, vehicle count, included roles, hotel, etc.
+        // SERVICIO — vehicle count, included roles, hotel, etc.
+        // "Sencillo — Salida" salió de aquí: la DIRECCIÓN ya la dice el ícono del riel (arrival.png vs
+        // departure.png en traslados de aeropuerto) y el REDONDO se ve en Ubicaciones, que en ese caso
+        // desglosa pick-up y drop-off de ida y de regreso.
         const servicioItems = [];
-        if (svc.type === 'transport' && sub.tripType) {
-            const tripLabel = sub.tripType === 'round-trip' ? 'Redondo' : 'Sencillo';
-            const dirLabel = sub.directionType === 'arrival' ? 'Llegada' : 'Salida';
-            servicioItems.push(detailLine('arrows-exchange', `${tripLabel} — ${dirLabel}`));
-        }
         if (svc.type === 'a-disposicion' && sub.vehicleCount && sub.vehicleCount > 0) {
             servicioItems.push(detailLine('car', `${sub.vehicleCount} vehículo${sub.vehicleCount > 1 ? 's' : ''}`));
         }
@@ -1557,35 +2028,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         }
 
-        // HORARIO — schedule / duration / suggested times.
+        // HORARIO — solo lo que NO está ya en el encabezado del servicio.
+        // La hora de pick-up de los traslados de aeropuerto salió de aquí: ahora encabeza el servicio
+        // (servicePickupTime), donde se lee de inmediato en vez de bajo un rótulo "Horario" que no
+        // decía de qué hora hablaba. La del vuelo vive en la tabla de Vuelos.
         const horarioItems = [];
-        if (svc.type === 'transport' && sub.transportType === 'aeropuerto') {
-            const isDeparture = sub.directionType === 'departure';
-            const isArrival = sub.directionType === 'arrival';
-            let rawTime = '';
-            let timeLabel = '';
-            if (isDeparture && (svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested)) {
-                // Salida: la hora sugerida ES la hora de pick-up del servicio.
-                rawTime = svc.flightDepartureTimeSuggested || sub.flightDepartureTimeSuggested;
-                timeLabel = 'Horario';
-            } else if (isArrival) {
-                // Llegada: el pick-up ocurre a la hora de llegada del pasajero.
-                rawTime = sub.startTime || sub.time || svc.time || '';
-                if (!rawTime && sub.selectedSchedule) {
-                    const m = String(sub.selectedSchedule).match(/^(\d{1,2}:\d{2})/);
-                    if (m) rawTime = m[1];
-                }
-                timeLabel = 'Horario';
-            }
-            const rounded = rawTime ? roundTimeToNearest15(rawTime) : '';
-            if (rounded) horarioItems.push(detailLine('clock', rounded, timeLabel));
-        }
-        if (sub.selectedSchedule && (svc.type === 'experience' || svc.type === 'a-disposicion')) {
-            horarioItems.push(detailLine('clock', sub.selectedSchedule, 'Horario'));
-        }
-        if (sub.hours && sub.hours > 0 && svc.type === 'a-disposicion') {
-            horarioItems.push(detailLine('clock-hour-4', `${sub.hours} h`, 'Duración'));
-        }
+        // El "Horario" de experiencias y a-disposición (selectedSchedule) también salió: su hora de
+        // inicio ya encabeza el servicio, y cuando es un rango ("09:00 – 15:00") el final se deduce de
+        // la duración que va al lado ("09:00 - 6 horas").
+        // La DURACIÓN (horas contratadas de a-disposición y duración de ruta de un traslado) ya se
+        // muestra junto a la hora, arriba del título — ver serviceDurationLabel. Aquí se repetía.
         if (sub.waitingTimeHours) {
             horarioItems.push(detailLine('clock-pause', `${sub.waitingTimeHours}h`, 'Espera'));
         }
@@ -1595,68 +2047,46 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if (wh > 0) horarioItems.push(detailLine('clock-pause', `${wh}h`, `Espera ${(v.vehicleTypeName || 'adicional')}`));
             });
         }
-        if (sub.routeDuration) {
-            horarioItems.push(detailLine('route', `${sub.routeDuration} min`, 'Duración ruta'));
+
+        // PERSONAS desapareció como sección: el CONTEO se movió a la línea destacada bajo el título
+        // (servicePeopleLabel) y la lista nominal de ASISTENTES a su propio renglón etiquetado, junto a
+        // las ubicaciones (serviceAttendeesLine). No quedaba nada más que mostrar aquí.
+        // "Walking tour" era lo único que se perdía al mover el conteo: su etiqueta describía la
+        // naturaleza del tour, no su gente. Pasa a SERVICIO, que es donde vive ese tipo de dato.
+        if (svc.type === 'tour' && sub.isWalkingTour) {
+            servicioItems.push(detailLine('walk', 'Walking tour'));
         }
 
-        // PERSONAS — passenger / ticket counts.
-        const personasItems = [];
-        if (svc.type === 'transport') {
-            const parts = [];
-            if (sub.transportAdults) parts.push(`${sub.transportAdults} adulto${sub.transportAdults > 1 ? 's' : ''}`);
-            if (sub.transportChildren) parts.push(`${sub.transportChildren} niño${sub.transportChildren > 1 ? 's' : ''}`);
-            if (sub.transportInfants) parts.push(`${sub.transportInfants} infante${sub.transportInfants > 1 ? 's' : ''}`);
-            if (parts.length === 0 && sub.persons) parts.push(`${sub.persons} persona${sub.persons > 1 ? 's' : ''}`);
-            if (parts.length) personasItems.push(detailLine('users', parts.join(', ')));
-        } else if (svc.type === 'experience') {
-            const tickets = [];
-            if (sub.adultsQuantity) tickets.push(`${sub.adultsQuantity} adulto${sub.adultsQuantity > 1 ? 's' : ''}`);
-            if (sub.childrenQuantity) tickets.push(`${sub.childrenQuantity} niño${sub.childrenQuantity > 1 ? 's' : ''}`);
-            if (sub.adultsNoAlcoholQuantity) tickets.push(`${sub.adultsNoAlcoholQuantity} sin alcohol`);
-            if (tickets.length) personasItems.push(detailLine('ticket', tickets.join(', ')));
-        } else if (svc.type === 'tour') {
-            if (sub.isWalkingTour) {
-                const adults = Number(sub.adultsQuantity) || 0;
-                const children = Number(sub.childrenQuantity) || 0;
-                const infants = Number(sub.infantsQuantity) || 0;
-                const parts = [];
-                if (adults) parts.push(`${adults} adulto${adults > 1 ? 's' : ''}`);
-                if (children) parts.push(`${children} niño${children > 1 ? 's' : ''}`);
-                if (infants) parts.push(`${infants} infante${infants > 1 ? 's' : ''}`);
-                const totalPeople = adults + children + infants || sub.walkingTourPeopleCount || 0;
-                personasItems.push(detailLine('walk', `${totalPeople} pax${parts.length ? ` (${parts.join(', ')})` : ''}`, 'Walking tour'));
-            } else if (sub.persons) {
-                personasItems.push(detailLine('users', `${sub.persons} persona${sub.persons > 1 ? 's' : ''}`));
-            }
-        }
-        // Asistentes (named list) — applies to all types.
-        if (Array.isArray(sub.attendees)) {
-            const names = sub.attendees.map((n) => String(n || '').trim()).filter(Boolean);
-            if (names.length > 0) {
-                personasItems.push(detailLine('user-check', `${names.join(', ')}`, `Asistentes (${names.length})`));
-            }
-        }
-
-        // VUELOS — airline + flight number + additional flights.
-        const vuelosItems = [];
+        // VUELOS — mini tabla en el formato del itinerario (.itin-flight): encabezado chico arriba y el
+        // valor en negrita abajo, en vez del renglón "AeroMéxico AM123 @ 14:15".
+        // Se conservan dos columnas que el itinerario no tiene: la HORA del vuelo (distinta al pick-up
+        // del Horario) y los VUELOS ADICIONALES, que aquí van como renglones extra de la misma tabla.
+        // Terminal y Puerta se incluyen por fidelidad, pero hoy siempre salen "—": el dato no existe en
+        // el modelo, y el itinerario también los deja fijos en "—".
+        const flightRows = [];
         if (svc.type === 'transport') {
             if (sub.airline || sub.flightNumber) {
-                const flightLabel = `${sub.airline || ''} ${sub.flightNumber || ''}`.trim();
                 // Hora real del vuelo (llegada o salida del avión), distinta al pick-up del Horario.
                 const fm = String(svc.time || sub.selectedSchedule || sub.time || '').match(/^(\d{1,2}:\d{2})/);
-                const flightTime = fm ? fm[1] : '';
-                vuelosItems.push(detailLine('plane', flightTime ? `${flightLabel} @ ${flightTime}` : flightLabel));
+                flightRows.push({ airline: sub.airline, flightNumber: sub.flightNumber, time: fm ? fm[1] : '' });
             }
-            if (Array.isArray(sub.additionalFlights) && sub.additionalFlights.length > 0) {
+            if (Array.isArray(sub.additionalFlights)) {
                 sub.additionalFlights.forEach((f) => {
-                    const parts = [(f.airline || '').trim(), (f.flightNumber || '').trim()].filter(Boolean).join(' ');
+                    const airline = (f.airline || '').trim();
+                    const flightNumber = (f.flightNumber || '').trim();
                     const time = (f.flightTime || '').trim();
-                    const label = parts || 'Vuelo';
-                    const text = time ? `${label} @ ${time}` : label;
-                    vuelosItems.push(detailLine('plane', text));
+                    if (airline || flightNumber || time) flightRows.push({ airline, flightNumber, time });
                 });
             }
         }
+        // El texto de aerolínea/vuelo lo escribe el usuario: se escapa (antes se interpolaba crudo).
+        const escF = PaymentBreakdownHelpers.escapeHtml;
+        const vuelosHtml = flightRows.length
+            ? `<div class="svc-flight">
+                 <div class="h">Aerolínea</div><div class="h">Vuelo</div><div class="h">Hora</div><div class="h">Terminal</div><div class="h">Puerta</div>
+                 ${flightRows.map((f) => `<div class="v">${escF(f.airline) || '—'}</div><div class="v">${escF(f.flightNumber) || '—'}</div><div class="v">${escF(f.time) || '—'}</div><div class="v">—</div><div class="v">—</div>`).join('')}
+               </div>`
+            : '';
 
         // OTROS — discounts, etc.
         const otrosItems = [];
@@ -1677,28 +2107,15 @@ document.addEventListener('DOMContentLoaded', async function() {
             otrosItems.push(detailLine('coin', `Propina${tPct} +${formatCurrency(sub.tipAmount, reservationData.currency)}${tMand}`));
         }
 
-        // UBICACIONES — direcciones de pick-up / drop-off (cuando existan).
-        const ubicacionesItems = [];
-        if (svc.type === 'transport') {
-            if (sub.tripType === 'round-trip') {
-                if (sub.pickupAddressIda) ubicacionesItems.push(detailLine('map-pin-up', sub.pickupAddressIda, 'Pick-up (ida)'));
-                if (sub.dropoffAddressIda) ubicacionesItems.push(detailLine('map-pin-down', sub.dropoffAddressIda, 'Drop-off (ida)'));
-                if (sub.pickupAddressVuelta) ubicacionesItems.push(detailLine('map-pin-up', sub.pickupAddressVuelta, 'Pick-up (regreso)'));
-                if (sub.dropoffAddressVuelta) ubicacionesItems.push(detailLine('map-pin-down', sub.dropoffAddressVuelta, 'Drop-off (regreso)'));
-            } else {
-                if (sub.pickupAddress) ubicacionesItems.push(detailLine('map-pin-up', sub.pickupAddress, 'Pick-up'));
-                if (sub.dropoffAddress) ubicacionesItems.push(detailLine('map-pin-down', sub.dropoffAddress, 'Drop-off'));
-            }
-        } else if (svc.type === 'tour' || svc.type === 'experience') {
-            if (sub.pickupAddress) ubicacionesItems.push(detailLine('map-pin-up', sub.pickupAddress, 'Pick-up'));
-        }
+        // UBICACIONES salió de las secciones: sus direcciones ahora encabezan el servicio como
+        // renglones etiquetados (serviceLocationLines), donde se leen sin tener que bajar la vista.
 
         const sectionsHtml = [
             detailSection('info-circle', 'Servicio', servicioItems),
-            detailSection('map-pin', 'Ubicaciones', ubicacionesItems),
             detailSection('clock', 'Horario', horarioItems),
-            detailSection('users', 'Personas', personasItems),
-            detailSection('plane', 'Vuelos', vuelosItems),
+            // Sin encabezado de sección: la mini tabla ya rotula sus columnas (Aerolínea / Vuelo / …),
+            // así que un "VUELOS" encima solo repetía. El itinerario tampoco lo lleva.
+            vuelosHtml,
             detailSection('award', 'Otros', otrosItems),
         ].filter(Boolean).join('');
 
@@ -1713,21 +2130,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         const isAdmin = userRole === 'admin' || userRole === 'superadmin';
         const isClientFacing = isAdmin || userRole === 'department_manager' || userRole === 'client';
         const noteChannels = [
-            { label: 'Notas del administrador', icon: 'notes', color: '#adb5bd', text: (sub.notes || svc.notes || '').trim(), visible: true },
-            { label: 'Notas del cliente', icon: 'user', color: '#0dcaf0', text: (sub.agencyNotes || '').trim(), visible: true },
-            { label: 'Notas del cliente (catálogo)', icon: 'book', color: '#0d6efd', text: (sub.clientNotes || '').trim(), visible: isClientFacing },
-            { label: 'Notas del proveedor', icon: 'building', color: '#198754', text: (sub.providerNotes || '').trim(), visible: isAdmin },
-            { label: 'Notas del equipo', icon: 'users', color: '#fd7e14', text: (sub.teamNotes || '').trim(), visible: isAdmin },
-            { label: 'Notas internas', icon: 'lock', color: '#6f42c1', text: (sub.internalNotes || '').trim(), visible: isAdmin },
+            // Sin rótulo: es el canal general y por defecto, así que anunciarlo no distinguía nada —
+            // a diferencia de proveedor / equipo / internas, donde saber a quién va dirigida es el dato.
+            { label: '', icon: 'notes', tier: '', text: (sub.notes || svc.notes || '').trim(), visible: true },
+            { label: 'Notas del cliente', icon: 'user', tier: 'is-client', text: (sub.agencyNotes || '').trim(), visible: true },
+            { label: 'Notas del cliente (catálogo)', icon: 'book', tier: 'is-client', text: (sub.clientNotes || '').trim(), visible: isClientFacing },
+            { label: 'Notas del proveedor', icon: 'building', tier: 'is-ops', text: (sub.providerNotes || '').trim(), visible: isAdmin },
+            { label: 'Notas del equipo', icon: 'users', tier: 'is-ops', text: (sub.teamNotes || '').trim(), visible: isAdmin },
+            { label: 'Notas internas', icon: 'lock', tier: 'is-internal', text: (sub.internalNotes || '').trim(), visible: isAdmin },
         ].filter((n) => n.visible && n.text);
 
+        // Formato del itinerario (.itin-desc + renderNotes): texto corrido justificado, sin caja gris
+        // ni filete de color. Se CONSERVA la etiqueta del canal —reducida a un rótulo en versalitas—
+        // porque el itinerario solo tiene notas de cara al cliente y no necesita distinguirlas, pero
+        // aquí saber si una nota es del proveedor, del equipo o interna es justo lo que importa.
         const notesHtml = noteChannels.map((n) => `
-            <div class="mt-2 p-2 rounded" style="background: #f8f9fa; border-left: 3px solid ${n.color};">
-                <div class="d-flex align-items-center mb-1">
-                    <i class="ti ti-${n.icon} me-1" style="color: ${n.color};"></i>
-                    <strong style="font-size: 0.8rem; color: ${n.color};">${n.label}</strong>
-                </div>
-                <div class="text-dark" style="white-space: pre-line; word-break: break-word; font-size: 0.85rem;">${n.text}</div>
+            <div class="svc-note">
+                ${n.label ? `<span class="svc-note-lbl ${n.tier}"><i class="ti ti-${n.icon}"></i>${n.label}</span>` : ''}
+                <div class="svc-note-body">${renderServiceNotes(n.text)}</div>
             </div>
         `).join('');
 
@@ -1740,7 +2160,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         const days = {};
         services.forEach(svc => {
             const key = svc.dayNumber || 1;
-            if (!days[key]) days[key] = { title: svc.dayTitle || `Dia ${key}`, date: svc.serviceDate, services: [] };
+            // El título se guarda TAL CUAL (sin caer a "Dia N"): la barra ya nombra el día, así que un
+            // título de respaldo se leería duplicado ("Día 1 — Dia 1").
+            if (!days[key]) days[key] = { title: svc.dayTitle || '', date: svc.serviceDate, services: [] };
             days[key].services.push(svc);
         });
 
@@ -1773,62 +2195,18 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         const canAssign = reservationData.status !== 'cancelled' && reservationData.status !== 'completed';
 
-        let html = '';
+        let html = '<div class="svc-timeline">';
         Object.keys(days).sort((a, b) => a - b).forEach(dayNum => {
             const day = days[dayNum];
-            html += `<div class="day-header"><i class="ti ti-calendar-event me-1"></i>Dia ${dayNum} — ${day.title}${day.date ? ` (${formatDate(day.date)})` : ''}</div>`;
+            // Cada día es su propio contenedor para que el riel de la línea de tiempo se corte al
+            // final del día (el :last-child de .svc-entry es por día, no de toda la lista).
+            // "Miércoles. Jul 29 · Día 1 — Llegada". El día del paquete y su título se conservan
+            // porque identifican el día en la operación; el itinerario del cliente no los necesita.
+            const dayDate = itinDayLabel(day.date);
+            const dayLbl = `${dayDate ? `${dayDate} · ` : ''}Día ${dayNum}${day.title ? ` — ${day.title}` : ''}`;
+            html += `<div class="svc-day"><div class="svc-day-bar">${dayLbl}</div>`;
 
             day.services.forEach(svc => {
-                const icon = getServiceTypeIcon(svc.type);
-                // Build person cards for assigned employees
-                // Build paired cards (conductor + vehículo per slot) so it's obvious who's
-                // driving which vehicle. Non-vehicle roles (guía/chofer, greeter, seguidor)
-                // are rendered separately at the end.
-                let pairsHtml = '';
-                let rolesHtml = '';
-
-                // Driver+vehicle pair for the main slot.
-                const showMainPair = !!(svc.assignedDriver || svc.assignedVehicle);
-                const extras = svc.extraAssignments || [];
-                const hasAnyExtraSlot = extras.some((ea) => ea.driverId || ea.vehicleId);
-                const useSlotLabels = hasAnyExtraSlot; // only label when there's more than one slot
-                if (showMainPair) {
-                    pairsHtml += buildPairCard(
-                        useSlotLabels ? 'Vehículo principal' : '',
-                        svc.assignedDriver,
-                        svc.assignedVehicle,
-                        svc.vehicleTypeName || ''
-                    );
-                }
-
-                // Extras (additional vehicles + their drivers).
-                extras.forEach((ea, idx) => {
-                    if (!ea.driverId && !ea.vehicleId) return;
-                    const driver = ea.driverId ? { fullName: ea.driverName, phone: '', profilePhotoUrl: '' } : null;
-                    const vehicle = ea.vehicleId ? { name: ea.vehicleName, imageUrl: ea.vehicleImageUrl || '' } : null;
-                    const label = useSlotLabels ? `Vehículo extra ${idx + 1}` : '';
-                    pairsHtml += buildPairCard(label, driver, vehicle, ea.vehicleName || '');
-                });
-
-                // Non-vehicle roles
-                rolesHtml += buildPersonCard(svc.assignedGuide, svc.type === 'a-disposicion' ? 'Chofer' : 'Guía', 'ti-map-pin', 'success');
-                rolesHtml += buildPersonCard(svc.assignedGreeter, 'Greeter', 'ti-hand-stop', 'warning');
-                rolesHtml += buildPersonCard(svc.assignedServiceCustomer, 'Seguidor', 'ti-headset', 'primary');
-
-                const hasAssignments = pairsHtml || rolesHtml;
-
-                const route = svc.originName || svc.destinationName
-                    ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' &rarr; ' : ''}${svc.destinationName || ''}</small>`
-                    : '';
-
-                // "Pago externo" (includeInTotal:false): el cliente lo paga directo a un tercero. Se
-                // marca junto al título y se muestra su precio REAL (nunca $0), igual que la vista
-                // pública, para no aparentar un servicio gratis ni un cargo que la agencia debe cobrar.
-                // Estilo tomado de .service-badge.external (services-renderer.js), que estas vistas no cargan.
-                const externalBadge = svc.subconcept?.includeInTotal === false
-                    ? '<span class="badge me-1" style="background:rgba(150,155,129,0.15);color:#969b81;border:1px solid rgba(150,155,129,0.3);font-weight:600;">Pago externo</span>'
-                    : '';
-
                 const includeGuide = svc.subconcept?.includeGuide;
                 const includeGreeter = svc.subconcept?.includeGreeter;
                 // Decide whether this service actually needs vehicle assignment slots.
@@ -1853,25 +2231,172 @@ document.addEventListener('DOMContentLoaded', async function() {
                     }
                 }
 
+                // Parejas chofer+vehículo (una por plaza) y los roles que no van amarrados a un
+                // vehículo. Las plazas que el servicio pide y nadie ha llenado se dibujan en gris
+                // punteado: el hueco es justo lo que quien asigna necesita ver.
+                const extras = svc.extraAssignments || [];
+                // En «a disposición» el chofer se captura en el campo de guía, no en el de
+                // conductor, así que la pareja nunca debe pedirlo ahí: diría «Conductor pendiente»
+                // con el chofer ya asignado en el renglón de abajo.
+                const isAtDisposal = svc.type === 'a-disposicion';
+                const pairs = [];
+                const pushPair = (driver, vehicle, segmentName, segmentColor, expectedVehicleName) => {
+                    const hasDriver = !!(driver && driver.fullName);
+                    const hasVehicle = !!(vehicle && vehicle.name);
+                    if (!hasDriver && !hasVehicle) return;
+                    pairs.push({
+                        driver: hasDriver ? driver : null,
+                        vehicle: hasVehicle ? vehicle : null,
+                        needsDriver: !hasDriver && !isAtDisposal,
+                        needsVehicle: !hasVehicle && vehicleQty > 0,
+                        expectedVehicleName: expectedVehicleName || '',
+                        segmentName: segmentName || '',
+                        segmentColor: segmentColor || '',
+                    });
+                };
+                pushPair(svc.assignedDriver, svc.assignedVehicle,
+                    svc.subconcept?.categoryName, svc.subconcept?.categoryColor, svc.vehicleTypeName || '');
+                extras.forEach((ea) => {
+                    if (!ea.driverId && !ea.vehicleId) return;
+                    pushPair(
+                        ea.driverId ? { fullName: ea.driverName, phone: '', profilePhotoUrl: '' } : null,
+                        ea.vehicleId ? { name: ea.vehicleName, imageUrl: ea.vehicleImageUrl || '' } : null,
+                        ea.segmentName, ea.segmentColor, ea.vehicleName || ''
+                    );
+                });
+
+                // Tipo y segmento ESPERADOS de cada plaza. Es el mismo mapeo que arma el modal de
+                // asignación (ver slotSpecs en openAssignModal): plaza 0 = vehículo principal,
+                // plaza 1 = adicional cuando venía marcado, 2+ = extras en orden. Se replica aquí
+                // para que la lista y el formulario nombren la misma plaza igual.
+                const sub = svc.subconcept || {};
+                const hasPrimaryAdditional = !!(sub.additionalVehicleTypeName || svc.additionalVehicleTypeName);
+                const slotSpecs = [{
+                    type: sub.vehicleTypeName || vehicleTypeAsName(sub.vehicleType) || svc.vehicleTypeName || '',
+                    segment: sub.categoryName || '',
+                    color: sub.categoryColor || '',
+                }];
+                // hasPrimaryAdditional se define igual que en el modal (por el nombre del tipo) a
+                // propósito: de él depende el índice de plaza, y si las dos vistas no coincidieran,
+                // la lista diría "Vehículo adicional" donde el formulario dice "Vehículo extra 1".
+                if (hasPrimaryAdditional) {
+                    slotSpecs.push({
+                        type: sub.additionalVehicleTypeName || svc.additionalVehicleTypeName || '',
+                        segment: sub.additionalVehicleSegmentName || svc.additionalVehicleSegmentName || '',
+                        color: sub.additionalVehicleSegmentColor || '',
+                    });
+                }
+                // Las plazas 3+ se leen de `extraAdditionalVehicles` —la lista COTIZADA— y no de
+                // `extraAssignments`, que solo tiene lo ya asignado: por eso una plaza extra vacía
+                // salía como «Vehículo» pelón. La cotizada siempre trae vehicleTypeName, segmentName
+                // y segmentColor, así que las extras se ven igual que la principal.
+                const expectedExtras = Array.isArray(sub.extraAdditionalVehicles) ? sub.extraAdditionalVehicles : [];
+                const extraSlotCount = Math.max(expectedExtras.length, extras.length);
+                for (let i = 0; i < extraSlotCount; i += 1) {
+                    const exp = expectedExtras[i] || {};
+                    const asg = extras[i] || {};
+                    slotSpecs.push({
+                        type: exp.vehicleTypeName || asg.vehicleName || '',
+                        segment: exp.segmentName || asg.segmentName || '',
+                        color: exp.segmentColor || asg.segmentColor || '',
+                    });
+                }
+
+                // Math.max: si hay más parejas asignadas —o más vehículos cotizados— que el
+                // `quantity` capturado, manda lo mayor. Nunca se oculta a nadie real ni una plaza
+                // que la cotización sí pidió. El piso por slotSpecs solo aplica cuando el servicio
+                // de verdad lleva vehículo: slotSpecs siempre tiene la plaza principal, y sin este
+                // guardia un tour caminando acabaría pidiendo camioneta.
+                const totalSlots = vehicleQty > 0
+                    ? Math.max(vehicleQty, pairs.length, slotSpecs.length)
+                    : pairs.length;
+                for (let i = pairs.length; i < totalSlots; i += 1) {
+                    const spec = slotSpecs[i] || {};
+                    // La negrita lleva el TIPO esperado (SEDAN, SUBURBAN) y «Pendiente» baja a la
+                    // segunda línea: así el renglón vacío se lee igual que uno asignado, donde la
+                    // negrita dice qué es y la línea de abajo el detalle y el estado.
+                    //
+                    // El segmento se hereda del servicio cuando la plaza no trae uno propio. Los
+                    // campos por plaza existen para poder DIFERIR del servicio y casi nunca están
+                    // capturados: sin la herencia, un traslado Premium de dos vehículos mostraba
+                    // "Premium" en la primera plaza y nada en la segunda, siendo las dos Premium.
+                    pairs.push({
+                        pending: true,
+                        label: spec.type || 'Vehículo',
+                        segmentName: spec.segment || sub.categoryName || '',
+                        segmentColor: spec.color || sub.categoryColor || '',
+                    });
+                }
+                // La etiqueta de plaza solo aparece cuando hay más de una: con una sola, "Vehículo
+                // principal" no distingue nada. Usa el vocabulario del modal para que coincidan.
+                if (totalSlots > 1) {
+                    pairs.forEach((p, i) => {
+                        p.slotLabel = i === 0
+                            ? 'Vehículo principal'
+                            : (i === 1 && hasPrimaryAdditional
+                                ? 'Vehículo adicional'
+                                : `Vehículo extra ${i - (hasPrimaryAdditional ? 1 : 0)}`);
+                    });
+                }
+
+                // includeGuide / includeGreeter dicen si el servicio los lleva contratados, así que
+                // un rol contratado y sin asignar también se muestra pendiente. El Customer Support
+                // por servicio es OPCIONAL —siempre se puede asignar, pero no se contrata—, así que
+                // no lleva plaza pendiente: un «Pendiente» ahí haría creer que falta algo.
+                const roles = [
+                    { person: svc.assignedGuide, role: isAtDisposal ? 'Chofer' : 'Guía', expected: !!includeGuide },
+                    { person: svc.assignedGreeter, role: 'Greeter', expected: !!includeGreeter },
+                    { person: svc.assignedServiceCustomer, role: 'Customer Support', expected: false },
+                ].filter((r) => (r.person && r.person.fullName) || r.expected)
+                 .map((r) => (r.person && r.person.fullName ? r : { role: r.role, person: null }));
+
+                const pairsHtml = pairs.map(svcPairRow).join('');
+                const rolesHtml = roles.map(svcRoleRow).join('');
+                const hasAssignments = pairsHtml || rolesHtml;
+
+                // Ubicaciones en renglones etiquetados, formato del itinerario (ver serviceLocationLines).
+                // Se escapan: son direcciones escritas a mano y antes se interpolaban crudas.
+                const routeParts = serviceLocationLines(svc).map((l) =>
+                    `<span class="lbl">${l.label}:</span> <b>${PaymentBreakdownHelpers.escapeHtml(l.value)}</b>`);
+                const route = routeParts.length ? `<div class="svc-route">${routeParts.join('<br>')}</div>` : '';
+
+                // Hora + duración, como en el itinerario ("09:00 · 2 h"). La duración también aparece
+                // en la sección HORARIO de los detalles; queda duplicada a propósito hasta que decidas
+                // de cuál de los dos sitios quitarla.
+                // "09:00 - 4 horas", con el guion como separador igual que .itin-time del itinerario.
+                // La hora es la de PICK-UP (ver servicePickupTime): en una salida a aeropuerto difiere de
+                // la del vuelo, y es la que necesita quien opera. Cuando son distintas, el title lo
+                // aclara para que nadie lea 14:15 pensando que es la hora del avión.
+                const durLabel = serviceDurationLabel(svc);
+                const pickupTime = servicePickupTime(svc);
+                const flightTime = serviceFlightTime(svc);
+                const timeTitle = (flightTime && flightTime !== pickupTime)
+                    ? ` title="Hora de pick-up · el vuelo es a las ${flightTime}"` : '';
+                const timeHtml = (pickupTime || durLabel)
+                    ? `<div class="svc-time"${timeTitle}>${pickupTime}${pickupTime && durLabel ? ' - ' : ''}${durLabel}</div>`
+                    : '';
+
+                // El badge "Pago externo" (includeInTotal:false) se retiró del título en el rediseño de
+                // la lista. Lo que resolvía sigue en pie: el precio mostrado es el REAL (nunca $0), vía
+                // getServicePriceByTypeGross, para no aparentar un servicio gratis. Agencia y agente
+                // todavía lo pintan; se alinean al portar esta maqueta.
+
                 html += `
-                <div class="service-row d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center flex-grow-1">
-                        <div>
-                            <div class="fw-semibold">${externalBadge}${getDisplayConcept(svc)}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
-                            ${route}
-                            ${(svc.vehicleTypeName && needsVehicle && vehicleQty === 1) ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
-                            ${getSubconceptDetails(svc)}
-                            ${hasAssignments ? `
-                                <div class="mt-2">
-                                    ${pairsHtml ? `<div class="d-flex flex-wrap gap-2">${pairsHtml}</div>` : ''}
-                                    ${rolesHtml ? `<div class="d-flex flex-wrap gap-3 mt-2">${rolesHtml}</div>` : ''}
-                                </div>
-                            ` : (svc.type === 'concepto' ? '<div class="mt-2"><small class="text-muted">No requiere asignación</small></div>' : '<div class="mt-2"><small class="text-muted">Sin asignar</small></div>')}
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
+                <div class="svc-entry">
+                    <div class="svc-rail"><div class="svc-icon"><img src="/images/icons/${getServiceIconKey(svc)}.png" alt="" onerror="this.style.display='none'"></div></div>
+                    <div class="svc-body">
+                        <div class="svc-head">
+                            <div class="svc-head-main">
+                                ${timeHtml}
+                                <div class="svc-title">${getDisplayConcept(svc)}</div>
+                                ${route}
+                                ${servicePeopleLabel(svc) ? `<div class="svc-people"><strong>${servicePeopleLabel(svc)}</strong></div>` : ''}
+                                ${serviceAttendeesLine(svc)}
+                                ${(svc.vehicleTypeName && needsVehicle && vehicleQty === 1) ? `<div class="svc-vehicle">${svc.vehicleTypeName}</div>` : ''}
+                            </div>
+                            <div class="svc-side">
                         ${svc.type === 'concepto' && svc.status !== 'cancelled' ? '<span class="badge bg-success text-white">Lista</span>' : getReservationStatusBadge(svc.status)}
-                        <span class="text-end" style="min-width: 80px;">${formatCurrency(getServicePriceByTypeGross(svc, reservationData.paymentType), reservationData.currency)}</span>
+                        <span class="svc-price">${formatCurrency(getServicePriceByTypeGross(svc, reservationData.paymentType), reservationData.currency)}</span>
                         ${canAssign && svc.status !== 'cancelled' && svc.type !== 'concepto' ? `<button class="btn btn-sm ${svc.status === 'completed' ? 'btn-success' : (svc.status === 'assigned' ? 'btn-outline-success' : 'btn-outline-secondary')} status-toggle-btn" data-service-id="${svc.id}" data-current-status="${svc.status}" title="${svc.status === 'completed' ? 'Revertir a asignada' : (svc.status === 'assigned' ? 'Marcar completada' : 'Marcar asignada')}"><i class="ti ${svc.status === 'completed' ? 'ti-circle-check-filled' : (svc.status === 'assigned' ? 'ti-circle-check' : 'ti-circle')}"></i></button>` : ''}
                         ${canAssign ? (() => {
             // Build the extras payload merging the REQUESTED list (from subconcept blob — never
@@ -1898,10 +2423,18 @@ document.addEventListener('DOMContentLoaded', async function() {
                 : existing;
             return `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-service-type="${svc.type || ''}" data-service-concept="${getDisplayConcept(svc)}" data-service-route="${svc.originName && svc.destinationName ? `${svc.originName} → ${svc.destinationName}` : (svc.originName || svc.destinationName || '')}" data-include-guide="${includeGuide}" data-include-greeter="${includeGreeter}" data-vehicle-qty="${vehicleQty}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}" data-service-customer-id="${svc.assignedServiceCustomer?.id || ''}" data-vehicle-type-name="${svc.subconcept?.vehicleTypeName || svc.subconcept?.vehicleType || svc.vehicleTypeName || ''}" data-segment-name="${svc.subconcept?.categoryName || ''}" data-segment-color="${svc.subconcept?.categoryColor || ''}" data-additional-vehicle-type-name="${svc.subconcept?.additionalVehicleTypeName || svc.additionalVehicleTypeName || ''}" data-additional-segment-name="${svc.subconcept?.additionalVehicleSegmentName || svc.additionalVehicleSegmentName || ''}" data-additional-segment-color="${svc.subconcept?.additionalVehicleSegmentColor || ''}" data-extra='${JSON.stringify(mergedExtras)}'><i class="ti ti-user-plus"></i></button>`;
         })() : ''}
+                            </div>
+                        </div>
+                        ${getSubconceptDetails(svc)}
+                        ${hasAssignments
+                            ? `<div class="svc-assign">${pairsHtml}${rolesHtml}</div>`
+                            : `<div class="svc-assign"><span class="svc-assign-empty">${svc.type === 'concepto' ? 'No requiere asignación' : 'Sin asignar'}</span></div>`}
                     </div>
                 </div>`;
             });
+            html += '</div>';
         });
+        html += '</div>';
 
         container.innerHTML = html;
 
