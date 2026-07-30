@@ -10,7 +10,18 @@
  * escapeHtml (paymentBreakdownHelpers.test.js); aquí garantizamos que el dato pasa por ahí.
  */
 
+const fs = require('fs');
+const path = require('path');
 const { renderComponent } = require('../../../../helpers/ejsTestUtils');
+
+// El desglose financiero se extrajo de las plantillas a un módulo compartido, así que el punto de
+// interpolación de adj.description vive ahí. Lo que se protege es lo mismo; cambió dónde vive. Se
+// comprueba además que cada plantilla ENLACE el módulo: sin eso, la garantía se perdería quitando un
+// <script> sin que ningún test se enterara.
+const FUENTE_FINANZAS = fs.readFileSync(
+  path.join(__dirname, '../../../../../src/presentation/views/dashboards/shared/financialSummary.js'),
+  'utf8',
+);
 
 const params = { reservationId: 'test-reservation-id' };
 
@@ -58,7 +69,11 @@ describe.each([
   beforeAll(async () => { html = await renderComponent(`dashboards/${role}/booking-detail`, params); });
 
   test('la descripción de ajuste del desglose pasa por escapeHtml (no se interpola cruda)', () => {
-    expect(html).toContain('PaymentBreakdownHelpers.escapeHtml(adj.description)');
-    expect(html).not.toContain('${adj.description}');
+    expect(FUENTE_FINANZAS).toContain('PaymentBreakdownHelpers.escapeHtml(adj.description)');
+    expect(FUENTE_FINANZAS).not.toContain('${adj.description}');
+  });
+
+  test('la plantilla enlaza el módulo, que es lo que hace efectiva esa garantía', () => {
+    expect(html).toContain('/shared/services/financialSummary.js');
   });
 });

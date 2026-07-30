@@ -453,3 +453,17 @@
 /* Generando el PDF: el botón deja de aceptar clics y muestra el progreso en su propio lugar. */
 .hdr-seg-btn.is-busy{pointer-events:none;color:#8a8f78;}
 .hdr-seg-btn:disabled:hover{background:transparent;color:#b3b7a5;}
+
+/* Acciones del encabezado: exportar (neutra) y cancelar (la única irreversible, discreta a
+   propósito, que se tiñe al hover). Compartidas por los cuatro detalles. */
+/* Acciones del encabezado. Aquí solo hay una exportación, así que va como botón suelto (en admin,
+   que tiene dos, van en un control segmentado). */
+.hdr-btn{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#6b7256;
+  background:#fff;border:1px solid #dcdccf;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
+  white-space:nowrap;text-decoration:none;font-family:inherit;transition:all .12s ease;}
+.hdr-btn:hover{background:#f1f2ec;border-color:#c9cdbb;color:#4f5838;}
+/* La única acción irreversible NO debe ser lo más llamativo: arranca discreta y se tiñe al hover. */
+.hdr-danger{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#8a8f78;
+  background:transparent;border:1px solid transparent;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
+  white-space:nowrap;font-family:inherit;cursor:pointer;transition:all .12s ease;}
+.hdr-danger:hover{background:#f7ecea;border-color:#e6c9c4;color:#a1443a;}

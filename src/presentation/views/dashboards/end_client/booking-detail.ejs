@@ -109,13 +109,16 @@
     </div>
 
     <!-- Financial Summary Card (read-only) -->
-    <div class="card border-0 shadow-sm mb-4" id="financialSummaryCard" style="display:none;">
-        <div class="card-header" style="background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%); border: none;">
-            <h5 class="card-title mb-0 text-white">
-                <i class="ti ti-calculator me-2"></i>Resumen Financiero
-            </h5>
+    <div class="fin-wrap mb-4" id="financialSummaryCard" style="display:none;">
+        <div class="fin-section-head">
+            <h5 class="fin-section-title"><i class="ti ti-calculator me-2"></i>Resumen Financiero</h5>
+            <!-- El acceso al carrito: en las vistas que registran pagos se entra por "Agregar pago",
+                 que aquí no existe. Sin este botón el historial quedaría inalcanzable. -->
+            <button type="button" class="hdr-btn" id="viewPaymentsBtn">
+                <i class="ti ti-cash"></i>Ver pagos
+            </button>
         </div>
-        <div class="card-body" id="financialSummaryBody"></div>
+        <div id="financialSummaryBody"></div>
     </div>
 
     <!-- Services by Day -->
@@ -139,6 +142,7 @@
 <!-- Assign Employee Modal -->
 
 <link rel="stylesheet" href="/shared/services/serviceList.css">
+<link rel="stylesheet" href="/shared/services/reservationFinance.css">
 <style>
 .service-row {
     padding: 0.75rem 1rem;
@@ -169,7 +173,48 @@
 </style>
 
 <!-- Shared payment breakdown helpers (isomorphic; also require'd by Jest) -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="paymentsOffcanvas" aria-labelledby="paymentsOffcanvasLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title mb-0" id="paymentsOffcanvasLabel"><i class="ti ti-cash me-2"></i>Pagos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+    <div class="offcanvas-body">
+        <!-- Tabs: Pago (resumen + registrar + por método) | Historial. Reemplazan la columna única con
+             chips + "saldo restante" + historial colapsado: el carrito crecía hacia abajo y obligaba a
+             desplazarse para llegar al historial. -->
+        <ul class="nav payments-seg mb-3" id="paymentsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tabPagoBtn" data-bs-toggle="tab" data-bs-target="#tabPago" type="button" role="tab" aria-selected="true"><i class="ti ti-cash me-1"></i>Pago</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tabHistorialBtn" data-bs-toggle="tab" data-bs-target="#tabHistorial" type="button" role="tab" aria-selected="false"><i class="ti ti-history me-1"></i>Historial <span id="historialCount" class="badge rounded-pill ms-1" style="background:#eef0e6;color:#566040;"></span></button>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <!-- TAB PAGO -->
+            <div class="tab-pane fade show active" id="tabPago" role="tabpanel" aria-labelledby="tabPagoBtn">
+                <!-- Card de cobertura (total + estado + barra + Pagado/Saldo) -->
+                <div class="rounded p-3 mb-3 payment-coverage-highlight" id="paymentCoverageCard"></div>
+                <!-- Sin "Registrar pago" ni formulario: el servidor le niega POST/PUT/DELETE a este rol
+                     (denyRoles('end_client')), así que el control no debe ni existir en el DOM. -->
+                <!-- Por método de pago: total + cubierto + restante (reemplaza chips y saldo restante) -->
+                <div class="text-muted fw-semibold mb-2"><i class="ti ti-credit-card me-1"></i>Por método de pago</div>
+                <div class="p-3 mb-3" id="paymentMethodTable" style="display:none;"></div>
+            </div>
+            <!-- TAB HISTORIAL -->
+            <div class="tab-pane fade" id="tabHistorial" role="tabpanel" aria-labelledby="tabHistorialBtn">
+                <div id="paymentsBody">
+                    <!-- Payments table — rendered by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <script src="/shared/payments/paymentBreakdownHelpers.js"></script>
+<script src="/shared/services/financialSummary.js"></script>
+<script src="/shared/services/paymentsPanel.js"></script>
 <script src="/shared/services/serviceListHelpers.js"></script>
 <script src="/shared/services/serviceListRenderer.js"></script>
 <script src="/shared/services/itineraryExport.js"></script>
@@ -308,10 +353,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         const folio = encodeURIComponent(d.folio || '');
         const canCancel = d.status !== 'cancelled' && d.status !== 'completed';
         const exportBtnHtml = folio
-            ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir vista pública (incluye Exportar a PDF)"><i class="ti ti-file-export me-1"></i>Exportar</a>`
+            ? `<a class="hdr-btn" href="/reservations/${folio}" target="_blank" rel="noopener" title="Exportar confirmación — abre la vista pública, exportable a PDF"><i class="ti ti-file-export"></i>Exportar confirmación</a>`
             : '';
         const cancelBtnHtml = canCancel
-            ? `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservación</button>`
+            ? `<button type="button" class="hdr-danger" id="cancelResBtn"><i class="ti ti-x"></i>Cancelar reservación</button>`
             : '';
         actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
         if (canCancel) {
@@ -323,72 +368,253 @@ document.addEventListener('DOMContentLoaded', async function() {
         // acceso nuevo. Esta vista no tiene pmToast, así que el fallo del PDF avisa con alert.
         ItineraryExport.wire({ folio, alFallar: (msg) => alert(msg) });
 
+        document.getElementById('viewPaymentsBtn')?.addEventListener('click', () => {
+            paymentsOffcanvasInstance()?.show();
+        });
+
         // Render services grouped by day
         renderServices(d.services);
+
+        // El historial y el resumen de cobertura vienen de GET /payments, que este rol SÍ puede leer.
+        loadPayments();
         renderFinancialSummary();
 
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('reservationContent').style.display = '';
     }
 
+    // Estado del carrito de pagos. Vive fuera de los render para sobrevivir a las recargas.
+    let paymentsCache = [];
+    let latestSummary = null;
+    let paymentsSort = { key: 'date', dir: 'desc' };
+
+    // Copiar al portapapeles con respaldo para contextos sin navigator.clipboard (HTTP, navegadores
+    // viejos), donde la API no existe y el botón quedaría muerto sin avisar.
+    async function copyToClipboard(text) {
+        if (!text) return;
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+            pmToast('Referencia copiada', 'success');
+        } catch (err) {
+            console.error('Error copiando al portapapeles:', err);
+            pmToast('No se pudo copiar la referencia', 'warning');
+        }
+    }
+
+    // Rellena las secciones del offcanvas (chips / cobertura / saldo restante / descuento) desde el
+    // summary AMPLIO. Los % de cada chip y la barra usan coveragePercent/remainingPercent del backend TAL
+    // CUAL (no re-derivar en cliente: rompería con ajustes manuales).
+    // "En efectivo ahorras $X" bajo el total: el mismo hint del hero del Resumen Financiero, para que
+    // el ahorro se vea al registrar el pago y no solo al bajar al desglose por método. Devuelve '' si no
+    // hay un método más barato que el cotizado.
+    function cheapestSavingsHint(summary, services, curr) {
+        const H = PaymentBreakdownHelpers;
+        const s = summary || {};
+        const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
+        const anchor = s.anchoredMethod;
+        const cheapest = H.cheapestAvailableMethod(methods, services, curr);
+        if (!cheapest || !anchor || cheapest === anchor) return '';
+        // Mismos totales por método que el resto del panel (subtotal del método + ajustes + propina).
+        const extras = H.round2(s.adjustments) + H.round2(s.tip);
+        const totalFor = (m) => Math.max(0, H.round2(H.computeServicesSubtotalByType(services, m, curr) + extras));
+        const savings = H.round2(totalFor(anchor) - totalFor(cheapest));
+        if (savings < 0.005) return '';
+        return `<div class="pay-savings-hint"><i class="ti ti-discount-2"></i>En ${H.escapeHtml(H.methodLabel(cheapest).toLowerCase())} ahorras ${formatCurrency(savings, curr)}</div>`;
+    }
+
+    // Tabla "Por método de pago": un renglón por método con Total, Cubierto y Restante. Reemplaza los
+    // chips de progreso + la sección de saldo restante, que repetían las mismas barras dos veces.
+    // Total = subtotal por método + ajustes + propina; restante = montoParaSaldar del backend.
+    function buildMethodTableHtml(summary, services, curr) {
+        const H = PaymentBreakdownHelpers;
+        const s = summary || {};
+        const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
+        if (!methods.length) return '';
+        const adjustments = H.round2(s.adjustments);
+        const tip = H.round2(s.tip);
+        const mps = s.montoParaSaldar || {};
+        const isPaid = s.paymentStatus === 'paid';
+        const paid = H.round2(s.paidAmount);
+        const rows = methods.map((m) => {
+            const total = Math.max(0, H.round2(H.computeServicesSubtotalByType(services, m, curr) + adjustments + tip));
+            return {
+                method: m,
+                label: H.methodLabel(m),
+                total,
+                // % cubierto CORRECTO por método = pagado ÷ total del método (distinto en cada método).
+                pct: total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0,
+                // Monto cubierto de ESTE total. Se topa al total del método por la misma razón que el
+                // porcentaje: si lo pagado supera el total de un método más barato, lo excedente es
+                // saldo a favor, no cobertura de este renglón.
+                covered: Math.min(paid, total),
+                remaining: H.round2(mps[m]),
+            };
+        });
+        const cheapest = H.cheapestAvailableMethod(methods, services, curr);
+        const anchor = s.anchoredMethod;
+        const showCheaper = cheapest && anchor && cheapest !== anchor;
+        // Ahorro del método más barato vs. el cotizado, dentro del tag "Más barato".
+        const anchorTotal = (rows.find((r) => r.method === anchor) || {}).total || 0;
+        const savingsVsAnchor = H.round2(anchorTotal - ((rows.find((r) => r.method === cheapest) || {}).total || 0));
+        const thR = 'text-align:right;padding:.45rem .3rem;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#8a8f78;font-weight:700;';
+        const body = rows.map((r) => {
+            const cheap = (showCheaper && r.method === cheapest)
+                ? `<span class="badge ms-2" style="background:#146c43;color:#fff;font-size:.74rem;padding:.32em .6em;">Más barato · ahorra ${formatCurrency(savingsVsAnchor, curr)}</span>` : '';
+            const remainingCell = isPaid
+                ? '<span style="color:#4b6b3f;font-weight:700;">Pagado</span>'
+                : `<span style="font-weight:700;color:#2b2b2b;">${formatCurrency(r.remaining, curr)}</span>`;
+            return `<tr style="border-top:1px solid #f1efe8;">
+                <td style="padding:.55rem .3rem;font-weight:600;">${H.escapeHtml(r.label)}${cheap}</td>
+                <td style="padding:.55rem .3rem;text-align:right;color:#6b6656;">${formatCurrency(r.total, curr)}</td>
+                <td style="padding:.55rem .3rem;text-align:right;">
+                    <div style="font-weight:700;color:#4b6b3f;">${formatCurrency(r.covered, curr)}</div>
+                    <div style="font-size:.76rem;font-weight:600;color:#8a8f78;">${r.pct}%</div>
+                </td>
+                <td style="padding:.55rem .3rem;text-align:right;">${remainingCell}</td>
+            </tr>`;
+        }).join('');
+        return `<table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="text-align:left;padding:.45rem .3rem;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#8a8f78;font-weight:700;">Método</th>
+              <th style="${thR}">Total</th>
+              <th style="${thR}">Cubierto</th>
+              <th style="${thR}">Restante</th>
+            </tr></thead>
+            <tbody>${body}</tbody>
+          </table>`;
+    }
+
+    // El resumen lo arma FinancialSummary, compartido con client y department_manager.
+    // `allowEdit: false` — este rol no registra pagos: el servidor le niega POST/PUT/DELETE con
+    // denyRoles('end_client'), así que su hero no debe ofrecer el botón de agregar.
     function renderFinancialSummary() {
-        const d = reservationData;
-        const adjustments = d.adjustments || [];
-        const pay = d.payment;
-        // Propina cobrada (Fase 2): SIEMPRE del summary del servidor (d.payment), NUNCA de d.globalTip del
-        // snapshot bruto de la cotización (puede venir inflado con recargo de tarjeta si se guardó con
-        // tarjeta seleccionada). El Total Final usa pay.total (ya la incluye), no d.totalAmount directo.
-        const generalTip = pay ? Number(pay.generalTip) || 0 : 0;
-        const serviceTipsTotal = pay ? Number(pay.serviceTipsTotal) || 0 : 0;
-
         const card = document.getElementById('financialSummaryCard');
+        if (card) card.style.display = '';
         const body = document.getElementById('financialSummaryBody');
-        const servicesSubtotal = d.servicesSubtotal || d.totalAmount || 0;
-        const curr = d.currency || 'MXN';
-
-        card.style.display = '';
-        let html = '';
-        html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-            <span class="text-muted"><i class="ti ti-list-details me-2"></i>Subtotal Servicios</span>
-            <span class="fw-semibold">${formatCurrency(servicesSubtotal, curr)}</span>
-        </div>`;
-
-        adjustments.filter(a => a.type === 'charge').forEach(adj => {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-plus text-danger me-1"></i><span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span></div>
-                <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
-            </div>`;
-        });
-
-        adjustments.filter(a => a.type === 'discount').forEach(adj => {
-            const pctLabel = adj.percentage ? ` (${adj.percentage}%)` : '';
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-discount-2 text-success me-1"></i><span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}${pctLabel}</span></div>
-                <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
-            </div>`;
-        });
-
-        // Propina cobrada (Fase 2): líneas leídas del summary del servidor para que Subtotal + ajustes +
-        // propina reconcilie con el Total Final. La general en su línea; la de por-servicio agregada (los
-        // tips por servicio también aparecen por servicio en el itinerario, aquí es el agregado).
-        if (generalTip > 0) {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propina general</span></div>
-                <span class="text-info fw-semibold">+${formatCurrency(generalTip, curr)}</span>
-            </div>`;
+        if (body) {
+            body.innerHTML = FinancialSummary.buildHtml({
+                reservationData,
+                formatCurrency,
+                allowEdit: false,
+            });
         }
-        if (serviceTipsTotal > 0) {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propinas por servicio</span></div>
-                <span class="text-info fw-semibold">+${formatCurrency(serviceTipsTotal, curr)}</span>
-            </div>`;
-        }
+    }
 
-        html += `<div class="d-flex justify-content-between align-items-center py-2 mt-1">
-            <span class="fw-bold"><i class="ti ti-receipt me-2"></i>Total Final</span>
-            <span class="fw-bold fs-5 text-success">${formatCurrency(pay ? Number(pay.total) || 0 : (d.totalAmount || 0), curr)}</span>
-        </div>`;
-        body.innerHTML = html;
+    /** Instancia del carrito, creada a demanda. */
+    function paymentsOffcanvasInstance() {
+        const el = document.getElementById('paymentsOffcanvas');
+        return el ? bootstrap.Offcanvas.getOrCreateInstance(el) : null;
+    }
+
+    function renderPaymentsSkeleton() {
+        const body = document.getElementById('paymentsBody');
+        if (body) body.innerHTML = PaymentsPanel.renderPaymentsSkeleton();
+    }
+
+    function renderPaymentsLoadError() {
+        const coverage = document.getElementById('paymentCoverageCard');
+        if (coverage) {
+            coverage.innerHTML = `<div class="text-center py-2">
+                <div class="text-muted mb-2"><i class="ti ti-alert-triangle me-1"></i>No se pudo cargar la información de pagos.</div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="retryPaymentsBtn"><i class="ti ti-refresh me-1"></i>Reintentar</button>
+              </div>`;
+            document.getElementById('retryPaymentsBtn')?.addEventListener('click', () => loadPayments());
+        }
+        const methodTable = document.getElementById('paymentMethodTable');
+        if (methodTable) { methodTable.innerHTML = ''; methodTable.style.display = 'none'; }
+        const body = document.getElementById('paymentsBody');
+        if (body) body.innerHTML = PaymentsPanel.renderPaymentsLoadError();
+    }
+
+    // Historial de SOLO LECTURA: la tabla la arma PaymentsPanel y aquí solo se enganchan el orden y
+    // el copiar-referencia. Sin editar ni borrar, que es lo que el servidor le niega a este rol.
+    function renderPayments() {
+        const body = document.getElementById('paymentsBody');
+        if (!body) return;
+        const histCount = document.getElementById('historialCount');
+        if (histCount) histCount.textContent = paymentsCache.length ? String(paymentsCache.length) : '';
+        body.innerHTML = PaymentsPanel.renderPayments({
+            reservationData,
+            formatCurrency,
+            payments: paymentsCache,
+            sort: paymentsSort,
+            allowEdit: false,
+        });
+        body.querySelectorAll('.pay-hist-sort').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.sortKey;
+                // Volver a la misma columna invierte el sentido; cambiar de columna arranca descendente.
+                if (paymentsSort.key === key) paymentsSort.dir = paymentsSort.dir === 'asc' ? 'desc' : 'asc';
+                else paymentsSort = { key, dir: 'desc' };
+                renderPayments();
+            });
+        });
+        body.querySelectorAll('.copy-ref-btn').forEach((btn) => {
+            btn.addEventListener('click', () => copyToClipboard(btn.dataset.ref || ''));
+        });
+    }
+
+    function renderPaymentsOffcanvas() {
+        if (!latestSummary) return;
+        const services = reservationData?.services || [];
+        const curr = reservationData?.currency || 'MXN';
+        const coverage = document.getElementById('paymentCoverageCard');
+        const methodTable = document.getElementById('paymentMethodTable');
+        if (coverage) {
+            coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(
+                latestSummary, curr, cheapestSavingsHint(latestSummary, services, curr),
+            );
+        }
+        if (methodTable) {
+            const html = buildMethodTableHtml(latestSummary, services, curr);
+            methodTable.innerHTML = html;
+            methodTable.style.display = html ? '' : 'none';
+        }
+    }
+
+    function applyPaymentSummary(summary) {
+        if (!summary) return;
+        latestSummary = summary;
+        if (reservationData.payment) Object.assign(reservationData.payment, summary);
+        else reservationData.payment = { ...summary };
+        renderFinancialSummary();
+        renderPaymentsOffcanvas();
+    }
+
+    // GET /payments SÍ está abierto a este rol: leer su propio historial es parte de su scope. Los
+    // verbos de escritura son los que llevan denyRoles.
+    async function loadPayments() {
+        if (!latestSummary) renderPaymentsSkeleton();
+        let loaded = false;
+        try {
+            const response = await fetch(`/api/reservations/${reservationId}/payments`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const result = await response.json().catch(() => null);
+            loaded = response.ok && !!result?.data;
+            if (loaded) {
+                paymentsCache = result.data.payments || [];
+                if (result.data.summary) applyPaymentSummary(result.data.summary);
+            } else {
+                console.error('Error loading payments:', response.status, result);
+            }
+        } catch (err) {
+            console.error('Error loading payments:', err);
+        }
+        if (!loaded && !latestSummary) { renderPaymentsLoadError(); return; }
+        renderPayments();
     }
 
     // La lista la arma ServiceListRenderer, la MISMA que pinta el detalle de admin. Esta vista
