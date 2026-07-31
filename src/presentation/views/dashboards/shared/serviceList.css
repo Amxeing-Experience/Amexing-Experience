@@ -489,11 +489,10 @@
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
-  padding: 14px 22px 15px;
+  padding: 2px 22px 16px;
+  /* Sin fondo: con él se leía como una tira pegada encima de la lista, compitiendo con la barra del
+     día que va justo debajo. Lo que separa es el aire y el peso de la tipografía, no una caja. */
   border-bottom: 1px solid #ece8dd;
-  /* Degradado y no un plano: la banda tiene que leerse como zona propia sin competir con la barra
-     del día, que va justo debajo y es la que anuncia el contenido. */
-  background: linear-gradient(135deg, #f5f4ee 0%, #fbfaf6 70%);
 }
 .svc-doc-id { min-width: 0; }
 .svc-doc-quien {
