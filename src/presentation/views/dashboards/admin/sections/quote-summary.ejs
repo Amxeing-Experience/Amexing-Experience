@@ -1839,11 +1839,19 @@ const e = __isRes ? 'reservación' : 'cotización';
         // Pass the exact quote id (?q=) so the PDF resolves the same record even
         // when folios are duplicated. Reservations are unaffected.
         const qParam = (isQuote && window.__quoteId) ? `?q=${encodeURIComponent(window.__quoteId)}` : '';
+        // Una reservación tiene DOS documentos públicos y cada uno con su ruta: la confirmación en
+        // /reservations/:folio/pdf y el itinerario en /reservations/:folio/itinerary/pdf. Desde aquí
+        // se exporta el ITINERARIO, que es lo que se manda al pasajero; la confirmación se descarga
+        // desde su propia vista, con el flotante que vive ahí.
         const endpoint = isQuote
             ? `/quotes/${encodeURIComponent(folio)}/pdf${qParam}`
-            : `/reservations/${encodeURIComponent(folio)}/pdf`;
-        const docKind = isQuote ? 'Cotizacion' : 'Reservacion';
-        const filename = `${folio.replace(/\s+/g, '_')}.pdf`;
+            : `/reservations/${encodeURIComponent(folio)}/itinerary/pdf`;
+        const docKind = isQuote ? 'Cotizacion' : 'Itinerario';
+        // El sufijo evita que el itinerario y la confirmación de la misma reservación se pisen en la
+        // carpeta de descargas.
+        const filename = isQuote
+            ? `${folio.replace(/\s+/g, '_')}.pdf`
+            : `${folio.replace(/\s+/g, '_')}-itinerario.pdf`;
 
         const btn = document.getElementById('exportPdfBtn');
         const originalText = btn ? btn.innerHTML : '';
