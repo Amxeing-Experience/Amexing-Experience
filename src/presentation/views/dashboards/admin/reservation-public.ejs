@@ -480,7 +480,8 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
         </div>
     </div>
 
-    <% if (quote.folio && !esPdf) { %>
+    <% /* typeof: no todos los call sites pasan esPdf y EJS revienta con un local ausente. */ %>
+<% if (quote.folio && !(typeof esPdf !== 'undefined' && esPdf)) { %>
     <a class="pdf-fab" id="pdfFab" href="/reservations/<%= encodeURIComponent(quote.folio) %>/pdf"
        aria-label="Descargar la confirmación en PDF">
       <span class="pdf-fab-ico" id="pdfFabIco" aria-hidden="true"><i class="ti ti-download"></i></span>

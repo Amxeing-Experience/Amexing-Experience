@@ -620,7 +620,8 @@ const pairLines = (p) => {
     })();
   </script>
 
-  <% if (q.folio && !esPdf) { %>
+  <% /* typeof: no todos los call sites pasan esPdf y EJS revienta con un local ausente. */ %>
+<% if (q.folio && !(typeof esPdf !== 'undefined' && esPdf)) { %>
   <a class="pdf-fab" id="pdfFab" href="/reservations/<%= encodeURIComponent(q.folio) %>/itinerary/pdf"
      aria-label="Descargar el itinerario en PDF">
     <span class="pdf-fab-ico" id="pdfFabIco" aria-hidden="true"><i class="ti ti-download"></i></span>
