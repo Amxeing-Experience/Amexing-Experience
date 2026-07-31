@@ -23,6 +23,21 @@ const fileStorageService = new FileStorageService({
   presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
 });
 
+// Márgenes de página de cada documento público.
+//
+// El itinerario va A SANGRE: su encabezado llega a los bordes de la hoja y el espacio superior de
+// cada página lo pone la propia plantilla.
+const MARGENES_A_SANGRE = {
+  top: '0', bottom: '0', left: '0', right: '0',
+};
+// La confirmación NO va a sangre: es una tarjeta centrada de ancho fijo sobre fondo blanco. Heredó
+// los márgenes en cero de cuando los dos documentos compartían endpoint, y por eso cada página nueva
+// arrancaba pegada al borde. Los laterales se quedan en cero porque el centrado ya lo hace la
+// tarjeta con su max-width.
+const MARGENES_CONFIRMACION = {
+  top: '14mm', bottom: '14mm', left: '0', right: '0',
+};
+
 /**
  * Controller for viewing reservations publicly without authentication, where the
  * folio (e.g. MAY-2605-001) acts as the access token. Mirrors PublicQuoteController
@@ -37,6 +52,8 @@ class PublicReservationController {
     this.viewPublicReservation = this.viewPublicReservation.bind(this);
     this.viewReservationItinerary = this.viewReservationItinerary.bind(this);
     this.downloadReservationPdf = this.downloadReservationPdf.bind(this);
+    this.downloadItineraryPdf = this.downloadItineraryPdf.bind(this);
+    this.renderPdf = this.renderPdf.bind(this);
     this.preparePublicReservationData = this.preparePublicReservationData.bind(this);
 
     this.experiencesCache = null;
@@ -45,42 +62,73 @@ class PublicReservationController {
   }
 
   /**
-   * Download reservation as PDF via headless Chrome (puppeteer).
-   * GET /reservations/:folio/pdf.
-   * @param req
-   * @param res
+   * Renderiza a PDF una de las dos vistas públicas de la reservación.
+   *
+   * Cada ruta de PDF refleja la vista de su MISMA ruta base: /reservations/:folio/pdf entrega la
+   * confirmación —lo que se ve en /reservations/:folio— y /reservations/:folio/itinerary/pdf entrega
+   * el itinerario. Desde el PR #162 la primera devolvía el itinerario, así que el botón "Exportar a
+   * PDF" de la confirmación bajaba un documento distinto del que el usuario tenía enfrente.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @param {string} vista - '' para la confirmación, '/itinerary' para el itinerario.
+   * @param {string} sufijo - Se agrega al nombre del archivo para distinguir los dos documentos.
+   * @param {object} margenes - Márgenes de página; cada documento tiene los suyos.
+   * @returns {Promise<object>} La respuesta con el PDF, o el error.
    * @example
+   * await this.renderPdf(req, res, '/itinerary', '-itinerario', A_SANGRE);
    */
-  async downloadReservationPdf(req, res) {
+  async renderPdf(req, res, vista, sufijo, margenes) {
     const { folio } = req.params;
     try {
       const folioError = this.validateFolio(folio, req, res);
       if (folioError) return folioError;
 
       const reservation = await this.fetchReservationByFolio(folio, req, res);
-      if (!reservation) return;
+      if (!reservation) return undefined;
 
       const proto = req.headers['x-forwarded-proto'] || req.protocol;
       const host = req.get('host');
-      const url = `${proto}://${host}/reservations/${encodeURIComponent(folio)}/itinerary?pdf=1`;
+      const url = `${proto}://${host}/reservations/${encodeURIComponent(folio)}${vista}?pdf=1`;
 
-      // Full-bleed: header reaches the page edges; per-page top spacing comes from the template, not the margin.
-      const pdfBuffer = await renderUrlToPdf(url, {
-        footer: false,
-        margin: {
-          top: '0', bottom: '0', left: '0', right: '0',
-        },
-      });
+      const pdfBuffer = await renderUrlToPdf(url, { footer: false, margin: margenes });
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${folio}.pdf"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${folio}${sufijo}.pdf"`);
       return res.end(pdfBuffer);
     } catch (error) {
       logger.error('Failed to render reservation PDF', {
-        folio, error: error.message, stack: error.stack,
+        folio, vista, error: error.message, stack: error.stack,
       });
       return res.status(500).json({ success: false, error: 'Error al generar el PDF' });
     }
+  }
+
+  /**
+   * Confirmación de la reservación en PDF — el mismo documento que se ve en pantalla.
+   * GET /reservations/:folio/pdf.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} La respuesta con el PDF.
+   * @example
+   * GET /reservations/MAY-2605-001/pdf
+   */
+  async downloadReservationPdf(req, res) {
+    return this.renderPdf(req, res, '', '', MARGENES_CONFIRMACION);
+  }
+
+  /**
+   * Itinerario de viaje en PDF.
+   * GET /reservations/:folio/itinerary/pdf.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} La respuesta con el PDF.
+   * @example
+   * GET /reservations/MAY-2605-001/itinerary/pdf
+   */
+  async downloadItineraryPdf(req, res) {
+    // El sufijo evita que los dos documentos de la misma reservación se pisen en la carpeta de
+    // descargas: antes ambos se llamaban igual.
+    return this.renderPdf(req, res, '/itinerary', '-itinerario', MARGENES_A_SANGRE);
   }
 
   /**
@@ -107,6 +155,11 @@ class PublicReservationController {
 
       return res.render('dashboards/admin/reservation-public', {
         quote: quoteShaped,
+        // El botón flotante NO debe salir impreso. No basta con @media print: PdfRenderService
+        // emula media `screen` a propósito —con `print` las reglas de estas vistas colapsan el
+        // layout y puppeteer devuelve un PDF en blanco—, así que la única señal fiable de que
+        // esto es una exportación es el ?pdf=1 con el que se abre la página.
+        esPdf: req.query.pdf === '1',
         isPublicView: true,
         isReservationView: true,
         pageTitle: `Reservación ${folio}`,
@@ -148,6 +201,11 @@ class PublicReservationController {
 
       return res.render('dashboards/admin/reservation-itinerary', {
         quote: quoteShaped,
+        // El botón flotante NO debe salir impreso. No basta con @media print: PdfRenderService
+        // emula media `screen` a propósito —con `print` las reglas de estas vistas colapsan el
+        // layout y puppeteer devuelve un PDF en blanco—, así que la única señal fiable de que
+        // esto es una exportación es el ?pdf=1 con el que se abre la página.
+        esPdf: req.query.pdf === '1',
         isPublicView: true,
         isReservationView: true,
         pageTitle: `Itinerario ${folio}`,

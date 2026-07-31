@@ -75,7 +75,15 @@ router.get('/reservations/:folio', PublicReservationController.viewPublicReserva
 router.get('/reservations/:folio/itinerary', PublicReservationController.viewReservationItinerary);
 
 /**
- * Public reservation PDF download (server-side, puppeteer-rendered).
+ * Itinerary PDF download (server-side, puppeteer-rendered).
+ * GET /reservations/:folio/itinerary/pdf.
+ */
+router.get('/reservations/:folio/itinerary/pdf', PublicReservationController.downloadItineraryPdf);
+
+/**
+ * Reservation confirmation PDF download (server-side, puppeteer-rendered).
+ * Cada ruta de PDF refleja la vista de su misma ruta base: esta entrega lo que se ve en
+ * /reservations/:folio, no el itinerario.
  * GET /reservations/:folio/pdf.
  */
 router.get('/reservations/:folio/pdf', PublicReservationController.downloadReservationPdf);

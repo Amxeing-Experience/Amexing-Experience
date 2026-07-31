@@ -213,6 +213,8 @@ const ServiceListRenderer = (() => {
 
   /**
    * Cobertura de la asignación, DERIVADA de las plazas y los roles contratados.
+   * Solo la ve la vista de operación: al cliente no le dice nada que falte 1 de 2 por asignar —es
+   * trabajo interno— y en cambio le siembra una duda sobre un servicio que ya tiene contratado.
    * Lo que RESALTA es la buena noticia, que hoy es la rara: 226 de 291 servicios están sin asignar,
    * así que pintar el faltante en ámbar reconstruiría el muro de advertencias que quitamos de la
    * píldora de estado. El estado común va callado y el completo salta.
@@ -882,6 +884,11 @@ ctx,
 
         const canAssign = vista.allowAssign !== false
                 && vista.reservationData.status !== 'cancelled' && vista.reservationData.status !== 'completed';
+        // Si esta vista es la de OPERACIÓN. Se lee de la bandera CRUDA y no de canAssign: canAssign ya
+        // es falso en reservaciones canceladas o completadas, y ahí admin sigue necesitando ver la
+        // cobertura —es justo donde la revisa—. Lo que decide es de quién es la vista, no si en este
+        // momento se puede asignar.
+        const esOperacion = vista.allowAssign !== false;
 
         let html = '<div class="svc-timeline">';
         Object.keys(days).sort((a, b) => a - b).forEach((dayNum) => {
@@ -1025,10 +1032,10 @@ ctx,
                                 ${serviceAttendeesLine(svc)}
                             </div>
                             <div class="svc-side">
-                        ${svc.type === 'concepto' && svc.status !== 'cancelled'
+                        ${esOperacion && svc.type === 'concepto' && svc.status !== 'cancelled'
                             ? '<span class="svc-cov is-none">No requiere asignación</span>'
                             : svcExceptionBadge(svc.status)}
-                        ${svc.status !== 'cancelled' && svc.type !== 'concepto' ? coverageHtml : ''}
+                        ${esOperacion && svc.status !== 'cancelled' && svc.type !== 'concepto' ? coverageHtml : ''}
                         ${canAssign && svc.status === 'completed'
                             ? `<button class="svc-status-btn is-revert status-toggle-btn" data-service-id="${svc.id}" data-next-status="assigned"><i class="ti ti-arrow-back-up"></i>Revertir</button>`
                             : ''}

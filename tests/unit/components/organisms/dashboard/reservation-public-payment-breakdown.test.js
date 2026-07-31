@@ -405,9 +405,16 @@ describe('reservation-public payment breakdown (Fase 2)', () => {
   });
 
   describe('Accessibility', () => {
-    test('exposes a real <button> for PDF export and native <details>/<summary> for breakdown', async () => {
+    // La descarga pasó de <button> a un <a href> flotante, el mismo que el itinerario. Lo que este
+    // test protege sigue siendo lo mismo: que sea un control NATIVO —enfocable y activable con
+    // teclado— y no un div con onclick. El <a> además conserva el href, así que "abrir en pestaña
+    // nueva" y el clic con el botón central siguen sirviendo.
+    test('exposes a native, labelled control for PDF export and native <details>/<summary> for breakdown', async () => {
       const html = await render(quote());
-      expect(html).toMatch(/<button id="exportPdfBtn"/);
+      const fab = html.match(/<a class="pdf-fab"[^>]*>/);
+      expect(fab).not.toBeNull();
+      expect(fab[0]).toMatch(/href="\/reservations\/[^"]+\/pdf"/);
+      expect(fab[0]).toMatch(/aria-label="[^"]+"/);
       expect(html).toMatch(/<details class="rc-mini">/);
       expect(html).toMatch(/<summary>/);
     });

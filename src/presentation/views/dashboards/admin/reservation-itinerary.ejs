@@ -259,6 +259,7 @@ const pairLines = (p) => {
     /* @font-face only; body / .itin-resnum reference 'MyriadPDF' in the main stylesheet
        below so Chrome embeds the TTF in the PDF (the .otf faces from fonts.css are dropped). */
   </style><% } %>
+  <link rel="stylesheet" href="/shared/services/pdfFab.css">
   <style>
     * { box-sizing: border-box; }
     body {
@@ -416,64 +417,6 @@ const pairLines = (p) => {
     .itin-assign-role { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 700; color: #8a8f78; }
     .itin-seg-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
 
-    /* Botón flotante de descarga. Vive DENTRO del documento porque esta vista es una ruta PÚBLICA:
-       quien recibe el link no entra al detalle de la reservación, así que sin esto su única forma de
-       obtener el PDF sería imprimir desde el navegador. Fijo y no pegado al encabezado: el itinerario
-       son varias páginas y la decisión de descargarlo suele tomarse después de leerlo, no antes.
-       Con etiqueta y no un ícono pelón: un glifo de descarga solo, sobre un documento de viaje, se
-       puede leer como cualquier cosa. */
-    .itin-fab {
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      z-index: 50;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 18px;
-      border-radius: 999px;
-      background: #6f7459;
-      color: #fff;
-      text-decoration: none;
-      font-size: 0.9rem;
-      font-weight: 600;
-      line-height: 1;
-      box-shadow: 0 6px 20px rgba(43, 43, 43, 0.22);
-      transition: background 0.15s ease, transform 0.15s ease;
-    }
-    .itin-fab:hover { background: #566040; color: #fff; transform: translateY(-1px); }
-    .itin-fab:focus-visible { outline: 3px solid #b7c39a; outline-offset: 2px; }
-    .itin-fab.is-busy { pointer-events: none; background: #8a8f78; }
-    .itin-fab i { font-size: 1.1rem; }
-    /* Girito propio, sin depender de que Bootstrap haya cargado.
-       `display: inline-block` es obligatorio: es un <span>, y width/height NO aplican a un elemento
-       inline —colapsaba a la altura de la línea y se veía como una tirita vertical—. `flex: none`
-       para que el contenedor flex tampoco lo comprima. */
-    .itin-fab-spin {
-      display: inline-block;
-      flex: none;
-      width: 15px;
-      height: 15px;
-      border-radius: 50%;
-      border: 2px solid rgba(255, 255, 255, 0.45);
-      border-top-color: #fff;
-      animation: itin-spin 0.7s linear infinite;
-    }
-    /* El contenedor del ícono también es un <span> inline: en flex se comporta bien, pero se declara
-       para que el spinner quede centrado igual que el ícono al que sustituye. */
-    #itinPdfFabIco { display: inline-flex; align-items: center; }
-    @keyframes itin-spin { to { transform: rotate(360deg); } }
-    @media (prefers-reduced-motion: reduce) {
-      .itin-fab { transition: none; }
-      .itin-fab:hover { transform: none; }
-    }
-    /* En pantallas angostas se queda solo el ícono, para no tapar el documento. */
-    @media (max-width: 560px) {
-      .itin-fab-txt { display: none; }
-      .itin-fab { padding: 14px; right: 14px; bottom: 14px; }
-    }
-    /* NUNCA en el PDF: esta misma plantilla es la que imprime puppeteer. */
-    @media print { .itin-fab { display: none !important; } }
 
     @media print { body { font-size: 12px; } }
     .itin-notes-list { margin: 6px 0 0; padding-left: 1.2em; }
@@ -677,56 +620,18 @@ const pairLines = (p) => {
     })();
   </script>
 
-  <% if (q.folio) { %>
-  <a class="itin-fab" id="itinPdfFab" href="/reservations/<%= encodeURIComponent(q.folio) %>/pdf"
+  <% /* typeof: no todos los call sites pasan esPdf y EJS revienta con un local ausente. */ %>
+<% if (q.folio && !(typeof esPdf !== 'undefined' && esPdf)) { %>
+  <a class="pdf-fab" id="pdfFab" href="/reservations/<%= encodeURIComponent(q.folio) %>/itinerary/pdf"
      aria-label="Descargar el itinerario en PDF">
-    <span id="itinPdfFabIco" aria-hidden="true"><i class="ti ti-download"></i></span>
-    <span class="itin-fab-txt" id="itinPdfFabTxt">Descargar PDF</span>
+    <span class="pdf-fab-ico" id="pdfFabIco" aria-hidden="true"><i class="ti ti-download"></i></span>
+    <span class="pdf-fab-txt" id="pdfFabTxt">Descargar PDF</span>
   </a>
+  <script src="/shared/services/itineraryExport.js"></script>
   <script>
-    // La descarga se hace por fetch y no dejando navegar el <a>: armar el PDF toma ~10 segundos y una
-    // descarga por navegación no avisa cuándo empieza ni cuándo termina, así que el botón parecería
-    // muerto todo ese rato. El href se conserva para que "abrir en pestaña nueva" siga funcionando.
-    (function () {
-      var fab = document.getElementById('itinPdfFab');
-      if (!fab) return;
-      var ico = document.getElementById('itinPdfFabIco');
-      var txt = document.getElementById('itinPdfFabTxt');
-      var folio = <%- JSON.stringify(String(q.folio)) %>;
-      fab.addEventListener('click', function (ev) {
-        if (fab.classList.contains('is-busy')) return;
-        ev.preventDefault();
-        var icoHtml = ico.innerHTML;
-        var txtHtml = txt.innerHTML;
-        fab.classList.add('is-busy');
-        ico.innerHTML = '<span class="itin-fab-spin"></span>';
-        txt.textContent = 'Generando…';
-        var blobUrl = '';
-        var restore = function () {
-          fab.classList.remove('is-busy');
-          ico.innerHTML = icoHtml;
-          txt.innerHTML = txtHtml;
-          // Revocar de inmediato cancela la descarga en navegadores que leen el blob tras el click.
-          if (blobUrl) setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 60000);
-        };
-        fetch(fab.href)
-          .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
-          .then(function (blob) {
-            blobUrl = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = folio + '.pdf';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-          })
-          .catch(function (err) {
-            console.error('PDF download failed:', err);
-            alert('No se pudo generar el PDF. Intenta de nuevo.');
-          })
-          .then(restore, restore);
-      });
-    })();
+    // El comportamiento vive en ItineraryExport.wireFab, compartido con la confirmación: es el mismo
+    // botón y la misma espera de puppeteer en las dos vistas públicas.
+    ItineraryExport.wireFab({ nombreArchivo: <%- JSON.stringify(String(q.folio) + '-itinerario.pdf') %> });
   </script>
   <% } %>
 </body>

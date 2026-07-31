@@ -134,3 +134,42 @@ describe('escapado de lo que escribe una persona', () => {
     expect(html).not.toContain('<script>');
   });
 });
+
+describe('cobertura de asignación — solo la vista de operación', () => {
+  // "1 de 2 asignados" / "Asignación completa" son vocabulario interno: al cliente no le dicen nada
+  // y le siembran una duda sobre un servicio que ya tiene contratado.
+  const conPlazas = () => ({ ...servicio(), subconcept: { quantity: 2 } });
+
+  it('el cliente no ve la etiqueta de cobertura', () => {
+    const html = SLR.buildHtml([conPlazas()], ctx({ allowAssign: false }));
+    expect(html).not.toContain('svc-cov');
+    expect(html).not.toContain('asignado');
+  });
+
+  it('admin sí la ve', () => {
+    const html = SLR.buildHtml([conPlazas()], ctx({ allowAssign: true, userRole: 'admin' }));
+    expect(html).toContain('svc-cov');
+  });
+
+  it('admin la sigue viendo en una reservación COMPLETADA, que es donde la revisa', () => {
+    const html = SLR.buildHtml([conPlazas()], ctx({
+      allowAssign: true,
+      userRole: 'admin',
+      reservationData: { status: 'completed', currency: 'MXN' },
+    }));
+    expect(html).toContain('svc-cov');
+  });
+
+  it('el cliente tampoco ve "No requiere asignación" en un concepto', () => {
+    const html = SLR.buildHtml([{ ...servicio(), type: 'concepto' }], ctx({ allowAssign: false }));
+    expect(html).not.toContain('No requiere asignación');
+  });
+
+  it('el estado excepcional SÍ le llega al cliente: eso sí le importa', () => {
+    const html = SLR.buildHtml(
+      [{ ...servicio(), status: 'cancelled' }],
+      ctx({ allowAssign: false }),
+    );
+    expect(html).toMatch(/svc-exc|Cancelad/i);
+  });
+});
