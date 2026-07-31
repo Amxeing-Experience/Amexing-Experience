@@ -51,7 +51,15 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
         .resv-conf .rc-cell.rc-full{grid-column:1 / -1;border-right:none}
         .resv-conf .rc-label{display:block;color:#8a8a8a;font-size:10px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:1px}
         .resv-conf .rc-value{display:block;color:#2b2b2b;font-size:14px;word-break:break-word}
-        .resv-conf .rc-service{margin-bottom:18px}
+        /* Paginación del PDF. Va en el CSS NORMAL y no bajo @media print: PdfRenderService emula
+           media `screen` a propósito, así que una regla de impresión no llegaría a la exportación.
+           En pantalla no estorba, porque ahí no hay páginas.
+           `break-inside` en el servicio COMPLETO para que su número y su tabla no se separen; y
+           también en cada .rc-tbl, que es la unidad mínima: si un servicio no cabe entero en lo que
+           queda de hoja, se pasa a la siguiente, y si ni siquiera cabe en una hoja, al menos corta
+           entre tablas y no a media fila. */
+        .resv-conf .rc-service{margin-bottom:18px;break-inside:avoid;page-break-inside:avoid}
+        .resv-conf .rc-tbl{break-inside:avoid;page-break-inside:avoid}
         .resv-conf .rc-badge{width:26px;height:26px;background:#8a8c6e;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:6px}
         .resv-conf .rc-card{flex:1 1 auto;min-width:0}
         .resv-conf .rc-tbl{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid #a9a79a;border-left:1px solid #a9a79a}
