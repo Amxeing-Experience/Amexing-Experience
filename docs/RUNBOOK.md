@@ -328,6 +328,12 @@ mongosh AmexingDEV --eval 'db.Payment.find({ requiresRefundReview: true }).prett
   moneda **reporta y no corrige**: deja un log de nivel error y la evidencia en `gatewayRaw`, y jamás
   reescribe `amount`/`origAmount`/`origCurrency`.
 
+**Ninguno de los dos tiene guarda de solapamiento**, y no la necesita: todas sus escrituras son
+condicionales (el filtro de estado va dentro de la consulta), así que dos corridas encimadas —por una
+cadencia agresiva o por un disparo manual sobre uno ya en curso— convergen al mismo resultado sin
+duplicar nada. El único costo son consultas repetidas a Stripe. Si aun así se quiere evitar, basta con
+separar las cadencias; **no** hace falta un lock.
+
 ```bash
 # Filas en 'processing'. OJO: hoy NINGÚN camino del código escribe ese estado — lo produciría un
 # payment_intent.processing (métodos asíncronos) que todavía no se maneja. Si esta query devuelve
