@@ -242,14 +242,26 @@ async function retiredCandidates(windowStart, cooldownThreshold) {
  * They need no provider call at all — the money is already settled locally, what failed was OUR
  * write. Recovery is simply re-running the rollup repair and clearing the marker, which also makes
  * this branch the lever an operator can pull by hand (set the marker, run the job).
- * @returns {Promise<object[]>} The rows awaiting a rollup repair.
+ *
+ * A diferencia de las otras dos, esta rama NO lleva enfriamiento, y es deliberado: una reparación no
+ * consulta al proveedor, así que el enfriamiento —que existe para no machacar a Stripe— aquí solo
+ * retrasaría seis horas un arreglo que puede hacerse de inmediato, dejando una alerta CRITICAL viva
+ * todo ese rato.
+ *
+ * Lo que sí hereda es el ORDEN. repairRollup devuelve 'skipped' sobre una fila sin reservationPtr,
+ * irreparable por definición, y esa fila conserva su marca para siempre. Sin ordenar, las
+ * irreparables se acumulan y compiten por los mismos lugares del lote, desplazando candidatos con
+ * dinero recuperable detrás — y son justamente las que nunca van a dejar de aparecer. Como el camino
+ * de omisión ahora estampa `lastReconciledAt`, ordenar por ese cursor las manda al final de la fila
+ * sin excluir a nadie: el arreglo es de prioridad, no de visibilidad.
+ * @returns {Promise<object[]>} The rows awaiting a rollup repair, neediest first.
  */
 async function rollupRepairCandidates() {
   // queryAll: a row can need a repair whether or not it is visible.
   const query = BaseModel.queryAll('Payment');
   query.equalTo('requiresRollupRepair', true);
   query.limit(RECONCILE_BATCH_LIMIT);
-  return query.find({ useMasterKey: true });
+  return orderBatch(await query.find({ useMasterKey: true }));
 }
 
 /**
@@ -404,7 +416,13 @@ async function repairRollup(payment) {
   const reservationPtr = payment.get('reservationPtr');
   const reservationId = reservationPtr && reservationPtr.id;
   if (!reservationId) {
-    logger.error('A payment flagged for rollup repair has no reservationPtr; it cannot be repaired automatically', {
+    // Se estampa el cursor TAMBIÉN en el camino de omisión. Sin esto, una fila irreparable conserva
+    // su marca para siempre y esta rama, que ordena y limita como las otras, la vuelve a traer en
+    // CADA corrida: las irreparables se acumulan y compiten por los mismos lugares del lote,
+    // desplazando candidatos que sí tienen dinero recuperable detrás. El estampado es un
+    // enfriamiento, no una exclusión — la fila vuelve, solo que al final de la fila y no siempre.
+    await stampReconciled(payment.id);
+    logger.error('A payment flagged for rollup repair has no reservationPtr; it cannot be repaired automatically (parked for the cooldown so it stops crowding out real candidates)', {
       paymentId: payment.id,
     });
     return 'skipped';

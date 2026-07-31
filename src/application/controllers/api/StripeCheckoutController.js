@@ -513,10 +513,15 @@ class StripeCheckoutController {
   }
 }
 
-// The TTL sweep must measure its threshold against the SAME two numbers this controller stamps on a
-// pending, not against a second copy of them: a sweep that used a shorter cushion would retire a
-// pending whose Checkout Session is still payable in Stripe.
-StripeCheckoutController.PENDING_TTL_MS = PENDING_TTL_MS;
+// El barrido TTL mide su umbral contra el colchón que estampa este controller, no contra una segunda
+// copia: uno que usara un colchón más corto retiraría un pendiente cuya Checkout Session sigue siendo
+// pagable en Stripe.
+//
+// PENDING_TTL_MS NO se exporta a propósito, aunque el barrido "lógicamente" lo necesite: ya viene
+// horneado dentro de `expiresAt` (que es creación + TTL), así que el umbral correcto es
+// `expiresAt < ahora − colchón − margen` y NO resta el TTL otra vez. Publicarlo aquí invitaba a que
+// alguien lo restara "por consistencia", y esa resta haría que el barrido retire pendientes todavía
+// pagables — exactamente la carrera que el colchón existe para evitar.
 StripeCheckoutController.SESSION_EXPIRY_CUSHION_MS = SESSION_EXPIRY_CUSHION_MS;
 
 module.exports = StripeCheckoutController;

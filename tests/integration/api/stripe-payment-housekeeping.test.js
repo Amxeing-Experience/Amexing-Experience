@@ -1036,6 +1036,46 @@ describe('online payment housekeeping (integration)', () => {
       expect((await reload(payment.id)).get('requiresRollupRepair')).toBe(true);
     });
 
+    // Una fila marcada SIN reservationPtr es irreparable por definición y conserva su marca. Sin el
+    // estampado del camino de omisión reaparecía en cada corrida, se acumulaba con sus iguales y
+    // competía por los mismos 100 lugares del lote, desplazando candidatos con dinero recuperable
+    // detrás. No se excluye: se manda al final de la fila.
+    it('una fila irreparable se estampa al omitirla, para no desplazar candidatos reales', async () => {
+      const reservationId = await createReservation(1000);
+      const huerfana = await createOnline({
+        reservationId, gatewayStatus: 'succeeded', expiresAtOffsetMs: -60 * MINUTE,
+      });
+      huerfana.set('requiresRollupRepair', true);
+      huerfana.unset('reservationPtr');
+      await huerfana.save(null, { useMasterKey: true });
+
+      const stats = await housekeeping.reconcileStalePayments();
+      expect(stats.skipped).toBe(1);
+      expect(stats.repaired).toBe(0);
+
+      const despues = await reload(huerfana.id);
+      // Estampada (va al final del orden), pero NO excluida: conserva su marca y vuelve a aparecer.
+      expect(despues.get('lastReconciledAt')).toBeInstanceOf(Date);
+      expect(despues.get('requiresRollupRepair')).toBe(true);
+    });
+
+    it('una reparación real NO espera el enfriamiento: no consulta al proveedor', async () => {
+      const reservationId = await createReservation(1000);
+      const payment = await createOnline({
+        reservationId, gatewayStatus: 'succeeded', expiresAtOffsetMs: -60 * MINUTE,
+      });
+      // Recién estampada: bajo el enfriamiento de las otras dos ramas quedaría fuera 6 horas, con una
+      // alerta CRITICAL viva todo ese rato por un arreglo que puede hacerse ya.
+      payment.set('requiresRollupRepair', true);
+      payment.set('lastReconciledAt', new Date());
+      await payment.save(null, { useMasterKey: true });
+
+      const stats = await housekeeping.reconcileStalePayments();
+      expect(stats.rollupRepair).toBe(1);
+      expect(stats.repaired).toBe(1);
+      expect(retrieveSession).not.toHaveBeenCalled();
+    });
+
     it('a flagged row is processed ONCE, as a repair, even if it also matches another branch', async () => {
       const reservationId = await createReservation(1000);
       const payment = await createOnline({ reservationId, expiresAtOffsetMs: -60 * MINUTE });
