@@ -241,16 +241,47 @@ describe('paymentAtomicStore — PR6 housekeeping writes', () => {
 
   // -----------------------------------------------------------------------------------------
   describe('backfillAuditFields — rellena SOLO lo ausente', () => {
-    it('exige que CADA campo propuesto siga ausente, así que nunca pisa al ganador', async () => {
+    it('una escritura POR CAMPO, cada una exigiendo que SU campo siga ausente', async () => {
+      const calls = [];
+      findOneAndUpdateImpl = (filter, update, options) => {
+        calls.push({ filter, update, options });
+        lastCall = { filter, update, options };
+        return Promise.resolve({ _id: 'pay_1' });
+      };
       await store.backfillAuditFields('pay_abc', { gatewayChargeId: 'ch_tarde', gatewayIntentId: 'pi_tarde' });
 
-      expect(lastCall.filter).toEqual({
-        _id: 'pay_abc',
-        gatewayChargeId: { $in: [null, ''] },
-        gatewayIntentId: { $in: [null, ''] },
+      expect(calls).toHaveLength(2);
+      expect(calls[0].filter).toEqual({ _id: 'pay_abc', gatewayChargeId: { $in: [null, ''] } });
+      expect(calls[0].update.$set.gatewayChargeId).toBe('ch_tarde');
+      expect(calls[1].filter).toEqual({ _id: 'pay_abc', gatewayIntentId: { $in: [null, ''] } });
+      expect(calls[1].update.$set.gatewayIntentId).toBe('pi_tarde');
+      // Ninguna escritura arrastra al otro campo: un campo ya presente no puede bloquear al resto.
+      expect(Object.prototype.hasOwnProperty.call(calls[0].update.$set, 'gatewayIntentId')).toBe(false);
+    });
+
+    // El caso REAL, y la razón de que sea una escritura por campo: gatewayIntentId se sella al crear
+    // la Checkout Session, así que SIEMPRE está presente cuando llega un rescate. Con un filtro
+    // combinado por AND eso bloqueaba la escritura entera y el gatewayRaw de la discrepancia — el
+    // motivo del arreglo — no se guardaba nunca.
+    it('un campo ya escrito NO impide rellenar los demás (gatewayIntentId siempre viene sellado)', async () => {
+      const yaTiene = { gatewayIntentId: 'pi_del_checkout' };
+      const escritos = [];
+      findOneAndUpdateImpl = (filter, update) => {
+        const campo = Object.keys(filter).find((k) => k !== '_id');
+        lastCall = { filter, update };
+        if (yaTiene[campo]) return Promise.resolve(null); // ya presente: no matchea
+        escritos.push(campo);
+        return Promise.resolve({ _id: 'pay_abc' });
+      };
+
+      const out = await store.backfillAuditFields('pay_abc', {
+        gatewayChargeId: 'ch_tarde',
+        gatewayIntentId: 'pi_tarde',
+        gatewayRaw: { discrepancy: { storedAmount: 100, chargedAmount: 120 } },
       });
-      expect(lastCall.update.$set.gatewayChargeId).toBe('ch_tarde');
-      expect(lastCall.update.$set.gatewayIntentId).toBe('pi_tarde');
+
+      expect(escritos).toEqual(['gatewayChargeId', 'gatewayRaw']);
+      expect(out.matchedCount).toBe(2);
     });
 
     it('el gatewayRaw de una discrepancia viaja igual, en UNA sola escritura condicional', async () => {
