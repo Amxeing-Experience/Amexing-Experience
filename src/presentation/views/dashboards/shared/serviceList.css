@@ -615,3 +615,50 @@
 @media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
 
 .pay-desglose:empty { display: none; }
+
+/* ---------------------------------------------------------------------------
+   Píldoras de estado, en la paleta de marca.
+
+   Bootstrap las pinta en amarillo y verde de semáforo, que en esta interfaz gritan. El suavizado
+   estaba escrito CUATRO veces —una por cada contenedor donde vivía la píldora— así que cada casa
+   nueva heredaba el estilo crudo: fue lo que pasó con la barra de cobranza, que salía amarillo
+   Bootstrap mientras la de arriba salía suave.
+
+   Ahora los colores viven una sola vez y la lista de contenedores es lo único que crece.
+   --------------------------------------------------------------------------- */
+#headerActions .badge,
+.bkg-status .badge,
+.fin-hero-meta .badge,
+.pay-bar .badge {
+  font-weight: 700;
+  font-size: .72rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: .4rem .8rem;
+}
+#headerActions .badge.bg-success,
+.bkg-status .badge.bg-success,
+.fin-hero-meta .badge.bg-success,
+.pay-bar .badge.bg-success { background: #e6efe1 !important; color: #3f5a34 !important; border-color: #cfe0c6; }
+#headerActions .badge.bg-warning,
+.bkg-status .badge.bg-warning,
+.fin-hero-meta .badge.bg-warning,
+.pay-bar .badge.bg-warning { background: #f6efe2 !important; color: #96682f !important; border-color: #e7d6bd; }
+#headerActions .badge.bg-primary,
+.bkg-status .badge.bg-primary,
+.fin-hero-meta .badge.bg-primary,
+.pay-bar .badge.bg-primary { background: #eef0e6 !important; color: #566040 !important; border-color: #dce2d0; }
+#headerActions .badge.bg-info,
+.bkg-status .badge.bg-info,
+.fin-hero-meta .badge.bg-info,
+.pay-bar .badge.bg-info { background: #eaf1f0 !important; color: #3a6b63 !important; border-color: #cfe1dd; }
+#headerActions .badge.bg-secondary,
+.bkg-status .badge.bg-secondary,
+.fin-hero-meta .badge.bg-secondary,
+.pay-bar .badge.bg-secondary { background: #f0eee7 !important; color: #6b6656 !important; border-color: #ded9cb; }
+#headerActions .badge.bg-danger,
+.bkg-status .badge.bg-danger,
+.fin-hero-meta .badge.bg-danger,
+.pay-bar .badge.bg-danger { background: #f7ecea !important; color: #a1443a !important; border-color: #e6c9c4; }
+/* En la barra la píldora convive con cifras chicas: se achica para no competir con el saldo. */
+.pay-bar .badge { font-size: .66rem; padding: .25rem .6rem; }

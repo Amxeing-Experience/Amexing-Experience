@@ -21,12 +21,6 @@
 .fin-hero-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 .fin-hero-meta .fin-status-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
 /* Badge de estado suavizado SOLO en el hero (no toca getPaymentStatusBadge compartido) */
-.fin-hero-meta .badge{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;padding:.4rem .8rem;border-radius:999px;border:1px solid transparent;}
-.fin-hero-meta .badge::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;}
-.fin-hero-meta .badge.bg-warning{background:#f6efe2 !important;color:#96682f !important;border-color:#e7d6bd;}
-.fin-hero-meta .badge.bg-success{background:#e6efe1 !important;color:#3f5a34 !important;border-color:#cfe0c6;}
-.fin-hero-meta .badge.bg-secondary{background:#f0eee7 !important;color:#6b6656 !important;border-color:#ded9cb;}
-.fin-hero-meta .badge.bg-info{background:#eaf1f0 !important;color:#3a6b63 !important;border-color:#cfe1dd;}
 /* Botón "Agregar pago": pastilla olivo sólida, limpia y on-brand */
 .fin-pay-btn{display:inline-flex;align-items:center;gap:6px;background:#6E7A50;color:#fff;border:1px solid #6E7A50;
   border-radius:999px;font-size:.8rem;font-weight:600;padding:.42rem .95rem;line-height:1.2;transition:background .12s,border-color .12s;}
