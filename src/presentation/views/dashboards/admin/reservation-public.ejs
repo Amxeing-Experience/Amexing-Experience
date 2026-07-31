@@ -26,11 +26,10 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
 
     <style>
         body { background:#f5f5f5; margin:0; padding:2rem 0; font-family:'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif); }
-        .rc-actions { max-width:820px; margin:0 auto 12px; display:flex; justify-content:flex-end; padding:0 8px; }
-        .rc-export-btn { background:#4b5bdc; color:#fff; border:none; border-radius:8px; padding:10px 18px; font-size:14px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
-        .rc-export-btn:hover { background:#3f4dc0; }
-        .rc-export-btn:disabled { opacity:.6; cursor:default; }
-        @media print { body { background:#fff; padding:0; } .rc-actions { display:none; } }
+        /* .rc-actions y .rc-export-btn se retiraron con el botón del encabezado: la descarga es ahora
+           el flotante compartido, que la hoja pdfFab.css ya oculta en el PDF. El azul #4b5bdc de ese
+           botón era además el último resto fuera de la paleta en esta vista. */
+        @media print { body { background:#fff; padding:0; } }
 
         /* ===== Confirmation card (page-1 section) ===== */
         .resv-conf{max-width:820px;margin:0 auto;background:#fff;padding:24px;box-sizing:border-box;font-family:'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif);color:#2b2b2b;box-shadow:0 0 20px rgba(0,0,0,.08);border-radius:8px}
@@ -109,11 +108,9 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
         .resv-conf .resv-exp-site a{color:#2b2b2b;text-decoration:none;font-weight:600}
         .resv-conf .resv-exp-agent{color:#8a8a8a;font-size:.85rem;line-height:1.55;margin:0}
     </style>
+    <link rel="stylesheet" href="/shared/services/pdfFab.css">
 </head>
 <body>
-    <div class="rc-actions">
-        <button id="exportPdfBtn" class="rc-export-btn"><i class="ti ti-download"></i> Exportar a PDF</button>
-    </div>
 
     <div class="resv-conf">
         <div class="rc-logo">
@@ -483,30 +480,19 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
         </div>
     </div>
 
+    <% if (quote.folio && !esPdf) { %>
+    <a class="pdf-fab" id="pdfFab" href="/reservations/<%= encodeURIComponent(quote.folio) %>/pdf"
+       aria-label="Descargar la confirmación en PDF">
+      <span class="pdf-fab-ico" id="pdfFabIco" aria-hidden="true"><i class="ti ti-download"></i></span>
+      <span class="pdf-fab-txt" id="pdfFabTxt">Descargar PDF</span>
+    </a>
+    <script src="/shared/services/itineraryExport.js"></script>
     <script>
-        document.getElementById('exportPdfBtn').addEventListener('click', async function () {
-            const btn = this;
-            const folio = <%- JSON.stringify(quote.folio || '') %>;
-            if (!folio) return;
-            const original = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<i class="ti ti-loader"></i> Generando…';
-            try {
-                const res = await fetch('/reservations/' + encodeURIComponent(folio) + '/pdf', { credentials: 'same-origin' });
-                if (!res.ok) throw new Error('No se pudo generar el PDF');
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = folio + '.pdf';
-                document.body.appendChild(a); a.click(); a.remove();
-                URL.revokeObjectURL(url);
-            } catch (e) {
-                alert(e.message || 'Error al exportar el PDF');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = original;
-            }
-        });
+      // Mismo botón y misma espera que en el itinerario: el PDF lo arma puppeteer y tarda varios
+      // segundos. Antes esto bajaba el ITINERARIO —el endpoint /pdf lo renderizaba desde el #162—,
+      // así que el usuario pedía la confirmación y recibía otro documento.
+      ItineraryExport.wireFab({ nombreArchivo: <%- JSON.stringify(String(quote.folio) + '.pdf') %> });
     </script>
+    <% } %>
 </body>
 </html>

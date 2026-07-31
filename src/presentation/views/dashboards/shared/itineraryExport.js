@@ -59,7 +59,9 @@ const ItineraryExport = (() => {
    * Apunta los dos botones al folio y descubre el segmento.
    *
    * Las dos rutas son distintas y ambas hacen falta: /itinerary es la vista HTML, para revisarlo en
-   * pantalla antes de mandarlo, y /pdf es puppeteer sobre esa misma plantilla. La de descarga NO
+   * pantalla antes de mandarlo, y /itinerary/pdf es puppeteer sobre esa misma plantilla. Cada ruta de
+   * PDF refleja la vista de su misma ruta base; /reservations/:folio/pdf es OTRO documento, la
+   * confirmación. La de descarga NO
    * lleva target="_blank": al ser un adjunto, abriría una pestaña que se cierra sola y en algunos
    * navegadores parpadea. Sin folio no se descubre nada: no hay documento al que apuntar.
    * @param {object} opciones - Configuración.
@@ -82,7 +84,7 @@ const ItineraryExport = (() => {
     if (preview) preview.href = `/reservations/${o.folio}/itinerary`;
     if (!dl) { seg.classList.remove('d-none'); return true; }
 
-    dl.href = `/reservations/${o.folio}/pdf`;
+    dl.href = `/reservations/${o.folio}/itinerary/pdf`;
     seg.classList.remove('d-none');
 
     // El detalle se recarga tras cada asignación, y este cableo corre en cada recarga: sin la marca,
@@ -98,7 +100,66 @@ const ItineraryExport = (() => {
     return true;
   }
 
-  return { wire };
+  /**
+   * Cablea el botón flotante de descarga de las vistas públicas.
+   *
+   * Se descarga por fetch y no dejando navegar el <a> por lo mismo que el botón del detalle: armar el
+   * PDF toma varios segundos y una descarga por navegación no avisa cuándo empieza ni cuándo termina,
+   * así que el botón parecería muerto todo ese rato. El href se conserva para que "abrir en pestaña
+   * nueva" siga funcionando.
+   *
+   * El ícono y el texto van en dos <span> separados para poder sustituir SOLO el ícono por el girito
+   * y dejar la etiqueta contando qué pasa.
+   * @param {object} opciones - `{ fabId, icoId, txtId, nombreArchivo, alFallar }`.
+   * @returns {boolean} true si quedó cableado.
+   * @example
+   * ItineraryExport.wireFab({ fabId: 'pdfFab', nombreArchivo: 'MAY-2605-001.pdf' });
+   */
+  function wireFab(opciones) {
+    const o = opciones || {};
+    const fab = document.getElementById(o.fabId || 'pdfFab');
+    if (!fab || fab.dataset.bound) return false;
+    fab.dataset.bound = '1';
+
+    const ico = document.getElementById(o.icoId || 'pdfFabIco');
+    const txt = document.getElementById(o.txtId || 'pdfFabTxt');
+    const alFallar = o.alFallar || ((msg) => { alert(msg); });
+
+    fab.addEventListener('click', async (ev) => {
+      if (fab.classList.contains('is-busy')) return;
+      ev.preventDefault();
+      const icoHtml = ico ? ico.innerHTML : '';
+      const txtHtml = txt ? txt.innerHTML : '';
+      fab.classList.add('is-busy');
+      if (ico) ico.innerHTML = '<span class="pdf-fab-spin"></span>';
+      if (txt) txt.textContent = 'Generando…';
+      let blobUrl = '';
+      try {
+        const resp = await fetch(fab.href);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const blob = await resp.blob();
+        blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = o.nombreArchivo || 'documento.pdf';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (err) {
+        console.error('PDF download failed:', err);
+        alFallar('No se pudo generar el PDF. Intenta de nuevo.');
+      } finally {
+        fab.classList.remove('is-busy');
+        if (ico) ico.innerHTML = icoHtml;
+        if (txt) txt.innerHTML = txtHtml;
+        // Revocar de inmediato cancela la descarga en navegadores que leen el blob tras el click.
+        if (blobUrl) setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      }
+    });
+    return true;
+  }
+
+  return { wire, wireFab };
 })();
 
 // Node (Jest). En el navegador el IIFE de arriba ya dejó window.ItineraryExport.

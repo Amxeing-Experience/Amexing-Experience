@@ -36,7 +36,10 @@ describe('wire', () => {
     const n = montar();
     ItineraryExport.wire({ folio: 'MAY-2605-001' });
     expect(n.previewItineraryBtn.href).toBe('/reservations/MAY-2605-001/itinerary');
-    expect(n.downloadItineraryBtn.href).toBe('/reservations/MAY-2605-001/pdf');
+    // Cada ruta de PDF refleja la vista de su misma ruta base: /reservations/:folio/pdf es la
+    // CONFIRMACIÓN, otro documento. Confundirlas fue el bug: el botón de la confirmación bajaba el
+    // itinerario.
+    expect(n.downloadItineraryBtn.href).toBe('/reservations/MAY-2605-001/itinerary/pdf');
   });
 
   it('descubre el segmento, que nace oculto', () => {
