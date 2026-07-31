@@ -555,17 +555,22 @@
    bloque en el flujo, y el desglose completo vive en el carrito, que es donde además se actúa.
    --------------------------------------------------------------------------- */
 .pay-bar {
-  position: fixed;
-  left: 0; right: 0; bottom: 0;
+  /* Pegajosa DENTRO del contenido, no fija a la ventana. Con `fixed` arrancaba en el borde izquierdo
+     de la pantalla y se metía debajo del sidebar, que además cambia de ancho al colapsarse: cualquier
+     `left` sería un número mágico que se rompe en ese estado y en cada punto de quiebre.
+     El que hace scroll en este dashboard es .dashboard-content, así que basta con pegarse a su borde
+     inferior y el layout se encarga del resto. */
+  position: sticky;
+  bottom: 0;
   z-index: 40;
   background: #fff;
-  border-top: 1px solid #dcdccf;
-  box-shadow: 0 -6px 22px rgba(43, 43, 43, .10);
+  border: 1px solid #dcdccf;
+  border-radius: 12px;
+  box-shadow: 0 -4px 18px rgba(43, 43, 43, .09);
+  margin-top: 18px;
 }
 .pay-bar-inner {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 11px 22px;
+  padding: 11px 18px;
   display: flex;
   align-items: center;
   gap: 22px;
@@ -597,9 +602,6 @@
 .pay-bar-btn:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
 .pay-bar-btn.is-primaria { background: #6E7A50; border-color: #6E7A50; color: #fff; }
 .pay-bar-btn.is-primaria:hover { background: #566040; border-color: #566040; color: #fff; }
-
-/* El contenido no puede quedar debajo de la barra. */
-body.tiene-barra-cobranza { padding-bottom: 76px; }
 
 /* El carrito se angosta: su contenido es una columna —cobertura, desglose, acción, historial— y a
    860 px quedaba nadando, con el vacío concentrado abajo. */

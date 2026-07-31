@@ -1936,7 +1936,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const bar = document.getElementById('payBar');
         if (!bar) return;
         const pay = reservationData && reservationData.payment;
-        if (!pay) { bar.classList.add('d-none'); document.body.classList.remove('tiene-barra-cobranza'); return; }
+        if (!pay) { bar.classList.add('d-none'); return; }
 
         const curr = reservationData.currency || 'MXN';
         const resuelto = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
@@ -1955,7 +1955,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Saldo cubierto: deja de teñirse de ámbar, que es la señal de que falta algo.
         document.getElementById('payBarSaldo').classList.toggle('is-cubierto', saldo <= 0);
         bar.classList.remove('d-none');
-        document.body.classList.add('tiene-barra-cobranza');
     }
 
     function renderFinancialSummary() {
