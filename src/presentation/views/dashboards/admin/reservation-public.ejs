@@ -163,6 +163,12 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                 var dia = DIAS_SEM[dt.getDay()];
                 return dia.charAt(0).toUpperCase() + dia.slice(1) + ' ' + Number(m[3]) + ' de ' + MESES[Number(m[2]) - 1] + ' de ' + m[1];
             }
+            // Exportación a PDF. Un <details> impreso se queda cerrado y su contenido no sale, así que
+            // lo único que llega al papel es un renglón azul que invita a un clic imposible.
+            // Este bloque corre en el SERVIDOR, así que el local se lee directo. Ojo: una etiqueta
+            // de salida de EJS aquí adentro cerraría el propio bloque a media función — incluso
+            // escrita dentro de un comentario, porque el delimitador de cierre se busca en crudo.
+            var esPdfExport = (typeof esPdf !== 'undefined' && !!esPdf);
             var PAY_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
             var paymentLabel = PAY_LABELS[paymentType] || (paymentType ? (paymentType.charAt(0).toUpperCase() + paymentType.slice(1)) : '');
             var sumSubtotal = svc.subtotal;
@@ -220,7 +226,10 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                         miniMethods.forEach(function(m){ var v = Number(pbt[m.k]); if (isFinite(v)) { miniRows.push({ k: m.k, l: m.l, v: v }); } });
                     }
                     var miniTableHtml = '';
-                    if (miniRows.length >= 2) {
+                    // En el PDF se omite entero: el desglose sirve para COMPARAR antes de elegir cómo
+                    // pagar, y esta confirmación ya trae el método decidido. Ver los otros dos precios
+                    // en un documento ya confirmado invita a preguntarse si se pagó de más.
+                    if (miniRows.length >= 2 && !esPdfExport) {
                         var miniRowsHtml = miniRows.map(function(r){
                             var mark = (r.k === paymentType) ? ' <span class="rc-mini-active"><i class="ti ti-point-filled" aria-hidden="true"></i> Método actual</span>' : '';
                             return '<div class="rc-mini-row"><span>' + r.l + mark + '</span><span>' + fmtMoney(r.v) + '</span></div>';
