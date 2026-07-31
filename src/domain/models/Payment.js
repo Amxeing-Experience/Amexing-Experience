@@ -248,6 +248,44 @@ class Payment extends BaseModel {
     this.set('confirmedAt', confirmedAt);
   }
 
+  // ---- Rollup housekeeping fields (PR6) ----
+  // Internal state, never serialized by formatPayment. `retiredBySystem` is the ONLY signal that
+  // tells a housekeeping soft-delete (TTL sweep / retirePending) apart from a deliberate staff
+  // delete — deletedBy cannot, since both paths store a real user — and it is what gates the
+  // revive of a row whose card actually cleared afterwards.
+
+  getRetiredBySystem() {
+    return this.get('retiredBySystem') === true;
+  }
+
+  setRetiredBySystem(retiredBySystem) {
+    this.set('retiredBySystem', retiredBySystem === true);
+  }
+
+  getLastReconciledAt() {
+    return this.get('lastReconciledAt');
+  }
+
+  setLastReconciledAt(lastReconciledAt) {
+    this.set('lastReconciledAt', lastReconciledAt);
+  }
+
+  getRequiresRefundReview() {
+    return this.get('requiresRefundReview') === true;
+  }
+
+  setRequiresRefundReview(requiresRefundReview) {
+    this.set('requiresRefundReview', requiresRefundReview === true);
+  }
+
+  getRequiresRollupRepair() {
+    return this.get('requiresRollupRepair') === true;
+  }
+
+  setRequiresRollupRepair(requiresRollupRepair) {
+    this.set('requiresRollupRepair', requiresRollupRepair === true);
+  }
+
   // =================
   // STATIC HELPERS
   // =================
@@ -333,7 +371,8 @@ class Payment extends BaseModel {
       receiptS3Key: payment.get('receiptS3Key') || null,
       // Canal/pasarela expuestos al cliente. Los pagos manuales legacy no tienen `channel` -> 'manual'.
       // gatewayIntentId/gatewayRaw NUNCA se serializan (seguridad/ruido, plan seccion 6.2); tampoco
-      // gatewaySessionId/expiresAt/confirmedAt en este PR (el DTO solo expone estos 4).
+      // gatewaySessionId/expiresAt/confirmedAt (el DTO solo expone estos 4), ni los campos internos de
+      // housekeeping de PR6 (retiredBySystem/lastReconciledAt/requiresRefundReview/requiresRollupRepair).
       channel: payment.get('channel') || 'manual',
       gateway: payment.get('gateway') || null,
       gatewayStatus: payment.get('gatewayStatus') || null,
