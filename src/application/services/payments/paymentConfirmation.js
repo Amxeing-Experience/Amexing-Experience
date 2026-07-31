@@ -191,6 +191,35 @@ async function markIfReservationCancelled({
  * @example
  * await runRollup({ payment, shouldRecalculate: true, isSuccess: true, source: 'webhook', context });
  */
+/**
+ * markIfReservationCancelled, pero incapaz de tumbar lo que esté pasando alrededor.
+ *
+ * El saldo es dinero y la marca es una bandera: que no se pueda dejar la bandera nunca justifica
+ * abortar (ni enmascarar) el rollup, ni convertir un fallo de escritura en un fallo de la confirmación.
+ * @param {object} ctx - Contexto.
+ * @param {object} ctx.payment - El Payment.
+ * @param {string} ctx.reservationId - Id de la reservación.
+ * @param {string} ctx.source - Qué camino confirma.
+ * @param {object} ctx.context - Identificadores de log.
+ * @returns {Promise<boolean>} True si quedó marcada; false si no aplicaba o si el intento falló.
+ * @example
+ * const flagged = await markCancelledSafely({ payment, reservationId, source, context });
+ */
+async function markCancelledSafely({
+  payment, reservationId, source, context,
+}) {
+  try {
+    return await markIfReservationCancelled({
+      payment, reservationId, source, logContext: context,
+    });
+  } catch (markErr) {
+    logger.error('Could not flag a gateway charge landed on a cancelled reservation', {
+      ...context, source, paymentId: payment.id, reservationId, error: markErr && markErr.message,
+    });
+    return false;
+  }
+}
+
 async function runRollup({
   payment, shouldRecalculate, isSuccess, source, context,
 }) {
@@ -216,18 +245,19 @@ async function runRollup({
   // marca no volvería a evaluarse NUNCA. Un cobro sobre una reservación cancelada se quedaría sin
   // `requiresRefundReview`, que es justo lo que PR11 convierte en solicitud de reembolso.
   // Su propio fallo NO puede bloquear el rollup: el saldo es dinero, la marca es una bandera.
+  // Se evalúa en las DOS salidas del rollup, nunca ANTES de él. Ponerlo antes tambien resolvia el
+  // problema de perderlo, pero le agregaba una lectura de reservación al camino del GANADOR, retrasando
+  // su escritura del rollup y ensanchando la ventana en la que un evento hermano observa el saldo
+  // rancio: la prueba de cuatro eventos simultáneos lo detectó bajo carga (un hermano llegaba a
+  // "sanar"). El ganador ya no paga ese costo, y la marca sigue sin perderse porque el camino de fallo
+  // la deja antes de re-lanzar.
   let flaggedForRefundReview = false;
-  if (shouldRecalculate && isSuccess) {
-    try {
-      flaggedForRefundReview = await markIfReservationCancelled({
-        payment, reservationId, source, logContext: context,
-      });
-    } catch (markErr) {
-      logger.error('Could not flag a gateway charge landed on a cancelled reservation; the rollup continues', {
-        ...context, source, paymentId: payment.id, reservationId, error: markErr && markErr.message,
-      });
-    }
-  }
+  const markCancelled = async () => {
+    if (!(shouldRecalculate && isSuccess)) return;
+    flaggedForRefundReview = await markCancelledSafely({
+      payment, reservationId, source, context,
+    });
+  };
 
   let staleRollupRepaired = false;
   try {
@@ -238,6 +268,11 @@ async function runRollup({
       staleRollupRepaired = !!(outcome && outcome.healed);
     }
   } catch (rollupErr) {
+    // ANTES del re-throw: el reintento llega con matchedCount 0 (la fila ya está en el destino), así que
+    // shouldRecalculate es false y esta rama no volvería a evaluarse NUNCA. Un cobro sobre una
+    // reservación cancelada se quedaría sin `requiresRefundReview`, que es lo que PR11 convierte en
+    // solicitud de reembolso.
+    await markCancelled();
     try {
       await flagRollupRepair(payment.id);
     } catch (flagErr) {
@@ -250,6 +285,8 @@ async function runRollup({
     });
     throw rollupErr;
   }
+
+  await markCancelled();
 
   // The rollup is current again, so a marker left by an earlier failed attempt no longer applies.
   if (payment.get && payment.get('requiresRollupRepair') === true) {
