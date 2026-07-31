@@ -12,6 +12,22 @@
 
 const { renderComponent } = require('../../../../helpers/ejsTestUtils');
 
+// Estos tests verificaban MARCADORES DE CÓDIGO dentro del <script> embebido de cada plantilla. Ese
+// código se extrajo a módulos compartidos (financialSummary.js, paymentsPanel.js, serviceListRenderer.js),
+// así que ahora se lee de ahí. Lo que se protege es lo mismo; cambió dónde vive.
+//
+// Se comprueba ADEMÁS que la plantilla enlace el módulo: sin eso, la garantía se podría perder
+// quitando un <script> sin que ningún test se enterara.
+const fs = require('fs');
+const path = require('path');
+
+const RAIZ_SHARED = path.join(__dirname, '../../../../../src/presentation/views/dashboards/shared');
+const leerModulo = (nombre) => fs.readFileSync(path.join(RAIZ_SHARED, nombre), 'utf8');
+const FUENTE_FINANZAS = leerModulo('financialSummary.js');
+const FUENTE_PAGOS = leerModulo('paymentsPanel.js');
+const FUENTE_FORMULARIO = leerModulo('paymentForm.js');
+
+
 const params = { reservationId: 'test-reservation-id' };
 const AGENCY_ROLES = ['department_manager', 'client'];
 
@@ -35,9 +51,16 @@ describe('Booking Detail Fase 3 — módulo compartido', () => {
 //
 // El script embebido no se ejecuta en el cascarón, así que se verifica el literal en el HTML renderizado.
 describe('Booking Detail — total consistente entre roles (council L0F0)', () => {
-  it.each(['admin', 'department_manager', 'client'])('%s: el total mostrado sale de pay.total (summary del servidor)', async (role) => {
+  it('el total sale de pay.total en el módulo que usan las tres vistas', () => {
+    expect(FUENTE_FINANZAS).toMatch(/formatCurrency\(heroTotal|Number\(pay\.total\)/);
+  });
+
+  it.each(['admin', 'department_manager', 'client'])('%s enlaza el módulo del resumen', async (role) => {
     const html = await render(role);
-    expect(html).toMatch(/formatCurrency\(pay\.total|Number\(pay\.total\)/);
+    const esperado = role === 'admin'
+      ? /formatCurrency\(pay\.total|Number\(pay\.total\)/
+      : /shared\/services\/financialSummary\.js/;
+    expect(html).toMatch(esperado);
   });
 
   it.each(['admin', 'department_manager', 'client'])('%s: el tile #infoTotal ya no duplica el total en la tarjeta de info', async (role) => {
@@ -92,10 +115,11 @@ describe('Booking Detail Fase 3 — admin (nivel 6+)', () => {
 describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)', () => {
   it.each(AGENCY_ROLES)('%s: bloque de pago nuevo (Estado/Total/Pagado/Saldo)', async (role) => {
     const html = await render(role);
-    expect(html).toContain('Estado de pago');
-    expect(html).toContain('Total a pagar');
-    expect(html).toContain('Pagado');
-    expect(html).toContain('Saldo');
+    const fuente = role === 'admin' ? html : FUENTE_FINANZAS;
+    expect(fuente).toContain('Estado de pago');
+    expect(fuente).toContain('Total a pagar');
+    expect(fuente).toContain('Pagado');
+    expect(fuente).toContain('Saldo');
   });
 
   it.each(AGENCY_ROLES)('%s N3: propina AUSENTE del DOM (fila resumen y desglose por servicio fuera de scope)', async (role) => {
@@ -110,8 +134,9 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     // El ícono de descuento (ti-discount-2) ya NO está prohibido en toda la plantilla: la línea de
     // AHORRO (Fase D+E, aprobada) sí lo usa. Lo que se conserva es el framing NEUTRAL de los ajustes.
     const html = await render(role);
-    expect(html).toContain('ti-plus text-danger');
-    expect(html).toContain('ti-minus text-success');
+    const fuente = role === 'admin' ? html : FUENTE_FINANZAS;
+    expect(fuente).toContain('ti-plus text-danger');
+    expect(fuente).toContain('ti-minus text-success');
   });
 
   // El comparativo de 3 métodos DEJÓ de ser admin-only: agencia/agente también lo ven, desplegable
@@ -120,9 +145,10 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
   // que siguen siendo admin-only porque su endpoint lo es.
   it.each(['admin', ...AGENCY_ROLES])('%s: comparativo de 3 métodos desplegable desde el chip', async (role) => {
     const html = await render(role);
-    expect(html).toContain('id="paymentMethodComparison"');
-    expect(html).toContain('Total a pagar según el método de pago:');
-    expect(html).toContain('fin-cmp-badge');
+    const fuente = role === 'admin' ? html : FUENTE_FINANZAS;
+    expect(fuente).toContain('id="paymentMethodComparison"');
+    expect(fuente).toContain('Total a pagar según el método de pago:');
+    expect(fuente).toContain('fin-cmp-badge');
   });
 
   // RBAC — /adjustments es requireRole(['admin','superadmin']); la agencia NO debe ni ver el control.
@@ -141,11 +167,14 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
   it.each(AGENCY_ROLES)('%s: AHORA porta el formulario de registro de pago (agencia/agente cobran, nivel 4+)', async (role) => {
     const html = await render(role);
     expect(html).toContain('id="paymentFormWrap"');
-    expect(html).toContain('id="addPaymentBtn"');
+    // "Agregar pago" lo pinta el módulo del resumen, no el markup de la plantilla.
+    expect(FUENTE_FINANZAS).toContain('id="addPaymentBtn"');
     expect(html).toContain('id="showPaymentFormBtn"');
-    // savePaymentBtn se emite dentro de renderPaymentForm (marcador literal en el <script>).
-    expect(html).toContain('id="savePaymentBtn"');
-    expect(html).toContain('function renderPaymentForm');
+    // El formulario se extrajo a PaymentForm; la plantilla aporta el contenedor y el disparador, y el
+    // módulo el formulario en sí. Se comprueba además que lo ENLACE: sin eso el botón no haría nada.
+    expect(FUENTE_FORMULARIO).toContain('id="savePaymentBtn"');
+    expect(FUENTE_FORMULARIO).toContain('function renderPaymentForm');
+    expect(html).toContain('/shared/services/paymentForm.js');
   });
 
   // INVERSIÓN Fase D: antes agencia/agente NO tenían historial de pagos; ahora SÍ (offcanvas de lectura).
@@ -182,46 +211,39 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
 
   it.each(AGENCY_ROLES)('%s: "Agregar pago" sigue siendo la única puerta de entrada al carrito', async (role) => {
     const html = await render(role);
-    expect(html).toContain('id="addPaymentBtn"');
+    expect(FUENTE_FINANZAS).toContain('id="addPaymentBtn"');
   });
 });
 
 // Fix bug ALTA: un servicio "Pago externo" (includeInTotal:false) se mostraba distinto en cada vista —
 // $0.00 sin badge en admin, precio completo sin badge en agencia/agente.
 //
-// El BADGE se retiró de admin al rediseñar su lista de servicios con la maqueta del itinerario; agencia
-// y agente aún lo pintan y se alinearán al portar esa maqueta. Lo que NO cambia —y es lo que de verdad
-// arreglaba el bug— es que la línea del servicio muestre el precio REAL en las 3, en vez de $0.
+// Las tres vistas ya comparten ServiceListRenderer, así que el bug se quedó SIN SUPERFICIE: ninguna
+// pinta precio por servicio. Esa lista es la vista de OPERACIÓN —quién va, a qué hora, en qué
+// vehículo— y el dinero vive completo en el Resumen Financiero y en el carrito de pagos. Con el
+// precio se fue también el badge, que existía solo para explicar por qué un precio aparecía en $0.
+//
+// Lo que hay que blindar ahora es el AGREGADO: que siga excluyendo "Pago externo" del subtotal.
 // El <script> no se ejecuta en el cascarón; se verifica el literal en su fuente renderizada.
 describe('Booking Detail — servicio "Pago externo" (includeInTotal:false) unificado entre roles', () => {
   let htmlAdmin;
 
   beforeAll(async () => { htmlAdmin = await render('admin'); });
 
-  it.each(AGENCY_ROLES)('%s: pinta el badge "Pago externo" condicionado a includeInTotal === false', async (role) => {
-    const html = await render(role);
-    expect(html).toContain('Pago externo');
-    expect(html).toContain('svc.subconcept?.includeInTotal === false');
-  });
-
   // Se verifica el MARKUP del badge, no la frase: el <script> embebido viaja en el HTML y la frase
   // sobrevive en sus comentarios, así que un not.toContain('Pago externo') fallaría sin que el badge
   // se pinte.
-  it('admin: el badge salió del título con el rediseño de la lista', () => {
-    expect(htmlAdmin).not.toContain('>Pago externo</span>');
-    expect(htmlAdmin).not.toContain('externalBadge');
+  it.each(['admin', ...AGENCY_ROLES])('%s: ya no pinta el badge, que iba atado al precio', async (role) => {
+    const html = await render(role);
+    expect(html).not.toContain('>Pago externo</span>');
+    expect(html).not.toContain('externalBadge');
   });
 
-  // Admin ya no muestra PRECIO por servicio: su lista es la vista de operación (quién va, a qué hora,
-  // en qué vehículo) y el dinero vive en el Resumen Financiero y en el carrito de pagos. Con eso el
-  // bug original queda sin superficie en admin —no hay precio que pueda aparecer en $0—, pero lo que
-  // de verdad hay que blindar es que el AGREGADO siga excluyendo "Pago externo" (test siguiente).
-  //
-  // Marcadores de MARKUP y del call site completo, no del nombre del helper: ese sigue nombrado en
-  // los comentarios de la plantilla, que viajan en el <script> embebido.
-  it('admin: la línea del servicio ya no pinta precio', () => {
-    expect(htmlAdmin).not.toContain('<span class="svc-price">');
-    expect(htmlAdmin).not.toContain('getServicePriceByTypeGross(svc, reservationData.paymentType)');
+  // El precio por servicio salió de las TRES a la vez, al compartir el renderizador. Sin precio en la
+  // línea, el bug original —"Pago externo" mostrado en $0— no tiene dónde reaparecer.
+  it.each(['admin', ...AGENCY_ROLES])('%s: la línea del servicio ya no pinta precio', async (role) => {
+    const html = await render(role);
+    expect(html).not.toContain('<span class="svc-price">');
   });
 
   it('admin: el agregado financiero sigue usando computeServicesSubtotalByType (excluye Pago externo, no se tocó)', () => {

@@ -44,110 +44,21 @@ if (startDate) {
   headerRange = endDate && endDay !== startDay ? `${startDay}-${endDay}` : String(startDay);
 }
 
-// Duración del servicio POR TIPO: cada uno la guarda en un campo distinto y no son intercambiables.
-//   a-disposición      -> hours          (horas contratadas)
-//   tour / experiencia -> duration       (duración del catálogo, en horas)
-//   traslado           -> routeDuration  (duración de la ruta, en MINUTOS)
-//   concepto           -> ninguna
-// El orden importa: los subconceptos arrastran un `duration: 1` espurio en todo lo que no es tour, así
-// que evaluar `duration || hours` lo hacía ganar y un a-disposición de 6 h se anunciaba como "1 hour".
-const serviceDuration = (sc) => {
-  if (sc.type === 'a-disposicion') {
-    const h = Number(sc.hours || 0);
-    return h > 0 ? { hours: h } : null;
-  }
-  if (sc.type === 'tour' || sc.type === 'experience' || sc.type === 'experiencia') {
-    const h = Number(sc.duration || sc.hours || 0);
-    return h > 0 ? { hours: h } : null;
-  }
-  if (sc.type === 'transport' || sc.type === 'traslado') {
-    const min = Number(sc.routeDuration || 0);
-    return min > 0 ? { minutes: min } : null;
-  }
-  return null;
-};
-// Horas en una sola forma: "1 hr", "6 hrs". Igual que en el detalle de reservación.
-const hoursText = (h) => {
-  const n = Number(h) || 0;
-  return `${n} hr${n === 1 ? '' : 's'}`;
-};
+// El modelo de la lista vive en /shared/services/serviceListHelpers.js — mismo archivo que carga el
+// detalle de reservación en el navegador. Aquí llega como local (`svcHelpers`) porque dentro de una
+// plantilla EJS no hay `require`. Estos alias mantienen los call sites de abajo.
+const SLH = svcHelpers;
+const hoursText = (h) => SLH.hoursText(h);
+const durationLabel = (sc) => SLH.durationLabel(sc);
+const serviceStartTime = (sc) => SLH.startTime(sc);
+const peopleLabel = (sc) => SLH.peopleLabel(sc);
+const isTransportType = (sc) => SLH.isTransportType(sc && sc.type);
+const locationLines = (sc) => SLH.locationLines(sc);
 
-const durationLabel = (sc) => {
-  const d = serviceDuration(sc);
-  if (!d) return '';
-  if (d.minutes) {
-    const h = Math.floor(d.minutes / 60);
-    const m = d.minutes % 60;
-    if (h === 0) return `${m} min`;
-    // "hr/hrs", y en español: este documento está en español y decía "hour/hours".
-    return m ? `${hoursText(h)} ${m} min` : hoursText(h);
-  }
-  return hoursText(d.hours);
-};
-
-// Ubicaciones del servicio, en renglones etiquetados. En los TRASLADOS son las DIRECCIONES exactas de
-// pick-up y drop-off: la ruta ya la dice el título, pero la calle y el punto de encuentro no se
-// mostraban en ningún lado de este documento — y son justo lo que el pasajero necesita. En tours y
-// experiencias se conserva el origen/destino por nombre, porque ahí el título es el nombre del servicio.
-const locationLines = (sc) => {
-  const lines = [];
-  const add = (label, value) => {
-    const v = String(value == null ? '' : value).trim();
-    if (v) lines.push({ label, value: v });
-  };
-  if (sc.type === 'transport' || sc.type === 'traslado') {
-    if (sc.tripType === 'round-trip') {
-      add('Pick-up (ida)', sc.pickupAddressIda);
-      add('Drop-off (ida)', sc.dropoffAddressIda);
-      add('Pick-up (regreso)', sc.pickupAddressVuelta);
-      add('Drop-off (regreso)', sc.dropoffAddressVuelta);
-    } else {
-      add('Pick-up', sc.pickupAddress);
-      add('Drop-off', sc.dropoffAddress);
-    }
-  } else {
-    add('Desde', sc.originName);
-    add('Hacia', sc.destinationName);
-    add('Pick-up', sc.pickupAddress);
-  }
-  return lines;
-};
-
-// Nombres de las personas del servicio. El DTO ya los exponía (attendees) pero este documento nunca los
-// mostraba: complementan a peopleLabel, que dice cuántos son pero no quiénes. Sin rótulo, igual que
-// peopleLabel: en este documento los únicos nombres son los del propio cliente, así que no hay con qué
-// confundirlos.
+// El módulo devuelve los NOMBRES; aquí se escapan y se juntan, que es como los pinta este documento.
 const attendeesLine = (sc) => {
-  const names = Array.isArray(sc.attendees)
-    ? sc.attendees.map((n) => String(n == null ? '' : n).trim()).filter(Boolean)
-    : [];
+  const names = SLH.attendeeNames(sc);
   return names.length ? escapeHtml(names.join(', ')) : '';
-};
-
-// Hora que encabeza el servicio. En una SALIDA a aeropuerto no es la del avión sino la del PICK-UP:
-// el pasajero leía "18:00" arriba y entendía que a esa hora pasaban por él, cuando la camioneta sale
-// mucho antes. La del vuelo sigue visible en la tabla de vuelos, así que no se pierde nada.
-// Mismo criterio que servicePickupTime del detalle de reservación.
-const roundDownTo15 = (timeStr) => {
-  if (!timeStr || !String(timeStr).includes(':')) return timeStr || '';
-  const [hours, minutes] = String(timeStr).split(':').map(Number);
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return timeStr;
-  const total = Math.floor((hours * 60 + minutes) / 15) * 15;
-  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-};
-
-const serviceStartTime = (sc) => {
-  const isTransport = sc.type === 'transport' || sc.type === 'traslado';
-  if (isTransport && sc.transportType === 'aeropuerto' && sc.directionType === 'departure') {
-    const suggested = sc.flightDepartureTimeSuggested;
-    if (suggested) return roundDownTo15(suggested) || suggested;
-  }
-  let t = sc.time || sc.startTime || '';
-  if (!t && sc.selectedSchedule) {
-    const m = String(sc.selectedSchedule).match(/^(\d{1,2}:\d{2})/);
-    if (m) [, t] = m;
-  }
-  return t;
 };
 
 const titleFor = (sc) => {
@@ -160,21 +71,6 @@ const titleFor = (sc) => {
     return h ? `A Disposición - ${hoursText(h)}` : 'A Disposición';
   }
   return sc.serviceType || 'Servicio';
-};
-
-const peopleLabel = (sc) => {
-  const parts = [];
-  const adults = Number(sc.adultsQuantity || 0) + Number(sc.adultsNoAlcoholQuantity || 0);
-  const children = Number(sc.childrenQuantity || 0);
-  const infants = Number(sc.infantsQuantity || 0);
-  if (adults) parts.push(`${adults} ${adults === 1 ? 'adulto' : 'adultos'}`);
-  if (children) parts.push(`${children} ${children === 1 ? 'niño' : 'niños'}`);
-  if (infants) parts.push(`${infants} ${infants === 1 ? 'infante' : 'infantes'}`);
-  if (!parts.length && sc.numberOfPeople) {
-    const n = Number(sc.numberOfPeople);
-    return `${n} ${n === 1 ? 'persona' : 'personas'}`;
-  }
-  return parts.join(', ');
 };
 
 // Lines starting with "-" render as a bullet list; everything else stays plain text.
@@ -225,19 +121,7 @@ const includeLists = (sc) => ({
   notIncludes: Array.isArray(sc.notIncludes) ? sc.notIncludes.filter(Boolean) : [],
 });
 
-const iconKey = (sc) => {
-  if (sc.type === 'traslado' || sc.type === 'transport') {
-    if (sc.transportType === 'aeropuerto') return sc.directionType === 'departure' ? 'departure' : 'arrival';
-    return 'transfer';
-  }
-  // «A disposición» es un vehículo con chofer por horas, así que lleva el ícono de traslado igual que
-  // el resto del transporte. Antes caía al default y salía con el de experiencias, que no le
-  // corresponde. Mismo criterio que getServiceIconKey en el detalle de reservación.
-  if (sc.type === 'a-disposicion') return 'transfer';
-  if (sc.type === 'tour') return 'city';
-  if (sc.type === 'experiencia') return 'experience';
-  return 'experience';
-};
+const iconKey = (sc) => SLH.iconKey(sc);
 
 // ---------------------------------------------------------------------------
 // Asignaciones por servicio
@@ -254,142 +138,42 @@ const iconKey = (sc) => {
 // jerga del operador («Conductor pendiente»): aquí es «por confirmar» + «te avisamos».
 // ---------------------------------------------------------------------------
 
-// Cuántos vehículos NECESITA el servicio. Mismo criterio que el detalle interno: en
-// «a disposición» el conteo vive en vehicleCount; en el resto, en quantity.
-const vehicleSlotCount = (sc) => {
-  const isTransport = sc.type === 'transport' || sc.type === 'traslado';
-  const isAtDisposal = sc.type === 'a-disposicion';
-  const isTour = sc.type === 'tour';
-  const hasVehicleData = !!(sc.vehicleType || sc.vehicleTypeName || sc.additionalVehicleId
-    || (Array.isArray(sc.extraAdditionalVehicles) && sc.extraAdditionalVehicles.length > 0));
-  const needsVehicle = isTransport || isAtDisposal || (isTour && !sc.isWalkingTour && hasVehicleData);
-  if (!needsVehicle) return 0;
-  if (isAtDisposal) return Number(sc.vehicleCount) || 1;
-  return Number(sc.quantity) || 1;
-};
-
-// Tipo y segmento ESPERADOS de cada plaza: plaza 0 = vehículo principal, plaza 1 = adicional
-// cuando venía marcado, 2+ = extras en orden (mismo mapeo que el modal de asignación del detalle).
-// Así una plaza vacía anuncia QUÉ vehículo va a ser —«Suburban»— en vez del genérico «Vehículo».
-// `vehicleType` guarda normalmente el objectId del catálogo, pero en algunos registros trae el
-// NOMBRE ("SEDAN") ahí. Aprovecharlo recupera el tipo sin tocar la base; el guardia evita que un
-// objectId real se imprima en el PDF del cliente como si fuera un modelo de camioneta. Los objectId
-// de Parse son 10 alfanuméricos con mayúsculas y minúsculas mezcladas, forma que ningún nombre del
-// catálogo tiene (SEDAN, SUBURBAN, JAC Sunray, Van Turística…).
-const vehicleTypeAsName = (value) => {
-  const v = String(value == null ? '' : value).trim();
-  if (!v) return '';
-  const looksLikeObjectId = /^[A-Za-z0-9]{10}$/.test(v) && /[a-z]/.test(v) && /[A-Z]/.test(v);
-  return looksLikeObjectId ? '' : v;
-};
-
-const vehicleSlotSpecs = (sc) => {
-  const specs = [{
-    type: sc.vehicleTypeName || vehicleTypeAsName(sc.vehicleType) || '',
-    segment: sc.categoryName || '',
-    color: sc.categoryColor || '',
-  }];
-  if (sc.additionalVehicleTypeName) {
-    specs.push({
-      type: sc.additionalVehicleTypeName,
-      segment: sc.additionalVehicleSegmentName || '',
-      color: sc.additionalVehicleSegmentColor || '',
-    });
-  }
-  // Las plazas 3+ se leen de `extraAdditionalVehicles` —la lista COTIZADA— y no de los extras ya
-  // asignados: la cotizada siempre trae vehicleTypeName, segmentName y segmentColor, así que una
-  // plaza extra vacía anuncia su tipo igual que la principal en vez de quedar como «Vehículo».
-  const expected = Array.isArray(sc.extraAdditionalVehicles) ? sc.extraAdditionalVehicles : [];
-  const assigned = (sc.assignments && sc.assignments.extras) || [];
-  for (let i = 0; i < Math.max(expected.length, assigned.length); i += 1) {
-    const exp = expected[i] || {};
-    const asg = assigned[i] || {};
-    specs.push({
-      type: exp.vehicleTypeName || asg.vehicleName || '',
-      segment: exp.segmentName || asg.segmentName || '',
-      color: exp.segmentColor || asg.segmentColor || '',
-    });
-  }
-  return specs;
-};
-
-const assignmentPairs = (sc) => {
+// Plazas de vehículo y renglones de rol: los arma ServiceListHelpers, el mismo modelo que usa el
+// detalle interno. Aquí solo se ADAPTA la forma del dato y se pinta.
+//
+// El controlador resuelve las extras a objetos anidados ({ driver: {...}, vehicle: {...} }); el
+// modelo las lee en la forma PLANA en que la base las guarda, así que se aplanan aquí y no en el
+// módulo: aplanarlas allá le metería al modelo compartido una forma que solo existe en esta vista.
+const assignedOf = (sc) => {
   const a = sc.assignments || {};
-  const slots = vehicleSlotCount(sc);
-  // ¿La plaza ofrece chofer? Mismo criterio que el detalle interno: el checkbox de la cotización se
-  // llama "Guía + Chofer" y lo que contrata es el CHOFER.
-  //   traslado      → siempre: sin chofer no hay traslado.
-  //   tour          → solo con "Guía + Chofer": el tour ya trae guía propio y el chofer es el extra.
-  //   a disposición → nunca en la plaza: ahí el chofer se captura en el campo de guía.
-  const isAtDisposal = sc.type === 'a-disposicion';
-  const isTransport = sc.type === 'transport' || sc.type === 'traslado';
-  const offersDriver = isAtDisposal ? false : (isTransport ? true : !!sc.includeGuide);
-  const pairs = [];
-  const push = (driver, vehicle, segmentName, segmentColor) => {
-    const hasDriver = !!(driver && driver.fullName);
-    const hasVehicle = !!(vehicle && vehicle.name);
-    if (!hasDriver && !hasVehicle) return;
-    pairs.push({
-      driver: hasDriver ? driver : null,
-      vehicle: hasVehicle ? vehicle : null,
-      offersDriver,
-      needsDriver: hasVehicle && !hasDriver && offersDriver,
-      needsVehicle: hasDriver && !hasVehicle && slots > 0,
-      segmentName: segmentName || '',
-      segmentColor: segmentColor || '',
-    });
+  const extras = Array.isArray(a.extras) ? a.extras : [];
+  return {
+    driver: a.driver || null,
+    vehicle: a.vehicle || null,
+    guide: a.guide || null,
+    greeter: a.greeter || null,
+    serviceCustomer: a.serviceCustomer || null,
+    extras: extras.map((e) => ({
+      driverId: (e.driver && e.driver.id) || '',
+      driverName: (e.driver && e.driver.fullName) || '',
+      driverPhone: (e.driver && e.driver.phone) || '',
+      driverPhotoUrl: (e.driver && e.driver.profilePhotoUrl) || '',
+      vehicleId: (e.vehicle && e.vehicle.id) || '',
+      vehicleName: (e.vehicle && e.vehicle.name) || '',
+      vehiclePlate: (e.vehicle && e.vehicle.plate) || '',
+      vehicleImageUrl: (e.vehicle && e.vehicle.imageUrl) || '',
+      segmentName: e.segmentName || '',
+      segmentColor: e.segmentColor || '',
+    })),
   };
-  push(a.driver, a.vehicle, sc.categoryName, sc.categoryColor);
-  (a.extras || []).forEach((e) => push(e.driver, e.vehicle, e.segmentName, e.segmentColor));
-
-  // Se rellena hasta las plazas que pide el servicio. Math.max porque si ya hay más parejas
-  // asignadas que el `quantity` capturado, manda lo asignado: nunca se oculta a nadie real.
-  const specs = vehicleSlotSpecs(sc);
-  // El piso por specs solo cuando el servicio lleva vehículo: specs siempre tiene la plaza
-  // principal, y sin este guardia un tour caminando acabaría pidiendo camioneta.
-  const total = slots > 0 ? Math.max(slots, pairs.length, specs.length) : pairs.length;
-  for (let i = pairs.length; i < total; i += 1) {
-    const spec = specs[i] || {};
-    // El tipo va en la línea en negrita y «Por confirmar» debajo, igual que en un renglón
-    // asignado: arriba qué es, abajo el detalle y el estado.
-    // El segmento se hereda del servicio cuando la plaza no trae uno propio: los campos por plaza
-    // existen para poder DIFERIR del servicio y casi nunca están capturados, así que sin la herencia
-    // un traslado Premium de dos vehículos anunciaba "Premium" solo en la primera plaza.
-    pairs.push({
-      driver: null,
-      vehicle: null,
-      pending: true,
-      offersDriver,
-      label: spec.type || 'Vehículo',
-      segmentName: spec.segment || sc.categoryName || '',
-      segmentColor: spec.color || sc.categoryColor || '',
-    });
-  }
-  return pairs;
 };
 
-// Roles que no van amarrados a un vehículo. En «a disposición» el chofer se captura en el
-// campo de guía — mismo criterio que el detalle interno (ver buildPersonCard en booking-detail).
-// includeGuide / includeGreeter dicen si el servicio los lleva, así que un rol contratado y sin
-// asignar también se muestra por confirmar. `serviceCustomer` no tiene bandera: solo si existe.
-const assignmentRoles = (sc) => {
-  const a = sc.assignments || {};
-  const isAtDisposal = sc.type === 'a-disposicion';
-  const isTour = sc.type === 'tour';
-  const guideRole = isAtDisposal ? 'Chofer' : 'Guía';
-  const rows = [
-    // Un tour SIEMPRE trae guía propio y un «a disposición» siempre trae chofer: no dependen del
-    // checkbox. En traslados y experiencias sí, porque ahí el guía es el extra que se contrata.
-    { person: a.guide, role: guideRole, expected: !!sc.includeGuide, always: isTour || isAtDisposal },
-    { person: a.greeter, role: 'Greeter', expected: !!sc.includeGreeter },
-    { person: a.serviceCustomer, role: 'Customer Support', expected: false },
-  ];
-  return rows
-    .filter((r) => r.always || (r.person && r.person.fullName) || r.expected)
-    .map((r) => (r.person && r.person.fullName
-      ? { role: r.role, person: r.person }
-      : { role: r.role, person: null, pending: true }));
-};
+const assignmentPairs = (sc) => SLH.buildVehicleSlots(sc, assignedOf(sc));
+
+// Sin `reservationSupportId`: este documento no muestra un Customer Support a nivel reservación,
+// así que aquí no hay de qué divergir y el del servicio se muestra siempre que exista. En el
+// detalle sí se pasa, y ahí el renglón aparece solo cuando difiere del global.
+const assignmentRoles = (sc) => SLH.roleRows(sc, assignedOf(sc));
 
 // escapeHtml NO escapa comillas, así que no sirve dentro de un atributo: una URL con `"` se
 // saldría del src e inyectaría markup en esta página, que es pública y sin auth.

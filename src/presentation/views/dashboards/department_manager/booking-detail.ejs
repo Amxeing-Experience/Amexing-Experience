@@ -45,57 +45,10 @@
          · SIN botón de cambiar Customer Support: reasignarlo es admin-only; aquí es de solo lectura.
          · SIN bloque "Notas de la cotización": esta vista nunca ha mostrado d.notes y son notas
            internas; no se agrega. -->
+    <link rel="stylesheet" href="/shared/services/serviceList.css">
+<link rel="stylesheet" href="/shared/services/reservationHeader.css">
+<link rel="stylesheet" href="/shared/services/reservationFinance.css">
     <style>
-      /* Acciones del encabezado. Aquí solo hay una exportación, así que va como botón suelto (en admin,
-         que tiene dos, van en un control segmentado). */
-      .hdr-btn{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#6b7256;
-        background:#fff;border:1px solid #dcdccf;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
-        white-space:nowrap;text-decoration:none;font-family:inherit;transition:all .12s ease;}
-      .hdr-btn:hover{background:#f1f2ec;border-color:#c9cdbb;color:#4f5838;}
-      /* La única acción irreversible NO debe ser lo más llamativo: arranca discreta y se tiñe al hover. */
-      .hdr-danger{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#8a8f78;
-        background:transparent;border:1px solid transparent;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
-        white-space:nowrap;font-family:inherit;cursor:pointer;transition:all .12s ease;}
-      .hdr-danger:hover{background:#f7ecea;border-color:#e6c9c4;color:#a1443a;}
-      .bkg-info{border:1px solid #ece8dd;border-radius:14px;overflow:hidden;background:#fff;}
-      .bkg-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
-        padding:20px 26px;background:linear-gradient(135deg,#f7f6f1 0%,#ffffff 60%);border-bottom:1px solid #ece8dd;}
-      .bkg-eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.64rem;font-weight:700;color:#8a8f78;margin-bottom:4px;}
-      .bkg-title{font-size:1.35rem;font-weight:700;color:#2b2b2b;line-height:1.2;word-break:break-word;}
-      .bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
-      /* Badges de estado suavizados SOLO en la tarjeta de info (paleta de marca, sin tocar las
-         funciones compartidas getQuoteStatusBadge / getReservationStatusBadge). */
-      .bkg-status .badge{font-weight:700;font-size:.72rem;border:1px solid transparent;border-radius:999px;padding:.4rem .8rem;}
-      .bkg-status .badge.bg-success{background:#e6efe1 !important;color:#3f5a34 !important;border-color:#cfe0c6;}
-      .bkg-status .badge.bg-warning{background:#f6efe2 !important;color:#96682f !important;border-color:#e7d6bd;}
-      .bkg-status .badge.bg-primary{background:#eef0e6 !important;color:#566040 !important;border-color:#dce2d0;}
-      .bkg-status .badge.bg-info{background:#eaf1f0 !important;color:#3a6b63 !important;border-color:#cfe1dd;}
-      .bkg-status .badge.bg-secondary{background:#f0eee7 !important;color:#6b6656 !important;border-color:#ded9cb;}
-      .bkg-status .badge.bg-danger{background:#f7ecea !important;color:#a1443a !important;border-color:#e6c9c4;}
-      .bkg-top-left{display:flex;align-items:center;gap:26px;flex-wrap:wrap;}
-      .bkg-cs{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding-left:26px;border-left:1px solid #e6e1d5;}
-      .bkg-cs-lbl{text-transform:uppercase;letter-spacing:.07em;font-size:.62rem;font-weight:700;color:#8a8f78;}
-      .bkg-cs #infoServiceCustomer{font-weight:600;color:#2b2b2b;font-size:.9rem;}
-      .bkg-grid{display:grid;grid-template-columns:repeat(4,1fr);background:#fff;}
-      /* Hairlines con inset box-shadow: solo aparecen en tiles reales, así una fila
-         incompleta queda en blanco (no muestra el fondo de la rejilla). */
-      .bkg-tile{background:#fff;padding:16px 22px;min-width:0;box-shadow:inset -1px -1px 0 #efeadf;}
-      /* Celda sin dato (hoy solo Lead Guest): se oculta el CONTENIDO, no la celda. Con d-none la celda
-         salia del flujo del grid y todo lo de atras se recorria una posicion, cambiando el orden de las
-         demas. Asi conserva su lugar y sus lineas de rejilla, y visibility:hidden ademas la saca del
-         arbol de accesibilidad (el lector no anuncia "Lead Guest —"). */
-      .bkg-tile.is-empty > *{visibility:hidden;}
-      @media(max-width:992px){.bkg-grid{grid-template-columns:repeat(2,1fr);}}
-      @media(max-width:576px){.bkg-grid{grid-template-columns:1fr;}}
-      .bkg-lbl{display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.07em;font-size:.72rem;
-        font-weight:700;color:#8a8f78;margin-bottom:6px;}
-      .bkg-lbl i{font-size:1.05rem;color:#6E7A50;}
-      .bkg-val{font-size:1.08rem;font-weight:600;color:#2b2b2b;word-break:break-word;line-height:1.35;}
-      .bkg-link{color:#566040;text-decoration:none;}
-      .bkg-link:hover{text-decoration:underline;}
-      .bkg-dates{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-      .bkg-arrow{color:#8a8f78;font-weight:400;}
-      .bkg-sub{font-size:.72rem;color:#8a8f78;margin-top:5px;font-style:italic;}
     </style>
     <div class="bkg-info mb-4">
         <!-- [Cliente | Customer Support] a la izquierda, Estado a la derecha; el folio ya está en el título -->
@@ -151,67 +104,6 @@
            (cargo/ajuste, nunca "descuento").
          · "Agregar pago" vive ahora dentro del hero, como en admin. -->
     <style>
-      .fin-wrap{border:1px solid #ece8dd;border-radius:14px;background:#fff;padding:20px 22px;}
-      .fin-section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
-        margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #ece8dd;}
-      .fin-section-title{margin:0;font-weight:700;color:#566040;font-size:1.1rem;display:flex;align-items:center;}
-      .fin-hero{padding-bottom:18px;margin-bottom:16px;border-bottom:1px solid #ece8dd;}
-      .fin-hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
-      .fin-hero-lbl{text-transform:uppercase;letter-spacing:.12em;font-size:.64rem;font-weight:700;color:#8a8f78;
-        display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-      .fin-hero-total{font-size:1.9rem;font-weight:700;color:#2b2b2b;line-height:1.1;margin-top:2px;}
-      .fin-hero-pct{margin-top:15px;text-align:right;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;}
-      .fin-bar{margin:5px 0 12px;height:8px;border-radius:999px;background:#f0e5d0;overflow:hidden;}
-      .fin-bar > span{display:block;height:100%;width:0;border-radius:999px;background:#6E7A50;transition:width .35s ease;}
-      .fin-hero-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
-      .fin-hero-meta .fin-status-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
-      /* Badge de estado suavizado SOLO en el hero (no toca getPaymentStatusBadge compartido) */
-      .fin-hero-meta .badge{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;padding:.4rem .8rem;border-radius:999px;border:1px solid transparent;}
-      .fin-hero-meta .badge::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;}
-      .fin-hero-meta .badge.bg-warning{background:#f6efe2 !important;color:#96682f !important;border-color:#e7d6bd;}
-      .fin-hero-meta .badge.bg-success{background:#e6efe1 !important;color:#3f5a34 !important;border-color:#cfe0c6;}
-      .fin-hero-meta .badge.bg-secondary{background:#f0eee7 !important;color:#6b6656 !important;border-color:#ded9cb;}
-      .fin-hero-meta .badge.bg-info{background:#eaf1f0 !important;color:#3a6b63 !important;border-color:#cfe1dd;}
-      /* Botón "Agregar pago": pastilla olivo sólida, limpia y on-brand */
-      .fin-pay-btn{display:inline-flex;align-items:center;gap:6px;background:#6E7A50;color:#fff;border:1px solid #6E7A50;
-        border-radius:999px;font-size:.8rem;font-weight:600;padding:.42rem .95rem;line-height:1.2;transition:background .12s,border-color .12s;}
-      .fin-pay-btn:hover{background:#566040;border-color:#566040;color:#fff;}
-      .fin-pay-btn:disabled{opacity:.6;}
-      /* Chip de método = disparador del comparativo (collapse INLINE, no dropdown flotante). */
-      .fin-hero-method{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;font-weight:700;text-transform:uppercase;
-        letter-spacing:.05em;color:#566040;background:#eef0e6;border:1px solid #dce2d0;border-radius:999px;padding:.2rem .6rem;
-        cursor:pointer;font-family:inherit;line-height:1.2;}
-      .fin-hero-method:hover{background:#e4e8d8;border-color:#c9d2b8;}
-      .fin-hero-method i{font-size:.9rem;}
-      .fin-chev{font-size:.9rem;margin-left:2px;}
-      .fin-hero-hint{display:inline-flex;align-items:center;gap:5px;margin-top:7px;font-size:.75rem;font-weight:600;color:#4b6b3f;}
-      .fin-hero-hint i{font-size:.95rem;}
-      /* Comparativo por método de pago */
-      .fin-cmp-inline{margin-top:14px;padding:14px;border:1px solid #e6e1d5;border-radius:12px;background:#fbfaf6;}
-      .fin-cmp-cap{font-size:.72rem;color:#8a8f78;margin-bottom:8px;}
-      .fin-cmp-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;
-        border:1px solid #f0ece2;border-radius:9px;margin-bottom:6px;}
-      .fin-cmp-row:last-child{margin-bottom:0;}
-      .fin-cmp-row.active{border-color:#c9d2b8;background:#f4f7ee;}
-      .fin-cmp-method{display:flex;align-items:center;gap:8px;color:#4a4a44;font-weight:600;}
-      .fin-cmp-method i{color:#8a8f78;}
-      .fin-cmp-right{display:flex;align-items:center;gap:10px;}
-      .fin-cmp-amount{font-weight:700;color:#2b2b2b;}
-      .fin-cmp-delta{font-weight:700;font-size:.82rem;white-space:nowrap;}
-      .fin-cmp-badge{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:#566040;
-        background:#e7ecdd;border-radius:6px;padding:.16rem .5rem;}
-      .fin-cmp-cheap{font-size:.58rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:#3f5a34;
-        background:#e6efe1;border:1px solid #cfe0c6;border-radius:6px;padding:.08rem .42rem;}
-      .fin-hero-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
-      .fin-hero-foot .lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
-      .fin-hero-foot .val{font-weight:700;font-size:1.05rem;line-height:1.2;}
-      .fin-savings{margin-top:12px;padding-top:10px;border-top:1px dashed #d8cfb8;color:#4b6b3f;}
-      .fin-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1efe8;}
-      .fin-row:last-child{border-bottom:0;}
-      .fin-row .lbl{color:#6b6656;display:flex;align-items:center;gap:8px;min-width:0;}
-      .fin-row .lbl i{color:#8a8f78;flex-shrink:0;}
-      .fin-row .val{font-weight:600;color:#2b2b2b;white-space:nowrap;}
-      .fin-tip{color:#8a7d52 !important;}
     </style>
     <div class="fin-wrap mb-4" id="financialSummaryCard" style="display:none;">
         <div class="fin-section-head">
@@ -226,9 +118,14 @@
     <div class="svc-wrap">
         <div class="fin-section-head">
             <h5 class="fin-section-title"><i class="ti ti-list-details me-2"></i>Servicios</h5>
-            <a class="btn btn-sm btn-outline-secondary d-none" id="exportItineraryBtn" href="#" target="_blank" rel="noopener" title="Abrir itinerario de viaje (exportable a PDF)">
-                <i class="ti ti-file-export me-1"></i>Exportar itinerario
-            </a>
+            <!-- Dos acciones sobre el mismo documento: verlo en pantalla y descargarlo. Antes era un
+                 solo control, así que solo se podía hacer una de las dos. -->
+            <span class="hdr-seg d-none" id="exportItinerarySeg" role="group" aria-label="Itinerario">
+                <a class="hdr-seg-btn" id="previewItineraryBtn" href="#" target="_blank" rel="noopener"
+                   title="Ver el itinerario en pantalla"><i class="ti ti-eye"></i>Ver itinerario</a>
+                <a class="hdr-seg-btn" id="downloadItineraryBtn" href="#"
+                   title="Descargar el itinerario en PDF"><i class="ti ti-download"></i>PDF</a>
+            </span>
         </div>
         <div id="servicesContainer">
             <!-- Services will be rendered here -->
@@ -237,47 +134,6 @@
 </div>
 
 <!-- Assign Employee Modal -->
-<div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h6 class="modal-title fw-bold">Asignar Personal</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="assignServiceId">
-                <div class="mb-3">
-                    <label class="form-label">Conductor</label>
-                    <select id="assignDriver" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Guía</label>
-                    <select id="assignGuide" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Greeter</label>
-                    <select id="assignGreeter" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Vehículo</label>
-                    <select id="assignVehicle" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-sm btn-primary" id="saveAssignmentBtn">Guardar</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Pagos — Offcanvas (Bootstrap 5 nativo). Agencia (department_manager) y agente (client) registran,
      editan y eliminan pagos de SUS reservaciones (backend nivel 4+), con el mismo formulario, validación y
@@ -324,454 +180,16 @@
 
 <style>
 /* 860px (antes 760): la tabla del historial pasó a 6 columnas con letra mas grande. */
-#paymentsOffcanvas { --bs-offcanvas-width: 860px; }
-@media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
-.offcanvas-backdrop.show { background-color: rgba(15,23,32,0.72) !important; opacity: 1 !important; }
-#paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 1rem; }
-#paymentCoverageCard.payment-coverage-highlight,
-#paymentMethodTable,
-#paymentFormWrap {
-    background: #fff;
-    border: 1px solid #e0e6ed;
-    border-radius: 0.5rem;
-}
-#paymentCoverageCard.payment-coverage-highlight { border-left: 4px solid #969b81; }
-#paymentMethodTable,
-#paymentFormWrap {
-    border-left: 4px solid #c0c3b3;
-}
-/* Tabs del drawer — control segmentado full-width (mismo estilo que el catálogo de servicios) */
-#paymentsTabs.payments-seg { flex-wrap: nowrap; gap: 4px; background: #f1f2ec; border: 1px solid #e6e4dd; border-radius: 12px; padding: 4px; }
-#paymentsTabs.payments-seg .nav-item { flex: 1 1 0; min-width: 0; }
-#paymentsTabs.payments-seg .nav-link { width: 100%; border: none; border-radius: 9px; font-size: 0.92rem; font-weight: 600; padding: 0.55rem 0.4rem; color: #6b7256; background: transparent; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; transition: all 0.12s ease; }
-#paymentsTabs.payments-seg .nav-link:hover { color: #4f5838; background: rgba(110,122,80,0.08); }
-#paymentsTabs.payments-seg .nav-link.active { background: #6E7A50; color: #fff; font-weight: 700; box-shadow: 0 1px 3px rgba(79,88,56,0.25); }
-#paymentsTabs.payments-seg .nav-link.active .badge { background: rgba(255,255,255,0.28) !important; color: #fff !important; }
-/* #paymentsBody NO lleva tarjeta: la tabla del historial ya tiene estructura propia (encabezado,
-   separadores, pie), asi que el panel blanco alrededor solo sumaba un marco de mas. Tampoco lleva
-   `overflow: hidden`: creaba un contenedor de scroll que anulaba el `position: sticky` del encabezado. */
-/* Mismo radio de borde explicito para el bloque de descuento/ahorro (fondo verde claro propio). */
-#paymentCoverageCard .rounded { border-radius: 0.5rem; }
-/* Hint de ahorro bajo "Total a pagar" (mismo estilo que el hint del Resumen Financiero). */
-#paymentsOffcanvas .pay-savings-hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 7px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #4b6b3f;
-}
-#paymentsOffcanvas .pay-savings-hint i { font-size: 0.95rem; }
-/* Historial: tabla propia (.pay-hist) en vez de .table-sm.small de Bootstrap. La letra chica de antes
-   era la consecuencia de meter 8 columnas; al fusionar Moneda dentro de Monto, Recibio dentro de la
-   fecha de pago y Comprobante dentro de Acciones quedan 6 y la letra sube sin apretar nada. */
-#paymentsOffcanvas .pay-hist { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
-/* Encabezado pegajoso: el contenedor de scroll es .offcanvas-body, asi que ni #paymentsBody ni un
-   wrapper .table-responsive pueden tener overflow propio. El ancho chico se resuelve con la vista de
-   tarjetas de abajo, no con scroll horizontal. */
-#paymentsOffcanvas .pay-hist thead th {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-weight: 700;
-    color: #8a8f78;
-    background: #f8f9fa;
-    padding: 0.5rem 0.55rem;
-    border-bottom: 1px solid #ddddd2;
-    white-space: nowrap;
-}
-/* Sin panel blanco detras, las filas son transparentes y los separadores pesan un poco mas; el blanco
-   se reserva para el hover y la fila en edicion. */
-#paymentsOffcanvas .pay-hist tbody td { padding: 0.6rem 0.55rem; vertical-align: top; border-top: 1px solid #e6e6da; }
-#paymentsOffcanvas .pay-hist tbody tr:first-child td { border-top: none; }
-#paymentsOffcanvas .pay-hist tbody tr:hover td { background: #fff; }
-/* Columnas PAGO y REGISTRO: mismo patron (fecha arriba, persona abajo). La de pago pesa mas porque es
-   el dato del negocio; la de registro es metadato de auditoria. */
-#paymentsOffcanvas .pay-hist-date { white-space: nowrap; font-weight: 600; color: #2b2b2b; }
-#paymentsOffcanvas .pay-hist-meta { white-space: nowrap; font-size: 0.85rem; color: #6b6656; }
-#paymentsOffcanvas .pay-hist-person {
-    display: flex;
-    align-items: flex-start;
-    gap: 3px;
-    font-size: 0.78rem;
-    color: #8a8f78;
-    margin-top: 3px;
-    white-space: normal;
-    line-height: 1.25;
-}
-#paymentsOffcanvas .pay-hist-person .ti { font-size: 0.85rem; flex: 0 0 auto; margin-top: 1px; }
-#paymentsOffcanvas .pay-hist-ref { word-break: break-word; }
-/* Edicion inline: la fila que se esta editando se marca con el verde de marca y el formulario cuelga
-   de ella. El filete va SOLO en la primera celda: en todas dibujaba una linea vertical por columna. */
-#paymentsOffcanvas .pay-hist tbody tr.is-editing td { background: #fff; }
-#paymentsOffcanvas .pay-hist tbody tr.is-editing td:first-child { box-shadow: inset 3px 0 0 #6E7A50; }
-#paymentsOffcanvas .pay-hist-edit td { padding: 0; border-top: none; }
-#paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit:hover td { background: transparent; }
-/* En escritorio las filas no tienen bordes laterales, asi que enmarcar el formulario como tarjeta
-   dejaba dos lineas verticales sueltas: aqui es un bloque mas de la tabla. */
-#paymentsOffcanvas .pay-hist-form {
-    background: #fff;
-    border-bottom: 1px solid #e6e6da;
-    padding: 0 1rem 0.9rem;
-}
-/* El pie se sale del relleno lateral para que su linea divisoria corte el bloque completo, pero lo
-   recupera por dentro para que los botones sigan alineados con los campos. */
-#paymentsOffcanvas .pay-hist-form .pay-form-actions {
-    margin-left: -1rem;
-    margin-right: -1rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
-}
-/* Encabezados ordenables (Pago / Registro / Monto). */
-#paymentsOffcanvas .pay-hist-sort {
-    border: none;
-    background: transparent;
-    padding: 0;
-    font: inherit;
-    color: inherit;
-    text-transform: inherit;
-    letter-spacing: inherit;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-#paymentsOffcanvas .pay-hist-sort:hover { color: #4f5838; }
-#paymentsOffcanvas .pay-hist-sort .ti { font-size: 0.85rem; opacity: 0.35; }
-#paymentsOffcanvas .pay-hist-sort.is-active { color: #4f5838; }
-#paymentsOffcanvas .pay-hist-sort.is-active .ti { opacity: 1; }
-/* Separador de mes: solo aparece al ordenar por fecha. */
-#paymentsOffcanvas .pay-hist-group td {
-    background: #edeee4;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-weight: 700;
-    color: #6b7256;
-    padding: 0.4rem 0.7rem;
-}
-#paymentsOffcanvas .pay-hist-group .pay-hist-group-sum { float: right; color: #8a8f78; }
-/* El monto es EL dato de cada renglon. */
-#paymentsOffcanvas .pay-hist-amount { text-align: right; white-space: nowrap; font-weight: 700; font-size: 1.02rem; color: #2b2b2b; }
-#paymentsOffcanvas .pay-hist-curr { font-size: 0.7rem; font-weight: 700; color: #8a8f78; margin-left: 3px; }
-/* Moneda distinta a la de la reservacion: se resalta en ambar con el monto original debajo. */
-#paymentsOffcanvas .pay-hist-curr.is-foreign {
-    background: #f6efe2;
-    color: #96682f;
-    border: 1px solid #e7d6bd;
-    border-radius: 999px;
-    padding: 0.1rem 0.4rem;
-}
-#paymentsOffcanvas .pay-hist-orig { font-size: 0.76rem; font-weight: 600; color: #96682f; margin-top: 2px; }
-/* Pie: total de los pagos listados, para cuadrar contra "Pagado" de la card de cobertura. */
-#paymentsOffcanvas .pay-hist tfoot td {
-    border-top: 2px solid #ddddd2;
-    padding: 0.7rem 0.55rem;
-    font-weight: 700;
-    color: #2b2b2b;
-}
-#paymentsOffcanvas .pay-hist tfoot .pay-hist-foot-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8a8f78; }
-/* Chip de metodo con color propio: permite distinguir efectivo/transferencia/tarjeta de un vistazo. */
-#paymentsOffcanvas .pay-hist-method {
-    display: inline-block;
-    font-size: 0.78rem;
-    font-weight: 700;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    padding: 0.24rem 0.62rem;
-    white-space: nowrap;
-}
-/* Acciones "fantasma" para que no compitan con el monto; el color aparece en hover. */
-#paymentsOffcanvas .pay-hist-actions { text-align: right; white-space: nowrap; }
-#paymentsOffcanvas .pay-hist-act {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    background: transparent;
-    color: #8a8f78;
-    font-size: 1rem;
-    line-height: 1;
-    text-decoration: none;
-    transition: all 0.12s ease;
-}
-#paymentsOffcanvas .pay-hist-act:hover { background: #f1f2ec; color: #4f5838; border-color: #e0e3d6; }
-#paymentsOffcanvas .pay-hist-act.is-danger:hover { background: #f7ecea; color: #a1443a; border-color: #e6c9c4; }
-#paymentsOffcanvas .pay-hist-act.is-receipt { color: #566040; }
-/* Formulario de pago (alta y edicion inline): etiquetas en versalitas chicas, como los encabezados de
-   la tabla, para que no compitan con los campos. */
-#paymentsOffcanvas .pay-form .form-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 700;
-    color: #8a8f78;
-    margin-bottom: 0.3rem;
-}
-#paymentsOffcanvas .pay-form .form-control,
-#paymentsOffcanvas .pay-form .form-select,
-#paymentsOffcanvas .pay-form .input-group-text { font-size: 0.9rem; }
-/* El tema le pone border-radius propio a .form-control, asi que dentro de un .input-group el prefijo y
-   el campo se dibujaban como dos cajas sueltas con un hueco. Se fuerza la union a mano. */
-#paymentsOffcanvas .pay-form .input-group { flex-wrap: nowrap; }
-#paymentsOffcanvas .pay-form .input-group > .input-group-text {
-    background: #f7f7f2;
-    color: #8a8f78;
-    font-weight: 700;
-    border-right: 0;
-    border-radius: 0.375rem 0 0 0.375rem;
-}
-#paymentsOffcanvas .pay-form .input-group > .form-control {
-    border-left: 0;
-    border-radius: 0 0.375rem 0.375rem 0;
-    margin-left: 0;
-}
-#paymentsOffcanvas .pay-form textarea.form-control { resize: vertical; }
-/* Altura compartida por la zona de adjunto y el textarea de Notas: son vecinos en el mismo renglon y
-   con alturas distintas dejaban un escalon raro. */
-#paymentsOffcanvas { --pay-attach-h: 96px; }
-#paymentsOffcanvas .pay-form textarea#paymentNotes { height: var(--pay-attach-h); min-height: var(--pay-attach-h); }
-/* El <input type="file"> nativo no se puede estilizar y su texto se recortaba. Se esconde de la vista
-   (sigue en el DOM y accesible por teclado via el label) y se reemplaza por esta zona. */
-#paymentsOffcanvas .pay-drop {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-height: var(--pay-attach-h);
-    padding: 0.7rem;
-    text-align: center;
-    border: 1.5px dashed #dcdccf;
-    border-radius: 8px;
-    background: #fbfbf7;
-    position: relative;
-    transition: border-color 0.12s ease, background 0.12s ease;
-}
-#paymentsOffcanvas .pay-drop.is-dragover { border-color: #6E7A50; background: #f1f2ec; }
-#paymentsOffcanvas .pay-drop input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-#paymentsOffcanvas .pay-file-row { display: flex; align-items: center; gap: 6px; max-width: 100%; }
-#paymentsOffcanvas .pay-receipt-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.76rem;
-    font-weight: 600;
-    color: #566040;
-    background: #eef0e6;
-    border: 1px solid #dce2d0;
-    border-radius: 999px;
-    padding: 0.22rem 0.6rem;
-    text-decoration: none;
-}
-#paymentsOffcanvas .pay-receipt-chip:hover { background: #e4e8d8; color: #4f5838; }
-#paymentsOffcanvas .pay-file-clear {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    flex: 0 0 auto;
-    padding: 0;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: #a1443a;
-    line-height: 1;
-    cursor: pointer;
-}
-#paymentsOffcanvas .pay-file-clear:hover { background: #f7ecea; }
-#paymentsOffcanvas .pay-file-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #4f5838;
-    background: #f1f2ec;
-    border: 1px solid #e0e3d6;
-    border-radius: 8px;
-    padding: 0.36rem 0.7rem;
-    margin: 0;
-    cursor: pointer;
-    transition: all 0.12s ease;
-}
-#paymentsOffcanvas .pay-file-btn:hover { background: #e7e9df; border-color: #d2d6c4; }
-#paymentsOffcanvas .pay-drop input[type="file"]:focus-visible ~ .pay-file-row .pay-file-btn { outline: 2px solid #6E7A50; outline-offset: 2px; }
-#paymentsOffcanvas .pay-file-name {
-    font-size: 0.82rem;
-    color: #a8ac98;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-#paymentsOffcanvas .pay-file-name.has-file { color: #2b2b2b; font-weight: 600; }
-/* Pie de botones: separado del cuerpo y pegajoso, para que "Guardar" nunca quede bajo el pliegue. */
-#paymentsOffcanvas .pay-form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 1rem;
-    padding-top: 0.9rem;
-    border-top: 1px solid #f1efe8;
-    position: sticky;
-    bottom: 0;
-    background: #fff;
-}
-#paymentsOffcanvas .pay-form-actions .btn {
-    font-size: 0.92rem;
-    font-weight: 600;
-    padding: 0.55rem 1.6rem;
-    border-radius: 8px;
-}
-#paymentsOffcanvas .pay-form-actions .btn-outline-secondary { border-color: #dcdccf; color: #6b7256; }
-#paymentsOffcanvas .pay-form-actions .btn-outline-secondary:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
-/* Etiqueta de contexto en el pie (reemplaza al encabezado del formulario): ocupa el hueco que ya
-   existia a la izquierda de los botones, asi que no suma alto. */
-#paymentsOffcanvas .pay-form-context {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    margin-right: auto;
-    align-self: center;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #8a8f78;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-/* Bajo 576px el offcanvas es full-width (~360px reales): 6 columnas aprietan, asi que cada pago se
-   apila como tarjeta. Las etiquetas vuelven via data-label, ya que el thead se oculta. */
-@media (max-width: 576px) {
-    #paymentsOffcanvas .pay-hist thead { display: none; }
-    #paymentsOffcanvas .pay-hist,
-    #paymentsOffcanvas .pay-hist tbody,
-    #paymentsOffcanvas .pay-hist tfoot,
-    #paymentsOffcanvas .pay-hist tr,
-    #paymentsOffcanvas .pay-hist td { display: block; width: 100%; }
-    #paymentsOffcanvas .pay-hist tbody tr {
-        background: #fff;
-        border: 1px solid #ece9df;
-        border-radius: 10px;
-        margin-bottom: 0.6rem;
-        overflow: hidden;
-    }
-    #paymentsOffcanvas .pay-hist tbody td {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 12px;
-        border-top: 1px solid #f5f3ec;
-        padding: 0.5rem 0.75rem;
-        text-align: left;
-    }
-    #paymentsOffcanvas .pay-hist tbody td::before {
-        content: attr(data-label);
-        flex: 0 0 auto;
-        font-size: 0.68rem;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        font-weight: 700;
-        color: #8a8f78;
-        padding-top: 3px;
-    }
-    #paymentsOffcanvas .pay-hist tbody td.pay-hist-date::before,
-    #paymentsOffcanvas .pay-hist tbody td.pay-hist-actions::before { content: none; }
-    #paymentsOffcanvas .pay-hist tbody td.pay-hist-date { background: #faf9f4; display: block; }
-    #paymentsOffcanvas .pay-hist tbody td.pay-hist-actions { justify-content: flex-end; }
-    #paymentsOffcanvas .pay-hist tbody td.pay-hist-amount { text-align: right; }
-    #paymentsOffcanvas .pay-hist tbody td.pay-hist-meta .pay-hist-stack { text-align: right; }
-    #paymentsOffcanvas .pay-hist tbody td.pay-hist-meta .pay-hist-person { justify-content: flex-end; }
-    /* La fila de edición no es una tarjeta más: se pega a la del pago que está editando. */
-    #paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit { border: none; margin: -0.6rem 0 0.6rem; }
-    #paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit td { display: block; border-top: none; padding: 0; }
-    #paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit td::before { content: none; }
-    #paymentsOffcanvas .pay-hist-form {
-        border: 1px solid #ece9df;
-        border-top: none;
-        border-radius: 0 0 10px 10px;
-    }
-    #paymentsOffcanvas .pay-hist-group td { border-radius: 8px; margin-bottom: 0.4rem; }
-    #paymentsOffcanvas .pay-hist-group .pay-hist-group-sum { float: none; margin-left: 6px; }
-    #paymentsOffcanvas .pay-hist tfoot td { display: flex; justify-content: space-between; border-radius: 10px; }
-    /* Botones a todo el ancho y "Guardar" arriba (column-reverse: va último en el DOM). */
-    #paymentsOffcanvas .pay-form-actions { flex-direction: column-reverse; gap: 8px; }
-    #paymentsOffcanvas .pay-form-actions .btn { width: 100%; }
-    #paymentsOffcanvas .pay-form-context { display: none; }
-}
-/* Esqueleto de carga del carrito: el panel se puede abrir mientras GET .../payments sigue en vuelo,
-   asi que mostramos barras "shimmer" con la forma del contenido real en vez de dejarlo vacio. */
-#paymentsOffcanvas .pay-skel {
-    background: linear-gradient(90deg, #eceee6 25%, #f7f8f3 50%, #eceee6 75%);
-    background-size: 200% 100%;
-    animation: paySkelShimmer 1.2s ease-in-out infinite;
-    border-radius: 6px;
-}
-@keyframes paySkelShimmer {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-    #paymentsOffcanvas .pay-skel { animation: none; }
-}
-/* Panel de Servicios: mismo contenedor que el Resumen Financiero (fin-wrap + fin-section-head) en vez
-   del card-header con gradiente verde, que era el único bloque de la página fuera de la paleta. La
-   lista sangra hasta el borde con margen negativo para que las bandas de día y los separadores de fila
-   sigan corriendo a todo lo ancho, como cuando el card-body llevaba p-0; overflow:hidden recorta la
-   última fila contra la esquina redondeada. */
-.svc-wrap {
-    border: 1px solid #ece8dd;
-    border-radius: 14px;
-    background: #fff;
-    padding: 20px 22px 0;
-    overflow: hidden;
-}
-.svc-wrap #servicesContainer { margin: 0 -22px; }
-/* El botón de exportar venía en btn-light (pensado para el header de color): sobre blanco se perdía. */
-.svc-wrap .btn-outline-secondary { border-color: #dcdccf; color: #6b7256; }
-.svc-wrap .btn-outline-secondary:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
-.service-row {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #f0f0f0;
-    transition: background-color 0.15s;
-}
-.service-row:hover {
-    background-color: #f8f9fa;
-}
-.service-row:last-child {
-    border-bottom: none;
-}
-.day-header {
-    background-color: #f8f9fa;
-    padding: 0.5rem 1rem;
-    font-weight: 600;
-    border-bottom: 2px solid #e9ecef;
-}
-.assignment-badge {
-    font-size: 0.75rem;
-    padding: 0.2rem 0.5rem;
-}
-.detail-tag {
-    font-size: 0.9rem;
-    padding: 0.15rem 0.4rem;
-    font-weight: 500;
-}
 </style>
 
 <!-- Shared payment breakdown helpers (isomorphic; also require'd by Jest) -->
 <script src="/shared/payments/paymentBreakdownHelpers.js"></script>
+<script src="/shared/services/financialSummary.js"></script>
+<script src="/shared/services/paymentsPanel.js"></script>
+<script src="/shared/services/paymentForm.js"></script>
+<script src="/shared/services/serviceListHelpers.js"></script>
+<script src="/shared/services/serviceListRenderer.js"></script>
+<script src="/shared/services/itineraryExport.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
@@ -804,26 +222,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <div class="fw-semibold small">${name}</div>
                     <small class="text-${colorClass}"><i class="ti ${roleIcon} me-1"></i>${roleLabel}</small>
                     ${phone ? `<a href="tel:${phone}" class="text-muted small d-block"><i class="ti ti-phone me-1"></i>${phone}</a>` : ''}
-                </div>
-            </div>`;
-    }
-
-    function buildVehicleCard(vehicle) {
-        if (!vehicle) return '';
-        const name = vehicle.name || 'Vehiculo';
-        const photo = vehicle.imageUrl || '';
-        const initials = name.substring(0, 2).toUpperCase();
-        const photoHtml = photo
-            ? `<img src="${photo}" class="rounded-circle photo-preview-trigger" width="36" height="36" style="object-fit:cover;cursor:pointer" data-photo="${photo}" data-name="${name.replace(/"/g, '&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-            : '';
-        const initialsDisplay = photo ? 'display:none' : 'display:flex';
-        return `
-            <div class="d-flex align-items-center gap-2 mb-2">
-                ${photoHtml}
-                <span class="rounded-circle bg-secondary-subtle text-secondary align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;${initialsDisplay};font-size:0.8rem;font-weight:600">${initials}</span>
-                <div>
-                    <div class="fw-semibold small">${name}</div>
-                    <small class="text-secondary"><i class="ti ti-car me-1"></i>Vehiculo</small>
                 </div>
             </div>`;
     }
@@ -887,17 +285,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     function formatCurrency(amount, currency) {
         const sym = currency === 'USD' ? 'USD $' : '$';
         return `${sym}${(amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    }
-
-    function getServiceTypeIcon(type) {
-        const icons = {
-            transport: 'ti-car',
-            tour: 'ti-map-pin',
-            experience: 'ti-sparkles',
-            concepto: 'ti-tag',
-            'a-disposicion': 'ti-clock',
-        };
-        return icons[type] || 'ti-point';
     }
 
     async function loadReservation() {
@@ -1005,13 +392,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             ? `<button type="button" class="hdr-danger" id="cancelResBtn"><i class="ti ti-x"></i>Cancelar reservación</button>`
             : '';
         actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
-        // Botón "Exportar itinerario" del header de Servicios → página de itinerario (exportable a PDF).
-        // Misma familia de rutas públicas que "Exportar confirmación", así que no abre acceso nuevo.
-        const itinBtn = document.getElementById('exportItineraryBtn');
-        if (itinBtn && folio) {
-            itinBtn.href = `/reservations/${folio}/itinerary`;
-            itinBtn.classList.remove('d-none');
-        }
+        // Los dos botones del itinerario los cablea ItineraryExport, el mismo módulo que usa el
+        // detalle de admin. Son rutas públicas por folio, la misma familia que "Exportar
+        // confirmación", así que no abren acceso nuevo para este rol.
+        ItineraryExport.wire({ folio, alFallar: (msg) => pmToast(msg, 'warning') });
         if (canCancel) {
             document.getElementById('cancelResBtn')?.addEventListener('click', cancelReservation);
         }
@@ -1025,154 +409,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('reservationContent').style.display = '';
     }
 
+    // El resumen lo arma FinancialSummary, compartido con client y end_client. La vista solo decide
+    // dónde va y engancha "Agregar pago", que no todas pueden ofrecer.
     function renderFinancialSummary() {
-        const d = reservationData;
         const card = document.getElementById('financialSummaryCard');
-        const body = document.getElementById('financialSummaryBody');
-        const adjustments = d.adjustments || [];
-        const curr = d.currency || 'MXN';
-        const pay = d.payment;
-        const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
-        // Subtotal recalculado desde pricesByType[paymentType] de cada servicio, para que la reservación
-        // cuadre con la cotización cuando ambas usan el mismo método. Cae a los valores guardados en data
-        // muy vieja sin pricesByType.
-        const computedSubtotal = PaymentBreakdownHelpers.computeServicesSubtotalByType(d.services, d.paymentType, curr);
-        const servicesSubtotal = computedSubtotal > 0
-            ? computedSubtotal
-            : (d.servicesSubtotal || d.totalAmount || 0);
-        // Propina cobrada (Fase 2): del summary del servidor (d.payment), NUNCA de d.globalTip del snapshot
-        // bruto ni recalculada localmente. d.totalAmount ya la incluye vía recalculateTotal.
-        const generalTip = pay ? PaymentBreakdownHelpers.round2(pay.generalTip) : 0;
-        const serviceTipsTotal = pay ? PaymentBreakdownHelpers.round2(pay.serviceTipsTotal) : 0;
-
-        // La tarjeta financiera se pinta SIEMPRE que haya datos de reservación, con o sin ajustes.
-        // (Antes un early-return con 0 ajustes ocultaba también Subtotal/Total/Saldo — bug corregido.)
         card.style.display = '';
-        // "Agregar pago" se renderiza dentro del hero (solo si canEdit); su click se cablea por
-        // delegación sobre #financialSummaryCard, porque el hero se re-renderiza en cada pago.
-
-        const paymentTypeLabel = d.paymentType
-            ? d.paymentType.charAt(0).toUpperCase() + d.paymentType.slice(1)
-            : '—';
-
-        // Comparativo por método: los precios de servicios cambian por método. Se despliega desde el
-        // chip de método (Transferencia ⇄), no como sección suelta — queda pegado a lo que explica.
-        const comparisonMethods = [
-            { method: 'efectivo', label: 'Efectivo', icon: 'ti-cash' },
-            { method: 'transferencia', label: 'Transferencia', icon: 'ti-building-bank' },
-            { method: 'tarjeta', label: 'Tarjeta', icon: 'ti-credit-card' },
-        ];
-        // El método solo cambia el SUBTOTAL de servicios; el resto (ajustes, propinas) es igual. Por eso
-        // el TOTAL por método = total actual + Δsubtotal — así cada fila es el "Total a pagar" en ese
-        // método, y el actual coincide con el número grande del hero.
-        const cmpSubtotals = comparisonMethods.map((m) => ({ ...m, subtotal: PaymentBreakdownHelpers.computeServicesSubtotalByType(d.services, m.method, curr) }));
-        const cmpCurrentSubtotal = (cmpSubtotals.find((m) => m.method === d.paymentType) || {}).subtotal || 0;
-        const cmpBaseTotal = pay ? (Number(pay.total) || 0) : cmpCurrentSubtotal;
-        const cmpAmounts = cmpSubtotals.map((m) => ({ ...m, amount: cmpBaseTotal + (m.subtotal - cmpCurrentSubtotal) }));
-        const cmpCurrent = (cmpAmounts.find((m) => m.method === d.paymentType) || {}).amount || 0;
-        const cmpCheapest = Math.min(...cmpAmounts.map((m) => m.amount));
-        const comparisonRows = cmpAmounts.map((m) => {
-            const isActive = m.method === d.paymentType;
-            const delta = m.amount - cmpCurrent;
-            let tag;
-            if (isActive) {
-                tag = '<span class="fin-cmp-badge">Actual</span>';
-            } else if (Math.abs(delta) >= 0.005) {
-                const c = delta > 0 ? '#b8894a' : '#4b6b3f';
-                tag = `<span class="fin-cmp-delta" style="color:${c}">${delta > 0 ? '+' : '-'}${formatCurrency(Math.abs(delta), curr)}</span>`;
-            } else {
-                tag = '<span class="fin-cmp-delta" style="color:#8a8f78">igual</span>';
-            }
-            const cheap = (!isActive && m.amount === cmpCheapest && cmpCheapest < cmpCurrent)
-                ? '<span class="fin-cmp-cheap">más barato</span>' : '';
-            return `<div class="fin-cmp-row ${isActive ? 'active' : ''}">
-                <span class="fin-cmp-method"><i class="ti ${m.icon}"></i>${m.label}${cheap}</span>
-                <span class="fin-cmp-right"><span class="fin-cmp-amount">${formatCurrency(m.amount, curr)}</span>${tag}</span>
-            </div>`;
-        }).join('');
-        // Chip de método = disparador del comparativo (collapse INLINE, no dropdown flotante).
-        const methodChipHtml = '<button type="button" class="fin-hero-method" data-bs-toggle="collapse" data-bs-target="#paymentMethodComparison" aria-expanded="false" aria-controls="paymentMethodComparison" title="Comparar por método de pago">'
-            + `<i class="ti ti-credit-card"></i>${PaymentBreakdownHelpers.escapeHtml(paymentTypeLabel)}<i class="ti ti-arrows-exchange fin-chev" title="Comparar métodos de pago"></i></button>`;
-        // El comparativo se expande inline (empuja el contenido), no como panel flotante.
-        const comparisonInlineHtml = '<div class="collapse fin-cmp-inline" id="paymentMethodComparison">'
-            + `<div class="fin-cmp-cap">Total a pagar según el método de pago:</div>${comparisonRows}</div>`;
-        // Hint de ahorro SIEMPRE visible: si otro método es más barato que el actual, lo anuncia sin
-        // tener que abrir el comparativo (p. ej. "En efectivo ahorras $7,542").
-        const cmpCheapestMethod = cmpAmounts.find((m) => m.amount === cmpCheapest);
-        const cmpSavings = cmpCurrent - cmpCheapest;
-        const savingsHint = (cmpCheapestMethod && cmpCheapestMethod.method !== d.paymentType && cmpSavings >= 0.005)
-            ? `<div class="fin-hero-hint"><i class="ti ti-discount-2"></i>En ${PaymentBreakdownHelpers.escapeHtml(cmpCheapestMethod.label.toLowerCase())} ahorras ${formatCurrency(cmpSavings, curr)}</div>`
-            : '';
-
-        let html = '';
-        // ===== Hero de pago: cifras clave + barra de cobertura (solo si hay datos de pago) =====
-        if (pay) {
-            const heroResolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
-            const heroPaid = Number(pay.paidAmount) || 0;
-            const heroTotal = Number(pay.total) || 0;
-            const heroBal = heroResolved.displayedBalance;
-            const heroPct = heroTotal > 0 ? Math.min(100, Math.round((heroPaid / heroTotal) * 100)) : 0;
-            const heroSavings = heroResolved.savings
-                ? `<div class="fin-savings"><i class="ti ti-discount-2 me-2"></i><strong>${PaymentBreakdownHelpers.escapeHtml(heroResolved.savings.label)}</strong><div class="small">${PaymentBreakdownHelpers.escapeHtml(heroResolved.savings.sublabel)}</div></div>`
-                : '';
-            html += `<div class="fin-hero">
-                <div class="fin-hero-top">
-                    <div>
-                        <div class="fin-hero-lbl">Total a pagar ${methodChipHtml}</div>
-                        <div class="fin-hero-total">${formatCurrency(heroTotal, curr)}</div>
-                        ${savingsHint}
-                    </div>
-                    <div class="fin-hero-meta">
-                        <span class="fin-status-lbl">Estado de pago</span>
-                        ${PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus)}
-                        ${canEdit ? '<button class="fin-pay-btn" id="addPaymentBtn"><i class="ti ti-cash"></i>Agregar pago</button>' : ''}
-                    </div>
-                </div>
-                ${comparisonInlineHtml}
-                <div class="fin-hero-pct">${heroPct}% pagado</div>
-                <div class="fin-bar"><span style="width:${heroPct}%;background:#4b6b3f"></span></div>
-                <div class="fin-hero-foot">
-                    <div><span class="lbl">Pagado</span><div class="val" style="color:#4b6b3f">${formatCurrency(heroPaid, curr)}</div></div>
-                    <div class="text-end"><span class="lbl">Saldo</span><div class="val" style="color:${heroBal > 0 ? '#b8894a' : '#4b6b3f'}">${formatCurrency(heroBal, curr)}</div></div>
-                </div>
-                ${heroSavings}
-            </div>`;
-        }
-
-        // ===== Desglose =====
-        // Sin datos de pago no hay hero: el chip de método (con su comparativo inline) se muestra aquí.
-        if (!pay) {
-            html += `<div class="fin-row"><span class="lbl"><i class="ti ti-credit-card"></i>Tipo de pago</span><span class="val">${methodChipHtml}</span></div>${comparisonInlineHtml}`;
-        }
-        html += `<div class="fin-row"><span class="lbl"><i class="ti ti-list-details"></i>Subtotal servicios</span><span class="val">${formatCurrency(servicesSubtotal, curr)}</span></div>`;
-
-        // Propina cobrada (Fase 2): líneas del summary del servidor para que Subtotal + ajustes + propina
-        // reconcilie con el Total a pagar. La general en su línea; la de por-servicio agregada (los tips por
-        // servicio también aparecen por servicio en el itinerario, aquí es el agregado).
-        if (generalTip > 0) {
-            html += `<div class="fin-row"><span class="lbl"><i class="ti ti-coin fin-tip"></i>Propina general</span><span class="val fin-tip">+${formatCurrency(generalTip, curr)}</span></div>`;
-        }
-        if (serviceTipsTotal > 0) {
-            html += `<div class="fin-row"><span class="lbl"><i class="ti ti-coin fin-tip"></i>Propinas por servicio</span><span class="val fin-tip">+${formatCurrency(serviceTipsTotal, curr)}</span></div>`;
-        }
-
-        // Ajustes YA creados: se listan pero NO se pueden crear ni eliminar desde aquí (/adjustments es
-        // admin-only, así que ni el botón de agregar ni el de quitar existen en el DOM). Framing neutral
-        // de cargo/ajuste — nunca la palabra "descuento" ni su ícono.
-        adjustments.filter((a) => a.type === 'charge').forEach((adj) => {
-            html += `<div class="fin-row">
-                <span class="lbl"><i class="ti ti-plus text-danger"></i>${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span>
-                <span class="val text-danger">+${formatCurrency(adj.amount, curr)}</span>
-            </div>`;
+        document.getElementById('financialSummaryBody').innerHTML = FinancialSummary.buildHtml({
+            reservationData,
+            formatCurrency,
+            allowEdit: true,
         });
-        adjustments.filter((a) => a.type === 'discount').forEach((adj) => {
-            html += `<div class="fin-row">
-                <span class="lbl"><i class="ti ti-minus text-success"></i>${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span>
-                <span class="val text-success">-${formatCurrency(adj.amount, curr)}</span>
-            </div>`;
-        });
-
-        body.innerHTML = html;
     }
 
     // ===== PAGOS (registrar / editar / eliminar) =====
@@ -1203,52 +449,40 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Pago que se está editando. El formulario de edición se abre INLINE, en una fila expandida bajo el
     // pago tocado: el #paymentFormWrap del alta vive arriba, así que editar desde el historial dibujaba
     // el formulario lejos de la fila y podía quedar fuera de vista.
-    let editingPaymentId = null;
-    // Formulario de alta abierto. Su par de edición es editingPaymentId.
-    let addPaymentFormOpen = false;
+    // Formulario de alta abierto. Su par de edición es paymentForm.getEditingId().
     // El carrito solo se abre desde "Agregar pago", así que la intención al abrirlo es siempre registrar
     // uno: el formulario se despliega solo.
-    let pendingAddForm = false;
 
-    // "Registrar pago" se OCULTA mientras hay un formulario abierto, en vez de quedarse con su aspecto
-    // de llamada a la acción: ahí parecía que otro clic agregaría un segundo formulario. Además impide
-    // abrir el alta encima de una edición inline (savePayment lee los campos por id global, así que un
-    // segundo formulario guardaría los valores del equivocado).
-    function syncAddPaymentBtn() {
-        const btn = document.getElementById('showPaymentFormBtn');
-        if (!btn) return;
-        const status = reservationData ? reservationData.status : null;
-        const canEdit = status !== 'cancelled' && status !== 'completed';
-        const formOpen = addPaymentFormOpen || !!editingPaymentId;
-        btn.classList.toggle('d-none', !canEdit || formOpen);
-    }
+    // El formulario de pago lo arma PaymentForm, compartido con las otras dos vistas. Es una fábrica
+    // porque tiene estado propio —qué pago se edita, si el alta está abierta— y la vista solo le
+    // entrega lo suyo. Antes este bloque eran 386 líneas duplicadas palabra por palabra entre client y
+    // department_manager.
+    const paymentForm = PaymentForm.create({
+        reservationId,
+        token: () => token,
+        reservationData: () => reservationData,
+        payments: () => paymentsCache,
+        summary: () => latestSummary,
+        formatCurrency,
+        formatDate,
+        toast: pmToast,
+        confirm: pmConfirm,
+        attachThousands,
+        parseAmount,
+        applySummary: applyPaymentSummary,
+        reload: loadPayments,
+        repaint: renderPayments,
+        methodLabels: PAYMENT_METHOD_LABELS,
+    });
+    const renderPaymentForm = (...a) => paymentForm.renderPaymentForm(...a);
+    const closePaymentForm = (...a) => paymentForm.closePaymentForm(...a);
+    const maybeOpenAddForm = (...a) => paymentForm.maybeOpenAddForm(...a);
+    const syncAddPaymentBtn = (...a) => paymentForm.syncAddPaymentBtn(...a);
+    const savePayment = (...a) => paymentForm.savePayment(...a);
+    const deletePayment = (...a) => paymentForm.deletePayment(...a);
 
-    // El formulario necesita availableMethods del summary AMPLIO para poblar el select de método; si se
-    // dibujara antes de que llegue, saldría con el select vacío y el guardado bloqueado, y no se volvería
-    // a construir solo. Por eso se intenta en dos momentos: al terminar de abrir el panel y al llegar el
-    // summary — lo que ocurra al final.
-    function maybeOpenAddForm() {
-        if (!pendingAddForm) return;
-        const status = reservationData ? reservationData.status : null;
-        const canEdit = status !== 'cancelled' && status !== 'completed';
-        if (!canEdit || addPaymentFormOpen || editingPaymentId) { pendingAddForm = false; return; }
-        if (!latestSummary) return; // Aún cargando: se reintenta desde applyPaymentSummary.
-        pendingAddForm = false;
-        renderPaymentForm(null);
-    }
 
-    // Cierra el formulario abierto, sea el del alta o el inline del historial. NUNCA puede haber dos
-    // abiertos a la vez, por lo mismo de los ids globales.
-    function closePaymentForm() {
-        const wasEditing = !!editingPaymentId;
-        editingPaymentId = null;
-        addPaymentFormOpen = false;
-        const wrap = document.getElementById('paymentFormWrap');
-        if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; wrap.classList.remove('pay-form'); }
-        syncAddPaymentBtn();
-        // Re-render para quitar la fila expandida y reactivar los encabezados de orden.
-        if (wasEditing) renderPayments();
-    }
+
 
     // Las dos fechas del historial son de naturaleza distinta y por eso se leen distinto:
     //  · PAGO (paidAt): viene de un <input type="date">, se guarda como medianoche UTC y NO tiene hora
@@ -1354,50 +588,13 @@ document.addEventListener('DOMContentLoaded', async function() {
         return el ? bootstrap.Offcanvas.getOrCreateInstance(el) : null;
     }
 
-    // Esqueleto de carga del carrito. "Agregar pago" se habilita apenas carga la reservación, así que
-    // el panel se puede abrir mientras GET .../payments sigue en vuelo: sin esto salía en blanco y
-    // parecía que no funcionaba.
     function renderPaymentsSkeleton() {
-        const bar = (w, h, extra = '') => `<div class="pay-skel" style="width:${w};height:${h};${extra}"></div>`;
-        const coverage = document.getElementById('paymentCoverageCard');
-        if (coverage) {
-            coverage.innerHTML = `<div aria-busy="true" aria-live="polite">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-                  <div style="flex:1;">
-                    ${bar('190px', '12px')}
-                    ${bar('220px', '32px', 'margin-top:9px;')}
-                  </div>
-                  ${bar('118px', '30px', 'border-radius:999px;')}
-                </div>
-                ${bar('96px', '11px', 'margin:14px 0 0 auto;')}
-                ${bar('100%', '11px', 'border-radius:999px;margin:7px 0 18px;')}
-                <div style="display:flex;justify-content:space-between;gap:12px;">
-                  <div>${bar('64px', '10px')}${bar('120px', '22px', 'margin-top:7px;')}</div>
-                  <div style="text-align:right;">${bar('64px', '10px', 'margin-left:auto;')}${bar('120px', '22px', 'margin:7px 0 0 auto;')}</div>
-                </div>
-                <div class="d-flex align-items-center gap-2 mt-3 text-muted" style="font-size:.82rem;">
-                  <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>Cargando pagos…
-                </div>
-              </div>`;
-        }
-        const methodTable = document.getElementById('paymentMethodTable');
-        if (methodTable) {
-            const rows = [1, 2, 3].map(() => `<div style="display:flex;align-items:center;gap:12px;padding:.55rem 0;border-top:1px solid #f1efe8;">
-                ${bar('120px', '13px')}<div style="flex:1;"></div>${bar('80px', '13px')}${bar('44px', '13px')}${bar('90px', '13px')}
-              </div>`).join('');
-            methodTable.innerHTML = `<div aria-busy="true">${bar('100%', '10px', 'margin-bottom:.35rem;')}${rows}</div>`;
-            methodTable.style.display = '';
-        }
         const body = document.getElementById('paymentsBody');
-        if (body) {
-            body.innerHTML = `<div aria-busy="true" class="p-1">${[1, 2, 3].map(() => `<div style="display:flex;align-items:center;gap:12px;padding:.6rem .2rem;border-bottom:1px solid #f4f2ec;">
-                ${bar('86px', '12px')}${bar('96px', '12px')}<div style="flex:1;"></div>${bar('70px', '12px')}
-              </div>`).join('')}</div>`;
-        }
+        if (body) body.innerHTML = PaymentsPanel.renderPaymentsSkeleton();
     }
 
-    // Si el GET falla no hay summary que pintar: dejar el esqueleto girando para siempre es peor que el
-    // panel vacío, así que mostramos el error con reintento.
+    // El aviso lo arma el módulo; "Reintentar" lo engancha aquí, porque reintentar es volver a
+    // llamar a la carga de ESTA vista.
     function renderPaymentsLoadError() {
         const coverage = document.getElementById('paymentCoverageCard');
         if (coverage) {
@@ -1410,7 +607,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const methodTable = document.getElementById('paymentMethodTable');
         if (methodTable) { methodTable.innerHTML = ''; methodTable.style.display = 'none'; }
         const body = document.getElementById('paymentsBody');
-        if (body) body.innerHTML = '<div class="text-center py-3 text-muted">No se pudo cargar el historial de pagos.</div>';
+        if (body) body.innerHTML = PaymentsPanel.renderPaymentsLoadError();
     }
 
     async function loadPayments() {
@@ -1437,133 +634,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         renderPayments();
     }
 
+    // La tabla la arma PaymentsPanel, compartido con las otras dos vistas. Aquí se quedan el ORDEN y
+    // el pago en edición —los cambia el usuario al hacer clic, y esos clics los escucha esta vista— y
+    // el formulario inline, que solo existe donde se pueden registrar pagos.
     function renderPayments() {
         const body = document.getElementById('paymentsBody');
         if (!body) return;
-
-        const d = reservationData;
-        const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
-        const curr = d.currency || 'MXN';
-
         // "Registrar pago" depende de que la reservación siga editable Y de que no haya formulario abierto.
         syncAddPaymentBtn();
-        // Contador de pagos en el tab "Historial".
         const histCount = document.getElementById('historialCount');
         if (histCount) histCount.textContent = paymentsCache.length ? String(paymentsCache.length) : '';
-
-        if (!paymentsCache.length) {
-            body.innerHTML = `<div class="text-center py-4">
-                <i class="ti ti-receipt-off" style="font-size:2rem;color:#c9cdbb;"></i>
-                <div class="mt-2 fw-semibold" style="color:#6b6656;">Sin pagos registrados</div>
-                <div class="small text-muted">Los pagos que registres aparecerán aquí.</div>
-            </div>`;
-            return;
-        }
-
-        // El backend entrega los pagos ascendentes por paidAt; el historial los muestra por defecto del
-        // más reciente al más viejo (lo último es lo que se viene a revisar).
-        const isDateSort = paymentsSort.key === 'date' || paymentsSort.key === 'created';
-        const sorted = paymentsCache.slice().sort((a, b) => {
-            const dir = paymentsSort.dir === 'asc' ? 1 : -1;
-            if (paymentsSort.key === 'amount') {
-                const diff = (a.amount || 0) - (b.amount || 0);
-                if (diff) return diff * dir;
-            } else {
-                const diff = paymentMs(a, paymentsSort.key) - paymentMs(b, paymentsSort.key);
-                if (diff) return diff * dir;
-            }
-            // Desempate estable (dos pagos del mismo día, o dos del mismo monto): el orden de captura.
-            return (paymentMs(a, 'created') - paymentMs(b, 'created')) * dir;
+        body.innerHTML = PaymentsPanel.renderPayments({
+            reservationData,
+            formatCurrency,
+            payments: paymentsCache,
+            sort: paymentsSort,
+            editingId: paymentForm.getEditingId(),
+            allowEdit: true,
         });
-
-        // Agrupar por mes solo tiene sentido con un orden cronológico —y por el mes de LA fecha que se
-        // está ordenando—, y solo aporta cuando hay varios pagos repartidos en más de un mes.
-        const months = new Set(sorted.map((p) => monthKey(p, paymentsSort.key)));
-        const grouped = isDateSort && sorted.length > 4 && months.size > 1;
-
-        let lastMonth = null;
-        const rows = sorted.map((p) => {
-            let groupRow = '';
-            if (grouped && monthKey(p, paymentsSort.key) !== lastMonth) {
-                lastMonth = monthKey(p, paymentsSort.key);
-                const inMonth = sorted.filter((q) => monthKey(q, paymentsSort.key) === lastMonth);
-                const monthSum = inMonth.reduce((acc, q) => acc + (q.amount || 0), 0);
-                groupRow = `<tr class="pay-hist-group"><td colspan="6">${PaymentBreakdownHelpers.escapeHtml(monthLabel(p, paymentsSort.key))}
-                    <span class="pay-hist-group-sum">${inMonth.length} ${inMonth.length === 1 ? 'pago' : 'pagos'} · ${formatCurrency(monthSum, curr)}</span></td></tr>`;
-            }
-            const refLine = p.reference
-                ? `<span class="pay-hist-ref">${PaymentBreakdownHelpers.escapeHtml(p.reference)}</span>
-                   <button type="button" class="pay-hist-act copy-ref-btn" data-ref="${PaymentBreakdownHelpers.escapeHtml(p.reference)}" title="Copiar referencia" aria-label="Copiar referencia" style="width:24px;height:24px;font-size:.85rem;vertical-align:middle;"><i class="ti ti-copy"></i></button>`
-                : '<span class="text-muted">—</span>';
-            // Columna PAGO: cuándo se pagó y quién recibió el dinero. "Recibió" solo aplica al efectivo
-            // (en transferencia/tarjeta no hay una persona que lo tome en mano).
-            const receivedLine = (p.method === 'efectivo' && p.receivedBy)
-                ? `<div class="pay-hist-person" title="Recibió el dinero"><i class="ti ti-user"></i>${PaymentBreakdownHelpers.escapeHtml(p.receivedBy)}</div>` : '';
-            // Columna REGISTRO: cuándo se capturó en el sistema y quién lo capturó. Es el par de la
-            // columna de pago, no lo mismo: un pago del día 10 puede capturarse el 28 por otra persona.
-            const registeredLine = p.registeredByName
-                ? `<div class="pay-hist-person" title="Registró el pago"><i class="ti ti-user"></i>${PaymentBreakdownHelpers.escapeHtml(p.registeredByName)}</div>` : '';
-            const registeredAt = p.createdAt ? formatDateTimeShort(p.createdAt) : '<span class="text-muted">—</span>';
-            // El comprobante es una acción más (abrir el archivo), así que vive junto a editar/eliminar.
-            const receipt = p.receiptUrl
-                ? `<a href="${PaymentBreakdownHelpers.escapeHtml(p.receiptUrl)}" target="_blank" rel="noopener" class="pay-hist-act is-receipt" title="Ver comprobante" aria-label="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
-                : '';
-            const [mBg, mFg, mBd] = PAYMENT_METHOD_COLORS[p.method] || PAYMENT_METHOD_COLORS._default;
-            // Moneda distinta a la de la reservación: el monto listado está en la moneda de la reserva,
-            // así que el original se muestra aparte en ámbar en vez de dejar solo un código ambiguo.
-            const isForeign = !!p.origCurrency && p.origCurrency !== curr;
-            const origLine = (isForeign && p.origAmount)
-                ? `<div class="pay-hist-orig">Original ${formatCurrency(p.origAmount, p.origCurrency)}${p.exchangeRate ? ` · TC ${p.exchangeRate}` : ''}</div>` : '';
-            // Fila expandida con el formulario de edición, justo bajo el pago tocado. El contenido lo
-            // dibuja renderPaymentForm después de montar la tabla (necesita el nodo ya en el DOM).
-            const editRow = p.id === editingPaymentId
-                ? `<tr class="pay-hist-edit"><td colspan="6"><div class="pay-hist-form" id="paymentEditWrap"></div></td></tr>` : '';
-            return `${groupRow}<tr${p.id === editingPaymentId ? ' class="is-editing"' : ''}>
-                <td class="pay-hist-date" data-label="Pago">${formatDate(p.paidAt || p.createdAt)}${receivedLine}</td>
-                <td data-label="Método"><span class="pay-hist-method" style="background:${mBg};color:${mFg};border-color:${mBd};">${PaymentBreakdownHelpers.escapeHtml(PAYMENT_METHOD_LABELS[p.method] || p.method || '—')}</span></td>
-                <td data-label="Referencia">${refLine}</td>
-                <td class="pay-hist-meta" data-label="Registro"><div class="pay-hist-stack">${registeredAt}${registeredLine}</div></td>
-                <td class="pay-hist-amount" data-label="Monto">${formatCurrency(p.amount, curr)}<span class="pay-hist-curr${isForeign ? ' is-foreign' : ''}">${PaymentBreakdownHelpers.escapeHtml(p.origCurrency || curr)}</span>${origLine}</td>
-                <td class="pay-hist-actions" data-label="Acciones">
-                    ${receipt}
-                    ${canEdit ? `<button type="button" class="pay-hist-act edit-payment-btn" data-payment-id="${p.id}" title="Editar" aria-label="Editar pago"><i class="ti ti-edit"></i></button>
-                    <button type="button" class="pay-hist-act is-danger delete-payment-btn" data-payment-id="${p.id}" title="Eliminar" aria-label="Eliminar pago"><i class="ti ti-trash"></i></button>` : ''}
-                </td>
-            </tr>${editRow}`;
-        }).join('');
-
-        // Total de lo listado: ancla el historial contra el "Pagado" de la card de cobertura y delata
-        // capturas duplicadas.
-        const total = paymentsCache.reduce((acc, p) => acc + (p.amount || 0), 0);
-        const arrow = paymentsSort.dir === 'asc' ? 'ti-arrow-up' : 'ti-arrow-down';
-        // Reordenar re-monta la tabla, y con ella el formulario inline: se deshabilita mientras hay una
-        // edición abierta para no borrar lo que el usuario está escribiendo.
-        const sortTh = (key, label, align) => `<th style="text-align:${align};">
-            <button type="button" class="pay-hist-sort${paymentsSort.key === key ? ' is-active' : ''}" data-sort-key="${key}"
-                ${editingPaymentId ? 'disabled title="Termina de editar el pago para reordenar"' : ''}
-                aria-label="Ordenar por ${label.toLowerCase()}">${label} <i class="ti ${paymentsSort.key === key ? arrow : 'ti-arrows-sort'}"></i></button>
-        </th>`;
-
-        body.innerHTML = `<table class="pay-hist">
-                <thead>
-                    <tr>
-                        ${sortTh('date', 'Pago', 'left')}
-                        <th>Método</th>
-                        <th>Referencia</th>
-                        ${sortTh('created', 'Registro', 'left')}
-                        ${sortTh('amount', 'Monto', 'right')}
-                        <th style="text-align:right;">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="4" class="pay-hist-foot-label">Total registrado · ${paymentsCache.length} ${paymentsCache.length === 1 ? 'pago' : 'pagos'}</td>
-                        <td class="pay-hist-amount" data-label="Total">${formatCurrency(total, curr)}</td>
-                        <td></td>
-                    </tr>
-                </tfoot>
-            </table>`;
 
         body.querySelectorAll('.pay-hist-sort').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -1583,7 +671,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 const id = btn.dataset.paymentId;
                 // Cerrar primero descarta el otro formulario (alta u otra fila) antes de abrir este.
                 closePaymentForm();
-                editingPaymentId = id;
+                paymentForm.setEditingId(id);
                 renderPayments();
             });
         });
@@ -1593,10 +681,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // El formulario inline se dibuja al final, cuando su contenedor ya está en el DOM. Si el pago
         // en edición desapareció (lo borró otra pestaña), el estado se limpia solo.
-        if (editingPaymentId) {
+        if (paymentForm.getEditingId()) {
             const editWrap = document.getElementById('paymentEditWrap');
-            if (editWrap) renderPaymentForm(editingPaymentId, editWrap);
-            else editingPaymentId = null;
+            if (editWrap) renderPaymentForm(paymentForm.getEditingId(), editWrap);
+            else paymentForm.setEditingId(null);
         }
     }
 
@@ -1708,213 +796,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         maybeOpenAddForm();
     }
 
-    // Read a File as base64 (strip the "data:...;base64," prefix) for the JSON receipt upload.
-    function fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
-            reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
-            reader.readAsDataURL(file);
-        });
-    }
 
-    // Upload a payment receipt in a SEPARATE request (decoupled from the save). El pago ya está
-    // persistido, así que esto nunca lo arriesga: devuelve null si sube, o un aviso si falla.
-    async function uploadReceipt(paymentId, file) {
-        try {
-            const body = JSON.stringify({
-                fileBase64: await fileToBase64(file), fileName: file.name, mimeType: file.type,
-            });
-            const resp = await fetch(`/api/reservations/${reservationId}/payments/${paymentId}/receipt`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body,
-            });
-            const r = await resp.json().catch(() => ({}));
-            if (resp.ok && r.success) return null;
-            return r.error
-                ? `Pago guardado, pero el comprobante no se subió: ${r.error}`
-                : 'Pago guardado, pero el comprobante no se subió. Reinténtalo editando el pago.';
-        } catch (err) {
-            console.error('Receipt upload error:', err);
-            return 'Pago guardado, pero el comprobante no se subió (se cortó la conexión). Reinténtalo editando el pago.';
-        }
-    }
 
-    // Inline payment form (dentro de #paymentsOffcanvas). null = nuevo, id = editar el pago.
-    // targetWrap permite dibujarlo en dos sitios: el contenedor fijo del alta o la fila expandida del
-    // historial (edición). Todo lo demás es idéntico.
-    function renderPaymentForm(paymentId, targetWrap) {
-        const wrap = targetWrap || document.getElementById('paymentFormWrap');
-        if (!wrap) return;
-        // Alta = sin id y en el contenedor fijo. Marca el estado para que el botón que lo abrió ceda su
-        // lugar al formulario.
-        if (!paymentId && !targetWrap) addPaymentFormOpen = true;
-        syncAddPaymentBtn();
-        const existing = paymentId ? paymentsCache.find((p) => p.id === paymentId) : null;
-        const curr = existing?.origCurrency || 'MXN';
-        const paidAt = existing?.paidAt ? new Date(existing.paidAt).toISOString().slice(0, 10) : '';
-        // Payment date allows the future (reservations later); shared standard 1900 .. today + 20y.
-        const paidAtMax = (() => { const dt = new Date(); dt.setFullYear(dt.getFullYear() + 20); return dt.toISOString().slice(0, 10); })();
-        const opt = (v, label, sel) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${label}</option>`;
-        const receiptLink = existing?.receiptUrl
-            ? `<a href="${existing.receiptUrl}" target="_blank" rel="noopener" class="pay-receipt-chip"><i class="ti ti-file-invoice"></i>Ver comprobante actual</a>` : '';
-
-        // Método: poblado dinámicamente desde availableMethods (Fase C), NUNCA hardcodeado a 3 opciones.
-        // Al editar, se conserva el método guardado aunque ya no esté disponible (no cambiarlo en silencio).
-        // Sin métodos disponibles (H3): select deshabilitado con mensaje y guardado bloqueado.
-        const available = (latestSummary && Array.isArray(latestSummary.availableMethods)) ? latestSummary.availableMethods.slice() : [];
-        const method = existing?.method || available[0] || '';
-        const methodOrder = available.slice();
-        if (existing?.method && !methodOrder.includes(existing.method)) methodOrder.push(existing.method);
-        const methodDisabled = methodOrder.length === 0;
-        const methodSelectHtml = methodDisabled
-            ? `<select class="form-select form-select-sm" id="paymentMethod" disabled><option value="">Sin métodos disponibles</option></select>
-               <div class="form-text text-danger">No hay métodos de pago disponibles para esta reservación.</div>`
-            : `<select class="form-select form-select-sm" id="paymentMethod">${methodOrder.map((m) => opt(m, PAYMENT_METHOD_LABELS[m] || m, method)).join('')}</select>`;
-
-        const amountInit = existing ? (existing.origAmount ?? existing.amount ?? '') : '';
-
-        // Sin encabezado propio: la fila resaltada de arriba (o el botón que lo abrió) ya dice de qué
-        // pago se trata, así que un título + separador solo restaba alto útil. El dato se conserva como
-        // etiqueta en el pie, que tenía todo el lado izquierdo vacío.
-        const contextLabel = existing
-            ? `Editando el pago del ${formatDate(existing.paidAt || existing.createdAt)}`
-            : 'Nuevo pago';
-        wrap.classList.add('pay-form');
-        wrap.innerHTML = `
-            <input type="hidden" id="paymentId" value="${existing ? existing.id : ''}">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentAmount">Monto</label>
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text" id="paymentAmountPrefix">${curr === 'USD' ? 'USD $' : '$'}</span>
-                        <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentAmount" placeholder="0.00" value="${amountInit}">
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentCurrency">Moneda</label>
-                    <select class="form-select form-select-sm" id="paymentCurrency">${opt('MXN', 'MXN', curr)}${opt('USD', 'USD', curr)}</select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentMethod">Método</label>
-                    ${methodSelectHtml}
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
-                    <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}" required>
-                </div>
-                <div class="${method === 'efectivo' ? 'col-md-4' : 'col-md-8'}" id="paymentReferenceWrap">
-                    <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
-                    <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${PaymentBreakdownHelpers.escapeHtml(existing?.reference || '')}">
-                </div>
-                <div class="col-md-4" id="paymentReceivedByWrap" style="display:${method === 'efectivo' ? '' : 'none'};">
-                    <label class="form-label fw-semibold small" for="paymentReceivedBy">¿Quién recibió el efectivo?</label>
-                    <input type="text" class="form-control form-control-sm" id="paymentReceivedBy" maxlength="100" placeholder="Nombre de quien recibió" value="${PaymentBreakdownHelpers.escapeHtml(existing?.receivedBy || '')}" ${method === 'efectivo' ? 'required' : ''}>
-                </div>
-                <div class="col-md-5">
-                    <label class="form-label fw-semibold small" for="paymentReceipt">Comprobante (imagen o PDF)</label>
-                    <div class="pay-drop" id="paymentReceiptDrop">
-                        <input type="file" id="paymentReceipt" accept="image/*,application/pdf">
-                        <div class="pay-file-row">
-                            <label class="pay-file-btn" for="paymentReceipt"><i class="ti ti-paperclip"></i>Adjuntar</label>
-                            <button type="button" class="pay-file-clear d-none" id="paymentReceiptClear" title="Quitar archivo" aria-label="Quitar archivo"><i class="ti ti-x"></i></button>
-                        </div>
-                        <span class="pay-file-name" id="paymentReceiptName">o arrastra el archivo aquí</span>
-                        ${receiptLink}
-                    </div>
-                </div>
-                <div class="col-md-7">
-                    <label class="form-label fw-semibold small" for="paymentNotes">Notas</label>
-                    <textarea class="form-control form-control-sm" id="paymentNotes" rows="2" maxlength="300" placeholder="Notas del pago">${PaymentBreakdownHelpers.escapeHtml(existing?.notes || '')}</textarea>
-                </div>
-            </div>
-            <div class="pay-form-actions">
-                <span class="pay-form-context">${existing ? '<i class="ti ti-edit"></i>' : '<i class="ti ti-cash"></i>'}${PaymentBreakdownHelpers.escapeHtml(contextLabel)}</span>
-                <button type="button" class="btn btn-outline-secondary" id="cancelPaymentBtn">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="savePaymentBtn"><i class="ti ti-check me-1"></i>Guardar</button>
-            </div>`;
-        // El formulario vive dentro del offcanvas (posición fija con scroll propio): se muestra en su
-        // sitio y se desplaza a la vista dentro del panel, sin scrollIntoView de página ni borde inline.
-        wrap.style.display = '';
-        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        const saveBtn = document.getElementById('savePaymentBtn');
-        // Sin métodos disponibles (H3): no se puede registrar/editar el pago — bloquea el guardado.
-        if (methodDisabled && saveBtn) saveBtn.disabled = true;
-        document.getElementById('cancelPaymentBtn').addEventListener('click', () => closePaymentForm());
-        saveBtn.addEventListener('click', () => savePayment(existing ? existing.id : ''));
-        attachThousands(document.getElementById('paymentAmount'));
-
-        // "¿Quién recibió el efectivo?" es visible + required SOLO cuando el método es efectivo, y
-        // reacciona en vivo si el usuario cambia el método DESPUÉS de abrir el formulario.
-        const methodSel = document.getElementById('paymentMethod');
-        function syncReceivedByVisibility() {
-            const isCash = methodSel && methodSel.value === 'efectivo';
-            const wrapEl = document.getElementById('paymentReceivedByWrap');
-            const inputEl = document.getElementById('paymentReceivedBy');
-            if (wrapEl) wrapEl.style.display = isCash ? '' : 'none';
-            if (inputEl) inputEl.required = !!isCash;
-            // Referencia absorbe el ancho de "¿Quién recibió?" cuando está oculto, para que el renglón
-            // siempre cierre las 12 columnas y no quede el hueco a la derecha.
-            const refWrap = document.getElementById('paymentReferenceWrap');
-            if (refWrap) {
-                refWrap.classList.toggle('col-md-4', !!isCash);
-                refWrap.classList.toggle('col-md-8', !isCash);
-            }
-        }
-        if (methodSel) methodSel.addEventListener('change', syncReceivedByVisibility);
-        syncReceivedByVisibility();
-
-        // Zona de comprobante: el input nativo está oculto, así que el nombre del archivo elegido y el
-        // botón para quitarlo son la única señal de qué se adjuntó.
-        const receiptInput = document.getElementById('paymentReceipt');
-        const receiptName = document.getElementById('paymentReceiptName');
-        const receiptClear = document.getElementById('paymentReceiptClear');
-        const receiptDrop = document.getElementById('paymentReceiptDrop');
-        function syncReceiptName() {
-            if (!receiptInput || !receiptName) return;
-            const picked = receiptInput.files && receiptInput.files[0];
-            receiptName.textContent = picked ? picked.name : 'o arrastra el archivo aquí';
-            receiptName.title = picked ? picked.name : '';
-            receiptName.classList.toggle('has-file', !!picked);
-            if (receiptClear) receiptClear.classList.toggle('d-none', !picked);
-        }
-        if (receiptInput) receiptInput.addEventListener('change', syncReceiptName);
-        if (receiptClear && receiptInput) {
-            receiptClear.addEventListener('click', () => { receiptInput.value = ''; syncReceiptName(); });
-        }
-        // Arrastrar y soltar sobre la zona. Se asigna vía DataTransfer porque input.files es de solo
-        // lectura salvo con una FileList real.
-        if (receiptDrop && receiptInput) {
-            ['dragenter', 'dragover'].forEach((ev) => receiptDrop.addEventListener(ev, (e) => {
-                e.preventDefault();
-                receiptDrop.classList.add('is-dragover');
-            }));
-            // relatedTarget dentro de la zona = solo se pasó sobre un hijo, no es una salida real.
-            receiptDrop.addEventListener('dragleave', (e) => {
-                if (!receiptDrop.contains(e.relatedTarget)) receiptDrop.classList.remove('is-dragover');
-            });
-            receiptDrop.addEventListener('drop', (e) => {
-                e.preventDefault();
-                receiptDrop.classList.remove('is-dragover');
-                const dropped = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-                if (!dropped) return;
-                const dt = new DataTransfer();
-                dt.items.add(dropped);
-                receiptInput.files = dt.files;
-                syncReceiptName();
-            });
-        }
-
-        // El prefijo del monto sigue a la moneda elegida, para que no quede "$" sobre un importe en USD.
-        const currencySel = document.getElementById('paymentCurrency');
-        const amountPrefix = document.getElementById('paymentAmountPrefix');
-        if (currencySel && amountPrefix) {
-            currencySel.addEventListener('change', () => {
-                amountPrefix.textContent = currencySel.value === 'USD' ? 'USD $' : '$';
-            });
-        }
-    }
 
     // "Agregar pago": abre el carrito. Como es la ÚNICA puerta de entrada al panel, la intención es
     // siempre registrar un pago: el formulario se despliega solo (ver maybeOpenAddForm).
@@ -1922,7 +805,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // sobre el contenedor estable del Resumen Financiero.
     document.getElementById('financialSummaryCard')?.addEventListener('click', (e) => {
         if (e.target.closest('#addPaymentBtn')) {
-            pendingAddForm = true;
+            paymentForm.requestAddForm();
             paymentsOffcanvasInstance()?.show();
         }
     });
@@ -1955,111 +838,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         closePaymentForm();
     });
 
-    async function savePayment(paymentId) {
-        const amount = parseAmount(document.getElementById('paymentAmount').value);
-        const paidAt = document.getElementById('paymentPaidAt').value;
-        const method = document.getElementById('paymentMethod').value;
-        const receivedByEl = document.getElementById('paymentReceivedBy');
-        const receivedBy = receivedByEl ? receivedByEl.value.trim() : '';
-
-        if (!amount || amount <= 0) { pmToast('El monto debe ser mayor a 0', 'warning'); return; }
-        if (amount > 100000000) { pmToast('El monto no puede exceder 100,000,000', 'warning'); return; }
-        if (!paidAt) { pmToast('La fecha de pago es obligatoria', 'warning'); return; }
-        if (method === 'efectivo' && !receivedBy) { pmToast('Indica quién recibió el efectivo', 'warning'); return; }
-
-        const payload = {
-            amount,
-            currency: document.getElementById('paymentCurrency').value,
-            method,
-            reference: document.getElementById('paymentReference').value.trim(),
-            notes: document.getElementById('paymentNotes').value.trim(),
-        };
-        if (paidAt) payload.paidAt = paidAt;
-        if (receivedBy) payload.receivedBy = receivedBy;
-
-        // Receipt (optional) — validado aquí pero subido en una petición SEPARADA DESPUÉS de guardar el
-        // pago (ver uploadReceipt), para que una subida lenta a S3 nunca bloquee ni pierda el pago.
-        const fileInput = document.getElementById('paymentReceipt');
-        const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
-        if (file) {
-            if (file.size > 10 * 1024 * 1024) { pmToast('El comprobante supera el límite de 10MB', 'warning'); return; }
-            if (!/^image\//.test(file.type) && file.type !== 'application/pdf') { pmToast('El comprobante debe ser imagen o PDF', 'warning'); return; }
-        }
-
-        const isEdit = !!paymentId;
-        const url = isEdit
-            ? `/api/reservations/${reservationId}/payments/${paymentId}`
-            : `/api/reservations/${reservationId}/payments`;
-        const httpMethod = isEdit ? 'PUT' : 'POST';
-        // Snapshot del conteo actual para reconciliar si la RESPUESTA se pierde: el request suele llegar
-        // al servidor y guardar aunque la respuesta no regrese.
-        const prevCount = paymentsCache.length;
-
-        const btn = document.getElementById('savePaymentBtn');
-        if (btn) btn.disabled = true;
-        try {
-            const response = await fetch(url, {
-                method: httpMethod,
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-            // Leer el body crudo primero para que una respuesta no-JSON (p. ej. página HTML de error)
-            // muestre un mensaje claro en vez del genérico.
-            const rawBody = await response.text();
-            let result;
-            try {
-                result = JSON.parse(rawBody);
-            } catch (parseErr) {
-                pmToast(`Error del servidor (HTTP ${response.status})`, 'error');
-                if (btn) btn.disabled = false;
-                return;
-            }
-            if (result.success) {
-                const savedId = result.data?.payment?.id || paymentId;
-                // Sube el comprobante en su propia petición ahora que el pago está guardado. Si falla,
-                // el pago se queda — solo avisamos para que el usuario reintente el comprobante.
-                let receiptWarn = result.warning || null;
-                if (file && savedId) receiptWarn = await uploadReceipt(savedId, file);
-                closePaymentForm();
-                applyPaymentSummary(result.data?.summary);
-                await loadPayments();
-                if (receiptWarn) pmToast(receiptWarn, 'warning');
-                else pmToast('Pago guardado', 'success');
-            } else {
-                let msg = result.error || 'No se pudo guardar el pago';
-                if (result.detail) msg += ` — ${result.detail}`;
-                if (response.status === 401) {
-                    msg = `Sesión/token inválido (${result.detail || result.code || '401'}). Recarga la página (Ctrl+Shift+R) e intenta de nuevo.`;
-                }
-                pmToast(msg, 'error');
-                if (btn) btn.disabled = false;
-            }
-        } catch (err) {
-            // Error de red: el request suele llegar al servidor y guardar aunque la respuesta se pierda.
-            // En vez de un falso fallo, reconciliamos desde el servidor (lo mismo que un Ctrl+R manual).
-            console.error('Save payment network error, reconciling from server:', err);
-            await loadPayments();
-            let saved = !isEdit && paymentsCache.length > prevCount;
-            if (!saved && !isEdit) {
-                await new Promise((resolve) => setTimeout(resolve, 700));
-                await loadPayments();
-                saved = paymentsCache.length > prevCount;
-            }
-            if (saved) {
-                closePaymentForm();
-                pmToast('Pago guardado (se recuperó tras un corte de conexión)', 'success');
-            } else if (isEdit) {
-                closePaymentForm();
-                pmToast('La respuesta se perdió, pero la lista ya se actualizó — verifica que el pago sea correcto.', 'warning');
-            } else {
-                pmToast('No se pudo confirmar el guardado. Revisa la lista; si el pago no aparece, regístralo otra vez.', 'warning');
-                if (btn) btn.disabled = false;
-            }
-        }
-    }
 
     // ---- Styled confirm + toasts (reemplazan el confirm/alert nativo en el carrito de pagos) ----
     const pmEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
@@ -2127,354 +905,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         wrap.addEventListener('hidden.bs.toast', () => wrap.remove());
     }
 
-    async function deletePayment(paymentId) {
-        if (!(await pmConfirm({
-            title: 'Eliminar pago', message: '¿Eliminar este pago? Esta acción no se puede deshacer.',
-            confirmText: 'Eliminar', danger: true,
-        }))) return;
-        const existedBefore = paymentsCache.some((p) => p.id === paymentId);
-        try {
-            const response = await fetch(`/api/reservations/${reservationId}/payments/${paymentId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-            const result = await response.json();
-            if (result.success) {
-                applyPaymentSummary(result.data?.summary);
-                await loadPayments();
-                pmToast('Pago eliminado', 'success');
-            } else {
-                pmToast(result.error || 'Error al eliminar el pago', 'error');
-            }
-        } catch (err) {
-            // Respuesta perdida — el delete pudo haber pasado. Reconciliamos desde el servidor en vez de
-            // reportar un falso fallo (misma idea que el guardado).
-            console.error('Delete payment network error, reconciling from server:', err);
-            await loadPayments();
-            const stillThere = paymentsCache.some((p) => p.id === paymentId);
-            if (existedBefore && !stillThere) {
-                pmToast('Pago eliminado (se recuperó tras un corte de conexión)', 'success');
-            } else {
-                pmToast('No se pudo confirmar la eliminación. Revisa la lista; si el pago sigue ahí, inténtalo otra vez.', 'warning');
-            }
-        }
-    }
 
-    function getSubconceptDetails(svc) {
-        const sub = svc.subconcept;
-        if (!sub) return '';
-        const tags = [];
-        const tag = (icon, text, color) => `<span class="badge detail-tag bg-${color}-subtle text-${color}"><i class="ti ti-${icon} me-1"></i>${text}</span>`;
-
-        // Fase 2d: descuento y propina por servicio (ya reflejados en el total del servicio).
-        if (Number(sub.discountAmount) > 0) {
-            const dPct = (sub.discountType === 'percent' && sub.discountValue) ? ` ${sub.discountValue}%` : '';
-            tags.push(tag('discount-2', `Descuento${dPct} −${formatCurrency(sub.discountAmount, reservationData.currency)}`, 'success'));
-        }
-        if (Number(sub.tipAmount) > 0) {
-            const tPct = (sub.tipType === 'percent' && sub.tipValue) ? ` ${sub.tipValue}%` : '';
-            const tMand = sub.tipMandatory ? ' (oblig.)' : '';
-            tags.push(tag('coin', `Propina${tPct} +${formatCurrency(sub.tipAmount, reservationData.currency)}${tMand}`, 'info'));
-        }
-
-        // Vehicle quantity (applies to transport, a-disposicion, etc.)
-        if (sub.quantity && sub.quantity > 1) tags.push(tag('car', `${sub.quantity} vehículos`, 'primary'));
-
-        // Guide & Greeter status (applies to ALL service types)
-        if (sub.includeGuide === true) {
-            tags.push(tag('map-pin', 'Guía: Sí', 'success'));
-        } else if (sub.includeGuide === false && (svc.type === 'transport' || svc.type === 'tour')) {
-            tags.push(tag('map-pin', 'Guía: No', 'secondary'));
-        }
-        if (sub.includeGreeter === true) {
-            const inVehicle = sub.greeterInVehicle ? ' (en vehículo)' : ' (en punto)';
-            tags.push(tag('hand-stop', `Greeter: Sí${inVehicle}`, 'warning'));
-        } else if (sub.includeGreeter === false && (svc.type === 'transport' || svc.type === 'tour')) {
-            tags.push(tag('hand-stop', 'Greeter: No', 'secondary'));
-        }
-
-        // Transport-specific details
-        if (svc.type === 'transport') {
-            if (sub.tripType) {
-                const tripLabel = sub.tripType === 'round-trip' ? 'Redondo' : 'Sencillo';
-                const dirLabel = sub.directionType === 'arrival' ? 'Llegada' : 'Salida';
-                tags.push(tag('arrows-exchange', `${tripLabel} — ${dirLabel}`, 'info'));
-            }
-            const pax = [];
-            if (sub.transportAdults) pax.push(`${sub.transportAdults} adulto${sub.transportAdults > 1 ? 's' : ''}`);
-            if (sub.transportChildren) pax.push(`${sub.transportChildren} niño${sub.transportChildren > 1 ? 's' : ''}`);
-            if (sub.transportInfants) pax.push(`${sub.transportInfants} infante${sub.transportInfants > 1 ? 's' : ''}`);
-            if (sub.persons && !pax.length) pax.push(`${sub.persons} persona${sub.persons > 1 ? 's' : ''}`);
-            if (pax.length) tags.push(tag('users', pax.join(', '), 'primary'));
-            if (sub.airline || sub.flightNumber) {
-                const flightLabel = `${sub.airline || ''} ${sub.flightNumber || ''}`.trim();
-                // Hora real del vuelo (llegada o salida del avión), distinta al pick-up del Horario.
-                const fm = String(svc.time || sub.selectedSchedule || sub.time || '').match(/^(\d{1,2}:\d{2})/);
-                const flightTime = fm ? fm[1] : '';
-                tags.push(tag('plane', flightTime ? `${flightLabel} @ ${flightTime}` : flightLabel, 'info'));
-            }
-            if (sub.waitingTimeHours) tags.push(tag('clock-pause', `Espera: ${sub.waitingTimeHours}h`, 'warning'));
-            if (Array.isArray(sub.extraAdditionalVehicles)) {
-                sub.extraAdditionalVehicles.forEach((v) => {
-                    const wh = parseFloat(v && v.waitingHours) || 0;
-                    if (wh > 0) tags.push(tag('clock-pause', `Espera ${(v.vehicleTypeName || 'adicional')}: ${wh}h`, 'warning'));
-                });
-            }
-            if (sub.routeDuration) tags.push(tag('route', `Duración: ${sub.routeDuration} min`, 'secondary'));
-            
-            // Horario = hora de pick-up del servicio (aeropuerto). Salida: la hora sugerida ES el
-            // pick-up; llegada: el pick-up ocurre a la hora de llegada del pasajero.
-            if (sub.transportType === 'aeropuerto') {
-                let pickup = '';
-                if (sub.directionType === 'departure') {
-                    pickup = sub.flightDepartureTimeSuggested || '';
-                } else if (sub.directionType === 'arrival') {
-                    const am = String(sub.time || svc.time || sub.selectedSchedule || '').match(/^(\d{1,2}:\d{2})/);
-                    pickup = am ? am[1] : '';
-                }
-                if (pickup) tags.push(tag('clock-hour-4', `Horario: ${pickup}`, 'success'));
-            }
-            if (sub.roundTripDepartureTimeSuggestedIda) {
-                tags.push(tag('clock-hour-4', `Horario ida: ${sub.roundTripDepartureTimeSuggestedIda}`, 'success'));
-            }
-            if (sub.roundTripDepartureTimeSuggestedVuelta) {
-                tags.push(tag('clock-hour-4', `Horario vuelta: ${sub.roundTripDepartureTimeSuggestedVuelta}`, 'success'));
-            }
-        }
-
-        // Tour-specific details
-        if (svc.type === 'tour') {
-            if (sub.hotelName) tags.push(tag('building', sub.hotelName, 'secondary'));
-            if (sub.isWalkingTour) tags.push(tag('walk', `Walking tour (${sub.walkingTourPeopleCount || 0} pax)`, 'info'));
-            if (sub.persons) tags.push(tag('users', `${sub.persons} persona${sub.persons > 1 ? 's' : ''}`, 'primary'));
-            // Entradas asociadas al/los destino(s) del tour (boletos de acceso): nombre + ×cantidad si > 1.
-            if (Array.isArray(sub.tourEntradas)) {
-                const incEntradas = sub.tourEntradas.filter((e) => e && e.included !== false);
-                if (incEntradas.length) {
-                    const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
-                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
-                    }[ch]));
-                    const listEnt = incEntradas
-                        .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
-                        .join(', ');
-                    tags.push(tag('ticket', `Entradas: ${listEnt}`, 'primary'));
-                }
-            }
-        }
-
-        // Experience-specific details
-        if (svc.type === 'experience') {
-            const tickets = [];
-            if (sub.adultsQuantity) tickets.push(`${sub.adultsQuantity} adulto${sub.adultsQuantity > 1 ? 's' : ''}`);
-            if (sub.childrenQuantity) tickets.push(`${sub.childrenQuantity} niño${sub.childrenQuantity > 1 ? 's' : ''}`);
-            if (sub.adultsNoAlcoholQuantity) tickets.push(`${sub.adultsNoAlcoholQuantity} sin alcohol`);
-            if (tickets.length) tags.push(tag('ticket', tickets.join(', '), 'primary'));
-            if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
-            // Entradas asociadas a la experiencia (boletos de acceso): nombre + ×cantidad si > 1.
-            if (Array.isArray(sub.experienceEntradas)) {
-                const incEntradas = sub.experienceEntradas.filter((e) => e && e.included !== false);
-                if (incEntradas.length) {
-                    const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
-                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
-                    }[ch]));
-                    const listEnt = incEntradas
-                        .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
-                        .join(', ');
-                    tags.push(tag('ticket', `Entradas: ${listEnt}`, 'primary'));
-                }
-            }
-        }
-
-        // A Disposición-specific details
-        if (svc.type === 'a-disposicion') {
-            if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
-            if (sub.discountPercent) tags.push(tag('discount-2', `${sub.discountPercent}% desc.`, 'success'));
-        }
-
-        // General fields
-        if (sub.notes) tags.push(tag('note', `Admin: ${sub.notes}`, 'secondary'));
-        if (sub.agencyNotes) tags.push(tag('user', `Cliente: ${sub.agencyNotes}`, 'info'));
-
-        return tags.length ? `<div class="mt-1 d-flex flex-wrap gap-1">${tags.join('')}</div>` : '';
-    }
-
+    // La lista la arma ServiceListRenderer, la MISMA que pinta el detalle de admin. Antes esta
+    // vista traía su propia versión de dos columnas: cada mejora al detalle había que copiarla a
+    // mano y en la práctica no se copiaba, así que aquí seguía el layout de hace varias versiones.
+    //
+    // `allowAssign: false` — asignar es de admin. No es solo que no haya botón: sin eso los círculos
+    // saldrían clicables y el selector escribiría contra un endpoint que este rol no puede llamar.
+    //
+    // El rol va LITERAL y no leído de una variable inyectada: de él depende qué canales de notas se
+    // pintan —las de proveedor, equipo e internas son de admin— y si llegara vacío el renderizador
+    // asume el rol menos privilegiado, con lo que este usuario perdería hasta sus propias notas.
     function renderServices(services) {
         const container = document.getElementById('servicesContainer');
-
-        // Group by dayNumber
-        const days = {};
-        services.forEach(svc => {
-            const key = svc.dayNumber || 1;
-            if (!days[key]) days[key] = { title: svc.dayTitle || `Día ${key}`, date: svc.serviceDate, services: [] };
-            days[key].services.push(svc);
-        });
-
-        if (Object.keys(days).length === 0) {
-            container.innerHTML = '<div class="text-center py-4 text-muted">No hay servicios en esta reservación</div>';
-            return;
-        }
-
-        let html = '';
-        Object.keys(days).sort((a, b) => a - b).forEach(dayNum => {
-            const day = days[dayNum];
-            html += `<div class="day-header"><i class="ti ti-calendar-event me-1"></i>Día ${dayNum} — ${day.title}${day.date ? ' (' + formatDate(day.date) + ')' : ''}</div>`;
-
-            day.services.forEach(svc => {
-                const icon = getServiceTypeIcon(svc.type);
-                // Build person cards for assigned employees
-                let peopleHtml = '';
-                let vehiclesHtml = '';
-                peopleHtml += buildPersonCard(svc.assignedDriver, 'Conductor', 'ti-steering-wheel', 'info');
-                peopleHtml += buildPersonCard(svc.assignedGuide, 'Guía', 'ti-map-pin', 'success');
-                peopleHtml += buildPersonCard(svc.assignedGreeter, 'Greeter', 'ti-hand-stop', 'warning');
-                peopleHtml += buildPersonCard(svc.assignedServiceCustomer, 'Customer Support', 'ti-user-star', 'primary');
-
-                // Vehicle card
-                if (svc.assignedVehicle) vehiclesHtml += buildVehicleCard(svc.assignedVehicle);
-
-                // Extra assignments (additional vehicles/drivers)
-                const extras = svc.extraAssignments || [];
-                extras.forEach(ea => {
-                    if (ea.driverName) peopleHtml += buildPersonCard({ fullName: ea.driverName, phone: '', profilePhotoUrl: '' }, 'Conductor', 'ti-steering-wheel', 'info');
-                    if (ea.vehicleName) vehiclesHtml += buildVehicleCard({ name: ea.vehicleName, imageUrl: ea.vehicleImageUrl || '' });
-                });
-
-                const hasAssignments = peopleHtml || vehiclesHtml;
-
-                const route = svc.originName || svc.destinationName
-                    ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' → ' : ''}${svc.destinationName || ''}</small>`
-                    : '';
-
-                // "Pago externo" (includeInTotal:false): el cliente lo paga directo a un tercero, NO es un
-                // cargo que la agencia deba cobrar. Se marca junto al título (el precio ya se muestra
-                // completo). Estilo tomado de .service-badge.external (services-renderer.js), no cargado aquí.
-                const externalBadge = svc.subconcept?.includeInTotal === false
-                    ? '<span class="badge me-1" style="background:rgba(150,155,129,0.15);color:#969b81;border:1px solid rgba(150,155,129,0.3);font-weight:600;">Pago externo</span>'
-                    : '';
-
-                const canAssign = false; // Assignment is admin-only
-
-                html += `
-                <div class="service-row d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center flex-grow-1">
-                        <div>
-                            <div class="fw-semibold">${externalBadge}${svc.concept || '—'}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
-                            ${route}
-                            ${svc.vehicleTypeName ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
-                            ${getSubconceptDetails(svc)}
-                            ${hasAssignments ? `<div class="row mt-2"><div class="col-md-7">${peopleHtml}</div><div class="col-md-5">${vehiclesHtml}</div></div>` : (svc.type === 'concepto' ? '<div class="mt-2"><small class="text-muted">No requiere asignación</small></div>' : '<div class="mt-2"><small class="text-muted">Sin asignar</small></div>')}
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        ${svc.type === 'concepto' && svc.status !== 'cancelled' ? '<span class="badge bg-success text-white">Lista</span>' : getReservationStatusBadge(svc.status)}
-                        <span class="text-end" style="min-width: 80px;">${formatCurrency(svc.total, reservationData.currency)}</span>
-                        ${canAssign ? `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}"><i class="ti ti-user-plus"></i></button>` : ''}
-                    </div>
-                </div>`;
-            });
-        });
-
-        container.innerHTML = html;
-
-        // Bind assign buttons
-        container.querySelectorAll('.assign-btn').forEach(btn => {
-            btn.addEventListener('click', () => openAssignModal(btn));
+        container.innerHTML = ServiceListRenderer.buildHtml(services, {
+            reservationData,
+            formatCurrency,
+            allowAssign: false,
+            userRole: 'department_manager',
         });
     }
-
-    async function loadEmployees() {
-        if (employeesCache) return employeesCache;
-        try {
-            const response = await fetch('/api/employees?limit=500', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const result = await response.json();
-            employeesCache = result.data?.users || result.data || result.results || [];
-            return employeesCache;
-        } catch { return []; }
-    }
-
-    async function loadVehicles() {
-        if (vehiclesCache) return vehiclesCache;
-        try {
-            const response = await fetch('/api/vehicles?limit=500', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const result = await response.json();
-            vehiclesCache = result.data || result.results || [];
-            return vehiclesCache;
-        } catch { return []; }
-    }
-
-    async function openAssignModal(btn) {
-        const serviceId = btn.dataset.serviceId;
-        const driverId = btn.dataset.driverId;
-        const guideId = btn.dataset.guideId;
-        const greeterId = btn.dataset.greeterId;
-        const vehicleId = btn.dataset.vehicleId;
-
-        document.getElementById('assignServiceId').value = serviceId;
-
-        // Load employees and vehicles
-        const [employees, vehicles] = await Promise.all([loadEmployees(), loadVehicles()]);
-
-        // Populate dropdowns
-        const driverSelect = document.getElementById('assignDriver');
-        const guideSelect = document.getElementById('assignGuide');
-        const greeterSelect = document.getElementById('assignGreeter');
-        const vehicleSelect = document.getElementById('assignVehicle');
-
-        // Filter employees by role
-        const drivers = employees.filter(e => e.role === 'driver' || e.role === 'employee_amexing');
-        const guides = employees.filter(e => e.role === 'guia' || e.role === 'employee_amexing');
-        const greeters = employees.filter(e => e.role === 'greeter' || e.role === 'employee_amexing');
-
-        function populateSelect(select, items, selectedId, nameField) {
-            select.innerHTML = '<option value="">Sin asignar</option>';
-            items.forEach(item => {
-                const name = item[nameField] || item.fullName || item.username || item.name || 'Sin nombre';
-                const id = item.id || item.objectId;
-                select.innerHTML += `<option value="${id}" ${id === selectedId ? 'selected' : ''}>${name}</option>`;
-            });
-        }
-
-        populateSelect(driverSelect, drivers, driverId, 'fullName');
-        populateSelect(guideSelect, guides, guideId, 'fullName');
-        populateSelect(greeterSelect, greeters, greeterId, 'fullName');
-        populateSelect(vehicleSelect, vehicles, vehicleId, 'name');
-
-        const modal = new bootstrap.Modal(document.getElementById('assignModal'));
-        modal.show();
-    }
-
-    document.getElementById('saveAssignmentBtn')?.addEventListener('click', async function() {
-        const serviceId = document.getElementById('assignServiceId').value;
-        const driverId = document.getElementById('assignDriver').value;
-        const guideId = document.getElementById('assignGuide').value;
-        const greeterId = document.getElementById('assignGreeter').value;
-        const vehicleId = document.getElementById('assignVehicle').value;
-
-        try {
-            const response = await fetch(`/api/reservations/${reservationId}/services/${serviceId}/assign`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ driverId, guideId, greeterId, vehicleId }),
-            });
-            const result = await response.json();
-            if (result.success) {
-                bootstrap.Modal.getInstance(document.getElementById('assignModal'))?.hide();
-                await loadReservation(); // Reload to show updated assignments
-            } else {
-                alert(result.error || 'Error al guardar asignación');
-            }
-        } catch (err) {
-            console.error('Assignment error:', err);
-            alert('Error al guardar asignación');
-        }
-    });
 
     async function cancelReservation() {
         if (!confirm('¿Estás seguro de cancelar esta reservación? Se cancelarán todos los servicios.')) return;

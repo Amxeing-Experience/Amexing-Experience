@@ -39,6 +39,12 @@ const staticRoutes = [
     directory: path.join(__dirname, '..', '..', 'presentation', 'views', 'dashboards', 'shared'),
   },
   {
+    // Helpers isomórficos de la lista de servicios, compartidos por booking-detail.ejs (navegador) y
+    // reservation-itinerary.ejs (servidor, vía local de la plantilla). Mismo archivo que usa Jest.
+    route: '/shared/services',
+    directory: path.join(__dirname, '..', '..', 'presentation', 'views', 'dashboards', 'shared'),
+  },
+  {
     route: '/dashboard',
     directory: path.join(__dirname, '..', '..', '..', 'public', 'dashboard'),
   },
