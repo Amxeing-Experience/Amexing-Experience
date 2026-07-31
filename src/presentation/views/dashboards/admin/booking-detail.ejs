@@ -218,45 +218,11 @@
     </div>
 
     <!-- Resumen Financiero (sin panel blanco: encabezado de sección + contenido directo) -->
-    <div class="fin-wrap mb-4" id="financialSummaryCard" style="display:none;">
-        <div class="fin-section-head">
-            <h5 class="fin-section-title"><i class="ti ti-calculator me-2"></i>Resumen Financiero</h5>
-        </div>
-        <div>
-            <div id="financialSummaryBody">
-                <!-- Resumen (totales + saldo) — rendered by JS -->
-            </div>
-
-            <!-- Disparador + formulario inline de ajuste (acción final) -->
-            <button type="button" id="addAdjustmentBtn" class="fin-add-adj d-none"><i class="ti ti-plus me-1"></i>Agregar ajuste</button>
-            <div id="adjustmentInlineForm" class="fin-adj d-none">
-                <div class="fin-adj-row">
-                    <div class="fin-seg fin-seg-sm" role="group" aria-label="Tipo de ajuste">
-                        <input type="radio" class="btn-check" name="adjType" id="adjTypeCharge" value="charge" checked>
-                        <label class="fin-seg-btn fin-seg-charge" for="adjTypeCharge">Cargo</label>
-                        <input type="radio" class="btn-check" name="adjType" id="adjTypeDiscount" value="discount">
-                        <label class="fin-seg-btn fin-seg-discount" for="adjTypeDiscount">Descuento</label>
-                    </div>
-                    <input type="text" class="form-control form-control-sm fin-adj-desc" id="adjDescription" maxlength="150" placeholder="Descripción (ej. Estacionamiento)">
-                    <div class="fin-seg fin-seg-sm" id="adjAmountModeGroup" style="display:none;">
-                        <input type="radio" class="btn-check" name="adjAmountMode" id="adjModeFixed" value="fixed" checked>
-                        <label class="fin-seg-btn" for="adjModeFixed" title="Monto fijo">$</label>
-                        <input type="radio" class="btn-check" name="adjAmountMode" id="adjModePercent" value="percentage">
-                        <label class="fin-seg-btn" for="adjModePercent" title="Porcentaje">%</label>
-                    </div>
-                    <div class="input-group input-group-sm fin-adj-amt">
-                        <span class="input-group-text" id="adjAmountPrefix">$</span>
-                        <input type="text" inputmode="decimal" maxlength="17" class="form-control" id="adjAmount" placeholder="0.00">
-                    </div>
-                    <button class="btn btn-sm btn-primary" id="saveAdjustmentBtn" type="button" title="Guardar"><i class="ti ti-check"></i></button>
-                    <button class="btn btn-sm btn-outline-secondary" id="cancelAdjustmentBtn" type="button" title="Cancelar"><i class="ti ti-x"></i></button>
-                    <span id="adjAmountLabel" class="d-none"></span>
-                </div>
-                <div class="fin-adj-note" id="adjNote"></div>
-                <div class="fin-adj-preview" id="adjPreview"></div>
-            </div>
-        </div>
-    </div>
+    <!-- El Resumen Financiero dejó de ser una tarjeta en medio de la página. Sus cifras clave viven
+         ahora en la barra fija del pie —siempre a la vista mientras se asigna— y su desglose completo
+         en el carrito, que es donde además se registra el pago. Antes esos cinco números estaban en
+         los dos lugares a la vez. -->
+    <div id="financialSummaryBody" class="d-none"></div>
 
     <!-- Services by Day -->
     <div class="svc-wrap">
@@ -298,6 +264,28 @@
     </div>
 </div>
 
+<!-- Barra de cobranza: el saldo acompaña mientras se trabaja, sin ocupar un bloque en el flujo.
+     Nace oculta y la descubre renderPaymentBar() cuando llega el summary del servidor. -->
+<div class="pay-bar d-none" id="payBar">
+  <div class="pay-bar-inner">
+    <div class="pay-bar-cifra">
+      <span class="pay-bar-lbl">Saldo</span>
+      <span class="pay-bar-val" id="payBarSaldo">&mdash;</span>
+    </div>
+    <div class="pay-bar-prog">
+      <div class="pay-bar-track"><span id="payBarFill"></span></div>
+      <div class="pay-bar-pie">
+        <span id="payBarDetalle"></span>
+        <span id="payBarEstado"></span>
+      </div>
+    </div>
+    <div class="pay-bar-acciones">
+      <button type="button" class="pay-bar-btn" id="payBarVerBtn">Ver desglose</button>
+      <button type="button" class="pay-bar-btn is-primaria" id="payBarPagarBtn">Agregar pago</button>
+    </div>
+  </div>
+</div>
+
 <!-- Assign Employee Modal -->
 <!-- El formulario completo de asignación se retiró: permitía asignar guía, greeter o chofer que el
      servicio NO contrató, y esa es una regla del negocio, no una comodidad. Los círculos de la lista
@@ -331,6 +319,39 @@
             <div class="tab-pane fade show active" id="tabPago" role="tabpanel" aria-labelledby="tabPagoBtn">
                 <!-- Card de cobertura (total + estado + barra + Pagado/Saldo) -->
                 <div class="rounded p-3 mb-3 payment-coverage-highlight" id="paymentCoverageCard"></div>
+                <!-- Desglose: subtotal, propinas y ajustes. Vivía en una tarjeta de la página, lejos
+                     del lugar donde se registra el pago que lo modifica. -->
+                <div id="payDesglose" class="pay-desglose"></div>
+                <!-- Agregar ajuste: vivía en la tarjeta financiera de la página. Al mudarse el
+                     desglose aquí, su disparador tenía que venir con él o admin se quedaba viendo
+                     los ajustes sin poder crear uno. Sigue siendo admin-only. -->
+                <button type="button" id="addAdjustmentBtn" class="fin-add-adj d-none"><i class="ti ti-plus me-1"></i>Agregar ajuste</button>
+                <div id="adjustmentInlineForm" class="fin-adj d-none">
+                    <div class="fin-adj-row">
+                        <div class="fin-seg fin-seg-sm" role="group" aria-label="Tipo de ajuste">
+                            <input type="radio" class="btn-check" name="adjType" id="adjTypeCharge" value="charge" checked>
+                            <label class="fin-seg-btn fin-seg-charge" for="adjTypeCharge">Cargo</label>
+                            <input type="radio" class="btn-check" name="adjType" id="adjTypeDiscount" value="discount">
+                            <label class="fin-seg-btn fin-seg-discount" for="adjTypeDiscount">Descuento</label>
+                        </div>
+                        <input type="text" class="form-control form-control-sm fin-adj-desc" id="adjDescription" maxlength="150" placeholder="Descripción (ej. Estacionamiento)">
+                        <div class="fin-seg fin-seg-sm" id="adjAmountModeGroup" style="display:none;">
+                            <input type="radio" class="btn-check" name="adjAmountMode" id="adjModeFixed" value="fixed" checked>
+                            <label class="fin-seg-btn" for="adjModeFixed" title="Monto fijo">$</label>
+                            <input type="radio" class="btn-check" name="adjAmountMode" id="adjModePercent" value="percentage">
+                            <label class="fin-seg-btn" for="adjModePercent" title="Porcentaje">%</label>
+                        </div>
+                        <div class="input-group input-group-sm fin-adj-amt">
+                            <span class="input-group-text" id="adjAmountPrefix">$</span>
+                            <input type="text" inputmode="decimal" maxlength="17" class="form-control" id="adjAmount" placeholder="0.00">
+                        </div>
+                        <button class="btn btn-sm btn-primary" id="saveAdjustmentBtn" type="button" title="Guardar"><i class="ti ti-check"></i></button>
+                        <button class="btn btn-sm btn-outline-secondary" id="cancelAdjustmentBtn" type="button" title="Cancelar"><i class="ti ti-x"></i></button>
+                        <span id="adjAmountLabel" class="d-none"></span>
+                    </div>
+                    <div class="fin-adj-note" id="adjNote"></div>
+                    <div class="fin-adj-preview" id="adjPreview"></div>
+                </div>
                 <!-- Acción principal: registrar pago -->
                 <button class="btn btn-primary w-100 mb-3 d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
                 <!-- Inline payment form (aparece bajo el botón al registrar) -->
@@ -1366,6 +1387,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         renderServices(d.services);
         renderFinancialSummary();
+        renderPaymentBar();
         loadPayments();
 
         document.getElementById('loadingState').style.display = 'none';
@@ -1415,6 +1437,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     function svcPendingAvatar(...args) { return ServiceListRenderer.svcPendingAvatar(...args); }
     function svcPickAttrs(...args) { return ServiceListRenderer.svcPickAttrs(...args); }
     function svcTelLink(...args) { return ServiceListRenderer.svcTelLink(...args); }
+
+    // Las dos puertas de la barra abren el MISMO carrito; la de pagar además pide que el formulario
+    // se despliegue, igual que "Agregar pago" del hero cuando existía.
+    document.getElementById('payBarVerBtn')?.addEventListener('click', () => {
+        paymentsOffcanvasInstance()?.show();
+    });
+    document.getElementById('payBarPagarBtn')?.addEventListener('click', () => {
+        pendingAddForm = true;
+        paymentsOffcanvasInstance()?.show();
+    });
 
     async function toggleServiceStatus(btn) {
         const serviceId = btn.dataset.serviceId;
@@ -1640,7 +1672,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             html = assignPopPeopleGroup(ds.roleLabel || 'Persona', 'role',
                 pools[ds.rolePool] || pools.all, ds.currentId || '', ds.inheritLabel || '');
         }
-        body.innerHTML = html;
+        if (body) body.innerHTML = html;
         positionAssignPop(pop, row);
         search.focus();
     }
@@ -1897,10 +1929,39 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // ===== FINANCIAL SUMMARY =====
 
+    // Barra de cobranza del pie. Toma sus cifras del summary del servidor, igual que el carrito, así
+    // que no puede desviarse de él. Se descubre sólo cuando hay datos: una barra con guiones sería
+    // peor que ninguna.
+    function renderPaymentBar() {
+        const bar = document.getElementById('payBar');
+        if (!bar) return;
+        const pay = reservationData && reservationData.payment;
+        if (!pay) { bar.classList.add('d-none'); document.body.classList.remove('tiene-barra-cobranza'); return; }
+
+        const curr = reservationData.currency || 'MXN';
+        const resuelto = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
+        const total = Number(pay.total) || 0;
+        const pagado = Number(pay.paidAmount) || 0;
+        const saldo = resuelto.displayedBalance;
+        const pct = total > 0 ? Math.min(100, Math.round((pagado / total) * 100)) : 0;
+
+        document.getElementById('payBarSaldo').textContent = formatCurrency(saldo, curr);
+        document.getElementById('payBarFill').style.width = `${pct}%`;
+        document.getElementById('payBarDetalle').innerHTML =
+            `<strong>${pct}%</strong> pagado · ${formatCurrency(pagado, curr)} de ${formatCurrency(total, curr)}`;
+        document.getElementById('payBarEstado').innerHTML =
+            PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus);
+
+        // Saldo cubierto: deja de teñirse de ámbar, que es la señal de que falta algo.
+        document.getElementById('payBarSaldo').classList.toggle('is-cubierto', saldo <= 0);
+        bar.classList.remove('d-none');
+        document.body.classList.add('tiene-barra-cobranza');
+    }
+
     function renderFinancialSummary() {
         const d = reservationData;
-        const card = document.getElementById('financialSummaryCard');
-        const body = document.getElementById('financialSummaryBody');
+        // El desglose se pinta DENTRO del carrito: es donde se consulta y donde se actúa sobre él.
+        const body = document.getElementById('payDesglose');
         const addBtn = document.getElementById('addAdjustmentBtn');
         const adjustments = d.adjustments || [];
         // Subtotal recomputed from per-service pricesByType[paymentType] so the booking
@@ -1913,7 +1974,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             : (d.servicesSubtotal || d.totalAmount || 0);
         const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
 
-        card.style.display = '';
         if (canEdit) addBtn.classList.remove('d-none');
         else addBtn.classList.add('d-none');
         // "Agregar pago" ahora se renderiza dentro del hero (solo si canEdit), así que su visibilidad
@@ -1984,46 +2044,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             : '';
 
         let html = '';
-        // ===== Hero de pago: cifras clave + barra de cobertura (solo si hay datos de pago) =====
-        if (pay) {
-            const heroResolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
-            const heroPaid = Number(pay.paidAmount) || 0;
-            const heroTotal = Number(pay.total) || 0;
-            const heroBal = heroResolved.displayedBalance;
-            const heroPct = heroTotal > 0 ? Math.min(100, Math.round((heroPaid / heroTotal) * 100)) : 0;
-            const heroBarColor = '#4b6b3f'; // el llenado = lo pagado → verde (coincide con "Pagado")
-            const heroSavings = heroResolved.savings
-                ? `<div class="fin-savings"><i class="ti ti-discount-2 me-2"></i><strong>${PaymentBreakdownHelpers.escapeHtml(heroResolved.savings.label)}</strong><div class="small">${PaymentBreakdownHelpers.escapeHtml(heroResolved.savings.sublabel)}</div></div>`
-                : '';
-            html += `<div class="fin-hero">
-                <div class="fin-hero-top">
-                    <div>
-                        <div class="fin-hero-lbl">Total a pagar ${methodChipHtml}</div>
-                        <div class="fin-hero-total">${formatCurrency(heroTotal, curr)}</div>
-                        ${savingsHint}
-                    </div>
-                    <div class="fin-hero-meta">
-                        ${getPaymentStatusBadge(pay.paymentStatus)}
-                        ${canEdit ? '<button class="fin-pay-btn" id="addPaymentBtn"><i class="ti ti-cash"></i>Agregar pago</button>' : ''}
-                    </div>
-                </div>
-                ${comparisonInlineHtml}
-                <div class="fin-hero-pct">${heroPct}% pagado</div>
-                <div class="fin-bar"><span style="width:${heroPct}%;background:${heroBarColor}"></span></div>
-                <div class="fin-hero-foot">
-                    <div><span class="lbl">Pagado</span><div class="val" style="color:#4b6b3f">${formatCurrency(heroPaid, curr)}</div></div>
-                    <div class="text-end"><span class="lbl">Saldo</span><div class="val" style="color:${heroBal > 0 ? '#b8894a' : '#4b6b3f'}">${formatCurrency(heroBal, curr)}</div></div>
-                </div>
-                ${heroSavings}
-            </div>`;
-        }
-
-        // El comparativo por método ahora se despliega desde el chip de método en el hero (methodChipHtml).
+        // El HERO se retiró de aquí: sus cifras —total, estado, %, pagado y saldo— viven en la barra
+        // del pie y, completas, en la tarjeta de cobertura del carrito. Estaban en los dos lados.
 
         // ===== Desglose ===== (sin rótulo; los renglones ya se leen como desglose)
-        // Sin datos de pago no hay hero: mostramos el chip de método (con su comparativo inline) aquí.
-        if (!pay) {
-            html += `<div class="fin-row"><span class="lbl"><i class="ti ti-credit-card"></i>Tipo de pago</span><span class="val">${methodChipHtml}</span></div>${comparisonInlineHtml}`;
+        // El chip de método y su comparativo van SIEMPRE, no sólo cuando falta el summary. Vivían
+        // dentro del hero; al mudarse el hero a la barra del pie se habrían quedado sin dónde
+        // insertarse, y con ellos el aviso de ahorro, que es el único que sugiere cambiar de método.
+        html += `<div class="fin-row"><span class="lbl"><i class="ti ti-credit-card"></i>Tipo de pago</span><span class="val">${methodChipHtml}</span></div>${comparisonInlineHtml}`;
+        if (savingsHint) {
+            html += savingsHint;
         }
         html += `<div class="fin-row"><span class="lbl"><i class="ti ti-list-details"></i>Subtotal servicios</span><span class="val">${formatCurrency(servicesSubtotal, curr)}</span></div>`;
 
@@ -2057,7 +2087,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         // de arriba (fin-hero). El detalle completo (chips, cobertura, desglose por método, historial y
         // registro) vive en #paymentsOffcanvas.
 
-        body.innerHTML = html;
+        if (body) body.innerHTML = html;
 
         // Bind remove buttons
         body.querySelectorAll('.remove-adj-btn').forEach(btn => {
@@ -2812,6 +2842,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (reservationData.payment) Object.assign(reservationData.payment, summary);
         else reservationData.payment = { ...summary };
         renderFinancialSummary();
+        renderPaymentBar();
         renderPaymentsOffcanvas();
         // Si el panel se abrió antes de que llegara el summary, este es el momento de desplegar el alta.
         maybeOpenAddForm();
@@ -2821,25 +2852,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     // "Registrar pago" dentro del panel (menos amontonado al abrir).
     // "Agregar pago" vive dentro del hero (re-renderizado por renderFinancialSummary), así que se
     // cablea por delegación sobre el contenedor estable del Resumen Financiero.
-    document.getElementById('financialSummaryCard')?.addEventListener('click', (e) => {
-        if (e.target.closest('#addPaymentBtn')) {
-            pendingAddForm = true;
-            paymentsOffcanvasInstance()?.show();
-        }
-    });
-    // Al terminar la animación de apertura: si el summary ya está, el formulario se despliega solo.
-    document.getElementById('paymentsOffcanvas')?.addEventListener('shown.bs.offcanvas', () => maybeOpenAddForm());
-    // El hint "En efectivo ahorras…" solo tiene sentido colapsado (al expandir se duplica con la fila
-    // del comparativo), así que se oculta mientras el comparativo está abierto. Eventos de Bootstrap
-    // Collapse (burbujean) delegados en el contenedor estable, para sobrevivir al re-render del hero.
-    const toggleSavingsHint = (show) => {
-        const hint = document.querySelector('.fin-hero-hint');
-        if (hint) hint.style.display = show ? '' : 'none';
-    };
-    document.getElementById('financialSummaryCard')?.addEventListener('show.bs.collapse', (e) => {
+    // El comparativo vive ahora dentro del carrito, así que sus eventos cuelgan del panel de pagos y
+    // no de la tarjeta financiera, que dejó de existir. "Agregar pago" del hero también se fue: la
+    // barra del pie tiene su propio botón.
+    document.getElementById('paymentsOffcanvas')?.addEventListener('show.bs.collapse', (e) => {
         if (e.target.id === 'paymentMethodComparison') toggleSavingsHint(false);
     });
-    document.getElementById('financialSummaryCard')?.addEventListener('hide.bs.collapse', (e) => {
+    document.getElementById('paymentsOffcanvas')?.addEventListener('hide.bs.collapse', (e) => {
         if (e.target.id === 'paymentMethodComparison') toggleSavingsHint(true);
     });
     // "Registrar pago" (dentro del carrito): muestra el formulario de nuevo pago sin reabrir el panel.

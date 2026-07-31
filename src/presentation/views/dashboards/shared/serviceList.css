@@ -546,3 +546,64 @@
   .svc-doc-avance { text-align: left; }
   .svc-doc-barra { margin-left: 0; }
 }
+
+/* ---------------------------------------------------------------------------
+   Barra de cobranza del pie.
+
+   El detalle sirve dos oficios —operar y cobrar— y antes competían por el orden vertical: el dinero
+   se metía entre «quién es esto» y «qué tengo que hacer». Aquí el saldo acompaña sin ocupar un
+   bloque en el flujo, y el desglose completo vive en el carrito, que es donde además se actúa.
+   --------------------------------------------------------------------------- */
+.pay-bar {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 40;
+  background: #fff;
+  border-top: 1px solid #dcdccf;
+  box-shadow: 0 -6px 22px rgba(43, 43, 43, .10);
+}
+.pay-bar-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 11px 22px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.pay-bar-cifra { display: flex; align-items: baseline; gap: 8px; flex: none; }
+.pay-bar-lbl {
+  font-size: .6rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: #8a8f78;
+}
+.pay-bar-val { font-size: 1.3rem; font-weight: 700; color: #b8894a; }
+/* Sin saldo no hay nada que reclamar: deja el ámbar, que es la señal de que falta algo. */
+.pay-bar-val.is-cubierto { color: #4b6b3f; }
+
+.pay-bar-prog { flex: 1 1 200px; min-width: 150px; }
+.pay-bar-track { height: 5px; border-radius: 999px; background: #eceadf; overflow: hidden; }
+.pay-bar-track > span { display: block; height: 100%; width: 0; border-radius: 999px; background: #4b6b3f; transition: width .35s ease; }
+.pay-bar-pie {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 5px; font-size: .72rem; color: #6b6656;
+}
+
+.pay-bar-acciones { display: flex; gap: 8px; margin-left: auto; }
+.pay-bar-btn {
+  font-size: .72rem; font-weight: 700; letter-spacing: .06em;
+  border: 1px solid #dcdccf; background: #fff; color: #6b7256;
+  border-radius: 8px; padding: .55rem 1rem; line-height: 1.2;
+  white-space: nowrap; font-family: inherit; cursor: pointer; transition: all .12s ease;
+}
+.pay-bar-btn:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
+.pay-bar-btn.is-primaria { background: #6E7A50; border-color: #6E7A50; color: #fff; }
+.pay-bar-btn.is-primaria:hover { background: #566040; border-color: #566040; color: #fff; }
+
+/* El contenido no puede quedar debajo de la barra. */
+body.tiene-barra-cobranza { padding-bottom: 76px; }
+
+/* El carrito se angosta: su contenido es una columna —cobertura, desglose, acción, historial— y a
+   860 px quedaba nadando, con el vacío concentrado abajo. */
+#paymentsOffcanvas { --bs-offcanvas-width: 460px; }
+@media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
+
+.pay-desglose:empty { display: none; }

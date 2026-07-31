@@ -36,10 +36,26 @@ describe('Booking Detail - Pagos Offcanvas (admin)', () => {
   // DENTRO del hero (y solo si la reservación es editable), así que ya no hay un orden de DOM que
   // verificar en el cascarón. Lo que sigue importando es que ambos controles existan y que el de
   // AJUSTE siga siendo admin-only (su endpoint es requireRole(['admin','superadmin'])).
-  test('admin conserva "Agregar pago" (dentro del hero) y "+ Agregar ajuste"', () => {
-    expect(html).toContain('id="addPaymentBtn"');
-    expect(html).toContain('fin-pay-btn');
+  // Las dos afordancias se mudaron con el rediseño: "Agregar pago" vivía en el hero de la tarjeta
+  // financiera y ahora está en la barra de cobranza del pie; "+ Agregar ajuste" bajó al carrito,
+  // junto al desglose que modifica. Lo que este test protege es lo mismo: que admin conserve una
+  // forma de registrar un pago y otra de crear un ajuste.
+  test('admin conserva cómo registrar un pago y cómo agregar un ajuste', () => {
+    expect(html).toContain('id="payBarPagarBtn"');
     expect(html).toContain('id="addAdjustmentBtn"');
+  });
+
+  test('la barra de cobranza trae el saldo y el avance, no sólo un botón', () => {
+    expect(html).toContain('id="payBarSaldo"');
+    expect(html).toContain('id="payBarFill"');
+    expect(html).toContain('id="payBarDetalle"');
+  });
+
+  // El desglose dejó de vivir en una tarjeta de la página: sus cinco cifras clave estaban ahí y en
+  // la tarjeta de cobertura del carrito a la vez.
+  test('el desglose ya no se pinta en la página, sino dentro del carrito', () => {
+    expect(html).toContain('id="payDesglose"');
+    expect(html).not.toContain('class="fin-wrap mb-4" id="financialSummaryCard"');
   });
 
   test('el offcanvas contiene los contenedores clave: pestañas, cobertura, tabla por método, historial', () => {
