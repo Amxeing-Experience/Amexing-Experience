@@ -237,6 +237,26 @@ async function retiredCandidates(windowStart, cooldownThreshold) {
 }
 
 /**
+ * Order the batch by lastReconciledAt ASCENDING, with never-reconciled rows FIRST.
+ *
+ * Never by age of creation: the rows that are stuck are by definition the oldest, so they would occupy
+ * the head of every batch forever and permanently crowd out the candidates that still have recoverable
+ * money behind them.
+ * @param {object[]} rows - The union of both branches.
+ * @returns {object[]} The same rows, ordered.
+ * @example
+ * orderBatch([...live, ...retired]);
+ */
+function orderBatch(rows) {
+  const stamp = (p) => {
+    const value = p.get && p.get('lastReconciledAt');
+    const ms = value ? new Date(value).getTime() : NaN;
+    return Number.isFinite(ms) ? ms : -Infinity; // absent (or corrupt) sorts first
+  };
+  return [...rows].sort((a, b) => stamp(a) - stamp(b));
+}
+
+/**
  * Branch (iii): rows whose charge is confirmed but whose rollup could not be written.
  *
  * They need no provider call at all — the money is already settled locally, what failed was OUR
@@ -262,26 +282,6 @@ async function rollupRepairCandidates() {
   query.equalTo('requiresRollupRepair', true);
   query.limit(RECONCILE_BATCH_LIMIT);
   return orderBatch(await query.find({ useMasterKey: true }));
-}
-
-/**
- * Order the batch by lastReconciledAt ASCENDING, with never-reconciled rows FIRST.
- *
- * Never by age of creation: the rows that are stuck are by definition the oldest, so they would occupy
- * the head of every batch forever and permanently crowd out the candidates that still have recoverable
- * money behind them.
- * @param {object[]} rows - The union of both branches.
- * @returns {object[]} The same rows, ordered.
- * @example
- * orderBatch([...live, ...retired]);
- */
-function orderBatch(rows) {
-  const stamp = (p) => {
-    const value = p.get && p.get('lastReconciledAt');
-    const ms = value ? new Date(value).getTime() : NaN;
-    return Number.isFinite(ms) ? ms : -Infinity; // absent (or corrupt) sorts first
-  };
-  return [...rows].sort((a, b) => stamp(a) - stamp(b));
 }
 
 /**
