@@ -71,9 +71,13 @@
         }
 
         .main-content {
-            margin-left: 270px;
+            /* El ancho del sidebar vivía escrito a mano en tres lugares —270, 80 y 0— y cualquier
+               elemento anclado a la ventana tenía que volver a adivinarlo. Ahora se declara una vez
+               y quien lo necesite lo hereda con var(--ancho-sidebar). */
+            --ancho-sidebar: 270px;
+            margin-left: var(--ancho-sidebar);
             min-height: 100vh;
-            max-width: calc(100vw - 270px);
+            max-width: calc(100vw - var(--ancho-sidebar));
             flex: 1;
             display: flex;
             flex-direction: column;
@@ -193,15 +197,17 @@
         /* Desktop sidebar collapsed state */
         @media (min-width: 992px) {
             .main-content.sidebar-collapsed {
-                margin-left: 80px !important;
-                max-width: calc(100vw - 80px) !important;
+                --ancho-sidebar: 80px;
+                margin-left: var(--ancho-sidebar) !important;
+                max-width: calc(100vw - var(--ancho-sidebar)) !important;
             }
         }
 
         /* Responsive Design */
         @media (max-width: 991.98px) {
             .main-content {
-                margin-left: 0 !important;
+                --ancho-sidebar: 0px;
+                margin-left: var(--ancho-sidebar) !important;
                 max-width: 100vw !important;
             }
         }

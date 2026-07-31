@@ -555,22 +555,28 @@
    bloque en el flujo, y el desglose completo vive en el carrito, que es donde además se actúa.
    --------------------------------------------------------------------------- */
 .pay-bar {
-  /* Pegajosa DENTRO del contenido, no fija a la ventana. Con `fixed` arrancaba en el borde izquierdo
-     de la pantalla y se metía debajo del sidebar, que además cambia de ancho al colapsarse: cualquier
-     `left` sería un número mágico que se rompe en ese estado y en cada punto de quiebre.
-     El que hace scroll en este dashboard es .dashboard-content, así que basta con pegarse a su borde
-     inferior y el layout se encarga del resto. */
-  position: sticky;
+  /* Anclada a la ventana, pero arrancando donde termina el sidebar. `sticky` no sirve aquí: la barra
+     es el último elemento del contenido, así que su contenedor termina justo donde ella empieza y no
+     le queda margen para despegarse — sólo se veía al llegar hasta abajo.
+     El desplazamiento NO es un número escrito a mano: --ancho-sidebar lo declara el layout y vale
+     270 px, 80 px al colapsarlo y 0 en móvil. La barra sólo lo hereda. */
+  position: fixed;
+  left: var(--ancho-sidebar, 0px);
+  right: 0;
   bottom: 0;
   z-index: 40;
   background: #fff;
-  border: 1px solid #dcdccf;
-  border-radius: 12px;
-  box-shadow: 0 -4px 18px rgba(43, 43, 43, .09);
-  margin-top: 18px;
+  border-top: 1px solid #dcdccf;
+  box-shadow: 0 -5px 20px rgba(43, 43, 43, .10);
+  transition: left .3s ease;
 }
+/* El contenido no puede quedar tapado por la barra. */
+.dashboard-content:has(.pay-bar) { padding-bottom: 84px; }
+
 .pay-bar-inner {
-  padding: 11px 18px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 11px 22px;
   display: flex;
   align-items: center;
   gap: 22px;
