@@ -39,7 +39,8 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
         .resv-conf .rc-banner-title{font-size:15px;font-weight:300;text-transform:none;letter-spacing:1px;margin:0}
         .resv-conf .rc-banner-sub{font-size:18px;font-weight:300;text-transform:uppercase;letter-spacing:2px;margin:3px 0 0}
         .resv-conf .rc-folio{text-align:center;color:#8a8a8a;font-size:11px;letter-spacing:.5px;margin-bottom:28px}
-        .resv-conf .rc-section-title{color:#111;font-family:'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);font-weight:700;text-transform:uppercase;font-size:16px;letter-spacing:2px;text-align:left;max-width:640px;margin:22px auto 4px}
+        /* Un título no se queda solo al pie de una hoja: viaja con el bloque que encabeza. */
+        .resv-conf .rc-section-title{break-after:avoid;page-break-after:avoid;color:#111;font-family:'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);font-weight:700;text-transform:uppercase;font-size:16px;letter-spacing:2px;text-align:left;max-width:640px;margin:22px auto 4px}
         .resv-conf .rc-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #a9a79a;border-bottom:none}
         /* Info recuadros narrower than the green banner (left-aligned). */
         .resv-conf .rc-grid, .resv-conf .rc-service { max-width: 640px; margin-left: auto; margin-right: auto; }
@@ -67,7 +68,9 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
         .resv-conf .rc-c6{grid-column:span 6}
         .resv-conf .rc-c3{grid-column:span 3}
         .resv-conf .rc-c2{grid-column:span 2}
-        .resv-conf .rc-pay{max-width:640px;margin:4px auto 0;border:1px solid #a9a79a}
+        /* El resumen de pago no se parte: si no cabe en lo que queda de hoja, se pasa entero a la
+           siguiente. Se partía entre "PAGADO" y "TIPO DE PAGO". */
+        .resv-conf .rc-pay{max-width:640px;margin:4px auto 0;border:1px solid #a9a79a;break-inside:avoid;page-break-inside:avoid}
         .resv-conf .rc-pay-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:5px 12px;border-bottom:1px solid #a9a79a}
         .resv-conf .rc-pay-row:last-child{border-bottom:none}
         .resv-conf .rc-pay-row .l{color:#8a8a8a;font-size:10px;text-transform:uppercase;letter-spacing:.8px}
