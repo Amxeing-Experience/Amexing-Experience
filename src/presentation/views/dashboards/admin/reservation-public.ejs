@@ -455,11 +455,15 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
         <div class="resv-exp">
             <hr class="resv-exp-divider">
 
+            <!-- Los cinco son 77x77 de línea olivo sobre fondo opaco. Aquí estuvo sesion.png, que es
+                 el icono de SESIÓN del navbar: tinta blanca sobre transparente, pensado para una barra
+                 oscura. Cargaba bien y por eso el onerror nunca saltó — simplemente era invisible
+                 contra el fondo blanco de la confirmación. -->
             <div class="resv-exp-icons">
                 <img src="/images/icons/wine.png" alt="" onerror="this.style.display='none'">
                 <img src="/images/icons/harvest.png" alt="" onerror="this.style.display='none'">
                 <img src="/images/icons/paint.png" alt="" onerror="this.style.display='none'">
-                <img src="/images/icons/sesion.png" alt="" onerror="this.style.display='none'">
+                <img src="/images/icons/experience.png" alt="" onerror="this.style.display='none'">
                 <img src="/images/icons/city.png" alt="" onerror="this.style.display='none'">
             </div>
 
