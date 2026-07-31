@@ -21,7 +21,7 @@ jest.mock('../../../../src/infrastructure/payments/paymentAtomicStore', () => ({
   reviveIfSystemRetired: jest.fn(),
   flagRefundReview: jest.fn(),
   flagRollupRepair: jest.fn(),
-  backfillChargeId: jest.fn(),
+  backfillAuditFields: jest.fn(),
 }));
 
 const Parse = require('parse/node');
@@ -71,8 +71,8 @@ describe('paymentConfirmation.applyConfirmation', () => {
     store.flagRefundReview.mockResolvedValue({ matchedCount: 1, updatedDoc: null });
     store.flagRollupRepair.mockReset();
     store.flagRollupRepair.mockResolvedValue({ matchedCount: 1, updatedDoc: null });
-    store.backfillChargeId.mockReset();
-    store.backfillChargeId.mockResolvedValue({ matchedCount: 1, updatedDoc: null });
+    store.backfillAuditFields.mockReset();
+    store.backfillAuditFields.mockResolvedValue({ matchedCount: 1, updatedDoc: null });
   });
 
   afterEach(() => {
@@ -440,38 +440,48 @@ describe('paymentConfirmation.applyConfirmation', () => {
     });
   });
 
-  describe('el gatewayChargeId no se pierde cuando gana el evento hermano', () => {
-    // El update condicional no matchea, así que el extraSet del llamador se descarta entero. Si el
-    // polling es el único camino que conoce el id de cargo, PR11 se queda sin con qué reembolsar.
+  describe('el rastro de auditoría no se pierde cuando gana el evento hermano', () => {
+    // El update condicional no matchea, así que el extraSet del llamador se descarta ENTERO. Sus dos
+    // consumidores reales traen los ids del proveedor (sin gatewayChargeId no hay con qué reembolsar
+    // en PR11) y el gatewayRaw que registra una discrepancia de monto/moneda contra Stripe. Ese
+    // último es el caso COMÚN, porque el webhook suele ganar la carrera.
     const siblingAlreadyWon = () => {
       store.atomicTransitionPayment.mockResolvedValueOnce({ matchedCount: 0, updatedDoc: null });
       getSpy.mockReset();
       getSpy.mockResolvedValue(rowDouble({ gatewayStatus: 'succeeded', exists: true }));
     };
 
-    it('lo rellena cuando la fila ya estaba en el destino', async () => {
+    it('rescata los ids del proveedor cuando la fila ya estaba en el destino', async () => {
       siblingAlreadyWon();
-      await confirm({ source: 'polling', extraSet: { gatewayChargeId: 'ch_tarde' } });
-      expect(store.backfillChargeId).toHaveBeenCalledWith('pay_1', 'ch_tarde');
+      await confirm({ source: 'polling', extraSet: { gatewayChargeId: 'ch_tarde', gatewayIntentId: 'pi_tarde' } });
+      expect(store.backfillAuditFields)
+        .toHaveBeenCalledWith('pay_1', { gatewayChargeId: 'ch_tarde', gatewayIntentId: 'pi_tarde' });
     });
 
-    it('no escribe nada cuando el llamador no traía id de cargo', async () => {
+    it('rescata el registro de discrepancia, que si no viviría solo en un log rotado', async () => {
       siblingAlreadyWon();
-      await confirm({ source: 'polling', extraSet: { gatewayRaw: {} } });
-      expect(store.backfillChargeId).not.toHaveBeenCalled();
+      const raw = { id: 'ch_1', discrepancy: { storedAmount: 100, chargedAmount: 120 } };
+      await confirm({ source: 'reconciliation', extraSet: { gatewayRaw: raw } });
+      expect(store.backfillAuditFields).toHaveBeenCalledWith('pay_1', { gatewayRaw: raw });
+    });
+
+    it('no escribe nada cuando el llamador no traía extraSet', async () => {
+      siblingAlreadyWon();
+      await confirm({ source: 'polling' });
+      expect(store.backfillAuditFields).not.toHaveBeenCalled();
     });
 
     it('un backfill que falla no tumba la confirmación', async () => {
       siblingAlreadyWon();
-      store.backfillChargeId.mockRejectedValueOnce(new Error('mongo caido'));
+      store.backfillAuditFields.mockRejectedValueOnce(new Error('mongo caido'));
       await expect(confirm({ source: 'polling', extraSet: { gatewayChargeId: 'ch_tarde' } }))
         .resolves.toBeDefined();
     });
 
-    it('cuando ESTA llamada gana la transición no hay nada que rellenar', async () => {
+    it('cuando ESTA llamada gana la transición no hay nada que rescatar', async () => {
       store.atomicTransitionPayment.mockResolvedValueOnce({ matchedCount: 1, updatedDoc: { exists: true } });
       await confirm({ source: 'polling', extraSet: { gatewayChargeId: 'ch_ganador' } });
-      expect(store.backfillChargeId).not.toHaveBeenCalled();
+      expect(store.backfillAuditFields).not.toHaveBeenCalled();
     });
   });
 

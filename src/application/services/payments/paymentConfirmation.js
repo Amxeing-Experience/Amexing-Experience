@@ -32,7 +32,7 @@ const {
   reviveIfSystemRetired,
   flagRefundReview,
   flagRollupRepair,
-  backfillChargeId,
+  backfillAuditFields,
 } = require('../../../infrastructure/payments/paymentAtomicStore');
 
 /**
@@ -281,13 +281,17 @@ function sanitizeExtraSet(extraSet) {
 }
 
 /**
- * Rescata el gatewayChargeId cuando un evento hermano ya había llevado la fila al destino.
+ * Rescata el rastro de auditoría cuando un evento hermano ya había llevado la fila al destino.
  *
  * En esa rama el update condicional no matcheó, así que el `extraSet` de ESTE llamador se descartó
- * entero. De todo lo que traía, el id de cargo es el único que no puede perderse: si el polling es el
- * único camino que lo conoce y el webhook ganó la carrera, PR11 se queda sin con qué reembolsar. El
- * backfill solo escribe si el campo está ausente, así que jamás pisa el id del ganador, y su fallo
- * nunca tumba una confirmación que ya ocurrió.
+ * ENTERO. Sus dos consumidores traen datos que no deben perderse: los ids del proveedor (sin
+ * `gatewayChargeId` no hay con qué reembolsar en PR11) y, sobre todo, el `gatewayRaw` que registra
+ * una discrepancia de monto/moneda contra Stripe. Ese último es el caso COMÚN — el webhook suele
+ * ganar la carrera — y dejaba la discrepancia solo en un log rotado, en vez del marcador durable y
+ * consultable que el resto de este archivo se esfuerza en dejar.
+ *
+ * Nada de esto es monetario, y el store solo escribe lo que está ausente, así que jamás pisa al
+ * ganador. Su fallo nunca tumba una confirmación que ya ocurrió.
  *
  * Vive aparte y no en línea para no pasar de max-lines-per-function en applyConfirmation, igual que
  * warnIfInvisibleToRollup en el controller del webhook.
@@ -298,17 +302,17 @@ function sanitizeExtraSet(extraSet) {
  * @param {object} input.context - Identificadores de log.
  * @returns {Promise<void>} Resuelve siempre, haya o no escrito.
  * @example
- * await rescueChargeId({ paymentId: 'pay_1', extraSet: { gatewayChargeId: 'ch_1' }, source: 'polling', context });
+ * await rescueAuditTrail({ paymentId: 'pay_1', extraSet: { gatewayChargeId: 'ch_1' }, source: 'polling', context });
  */
-async function rescueChargeId({
+async function rescueAuditTrail({
   paymentId, extraSet, source, context,
 }) {
-  const proposedChargeId = sanitizeExtraSet(extraSet).gatewayChargeId;
-  if (!proposedChargeId) return;
+  const proposed = sanitizeExtraSet(extraSet);
+  if (Object.keys(proposed).length === 0) return;
   try {
-    await backfillChargeId(paymentId, proposedChargeId);
+    await backfillAuditFields(paymentId, proposed);
   } catch (backfillErr) {
-    logger.warn('Could not backfill the gateway charge id after a sibling event won the transition', {
+    logger.warn('Could not backfill the audit trail after a sibling event won the transition; a recorded amount/currency discrepancy may exist only in the logs', {
       ...context, source, paymentId, error: backfillErr && backfillErr.message,
     });
   }
@@ -368,7 +372,7 @@ async function applyConfirmation({
   }
 
   if (alreadyAtDestination) {
-    await rescueChargeId({
+    await rescueAuditTrail({
       paymentId: payment.id, extraSet, source, context,
     });
   }
