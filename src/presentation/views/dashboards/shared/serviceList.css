@@ -475,33 +475,69 @@
    itinerario. Vivían como celdas sueltas en la tarjeta de arriba, a media pantalla de los servicios
    que describen; aquí hacen que el panel se lea como el documento que se manda.
 
-   Es una línea corrida y no una rejilla a propósito: en la tarjeta, la celda del lead guest tenía que
-   reservar su lugar aunque estuviera vacía —de ahí .bkg-tile.is-empty— para que el resto no se
-   recorriera. En una línea, lo que no existe simplemente no se escribe.
+   Va en DOS niveles y no en una frase corrida: el nombre de quien viaja es el sujeto y lo demás es
+   su detalle. En una sola línea con todo del mismo peso, el ojo no sabía dónde empezar y los puntos
+   separadores hacían de todo un enunciado.
+
+   No es una rejilla: en la tarjeta, la celda del lead guest tenía que reservar su lugar aunque
+   estuviera vacía —de ahí .bkg-tile.is-empty— para que el resto no se recorriera. Aquí, lo que no
+   existe simplemente no se escribe.
    --------------------------------------------------------------------------- */
 .svc-doc {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
   flex-wrap: wrap;
-  padding: 12px 22px;
+  padding: 14px 22px 15px;
   border-bottom: 1px solid #ece8dd;
-  background: #f9f8f4;
-  font-size: .92rem;
-  color: #2b2b2b;
+  /* Degradado y no un plano: la banda tiene que leerse como zona propia sin competir con la barra
+     del día, que va justo debajo y es la que anuncia el contenido. */
+  background: linear-gradient(135deg, #f5f4ee 0%, #fbfaf6 70%);
 }
-.svc-doc-quien { font-size: 1.02rem; font-weight: 600; }
+.svc-doc-id { min-width: 0; }
+.svc-doc-quien {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: #2b2b2b;
+  line-height: 1.25;
+}
+.svc-doc-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  font-size: .86rem;
+  color: #6b6656;
+}
+.svc-doc-menor { color: #8a8f78; font-style: italic; }
 .svc-doc-sep { color: #c9cdbb; }
-.svc-doc-menor { font-size: .8rem; color: #8a8f78; font-style: italic; }
-/* El avance se va al extremo opuesto: es el estado del trabajo, no parte de la identidad. */
-.svc-doc-avance { display: flex; align-items: center; gap: 9px; margin-left: auto; }
-.svc-doc-cifra { font-size: .78rem; font-weight: 600; color: #6b6656; white-space: nowrap; }
+
+/* El avance es el estado del TRABAJO, no parte de la identidad: se separa al extremo opuesto y
+   lleva su propio rótulo, para que no se lea como un dato más del viaje. */
+.svc-doc-avance { flex: none; text-align: right; }
+.svc-doc-cap {
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #8a8f78;
+  margin-bottom: 2px;
+}
+.svc-doc-cifra { font-size: .95rem; font-weight: 600; color: #2b2b2b; white-space: nowrap; }
 .svc-doc-barra {
-  display: inline-block;
-  width: 92px; height: 5px;
-  border-radius: 999px; background: #eceadf; overflow: hidden;
+  display: block;
+  width: 132px;
+  height: 5px;
+  margin-top: 6px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: #eceadf;
+  overflow: hidden;
 }
 .svc-doc-barra > span { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .35s ease; }
 @media (max-width: 640px) {
-  .svc-doc-avance { margin-left: 0; width: 100%; }
+  .svc-doc-avance { text-align: left; }
+  .svc-doc-barra { margin-left: 0; }
 }

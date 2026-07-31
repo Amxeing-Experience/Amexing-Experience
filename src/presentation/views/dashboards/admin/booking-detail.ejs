@@ -277,16 +277,20 @@
              tarjeta de arriba, lejos de los servicios que describen. Aquí hacen que el panel se lea
              como el documento que se manda. -->
         <div class="svc-doc" id="svcDocLine">
-            <span class="svc-doc-quien" id="docLeadGuest">&mdash;</span>
-            <span class="svc-doc-sep">·</span>
-            <span id="docDates">&mdash;</span>
-            <span class="svc-doc-menor" id="docNights"></span>
-            <span class="svc-doc-sep">·</span>
-            <span id="docPeople">&mdash;</span>
-            <span class="svc-doc-avance">
-                <span class="svc-doc-barra d-none" id="docAssignProgress"><span id="docAssignBar"></span></span>
-                <span class="svc-doc-cifra" id="docAssignCounter"></span>
-            </span>
+            <div class="svc-doc-id">
+                <div class="svc-doc-quien" id="docLeadGuest">&mdash;</div>
+                <div class="svc-doc-meta">
+                    <span id="docDates">&mdash;</span>
+                    <span class="svc-doc-menor" id="docNights"></span>
+                    <span class="svc-doc-sep">·</span>
+                    <span id="docPeople">&mdash;</span>
+                </div>
+            </div>
+            <div class="svc-doc-avance">
+                <div class="svc-doc-cap">Asignación</div>
+                <div class="svc-doc-cifra" id="docAssignCounter"></div>
+                <div class="svc-doc-barra d-none" id="docAssignProgress"><span id="docAssignBar"></span></div>
+            </div>
         </div>
         <div id="servicesContainer">
             <!-- Services will be rendered here -->
@@ -1284,8 +1288,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             : assignedSvc === totalSvc ? '#6E7A50'
                 : assignedSvc > 0 ? '#b8894a' : '#8a8f78';
         if (totalSvc > 0) {
-            counterEl.innerHTML = `<span style="color:${assignColor}">${assignedSvc}</span>/${totalSvc} asignados`
-                + ((completedSvc > 0) ? ` · ${completedSvc} completados` : '');
+            // El rótulo de arriba ya dice "Asignación", así que la cifra no lo repite.
+            counterEl.innerHTML = `<span style="color:${assignColor}">${assignedSvc}</span>`
+                + `<span style="color:#8a8f78"> / ${totalSvc}</span>`
+                + ((completedSvc > 0) ? `<span class="svc-doc-menor"> · ${completedSvc} completados</span>` : '');
         } else {
             counterEl.textContent = '';
         }
