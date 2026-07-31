@@ -39,6 +39,12 @@
         userRole: typeof userRole !== 'undefined' ? userRole : 'guest'
     }) %>
 
+    <!-- Tipografías de marca (Arpona / Myriad Pro / Newsreader). Solo declara @font-face y las
+         variables --font-*: nada cambia de aspecto hasta que una vista las use, y los archivos se
+         descargan únicamente si se aplican. Las necesita el detalle de reservación para que su lista
+         de servicios use la misma tipografía que el itinerario. -->
+    <link rel="stylesheet" href="/css/fonts.css">
+
     <!-- Page-specific styles -->
     <% if (typeof pageStyles !== 'undefined' && pageStyles) { %>
         <% pageStyles.forEach(function(style) { %>
