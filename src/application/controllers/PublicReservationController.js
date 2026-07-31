@@ -23,6 +23,21 @@ const fileStorageService = new FileStorageService({
   presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
 });
 
+// Márgenes de página de cada documento público.
+//
+// El itinerario va A SANGRE: su encabezado llega a los bordes de la hoja y el espacio superior de
+// cada página lo pone la propia plantilla.
+const MARGENES_A_SANGRE = {
+  top: '0', bottom: '0', left: '0', right: '0',
+};
+// La confirmación NO va a sangre: es una tarjeta centrada de ancho fijo sobre fondo blanco. Heredó
+// los márgenes en cero de cuando los dos documentos compartían endpoint, y por eso cada página nueva
+// arrancaba pegada al borde. Los laterales se quedan en cero porque el centrado ya lo hace la
+// tarjeta con su max-width.
+const MARGENES_CONFIRMACION = {
+  top: '14mm', bottom: '14mm', left: '0', right: '0',
+};
+
 /**
  * Controller for viewing reservations publicly without authentication, where the
  * folio (e.g. MAY-2605-001) acts as the access token. Mirrors PublicQuoteController
@@ -57,11 +72,12 @@ class PublicReservationController {
    * @param {object} res - Express response.
    * @param {string} vista - '' para la confirmación, '/itinerary' para el itinerario.
    * @param {string} sufijo - Se agrega al nombre del archivo para distinguir los dos documentos.
+   * @param {object} margenes - Márgenes de página; cada documento tiene los suyos.
    * @returns {Promise<object>} La respuesta con el PDF, o el error.
    * @example
-   * await this.renderPdf(req, res, '/itinerary', '-itinerario');
+   * await this.renderPdf(req, res, '/itinerary', '-itinerario', A_SANGRE);
    */
-  async renderPdf(req, res, vista, sufijo) {
+  async renderPdf(req, res, vista, sufijo, margenes) {
     const { folio } = req.params;
     try {
       const folioError = this.validateFolio(folio, req, res);
@@ -74,13 +90,7 @@ class PublicReservationController {
       const host = req.get('host');
       const url = `${proto}://${host}/reservations/${encodeURIComponent(folio)}${vista}?pdf=1`;
 
-      // Full-bleed: header reaches the page edges; per-page top spacing comes from the template, not the margin.
-      const pdfBuffer = await renderUrlToPdf(url, {
-        footer: false,
-        margin: {
-          top: '0', bottom: '0', left: '0', right: '0',
-        },
-      });
+      const pdfBuffer = await renderUrlToPdf(url, { footer: false, margin: margenes });
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${folio}${sufijo}.pdf"`);
@@ -103,7 +113,7 @@ class PublicReservationController {
    * GET /reservations/MAY-2605-001/pdf
    */
   async downloadReservationPdf(req, res) {
-    return this.renderPdf(req, res, '', '');
+    return this.renderPdf(req, res, '', '', MARGENES_CONFIRMACION);
   }
 
   /**
@@ -118,7 +128,7 @@ class PublicReservationController {
   async downloadItineraryPdf(req, res) {
     // El sufijo evita que los dos documentos de la misma reservación se pisen en la carpeta de
     // descargas: antes ambos se llamaban igual.
-    return this.renderPdf(req, res, '/itinerary', '-itinerario');
+    return this.renderPdf(req, res, '/itinerary', '-itinerario', MARGENES_A_SANGRE);
   }
 
   /**
