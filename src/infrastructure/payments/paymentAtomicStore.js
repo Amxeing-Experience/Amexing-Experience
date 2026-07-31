@@ -326,7 +326,7 @@ async function closeForTests() {
 const BACKFILLABLE_AUDIT_FIELDS = ['gatewayChargeId', 'gatewayIntentId', 'gatewayRaw'];
 
 /**
- * Rellena campos de AUDITORÍA que la fila todavía no tiene, en UNA escritura condicional.
+ * Rellena campos de AUDITORÍA que la fila todavía no tiene, UNA escritura condicional POR CAMPO.
  *
  * Existe por la rama ambigua de applyConfirmation: cuando un evento hermano ya llevó la fila al
  * destino, el update condicional no matchea y el `extraSet` del llamador se descarta ENTERO. Dos
@@ -335,11 +335,18 @@ const BACKFILLABLE_AUDIT_FIELDS = ['gatewayChargeId', 'gatewayIntentId', 'gatewa
  * Stripe). En el caso COMÚN (el webhook gana la carrera) esa discrepancia se quedaba solo en un log
  * rotado, cuando es justo el dato que alguien va a querer consultar después.
  *
- * El filtro exige que CADA campo propuesto siga ausente, así que jamás pisa lo que escribió el
- * ganador: si alguien se adelantó, no matchea y no se pierde nada que valiera más.
+ * UNA POR CAMPO y no una sola combinada: combinarlas exigía que TODOS los campos propuestos
+ * siguieran ausentes (condiciones unidas por AND), y `gatewayIntentId` ya viene sellado desde
+ * buildChargeAndSave al crear la Checkout Session — o sea, siempre presente. El filtro no matcheaba
+ * jamás y no se rellenaba NADA, incluido el `gatewayRaw` que era el motivo del arreglo: la
+ * atomicidad se derrotaba a sí misma. Son tres escrituras como máximo, en una rama que solo corre
+ * cuando hubo carrera, así que el costo es irrelevante frente a perder el dato.
+ *
+ * Cada filtro sigue exigiendo que SU campo esté ausente, así que ninguna pisa lo que escribió el
+ * ganador; lo que cambia es que un campo ya escrito deja de bloquear a los demás.
  * @param {string} paymentId - Parse objectId of the Payment.
  * @param {object} fields - Campos propuestos; los que no estén en el allowlist se ignoran.
- * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} 1 cuando rellenó algo.
+ * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} Cuántos campos se rellenaron.
  * @example
  * await backfillAuditFields(payment.id, { gatewayChargeId: 'ch_1', gatewayRaw: { discrepancy } });
  */
@@ -347,23 +354,26 @@ async function backfillAuditFields(paymentId, fields) {
   if (!paymentId) throw new Error('paymentAtomicStore: paymentId is required');
   if (!fields || typeof fields !== 'object') return { matchedCount: 0, updatedDoc: null };
 
-  const $set = {};
-  const filter = { _id: String(paymentId) };
-  BACKFILLABLE_AUDIT_FIELDS.forEach((field) => {
-    if (fields[field] === undefined || fields[field] === null || fields[field] === '') return;
-    $set[field] = fields[field];
-    // null cubre también el campo ausente; '' cubre la fila que lo trae vacío.
-    filter[field] = { $in: [null, ''] };
-  });
-  if (Object.keys($set).length === 0) return { matchedCount: 0, updatedDoc: null };
+  const proposed = BACKFILLABLE_AUDIT_FIELDS
+    .filter((field) => fields[field] !== undefined && fields[field] !== null && fields[field] !== '');
+  if (proposed.length === 0) return { matchedCount: 0, updatedDoc: null };
 
   const db = await getDb();
-  const result = await db.collection(PAYMENT_COLLECTION).findOneAndUpdate(
-    filter,
-    { $set: { ...$set, _updated_at: new Date() } },
-    { returnDocument: 'after' }
-  );
-  return normalizeResult(result);
+  let matchedCount = 0;
+  let updatedDoc = null;
+  for (const field of proposed) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await db.collection(PAYMENT_COLLECTION).findOneAndUpdate(
+      // null cubre también el campo ausente; '' cubre la fila que lo trae vacío.
+      { _id: String(paymentId), [field]: { $in: [null, ''] } },
+      { $set: { [field]: fields[field], _updated_at: new Date() } },
+      { returnDocument: 'after' }
+    );
+    const normalized = normalizeResult(result);
+    matchedCount += normalized.matchedCount;
+    if (normalized.updatedDoc) ({ updatedDoc } = normalized);
+  }
+  return { matchedCount, updatedDoc };
 }
 
 module.exports = {
