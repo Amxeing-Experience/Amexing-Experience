@@ -489,7 +489,13 @@
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
-  padding: 2px 22px 16px;
+  /* SIN relleno lateral propio: .svc-wrap ya trae 22 px y esta línea es hija suya, así que uno
+     propio se sumaba al del contenedor y la dejaba metida respecto al título "Servicios" y a los
+     botones. El que sí hace falta es el inferior, para separarla de la barra del día.
+     (La lista de abajo es el caso contrario: #servicesContainer usa margen negativo para SALIRSE
+     del relleno y sangrar a todo lo ancho.) */
+  padding: 0 0 16px;
+  margin-bottom: 0;
   /* Sin fondo: con él se leía como una tira pegada encima de la lista, compitiendo con la barra del
      día que va justo debajo. Lo que separa es el aire y el peso de la tipografía, no una caja. */
   border-bottom: 1px solid #ece8dd;
