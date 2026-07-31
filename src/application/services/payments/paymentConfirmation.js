@@ -32,6 +32,7 @@ const {
   reviveIfSystemRetired,
   flagRefundReview,
   flagRollupRepair,
+  backfillChargeId,
 } = require('../../../infrastructure/payments/paymentAtomicStore');
 
 /**
@@ -119,7 +120,11 @@ async function reportVisibility({
   }
   if (!stillHidden) return false;
 
-  logger.error('CRITICAL: confirmed a gateway payment that the rollup cannot see (the row was deleted deliberately, not by housekeeping, so it is NOT auto-revived); the reservation balance will NOT reflect this charge until someone reconciles it by hand', {
+  // No se afirma QUIÉN la ocultó: la ausencia de `retiredBySystem` es evidencia de que no la retiró
+  // nuestra maquinaria, pero no prueba una decisión humana (una fila retirada por un camino que aún
+  // no marca, o una marca perdida, se ven igual). Atribuir intención en un log de dinero perdido
+  // manda al operador a buscar a un responsable que puede no existir.
+  logger.error('CRITICAL: confirmed a gateway payment that the rollup cannot see (no auto-retirement marker, so it is NOT auto-revived); the reservation balance will NOT reflect this charge until someone reconciles it by hand', {
     ...logContext, source, paymentId: payment.id,
   });
   return true;
@@ -206,6 +211,24 @@ async function runRollup({
   //
   // So: leave a durable, queryable marker, shout, and RE-THROW. The re-throw is what preserves the
   // webhook's retry contract; the marker is what gives every other path something to find later.
+  // ANTES del rollup a propósito: si el rollup revienta, el re-throw impide llegar al final de esta
+  // función, y en el reintento `shouldRecalculate` ya es false (la fila está en el destino), así que la
+  // marca no volvería a evaluarse NUNCA. Un cobro sobre una reservación cancelada se quedaría sin
+  // `requiresRefundReview`, que es justo lo que PR11 convierte en solicitud de reembolso.
+  // Su propio fallo NO puede bloquear el rollup: el saldo es dinero, la marca es una bandera.
+  let flaggedForRefundReview = false;
+  if (shouldRecalculate && isSuccess) {
+    try {
+      flaggedForRefundReview = await markIfReservationCancelled({
+        payment, reservationId, source, logContext: context,
+      });
+    } catch (markErr) {
+      logger.error('Could not flag a gateway charge landed on a cancelled reservation; the rollup continues', {
+        ...context, source, paymentId: payment.id, reservationId, error: markErr && markErr.message,
+      });
+    }
+  }
+
   let staleRollupRepaired = false;
   try {
     if (shouldRecalculate) {
@@ -233,15 +256,62 @@ async function runRollup({
     await flagRollupRepair(payment.id, false);
   }
 
-  // Only on a REAL confirmation: a sibling event re-checking an already-confirmed charge must not
-  // re-raise (nor re-flag) something the winner already handled.
-  const flaggedForRefundReview = shouldRecalculate && isSuccess
-    ? await markIfReservationCancelled({
-      payment, reservationId, source, logContext: context,
-    })
-    : false;
-
   return { staleRollupRepaired, flaggedForRefundReview };
+}
+
+/**
+ * Strip the two fields this module owns from a caller-supplied extraSet.
+ *
+ * `gatewayStatus` ya lo aplica el store al final, así que nunca era escribible. `confirmedAt` SÍ lo
+ * era en un destino no exitoso (el spread del caller entraba y el sello propio solo se agrega cuando
+ * isSuccess), contradiciendo lo que promete el JSDoc de `extraSet`. Se hace cierto en el código en vez
+ * de corregir el comentario: es la marca de cuándo entró el dinero, no un campo de uso general.
+ * @param {object} [extraSet] - Campos extra propuestos por el llamador.
+ * @returns {object} Los mismos campos, sin los dos que este módulo gobierna.
+ * @example
+ * sanitizeExtraSet({ gatewayChargeId: 'ch_1', confirmedAt: new Date() }); // { gatewayChargeId: 'ch_1' }
+ */
+const MODULE_OWNED_FIELDS = ['gatewayStatus', 'confirmedAt'];
+
+function sanitizeExtraSet(extraSet) {
+  if (!extraSet || typeof extraSet !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(extraSet).filter(([field]) => !MODULE_OWNED_FIELDS.includes(field))
+  );
+}
+
+/**
+ * Rescata el gatewayChargeId cuando un evento hermano ya había llevado la fila al destino.
+ *
+ * En esa rama el update condicional no matcheó, así que el `extraSet` de ESTE llamador se descartó
+ * entero. De todo lo que traía, el id de cargo es el único que no puede perderse: si el polling es el
+ * único camino que lo conoce y el webhook ganó la carrera, PR11 se queda sin con qué reembolsar. El
+ * backfill solo escribe si el campo está ausente, así que jamás pisa el id del ganador, y su fallo
+ * nunca tumba una confirmación que ya ocurrió.
+ *
+ * Vive aparte y no en línea para no pasar de max-lines-per-function en applyConfirmation, igual que
+ * warnIfInvisibleToRollup en el controller del webhook.
+ * @param {object} input - Datos del rescate.
+ * @param {string} input.paymentId - Parse objectId del Payment.
+ * @param {object} [input.extraSet] - El extraSet que propuso el llamador.
+ * @param {string} input.source - Qué camino está confirmando.
+ * @param {object} input.context - Identificadores de log.
+ * @returns {Promise<void>} Resuelve siempre, haya o no escrito.
+ * @example
+ * await rescueChargeId({ paymentId: 'pay_1', extraSet: { gatewayChargeId: 'ch_1' }, source: 'polling', context });
+ */
+async function rescueChargeId({
+  paymentId, extraSet, source, context,
+}) {
+  const proposedChargeId = sanitizeExtraSet(extraSet).gatewayChargeId;
+  if (!proposedChargeId) return;
+  try {
+    await backfillChargeId(paymentId, proposedChargeId);
+  } catch (backfillErr) {
+    logger.warn('Could not backfill the gateway charge id after a sibling event won the transition', {
+      ...context, source, paymentId, error: backfillErr && backfillErr.message,
+    });
+  }
 }
 
 /**
@@ -275,7 +345,7 @@ async function applyConfirmation({
     fromStatuses: allowedSourceStatuses(destination.gatewayStatus),
     toStatus: destination.gatewayStatus,
     extraSet: {
-      ...(extraSet && typeof extraSet === 'object' ? extraSet : {}),
+      ...sanitizeExtraSet(extraSet),
       ...(isSuccess ? { confirmedAt: new Date() } : {}),
     },
   });
@@ -295,6 +365,12 @@ async function applyConfirmation({
   if (!shouldRecalculate && matchedCount === 0 && destination.crossesThreshold) {
     current = await loadCurrent(payment.id);
     alreadyAtDestination = !!current && current.get('gatewayStatus') === destination.gatewayStatus;
+  }
+
+  if (alreadyAtDestination) {
+    await rescueChargeId({
+      paymentId: payment.id, extraSet, source, context,
+    });
   }
 
   // Revive BEFORE the rollup: loadAndCompute reads through exists:true, so a row still retired when

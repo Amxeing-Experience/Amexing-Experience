@@ -238,4 +238,31 @@ describe('paymentAtomicStore — PR6 housekeeping writes', () => {
       expect(Object.prototype.hasOwnProperty.call(lastCall.update.$set, 'amount')).toBe(false);
     });
   });
+
+  // -----------------------------------------------------------------------------------------
+  describe('backfillChargeId — rellena SOLO lo ausente', () => {
+    it('exige que el campo esté ausente/vacío, así que nunca pisa un id ya escrito', async () => {
+      await store.backfillChargeId('pay_abc', 'ch_tarde');
+
+      expect(lastCall.filter).toEqual({ _id: 'pay_abc', gatewayChargeId: { $in: [null, ''] } });
+      expect(lastCall.update.$set.gatewayChargeId).toBe('ch_tarde');
+    });
+
+    it('no toca el estado ni las banderas de ciclo de vida ni el monto', async () => {
+      await store.backfillChargeId('pay_abc', 'ch_tarde');
+      ['gatewayStatus', 'exists', 'active', 'amount', 'confirmedAt'].forEach((campo) => {
+        expect(Object.prototype.hasOwnProperty.call(lastCall.update.$set, campo)).toBe(false);
+      });
+    });
+
+    it('sin id de cargo no escribe nada en absoluto', async () => {
+      const out = await store.backfillChargeId('pay_abc', '');
+      expect(lastCall).toBeNull();
+      expect(out.matchedCount).toBe(0);
+    });
+
+    it('sin paymentId lanza, como el resto del store', async () => {
+      await expect(store.backfillChargeId('', 'ch_tarde')).rejects.toThrow('paymentId is required');
+    });
+  });
 });

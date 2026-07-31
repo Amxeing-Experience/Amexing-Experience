@@ -319,9 +319,40 @@ async function closeForTests() {
   if (client) await client.close();
 }
 
+/**
+ * Rellena el id de cargo de la pasarela SOLO si la fila todavía no lo tiene.
+ *
+ * Existe por la rama ambigua de applyConfirmation: cuando un evento hermano ya llevó la fila al
+ * destino, el update condicional no matchea y el `extraSet` del llamador se descarta entero. Si el
+ * polling es el único camino que conoce el `gatewayChargeId` y el webhook ganó la carrera, ese id no
+ * se guardaba nunca — y es el dato que PR11 necesita para poder reembolsar.
+ *
+ * Función propia y nombrada en vez de un "set any field" genérico, por la misma razón que setMarker:
+ * el nombre del campo jamás es elección del llamador en una tabla de dinero. El filtro exige que el
+ * campo esté ausente, así que NUNCA pisa un id ya escrito.
+ * @param {string} paymentId - Parse objectId of the Payment.
+ * @param {string} gatewayChargeId - El id de cargo a guardar.
+ * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} 1 cuando lo rellenó.
+ * @example
+ * await backfillChargeId(payment.id, 'ch_1abc'); // matchedCount 0 si ya tenía uno
+ */
+async function backfillChargeId(paymentId, gatewayChargeId) {
+  if (!paymentId) throw new Error('paymentAtomicStore: paymentId is required');
+  if (!gatewayChargeId) return { matchedCount: 0, updatedDoc: null };
+
+  const db = await getDb();
+  const result = await db.collection(PAYMENT_COLLECTION).findOneAndUpdate(
+    { _id: String(paymentId), gatewayChargeId: { $in: [null, ''] } },
+    { $set: { gatewayChargeId: String(gatewayChargeId), _updated_at: new Date() } },
+    { returnDocument: 'after' }
+  );
+  return normalizeResult(result);
+}
+
 module.exports = {
   atomicTransitionPayment,
   atomicRetirePayment,
+  backfillChargeId,
   reviveIfSystemRetired,
   stampReconciled,
   flagRefundReview,
