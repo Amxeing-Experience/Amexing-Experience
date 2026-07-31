@@ -251,6 +251,93 @@ curl -w "Time: %{time_total}s\n" http://localhost:1337/api/quotes
 
 ---
 
+### **Dinero varado: un cobro de pasarela que el saldo no ve**
+
+Un `Payment` de pasarela solo cuenta en el saldo de la reservación si tiene `exists: true`
+(`PaymentService.loadAndCompute` lee por `queryExisting`). Si una fila queda confirmada pero
+soft-eliminada, el cliente pagó y la reservación sigue mostrando saldo.
+
+**Query exacta de dinero varado:**
+
+```bash
+# Todo cobro confirmado que el rollup NO puede ver.
+mongosh AmexingDEV --eval 'db.Payment.find({ gatewayStatus: "succeeded", exists: false }).pretty()'
+```
+
+Esta query es **exacta**, no aproximada, y su precisión depende de dos cosas que ya están en el
+código: `retirePending` y el barrido TTL retiran con una escritura condicional que jamás puede
+mover una fila que ya está en `succeeded`, y toda confirmación intenta revivir la fila antes de
+recalcular. Si alguna de las dos se afloja, esta query vuelve a ser aproximada.
+
+**Cómo distinguir los dos casos (el campo `retiredBySystem` es el que los separa):**
+
+| `retiredBySystem` | Qué pasó | Qué hacer |
+|---|---|---|
+| `false` (o ausente) | Alguien del staff borró la fila **a propósito** y el cobro se confirmó después. El sistema NO la revive solo: gritó (`CRITICAL: confirmed a gateway payment that the rollup cannot see`) y dejó en pie la decisión humana. | Decidir con negocio: o se restaura la fila a mano (ver el bloque de abajo), o se inicia un reembolso. **No** es un bug. |
+| `true` | Nuestro propio housekeeping la retiró y el revive automático no corrió (o falló). | Es una anomalía. Revisar el log del `paymentId` y restaurarla a mano con el bloque de abajo. **Correr `reconcileStalePayments` NO sirve para esta fila**: sus tres ramas de candidatos buscan `requires_payment`/`processing`, `expired`+`exists:false`, o `requiresRollupRepair`, y esta fila no es ninguna de las tres — el job contestaría `scanned:0` y daría falsa tranquilidad. |
+
+**Restaurar a mano una fila varada** (los dos casos de la tabla). El `requiresRollupRepair: true` es
+lo que hace que el job recalcule el saldo por ti en su siguiente corrida; sin él, restaurar `exists`
+deja la fila visible pero el saldo persistido sigue viejo:
+
+```bash
+mongosh AmexingDEV --eval '
+  db.Payment.updateOne(
+    { _id: "<paymentId>" },
+    { $set: { exists: true, active: true, retiredBySystem: false, requiresRollupRepair: true, _updated_at: new Date() } }
+  )'
+# Luego correr reconcileStalePayments desde el Parse Dashboard: la rama de reparación toma la fila,
+# recalcula el saldo de la reservación y limpia la marca.
+```
+
+**Cobro perdido en su estado terminal** — pagado de verdad, pero el webhook nunca llegó y el barrido
+ya lo retiró. Es el caso para el que existe la reconciliación, y NO lo encuentra la query de dinero
+varado de arriba (aquella busca `succeeded`; esta fila dice `expired`):
+
+```bash
+mongosh AmexingDEV --eval 'db.Payment.find({ gatewayStatus: "expired", retiredBySystem: true, exists: false }).pretty()'
+```
+
+La mayoría de estas filas son checkouts abandonados normales (nadie pagó) y son esperables. Las que
+importan son las que Stripe reporta como pagadas: eso lo resuelve `reconcileStalePayments`, que las
+toma dentro de su ventana de 7 días y las reintenta tras el enfriamiento — **no** una sola vez.
+
+**Cobro confirmado con saldo sin actualizar** (la transición ganó pero el rollup falló después; el
+dinero está cobrado y el saldo miente). Se autorrepara en la siguiente corrida del job:
+
+```bash
+mongosh AmexingDEV --eval 'db.Payment.find({ requiresRollupRepair: true }).pretty()'
+```
+
+**Filas marcadas para revisión de reembolso** (un cobro que aterrizó sobre una reservación ya
+cancelada; se registra el dinero, se actualiza el saldo y se marca — nunca se reembolsa solo):
+
+```bash
+mongosh AmexingDEV --eval 'db.Payment.find({ requiresRefundReview: true }).pretty()'
+```
+
+**Los dos jobs de housekeeping** (se programan desde el Parse Dashboard, nunca en código):
+
+- `sweepExpiredOnlinePayments` — retira pendientes abandonados. Cadencia sugerida: cada 10 min.
+  Nunca toca pagos manuales, pendientes vigentes, ni filas `processing` (esas solo se reportan:
+  retirarlas sería retirar dinero todavía en vuelo en la pasarela).
+- `reconcileStalePayments` — le pregunta a Stripe por cobros cuyo webhook nunca llegó y aplica lo
+  que reporte. Cadencia sugerida: cada 30 min. Tiene **tres** ramas de candidatos: filas vivas y
+  rancias, filas que el propio barrido retiró (dentro de una ventana de 7 días, reintentadas tras un
+  enfriamiento de 6 h), y filas marcadas `requiresRollupRepair`. Ante una diferencia de monto o
+  moneda **reporta y no corrige**: deja un log de nivel error y la evidencia en `gatewayRaw`, y jamás
+  reescribe `amount`/`origAmount`/`origCurrency`.
+
+```bash
+# Filas en 'processing'. OJO: hoy NINGÚN camino del código escribe ese estado — lo produciría un
+# payment_intent.processing (métodos asíncronos) que todavía no se maneja. Si esta query devuelve
+# algo, es un dato inesperado y hay que investigarlo, no rutina. Nunca se retiran automáticamente
+# (sería retirar dinero en vuelo); solo la reconciliación puede sacarlas de ahí.
+mongosh AmexingDEV --eval 'db.Payment.find({ channel: "online", gatewayStatus: "processing", exists: true }).pretty()'
+```
+
+---
+
 ### **File Upload / S3 Issues**
 
 **Symptoms:**

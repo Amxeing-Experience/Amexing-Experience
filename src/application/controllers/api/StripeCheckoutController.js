@@ -31,6 +31,7 @@ const PaymentGatewayError = require('../../services/payments/PaymentGatewayError
 const { getGatewayRegistry, decodeGatewayCode } = require('../../services/payments/gatewayBootstrap');
 const SettingsService = require('../../services/SettingsService');
 const { withReservationLock } = require('../../../infrastructure/concurrency/reservationLock');
+const { atomicRetirePayment } = require('../../../infrastructure/payments/paymentAtomicStore');
 
 // A pending online Payment lives 30 min (aligned with a Checkout Session; the TTL sweep is PR6).
 const PENDING_TTL_MS = 30 * 60 * 1000;
@@ -109,14 +110,22 @@ class StripeCheckoutController {
    * parallel with a fresh one), mark it terminal ('expired'), and soft-delete it. Expiring the remote
    * session is best-effort: if Stripe already expired/completed it, that is logged and NON-fatal (council
    * BUG B). Reused both when replacing an expired/stale pending and when rolling back a provider failure.
+   *
+   * The local retirement is ONE conditional write (atomicRetirePayment), never the old
+   * setGatewayStatus('expired') + softDelete() pair. That pair was a fetch-then-save across a network
+   * call: while expireCheckout was in flight the webhook could confirm this very row, and the save
+   * would then push a real 'succeeded' charge back to 'expired' + exists:false — money the rollup can
+   * no longer see, and the exact reason the "stranded money" runbook query was not exact before. With
+   * the guard inside the write, a row that has already been confirmed simply matches nothing, which is
+   * treated as SUCCESS: there is no pending left to retire. Never a retry, never a throw.
    * @param {object} payment - The pending Payment to retire.
    * @param {object} adapter - The resolved gateway adapter (must expose expireCheckout).
-   * @param {object} req - Express request (for the deletedBy audit id).
-   * @returns {Promise<void>} Resolves once the local pending is retired.
+   * @returns {Promise<boolean>} True when this call actually retired the row; false when it had
+   * already moved past 'requires_payment' (a clean no-op).
    * @example
-   * await StripeCheckoutController.retirePending(existing, adapter, req);
+   * await StripeCheckoutController.retirePending(existing, adapter);
    */
-  static async retirePending(payment, adapter, req) {
+  static async retirePending(payment, adapter) {
     const sessionId = payment.getGatewaySessionId && payment.getGatewaySessionId();
     if (sessionId && adapter && typeof adapter.expireCheckout === 'function') {
       // Best-effort: one bounded retry absorbs a transient provider blip (never a loop). If it still fails,
@@ -135,8 +144,15 @@ class StripeCheckoutController {
         }
       }
     }
-    payment.setGatewayStatus('expired');
-    await payment.softDelete(req.userId);
+
+    const { matchedCount } = await atomicRetirePayment(payment.id);
+    if (matchedCount === 0) {
+      logger.info('Pending online Payment was no longer pending at retirement time (already confirmed or retired); nothing was rewritten', {
+        paymentId: payment.id,
+      });
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -281,7 +297,7 @@ class StripeCheckoutController {
    */
   static async createOrReusePending(ctx) {
     const {
-      reservation, adapter, req, charge,
+      reservation, adapter, charge,
     } = ctx;
     const reservationId = reservation.id;
 
@@ -297,7 +313,7 @@ class StripeCheckoutController {
         return { checkoutUrl: r.checkoutUrl, paymentId: existing.id, reused: true };
       }
       // Never counted in the rollup -> no recalculate needed on retirement.
-      await StripeCheckoutController.retirePending(existing, adapter, req);
+      await StripeCheckoutController.retirePending(existing, adapter);
     }
 
     const payment = StripeCheckoutController.buildPendingPayment(ctx);
@@ -315,18 +331,18 @@ class StripeCheckoutController {
       const r = await StripeCheckoutController.buildChargeAndSave(payment, reservation, adapter);
       return { checkoutUrl: r.checkoutUrl, paymentId: payment.id, reused: false };
     } catch (providerErr) {
-      // Roll back the just-created pending so it never blocks a retry (TTL sweep is PR6): expire any
-      // session that WAS created before the failure and leave it terminal ('expired'), not the
-      // half-open 'requires_payment' the old rollback left behind (council BUG B + LOW consistency).
+      // Roll back the just-created pending so it never blocks a retry: expire any session that WAS
+      // created before the failure and leave it terminal ('expired'), not the half-open
+      // 'requires_payment' the old rollback left behind (council BUG B + LOW consistency).
       // retirePending already swallows+logs its own expireCheckout failures, so the only thing that can
-      // escape here is a failed softDelete — which leaves the pending alive (requires_payment + exists:true)
-      // blocking the partial unique index until the PR6 sweep. Log it (never silence it); the flow is
-      // unchanged: the original providerErr is what propagates.
-      await StripeCheckoutController.retirePending(payment, adapter, req).catch((softDeleteErr) => {
+      // escape here is a failed conditional write — which leaves the pending alive (requires_payment +
+      // exists:true) blocking the partial unique index until the TTL sweep picks it up. Log it (never
+      // silence it); the flow is unchanged: the original providerErr is what propagates.
+      await StripeCheckoutController.retirePending(payment, adapter).catch((retireErr) => {
         logger.warn('Rollback of a just-created online pending failed; it may block new checkouts for this reservation until the TTL sweep', {
           reservationId,
           paymentId: payment.id,
-          error: softDeleteErr && softDeleteErr.message,
+          error: retireErr && retireErr.message,
         });
       });
       throw providerErr;
@@ -363,7 +379,7 @@ class StripeCheckoutController {
    */
   static async resolveWinner(ctx) {
     const {
-      reservation, adapter, req, charge,
+      reservation, adapter, charge,
     } = ctx;
     const reservationId = reservation.id;
 
@@ -376,7 +392,7 @@ class StripeCheckoutController {
     }
 
     // Stale winner (balance drifted): retire it (frees the unique index) and re-price a fresh pending.
-    await StripeCheckoutController.retirePending(winner, adapter, req);
+    await StripeCheckoutController.retirePending(winner, adapter);
     const fresh = StripeCheckoutController.buildPendingPayment(ctx);
     try {
       await fresh.save(null, { useMasterKey: true });
@@ -496,5 +512,11 @@ class StripeCheckoutController {
     }
   }
 }
+
+// The TTL sweep must measure its threshold against the SAME two numbers this controller stamps on a
+// pending, not against a second copy of them: a sweep that used a shorter cushion would retire a
+// pending whose Checkout Session is still payable in Stripe.
+StripeCheckoutController.PENDING_TTL_MS = PENDING_TTL_MS;
+StripeCheckoutController.SESSION_EXPIRY_CUSHION_MS = SESSION_EXPIRY_CUSHION_MS;
 
 module.exports = StripeCheckoutController;

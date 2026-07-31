@@ -14,9 +14,16 @@
  * - createOrReusePending rollback (hallazgo D): a failed rollback is logged, never swallowed silently.
  */
 
+// The controller destructures atomicRetirePayment at require time, so the seam has to be the module
+// itself (a later jest.spyOn would never be seen by the captured reference).
+jest.mock('../../../../src/infrastructure/payments/paymentAtomicStore', () => ({
+  atomicRetirePayment: jest.fn().mockResolvedValue({ matchedCount: 1, updatedDoc: { _id: 'pay_1' } }),
+}));
+
 const Parse = require('parse/node');
 const StripeCheckoutController = require('../../../../src/application/controllers/api/StripeCheckoutController');
 const logger = require('../../../../src/infrastructure/logger');
+const { atomicRetirePayment } = require('../../../../src/infrastructure/payments/paymentAtomicStore');
 
 // The session-expiry cushion over the pending TTL (kept in sync with the controller constant): 3 min, wide
 // enough to survive the SDK's worst-case network budget (3 attempts × 20s) plus the payment.save() round-trip.
@@ -147,23 +154,26 @@ describe('StripeCheckoutController.resolveWinner (winner re-check, council MEDIU
   });
 });
 
-describe('StripeCheckoutController.retirePending (bounded expireCheckout retry, council MEDIUM)', () => {
+describe('StripeCheckoutController.retirePending (bounded expireCheckout retry + atomic retirement)', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  const makePending = () => ({
-    getGatewaySessionId: () => 'cs_old',
-    setGatewayStatus: jest.fn(),
-    softDelete: jest.fn().mockResolvedValue({}),
+  beforeEach(() => {
+    atomicRetirePayment.mockReset();
+    atomicRetirePayment.mockResolvedValue({ matchedCount: 1, updatedDoc: { _id: 'pay_1' } });
   });
 
-  it('expires the old session once on success, then soft-deletes as terminal expired', async () => {
+  const makePending = () => ({ id: 'pay_1', getGatewaySessionId: () => 'cs_old' });
+
+  it('expires the old session once on success, then retires the row with ONE conditional write', async () => {
     const payment = makePending();
     const adapter = { expireCheckout: jest.fn().mockResolvedValue({ status: 'expired' }) };
-    await StripeCheckoutController.retirePending(payment, adapter, { userId: 'u1' });
+    await expect(StripeCheckoutController.retirePending(payment, adapter)).resolves.toBe(true);
     expect(adapter.expireCheckout).toHaveBeenCalledTimes(1);
     expect(adapter.expireCheckout).toHaveBeenCalledWith('cs_old');
-    expect(payment.setGatewayStatus).toHaveBeenCalledWith('expired');
-    expect(payment.softDelete).toHaveBeenCalledWith('u1');
+    // The status + soft-delete + system marker all travel inside atomicRetirePayment now: no
+    // setGatewayStatus/save pair can race a confirmation that landed during expireCheckout.
+    expect(atomicRetirePayment).toHaveBeenCalledTimes(1);
+    expect(atomicRetirePayment).toHaveBeenCalledWith('pay_1');
   });
 
   it('retries expireCheckout exactly once on a transient failure, then completes', async () => {
@@ -173,30 +183,39 @@ describe('StripeCheckoutController.retirePending (bounded expireCheckout retry, 
         .mockRejectedValueOnce(new Error('transient 500'))
         .mockResolvedValueOnce({ status: 'expired' }),
     };
-    await StripeCheckoutController.retirePending(payment, adapter, { userId: 'u1' });
+    await StripeCheckoutController.retirePending(payment, adapter);
     expect(adapter.expireCheckout).toHaveBeenCalledTimes(2); // one retry
-    expect(payment.softDelete).toHaveBeenCalledTimes(1);
+    expect(atomicRetirePayment).toHaveBeenCalledTimes(1);
   });
 
-  it('two failures => still soft-deletes (non-fatal, no throw, no third attempt)', async () => {
+  it('two failures => still retires locally (non-fatal, no throw, no third attempt)', async () => {
     const payment = makePending();
     const adapter = {
       expireCheckout: jest.fn()
         .mockRejectedValueOnce(new Error('boom1'))
         .mockRejectedValueOnce(new Error('boom2')),
     };
-    await expect(StripeCheckoutController.retirePending(payment, adapter, { userId: 'u1' })).resolves.toBeUndefined();
+    await expect(StripeCheckoutController.retirePending(payment, adapter)).resolves.toBe(true);
     expect(adapter.expireCheckout).toHaveBeenCalledTimes(2); // bounded: never a third attempt
-    expect(payment.setGatewayStatus).toHaveBeenCalledWith('expired');
-    expect(payment.softDelete).toHaveBeenCalledWith('u1');
+    expect(atomicRetirePayment).toHaveBeenCalledTimes(1);
   });
 
   it('no session id => never calls the provider, still retires locally', async () => {
-    const payment = { getGatewaySessionId: () => null, setGatewayStatus: jest.fn(), softDelete: jest.fn().mockResolvedValue({}) };
+    const payment = { id: 'pay_1', getGatewaySessionId: () => null };
     const adapter = { expireCheckout: jest.fn() };
-    await StripeCheckoutController.retirePending(payment, adapter, { userId: 'u1' });
+    await StripeCheckoutController.retirePending(payment, adapter);
     expect(adapter.expireCheckout).not.toHaveBeenCalled();
-    expect(payment.softDelete).toHaveBeenCalledWith('u1');
+    expect(atomicRetirePayment).toHaveBeenCalledTimes(1);
+  });
+
+  it('a row confirmed during the expireCheckout call is a SILENT SUCCESS, never a retry or a throw', async () => {
+    // matchedCount 0 = the webhook won while we were talking to Stripe. There is no pending left to
+    // retire; insisting would be exactly the backwards walk this hardening exists to prevent.
+    atomicRetirePayment.mockResolvedValue({ matchedCount: 0, updatedDoc: null });
+    const payment = makePending();
+    const adapter = { expireCheckout: jest.fn().mockResolvedValue({}) };
+    await expect(StripeCheckoutController.retirePending(payment, adapter)).resolves.toBe(false);
+    expect(atomicRetirePayment).toHaveBeenCalledTimes(1); // never a second attempt
   });
 });
 
