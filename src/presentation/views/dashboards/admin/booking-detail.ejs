@@ -204,25 +204,6 @@
                 <div class="bkg-lbl"><i class="ti ti-mail"></i> Contacto</div>
                 <div class="bkg-val" id="infoContact">&mdash;</div>
             </div>
-            <div class="bkg-tile is-empty" id="infoLeadGuestRow">
-                <div class="bkg-lbl"><i class="ti ti-user"></i> Lead Guest</div>
-                <div class="bkg-val" id="infoLeadGuest">&mdash;</div>
-            </div>
-            <div class="bkg-tile">
-                <div class="bkg-lbl"><i class="ti ti-list-check"></i> Servicios asignados</div>
-                <div class="bkg-val" id="infoAssignmentCounter">&mdash;</div>
-                <div class="bkg-progress d-none" id="infoAssignmentProgress"><span id="infoAssignmentBar"></span></div>
-                <div class="bkg-sub" id="infoAssignmentSub"></div>
-            </div>
-            <div class="bkg-tile">
-                <div class="bkg-lbl"><i class="ti ti-calendar"></i> Fechas</div>
-                <div class="bkg-val bkg-dates" id="infoDates">&mdash;</div>
-                <div class="bkg-sub" id="infoNights"></div>
-            </div>
-            <div class="bkg-tile">
-                <div class="bkg-lbl"><i class="ti ti-users"></i> Personas</div>
-                <div class="bkg-val" id="infoPeople">&mdash;</div>
-            </div>
             <div class="bkg-tile">
                 <div class="bkg-lbl"><i class="ti ti-plane"></i> Motivo de viaje</div>
                 <div class="bkg-val" id="infoEventType">&mdash;</div>
@@ -289,6 +270,22 @@
                    title="Ver el itinerario en pantalla"><i class="ti ti-eye"></i>Ver itinerario</a>
                 <a class="hdr-seg-btn" id="downloadItineraryBtn" href="#"
                    title="Descargar el itinerario en PDF"><i class="ti ti-download"></i>PDF</a>
+            </span>
+        </div>
+        <!-- Identidad del documento: quién viaja, cuándo, cuántos y cuánto se lleva asignado. Son los
+             mismos datos que encabezan el PDF del itinerario, y vivían como celdas sueltas en la
+             tarjeta de arriba, lejos de los servicios que describen. Aquí hacen que el panel se lea
+             como el documento que se manda. -->
+        <div class="svc-doc" id="svcDocLine">
+            <span class="svc-doc-quien" id="docLeadGuest">&mdash;</span>
+            <span class="svc-doc-sep">·</span>
+            <span id="docDates">&mdash;</span>
+            <span class="svc-doc-menor" id="docNights"></span>
+            <span class="svc-doc-sep">·</span>
+            <span id="docPeople">&mdash;</span>
+            <span class="svc-doc-avance">
+                <span class="svc-doc-barra d-none" id="docAssignProgress"><span id="docAssignBar"></span></span>
+                <span class="svc-doc-cifra" id="docAssignCounter"></span>
             </span>
         </div>
         <div id="servicesContainer">
@@ -1233,7 +1230,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (d.contactPhone) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactPhone));
         document.getElementById('infoContact').innerHTML = contactLines.length ? contactLines.join('<br>') : '&mdash;';
         document.getElementById('infoEventType').textContent = d.eventType || '—';
-        document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';
+        const peopleEl = document.getElementById('docPeople');
+        if (peopleEl) {
+            const n = Number(d.numberOfPeople) || 0;
+            peopleEl.textContent = n ? `${n} ${n === 1 ? 'persona' : 'personas'}` : '—';
+        }
 
         // Lead guest — only render row when at least one name is present. Falls back to
         // contactFirstName/contactPerson so a reservation that has the actual traveler in
@@ -1244,13 +1245,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         const leadGuestName = leadGuestParts.length > 0
             ? leadGuestParts.join(' ')
             : (d.contactPerson || '').trim();
-        const leadGuestRow = document.getElementById('infoLeadGuestRow');
-        const leadGuestEl = document.getElementById('infoLeadGuest');
-        if (leadGuestEl && leadGuestRow) {
-            // La celda siempre ocupa su lugar en la rejilla; solo se vacía cuando no hay lead guest.
-            leadGuestEl.textContent = leadGuestName || '—';
-            leadGuestRow.classList.toggle('is-empty', !leadGuestName);
-        }
+        // Encabeza la línea del documento. Ya no necesita reservar su lugar en una rejilla —era el
+        // motivo de .is-empty—: en una línea corrida, si no hay lead guest simplemente no se escribe.
+        const leadGuestEl = document.getElementById('docLeadGuest');
+        if (leadGuestEl) leadGuestEl.textContent = leadGuestName || '—';
 
         // Quote-level notes — same callout style as service notes.
         const quoteNotesRow = document.getElementById('infoQuoteNotesRow');
@@ -1260,9 +1258,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             quoteNotesEl.textContent = quoteNotesText;
             quoteNotesRow.classList.remove('d-none');
         }
-        document.getElementById('infoDates').innerHTML = formatDateRange(d.startDate, d.endDate);
+        document.getElementById('docDates').innerHTML = formatDateRange(d.startDate, d.endDate);
         // Duración (noches) = diferencia en días; se oculta en reservaciones de un solo día.
-        const nightsEl = document.getElementById('infoNights');
+        const nightsEl = document.getElementById('docNights');
         if (nightsEl) {
             if (d.startDate && d.endDate) {
                 const nights = Math.max(0, Math.round((new Date(d.endDate) - new Date(d.startDate)) / 86400000));
@@ -1280,26 +1278,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Los servicios 'concepto' no requieren asignación → cuentan como asignados.
         const assignedSvc = (d.services || []).filter(s => s.status === 'assigned' || s.status === 'completed' || s.type === 'concepto').length;
         const completedSvc = (d.services || []).filter(s => s.status === 'completed').length;
-        const counterEl = document.getElementById('infoAssignmentCounter');
+        const counterEl = document.getElementById('docAssignCounter');
         // Color del avance por estado (coincide con la barra de progreso de abajo).
         const assignColor = completedSvc === totalSvc ? '#4b6b3f'
             : assignedSvc === totalSvc ? '#6E7A50'
                 : assignedSvc > 0 ? '#b8894a' : '#8a8f78';
         if (totalSvc > 0) {
-            counterEl.innerHTML = `<span class="bkg-count" style="color:${assignColor}">${assignedSvc}</span>`
-                + `<span class="bkg-count-total">/${totalSvc}</span>`
-                + '<span class="bkg-count-cap">asignados</span>';
+            counterEl.innerHTML = `<span style="color:${assignColor}">${assignedSvc}</span>/${totalSvc} asignados`
+                + ((completedSvc > 0) ? ` · ${completedSvc} completados` : '');
         } else {
-            counterEl.innerHTML = '<span class="text-muted">Sin servicios</span>';
+            counterEl.textContent = '';
         }
-        const assignSubEl = document.getElementById('infoAssignmentSub');
-        if (assignSubEl) {
-            assignSubEl.textContent = (totalSvc > 0 && completedSvc > 0) ? `${completedSvc} completados` : '';
-        }
-
         // Barra de progreso de asignación (avance = asignados / total).
-        const progWrap = document.getElementById('infoAssignmentProgress');
-        const progBar = document.getElementById('infoAssignmentBar');
+        const progWrap = document.getElementById('docAssignProgress');
+        const progBar = document.getElementById('docAssignBar');
         if (progWrap && progBar && totalSvc > 0) {
             const pct = Math.round((assignedSvc / totalSvc) * 100);
             progBar.style.width = `${pct}%`;

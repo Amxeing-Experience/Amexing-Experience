@@ -467,3 +467,41 @@
   background:transparent;border:1px solid transparent;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
   white-space:nowrap;font-family:inherit;cursor:pointer;transition:all .12s ease;}
 .hdr-danger:hover{background:#f7ecea;border-color:#e6c9c4;color:#a1443a;}
+
+/* ---------------------------------------------------------------------------
+   Identidad del documento, al frente del panel de servicios.
+
+   Quién viaja, cuándo, cuántos y cuánto va asignado. Son los mismos datos que encabezan el PDF del
+   itinerario. Vivían como celdas sueltas en la tarjeta de arriba, a media pantalla de los servicios
+   que describen; aquí hacen que el panel se lea como el documento que se manda.
+
+   Es una línea corrida y no una rejilla a propósito: en la tarjeta, la celda del lead guest tenía que
+   reservar su lugar aunque estuviera vacía —de ahí .bkg-tile.is-empty— para que el resto no se
+   recorriera. En una línea, lo que no existe simplemente no se escribe.
+   --------------------------------------------------------------------------- */
+.svc-doc {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 22px;
+  border-bottom: 1px solid #ece8dd;
+  background: #f9f8f4;
+  font-size: .92rem;
+  color: #2b2b2b;
+}
+.svc-doc-quien { font-size: 1.02rem; font-weight: 600; }
+.svc-doc-sep { color: #c9cdbb; }
+.svc-doc-menor { font-size: .8rem; color: #8a8f78; font-style: italic; }
+/* El avance se va al extremo opuesto: es el estado del trabajo, no parte de la identidad. */
+.svc-doc-avance { display: flex; align-items: center; gap: 9px; margin-left: auto; }
+.svc-doc-cifra { font-size: .78rem; font-weight: 600; color: #6b6656; white-space: nowrap; }
+.svc-doc-barra {
+  display: inline-block;
+  width: 92px; height: 5px;
+  border-radius: 999px; background: #eceadf; overflow: hidden;
+}
+.svc-doc-barra > span { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .35s ease; }
+@media (max-width: 640px) {
+  .svc-doc-avance { margin-left: 0; width: 100%; }
+}
