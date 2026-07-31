@@ -126,7 +126,6 @@ describe('StripeAdapter.getCharge', () => {
       expect(out.ok).toBe(true);
       expect(out.gatewayStatus).toBe('succeeded');
       expect(out.crossesThreshold).toBe(true);
-      expect(out.fromStatuses).toEqual(['requires_payment', 'processing', 'failed', 'expired']);
       expect(out.gatewaySessionId).toBe('cs_test_ok');
       expect(out.gatewayIntentId).toBe('pi_test_ok');
       expect(out.gatewayChargeId).toBe('ch_test_ok');

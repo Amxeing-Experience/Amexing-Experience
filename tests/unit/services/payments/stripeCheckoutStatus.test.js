@@ -14,7 +14,8 @@
  */
 
 // A sentinel the real module would never return: if stripeCheckoutStatus kept its own copy of the
-// source allowlist, fromStatuses would not equal this and the reuse tests would fail.
+// source allowlist, canStillReachSucceeded would not answer against this list and the reuse tests
+// would fail.
 const SENTINEL = Object.freeze(['SENTINEL_SOURCE_A', 'SENTINEL_SOURCE_B']);
 
 jest.mock('../../../../src/application/services/payments/stripeWebhookEvents', () => {
@@ -136,20 +137,11 @@ describe('stripeCheckoutStatus.translateCheckoutStatus', () => {
 
   // -----------------------------------------------------------------------------------------
   describe('GC-U6 — it REUSES allowedSourceStatuses, it does not duplicate it', () => {
-    it('the fromStatuses it returns come from the shared module (sentinel proves it)', () => {
-      const out = translateCheckoutStatus({ status: 'complete', payment_status: 'paid' });
-      expect(webhookEvents.allowedSourceStatuses).toHaveBeenCalledTimes(1);
-      expect(webhookEvents.allowedSourceStatuses).toHaveBeenCalledWith('succeeded');
-      expect(out.fromStatuses).toEqual([...SENTINEL]);
-    });
-
-    it('the expired destination asks the shared module for ITS own allowlist too', () => {
-      const out = translateCheckoutStatus({ status: 'expired' });
-      expect(webhookEvents.allowedSourceStatuses).toHaveBeenCalledWith('expired');
-      expect(out.fromStatuses).toEqual([...SENTINEL]);
-    });
-
-    it('a pending answer never asks for an allowlist (nothing is going to be applied)', () => {
+    // El destino traducido ya NO publica fromStatuses: quien transiciona lo deriva por su cuenta,
+    // y publicarlo aquí era una segunda copia del mismo criterio que nadie consumía. La garantía de
+    // reuso sigue siendo real y se prueba donde el módulo SÍ consulta el allowlist.
+    it('traducir un destino no consulta ningún allowlist (ya no lo publica)', () => {
+      translateCheckoutStatus({ status: 'complete', payment_status: 'paid' });
       translateCheckoutStatus({ status: 'open' });
       expect(webhookEvents.allowedSourceStatuses).not.toHaveBeenCalled();
     });

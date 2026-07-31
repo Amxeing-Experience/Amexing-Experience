@@ -24,16 +24,15 @@ const { allowedSourceStatuses } = require('./stripeWebhookEvents');
  * caller transitions with the same guard the webhook uses.
  * @param {string} gatewayStatus - The destination Payment.gatewayStatus.
  * @param {boolean} crossesThreshold - Whether it crosses the rollup counts/does-not-count line.
- * @returns {{ok: boolean, gatewayStatus: string, crossesThreshold: boolean, fromStatuses: string[]}}
+ * @returns {{ok: boolean, gatewayStatus: string, crossesThreshold: boolean}}
  * The recognized destination.
  */
 function terminal(gatewayStatus, crossesThreshold) {
-  return {
-    ok: true,
-    gatewayStatus,
-    crossesThreshold,
-    fromStatuses: allowedSourceStatuses(gatewayStatus),
-  };
+  // NO devuelve fromStatuses: quien transiciona (applyConfirmation) lo deriva de
+  // allowedSourceStatuses con el destino en la mano. Publicarlo aquí creaba una SEGUNDA copia del
+  // mismo criterio de dinero, que nadie consumía y que podía divergir — justo lo que este módulo
+  // existe para impedir.
+  return { ok: true, gatewayStatus, crossesThreshold };
 }
 
 /**
@@ -74,7 +73,7 @@ function str(source, field) {
  * which is the only path that is TOLD an attempt failed rather than inferring it from a state.
  * @param {object} [session] - The Stripe Checkout Session (or nothing, when only an intent is known).
  * @param {object} [intent] - The Stripe PaymentIntent (expanded from the session, or fetched alone).
- * @returns {{ok: boolean, gatewayStatus?: string, crossesThreshold?: boolean, fromStatuses?: string[]}}
+ * @returns {{ok: boolean, gatewayStatus?: string, crossesThreshold?: boolean}}
  * The destination, or { ok:false } when the provider state maps to nothing we may apply.
  * @example
  * translateCheckoutStatus({ status: 'complete', payment_status: 'paid' }); // succeeded

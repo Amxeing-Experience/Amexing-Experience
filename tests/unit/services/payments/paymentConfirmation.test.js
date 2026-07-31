@@ -21,6 +21,7 @@ jest.mock('../../../../src/infrastructure/payments/paymentAtomicStore', () => ({
   reviveIfSystemRetired: jest.fn(),
   flagRefundReview: jest.fn(),
   flagRollupRepair: jest.fn(),
+  backfillAuditFields: jest.fn(),
 }));
 
 const Parse = require('parse/node');
@@ -70,6 +71,8 @@ describe('paymentConfirmation.applyConfirmation', () => {
     store.flagRefundReview.mockResolvedValue({ matchedCount: 1, updatedDoc: null });
     store.flagRollupRepair.mockReset();
     store.flagRollupRepair.mockResolvedValue({ matchedCount: 1, updatedDoc: null });
+    store.backfillAuditFields.mockReset();
+    store.backfillAuditFields.mockResolvedValue({ matchedCount: 1, updatedDoc: null });
   });
 
   afterEach(() => {
@@ -403,6 +406,103 @@ describe('paymentConfirmation.applyConfirmation', () => {
       store.atomicTransitionPayment.mockResolvedValueOnce({ matchedCount: 1, updatedDoc: { exists: true } });
       await confirm();
       expect(store.flagRollupRepair).not.toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------------------------
+  // Revisión de #335: los tres hallazgos, cada uno con el caso exacto que los dispara.
+  describe('la marca de reservación cancelada sobrevive a un rollup que revienta', () => {
+    // Un cobro sobre una reservación cancelada es lo que PR11 convierte en solicitud de reembolso.
+    // Si la marca dependiera de llegar al final de runRollup, un rollup fallido la perdería PARA
+    // SIEMPRE: el re-throw corta, y en el reintento matchedCount ya es 0, así que la rama no
+    // vuelve a evaluarse nunca.
+    const cancelledReservation = () => {
+      getSpy.mockReset();
+      getSpy.mockResolvedValue({ id: 'res_1', get: (f) => (f === 'status' ? 'cancelled' : undefined) });
+    };
+
+    it('se marca aunque el rollup falle y la llamada termine lanzando', async () => {
+      cancelledReservation();
+      store.atomicTransitionPayment.mockResolvedValueOnce({ matchedCount: 1, updatedDoc: { exists: true } });
+      recalcSpy.mockRejectedValueOnce(new Error('mongo caido'));
+
+      await expect(confirm()).rejects.toThrow('mongo caido');
+      expect(store.flagRefundReview).toHaveBeenCalledWith('pay_1');
+    });
+
+    it('su propio fallo NO impide el rollup: el saldo es dinero, la marca es una bandera', async () => {
+      cancelledReservation();
+      store.atomicTransitionPayment.mockResolvedValueOnce({ matchedCount: 1, updatedDoc: { exists: true } });
+      store.flagRefundReview.mockRejectedValueOnce(new Error('no se pudo marcar'));
+
+      await expect(confirm()).resolves.toBeDefined();
+      expect(recalcSpy).toHaveBeenCalledWith('res_1');
+    });
+  });
+
+  describe('el rastro de auditoría no se pierde cuando gana el evento hermano', () => {
+    // El update condicional no matchea, así que el extraSet del llamador se descarta ENTERO. Sus dos
+    // consumidores reales traen los ids del proveedor (sin gatewayChargeId no hay con qué reembolsar
+    // en PR11) y el gatewayRaw que registra una discrepancia de monto/moneda contra Stripe. Ese
+    // último es el caso COMÚN, porque el webhook suele ganar la carrera.
+    const siblingAlreadyWon = () => {
+      store.atomicTransitionPayment.mockResolvedValueOnce({ matchedCount: 0, updatedDoc: null });
+      getSpy.mockReset();
+      getSpy.mockResolvedValue(rowDouble({ gatewayStatus: 'succeeded', exists: true }));
+    };
+
+    it('rescata los ids del proveedor cuando la fila ya estaba en el destino', async () => {
+      siblingAlreadyWon();
+      await confirm({ source: 'polling', extraSet: { gatewayChargeId: 'ch_tarde', gatewayIntentId: 'pi_tarde' } });
+      expect(store.backfillAuditFields)
+        .toHaveBeenCalledWith('pay_1', { gatewayChargeId: 'ch_tarde', gatewayIntentId: 'pi_tarde' });
+    });
+
+    it('rescata el registro de discrepancia, que si no viviría solo en un log rotado', async () => {
+      siblingAlreadyWon();
+      const raw = { id: 'ch_1', discrepancy: { storedAmount: 100, chargedAmount: 120 } };
+      await confirm({ source: 'reconciliation', extraSet: { gatewayRaw: raw } });
+      expect(store.backfillAuditFields).toHaveBeenCalledWith('pay_1', { gatewayRaw: raw });
+    });
+
+    it('no escribe nada cuando el llamador no traía extraSet', async () => {
+      siblingAlreadyWon();
+      await confirm({ source: 'polling' });
+      expect(store.backfillAuditFields).not.toHaveBeenCalled();
+    });
+
+    it('un backfill que falla no tumba la confirmación', async () => {
+      siblingAlreadyWon();
+      store.backfillAuditFields.mockRejectedValueOnce(new Error('mongo caido'));
+      await expect(confirm({ source: 'polling', extraSet: { gatewayChargeId: 'ch_tarde' } }))
+        .resolves.toBeDefined();
+    });
+
+    it('cuando ESTA llamada gana la transición no hay nada que rescatar', async () => {
+      store.atomicTransitionPayment.mockResolvedValueOnce({ matchedCount: 1, updatedDoc: { exists: true } });
+      await confirm({ source: 'polling', extraSet: { gatewayChargeId: 'ch_ganador' } });
+      expect(store.backfillAuditFields).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('extraSet no puede escribir los dos campos que este módulo gobierna', () => {
+    it('un confirmedAt del llamador se descarta en un destino NO exitoso', async () => {
+      const suyo = new Date('2020-01-01T00:00:00.000Z');
+      store.atomicTransitionPayment.mockResolvedValueOnce({ matchedCount: 1, updatedDoc: { exists: true } });
+      await confirm({ destination: EXPIRED, extraSet: { confirmedAt: suyo, gatewayChargeId: 'ch_1' } });
+
+      const [, options] = store.atomicTransitionPayment.mock.calls[0];
+      expect(options.extraSet.confirmedAt).toBeUndefined();
+      expect(options.extraSet.gatewayChargeId).toBe('ch_1');
+    });
+
+    it('un gatewayStatus del llamador tampoco viaja en el extraSet', async () => {
+      store.atomicTransitionPayment.mockResolvedValueOnce({ matchedCount: 1, updatedDoc: { exists: true } });
+      await confirm({ extraSet: { gatewayStatus: 'refunded' } });
+
+      const [, options] = store.atomicTransitionPayment.mock.calls[0];
+      expect(options.extraSet.gatewayStatus).toBeUndefined();
+      expect(options.toStatus).toBe('succeeded');
     });
   });
 });

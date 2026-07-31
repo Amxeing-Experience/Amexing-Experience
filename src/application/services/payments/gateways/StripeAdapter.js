@@ -287,7 +287,7 @@ function pickMetadata(session, intent) {
  * persist it, and the SDK object carries payment_method_details/customer_details.
  * @param {object} session - The Checkout Session, or null.
  * @param {object} intent - The PaymentIntent, or null.
- * @returns {object} { ok, gatewayStatus?, crossesThreshold?, fromStatuses?, gatewaySessionId,
+ * @returns {object} { ok, gatewayStatus?, crossesThreshold?, gatewaySessionId,
  * gatewayIntentId, gatewayChargeId, amountReceived, currency, metadata, raw }.
  * @example
  * normalizeCharge(session, intent); // { ok: true, gatewayStatus: 'succeeded', ... }

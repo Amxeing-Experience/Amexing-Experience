@@ -319,9 +319,57 @@ async function closeForTests() {
   if (client) await client.close();
 }
 
+// Los ÚNICOS campos que backfillAuditFields puede escribir. Vive aquí y no en el llamador por la
+// misma razón que setMarker no expone el nombre del campo: en una tabla de dinero, "escribe lo que
+// te pasen" es la forma exacta que después se convierte en mass-assignment. Ninguno es monetario:
+// son rastro de auditoría (ids del proveedor y el crudo redactado con la discrepancia).
+const BACKFILLABLE_AUDIT_FIELDS = ['gatewayChargeId', 'gatewayIntentId', 'gatewayRaw'];
+
+/**
+ * Rellena campos de AUDITORÍA que la fila todavía no tiene, en UNA escritura condicional.
+ *
+ * Existe por la rama ambigua de applyConfirmation: cuando un evento hermano ya llevó la fila al
+ * destino, el update condicional no matchea y el `extraSet` del llamador se descarta ENTERO. Dos
+ * consumidores reales lo alimentan — el retorno del navegador (ids del proveedor) y la
+ * reconciliación (ids + el `gatewayRaw` que registra una discrepancia de monto/moneda contra
+ * Stripe). En el caso COMÚN (el webhook gana la carrera) esa discrepancia se quedaba solo en un log
+ * rotado, cuando es justo el dato que alguien va a querer consultar después.
+ *
+ * El filtro exige que CADA campo propuesto siga ausente, así que jamás pisa lo que escribió el
+ * ganador: si alguien se adelantó, no matchea y no se pierde nada que valiera más.
+ * @param {string} paymentId - Parse objectId of the Payment.
+ * @param {object} fields - Campos propuestos; los que no estén en el allowlist se ignoran.
+ * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} 1 cuando rellenó algo.
+ * @example
+ * await backfillAuditFields(payment.id, { gatewayChargeId: 'ch_1', gatewayRaw: { discrepancy } });
+ */
+async function backfillAuditFields(paymentId, fields) {
+  if (!paymentId) throw new Error('paymentAtomicStore: paymentId is required');
+  if (!fields || typeof fields !== 'object') return { matchedCount: 0, updatedDoc: null };
+
+  const $set = {};
+  const filter = { _id: String(paymentId) };
+  BACKFILLABLE_AUDIT_FIELDS.forEach((field) => {
+    if (fields[field] === undefined || fields[field] === null || fields[field] === '') return;
+    $set[field] = fields[field];
+    // null cubre también el campo ausente; '' cubre la fila que lo trae vacío.
+    filter[field] = { $in: [null, ''] };
+  });
+  if (Object.keys($set).length === 0) return { matchedCount: 0, updatedDoc: null };
+
+  const db = await getDb();
+  const result = await db.collection(PAYMENT_COLLECTION).findOneAndUpdate(
+    filter,
+    { $set: { ...$set, _updated_at: new Date() } },
+    { returnDocument: 'after' }
+  );
+  return normalizeResult(result);
+}
+
 module.exports = {
   atomicTransitionPayment,
   atomicRetirePayment,
+  backfillAuditFields,
   reviveIfSystemRetired,
   stampReconciled,
   flagRefundReview,

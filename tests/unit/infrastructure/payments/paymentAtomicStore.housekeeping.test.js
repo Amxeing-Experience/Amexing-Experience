@@ -238,4 +238,57 @@ describe('paymentAtomicStore — PR6 housekeeping writes', () => {
       expect(Object.prototype.hasOwnProperty.call(lastCall.update.$set, 'amount')).toBe(false);
     });
   });
+
+  // -----------------------------------------------------------------------------------------
+  describe('backfillAuditFields — rellena SOLO lo ausente', () => {
+    it('exige que CADA campo propuesto siga ausente, así que nunca pisa al ganador', async () => {
+      await store.backfillAuditFields('pay_abc', { gatewayChargeId: 'ch_tarde', gatewayIntentId: 'pi_tarde' });
+
+      expect(lastCall.filter).toEqual({
+        _id: 'pay_abc',
+        gatewayChargeId: { $in: [null, ''] },
+        gatewayIntentId: { $in: [null, ''] },
+      });
+      expect(lastCall.update.$set.gatewayChargeId).toBe('ch_tarde');
+      expect(lastCall.update.$set.gatewayIntentId).toBe('pi_tarde');
+    });
+
+    it('el gatewayRaw de una discrepancia viaja igual, en UNA sola escritura condicional', async () => {
+      const raw = { id: 'ch_1', discrepancy: { storedAmount: 100, chargedAmount: 120 } };
+      await store.backfillAuditFields('pay_abc', { gatewayRaw: raw });
+
+      expect(lastCall.filter).toEqual({ _id: 'pay_abc', gatewayRaw: { $in: [null, ''] } });
+      expect(lastCall.update.$set.gatewayRaw).toEqual(raw);
+      expect(Object.keys(lastCall.update)).toEqual(['$set']);
+    });
+
+    it('un campo fuera del allowlist se ignora: el nombre nunca es elección del llamador', async () => {
+      await store.backfillAuditFields('pay_abc', { amount: 999999, gatewayChargeId: 'ch_tarde' });
+
+      expect(Object.prototype.hasOwnProperty.call(lastCall.update.$set, 'amount')).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(lastCall.filter, 'amount')).toBe(false);
+      expect(lastCall.update.$set.gatewayChargeId).toBe('ch_tarde');
+    });
+
+    it('no toca el estado ni las banderas de ciclo de vida ni el monto', async () => {
+      await store.backfillAuditFields('pay_abc', { gatewayChargeId: 'ch_tarde' });
+      ['gatewayStatus', 'exists', 'active', 'amount', 'confirmedAt'].forEach((campo) => {
+        expect(Object.prototype.hasOwnProperty.call(lastCall.update.$set, campo)).toBe(false);
+      });
+    });
+
+    it.each([[{}], [{ gatewayChargeId: '' }], [{ amount: 1 }], [null]])(
+      'sin nada rescatable (%p) no escribe en absoluto',
+      async (fields) => {
+        const out = await store.backfillAuditFields('pay_abc', fields);
+        expect(lastCall).toBeNull();
+        expect(out.matchedCount).toBe(0);
+      }
+    );
+
+    it('sin paymentId lanza, como el resto del store', async () => {
+      await expect(store.backfillAuditFields('', { gatewayChargeId: 'ch_tarde' }))
+        .rejects.toThrow('paymentId is required');
+    });
+  });
 });
