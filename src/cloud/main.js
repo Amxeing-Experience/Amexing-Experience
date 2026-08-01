@@ -2247,6 +2247,68 @@ function registerCloudFunctions() {
      * // Schedule this job daily in Parse Dashboard or via cron
      * // Returns: { processed: 15, sent: 12, failed: 3, errors: [...] }
      */
+    // =================
+    // ONLINE PAYMENT HOUSEKEEPING (pasarela)
+    // =================
+    // Both jobs are THIN wrappers: the logic lives in application/services/payments/paymentHousekeeping
+    // so it can be driven by tests, same reasoning as aplicarInflacionJob. They run under useMasterKey
+    // with no user context, so no RBAC guard applies to them. Schedule them from the Parse Dashboard
+    // (never in code); the names below are the ones to use there.
+
+    /**
+     * Retire abandoned online pendings whose Checkout Session is certainly dead in Stripe too.
+     * Only touches channel:'online' rows still in 'requires_payment' past the TTL + session cushion +
+     * safety margin; never a manual payment, never a live pending, never money in flight
+     * ('processing' rows are only reported, never retired). Suggested cadence: every 10 minutes.
+     * @function sweepExpiredOnlinePayments
+     * @param {Parse.Cloud.JobRequest} request - The Parse Cloud job request object.
+     * @returns {Promise<object>} Sweep statistics.
+     * @example
+     * // Schedule in Parse Dashboard. Returns: { scanned: 4, retired: 4, skipped: 0, failed: 0 }
+     */
+    Parse.Cloud.job('sweepExpiredOnlinePayments', async (request) => {
+      const { message } = request;
+      message('Starting expired online pending sweep...');
+      try {
+        const { sweepExpiredOnlinePayments } = require('../application/services/payments/paymentHousekeeping');
+        const stats = await sweepExpiredOnlinePayments();
+        message(`Scanned ${stats.scanned}: retired ${stats.retired}, skipped ${stats.skipped}, failed ${stats.failed}`);
+        return { success: true, ...stats, timestamp: new Date().toISOString() };
+      } catch (error) {
+        logger.error('Error in expired online pending sweep job:', error);
+        message(`Job failed: ${error.message}`);
+        throw error;
+      }
+    });
+
+    /**
+     * Ask Stripe about online payments whose webhook never arrived (or arrived and was lost), and
+     * apply whatever it reports through the shared confirmation core. Covers both rows still live and
+     * rows the sweep itself already retired — the latter is where a real charge with a lost webhook
+     * ends up, and without that branch the job would have no candidates at all in normal operation.
+     * Never rewrites a monetary field: a mismatch is reported, never corrected. Suggested cadence:
+     * every 30 minutes.
+     * @function reconcileStalePayments
+     * @param {Parse.Cloud.JobRequest} request - The Parse Cloud job request object.
+     * @returns {Promise<object>} Reconciliation statistics.
+     * @example
+     * // Schedule in Parse Dashboard. Returns: { scanned: 3, confirmed: 1, pending: 2, failed: 0 }
+     */
+    Parse.Cloud.job('reconcileStalePayments', async (request) => {
+      const { message } = request;
+      message('Starting online payment reconciliation...');
+      try {
+        const { reconcileStalePayments } = require('../application/services/payments/paymentHousekeeping');
+        const stats = await reconcileStalePayments();
+        message(`Scanned ${stats.scanned} (live ${stats.live}, retired ${stats.retired}): confirmed ${stats.confirmed}, still pending ${stats.pending}, skipped ${stats.skipped}, failed ${stats.failed}`);
+        return { success: true, ...stats, timestamp: new Date().toISOString() };
+      } catch (error) {
+        logger.error('Error in online payment reconciliation job:', error);
+        message(`Job failed: ${error.message}`);
+        throw error;
+      }
+    });
+
     Parse.Cloud.job('processQuoteReminders', async (request) => {
       const { message } = request;
       message('Starting quote reminders processing...');

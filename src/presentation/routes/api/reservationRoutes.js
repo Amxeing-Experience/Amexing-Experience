@@ -10,6 +10,7 @@ const rateLimit = require('express-rate-limit');
 const ReservationController = require('../../../application/controllers/api/ReservationController');
 const PaymentController = require('../../../application/controllers/api/PaymentController');
 const StripeCheckoutController = require('../../../application/controllers/api/StripeCheckoutController');
+const StripeReturnController = require('../../../application/controllers/api/StripeReturnController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 
 const router = express.Router();
@@ -201,21 +202,37 @@ router.post(
 // pagador y ese navegador no trae Authorization header, así que apiRoutes.js los monta ANTES del
 // jwtMiddleware.authenticateToken global (mismo patrón que las rutas públicas de imágenes). Si vivieran en
 // el router de abajo, el usuario recibiría 401 tras pagar en vez del 404 de antes: igual de roto.
-// Son SOLO UX: no leen la reservación, no escriben nada, no marcan nada como pagado y NO confían en el
-// session_id del query. La confirmación real del dinero es del webhook de Stripe (PR5), única fuente de
-// verdad. Responden JSON, igual que el resto de este archivo (la página de UX definitiva llega con PR5+).
+// `pay/cancel` sigue siendo puro UX. `pay/success` ya NO: desde PR6 consulta a Stripe y puede confirmar el
+// cobro (polling defensivo). Sigue sin ser la fuente de verdad — lo es el webhook — pero es la red de
+// seguridad para la entrega que se perdió, y por eso tiene guarda de pertenencia y limitador propios.
 const payReturnRouter = express.Router();
 
+// Limitador PROPIO, mucho más estrecho que el de lectura compartido (400/15min): esta ruta es pública,
+// anónima y ahora dispara una llamada saliente a Stripe. 60/15min por IP alcanza de sobra para un pagador
+// que recarga su página de retorno y no para que alguien nos use como amplificador contra la API de Stripe.
+// El embudo local del controller (forma del id -> fila local -> pertenencia -> estado local) ya recorta la
+// mayoría antes de la red; esto es el techo duro.
+const paymentReturnLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: {
+    success: false,
+    error: 'Demasiadas solicitudes, por favor intente nuevamente más tarde',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 /**
- * GET /api/reservations/:id/pay/success — Retorno tras pagar (placeholder sin efectos, público).
+ * GET /api/reservations/:id/pay/success — Retorno tras pagar (público, con polling defensivo).
+ * SIN JWT a propósito: lo visita el navegador del pagador, que no trae Authorization. La pertenencia
+ * (que el session_id sea de ESTA reservación) se valida en el controller, contra la fila local y contra
+ * la metadata que devuelve Stripe.
  */
 payReturnRouter.get(
   '/:id/pay/success',
-  readOperationsLimiter,
-  (req, res) => res.json({
-    success: true,
-    message: 'Pago recibido, en confirmación. La reservación se actualiza automáticamente en cuanto la pasarela confirme el cobro.',
-  })
+  paymentReturnLimiter,
+  (req, res) => StripeReturnController.handle(req, res)
 );
 
 /**
