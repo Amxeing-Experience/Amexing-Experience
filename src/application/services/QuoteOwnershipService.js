@@ -23,6 +23,17 @@ const AmexingUser = require('../../domain/models/AmexingUser');
 const logger = require('../../infrastructure/logger');
 const AuditLog = require('../../domain/models/AuditLog');
 
+// Quién puede transferir la propiedad de una cotización SIN ser su dueño. Solo Amexing.
+//
+// Antes incluía 'department_manager' y 'client', y el comentario de esa línea decía "if they are the
+// owner" — pero al dueño ya lo dejó pasar el check de arriba, así que esa rama SOLO evalúa a quien NO
+// es dueño. El comentario describía algo que el código no hacía, y el efecto real era que cualquier
+// agente podía hacerse dueño de la cotización de otra agencia. Ser dueño da scope directo sobre la
+// reservación ligada (ReservationController.getClientEligibleQuoteIds), así que era una segunda
+// puerta al mismo acceso cruzado que cierra canGrantAccess — y la que quedaba abierta si solo se
+// cerraba la de colaboradores.
+const TRANSFER_ALLOWED_ROLES = ['admin', 'superadmin', 'super_admin'];
+
 /**
  * Service class for managing quote ownership.
  */
@@ -629,7 +640,7 @@ class QuoteOwnershipService {
           const roleName = roleObject && roleObject.get ? roleObject.get('name') : undefined;
           roleToCheck = roleName;
           // Allow department_manager and client roles to transfer ownership if they are the owner
-          hasAdminRole = ['admin', 'superadmin', 'super_admin', 'department_manager', 'client'].includes(roleName);
+          hasAdminRole = TRANSFER_ALLOWED_ROLES.includes(roleName);
 
           logger.info('Checked rolePointer object for admin privileges', {
             quoteId,
@@ -648,7 +659,7 @@ class QuoteOwnershipService {
         }
       } else if (typeof role === 'string' && role) {
         roleToCheck = role;
-        hasAdminRole = ['admin', 'superadmin', 'super_admin', 'department_manager', 'client'].includes(role);
+        hasAdminRole = TRANSFER_ALLOWED_ROLES.includes(role);
         logger.info('Checked role field (string) for admin privileges', {
           quoteId,
           userId,
@@ -657,7 +668,7 @@ class QuoteOwnershipService {
         });
       } else if (typeof displayRole === 'string' && displayRole) {
         roleToCheck = displayRole;
-        hasAdminRole = ['admin', 'superadmin', 'super_admin', 'department_manager', 'client'].includes(displayRole);
+        hasAdminRole = TRANSFER_ALLOWED_ROLES.includes(displayRole);
         logger.info('Checked displayRole field (string) for admin privileges', {
           quoteId,
           userId,
@@ -668,7 +679,7 @@ class QuoteOwnershipService {
         // New role system - role is a Parse object
         const roleName = role.get('name');
         roleToCheck = roleName;
-        hasAdminRole = ['admin', 'superadmin', 'super_admin', 'department_manager', 'client'].includes(roleName);
+        hasAdminRole = TRANSFER_ALLOWED_ROLES.includes(roleName);
         logger.info('Checked role object for admin privileges', {
           quoteId,
           userId,

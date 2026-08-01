@@ -785,35 +785,32 @@ class QuoteCollaborationService {
         return false;
       }
 
-      // Get the role - check both request context and database
+      // SOLO Amexing, nunca "cualquiera con rol de agencia".
+      //
+      // El allowlist anterior incluía 'department_manager' y 'client', comparando SOLO el nombre del
+      // rol y sin mirar de qué agencia era la cotización. Con eso, cualquier agente podía concederse
+      // acceso a sí mismo sobre CUALQUIER cotización (nada impedía agentId === grantedById), y ese
+      // QuoteAccess se traduce en scope sobre la reservación ligada vía
+      // ReservationController.getClientEligibleQuoteIds: leer, registrar, editar y borrar los pagos
+      // de un cliente de otra agencia.
+      //
+      // NO se compara "la agencia del solicitante contra la de la cotización", que era el arreglo
+      // obvio: en datos reales 62 de 65 agencias no tienen departmentId NI clientId, así que esa
+      // comparación negaría el paso a casi todas o pasaría por defecto — en autorización, un criterio
+      // que no se puede evaluar es un criterio que no existe. La regla del dueño no depende de
+      // ningún campo ausente, y es exactamente lo que el JSDoc de la ruta ya promete ("Owner only").
       const dbRole = user.get('role');
       const role = requestUserRole || dbRole;
+      const isAmexingStaff = role === 'admin' || role === 'superadmin';
 
-      logger.info('Checking user role for grant access', {
-        userId,
-        dbRole,
-        requestUserRole,
-        effectiveRole: role,
-        roleType: typeof role,
-      });
-
-      // Direct string comparison like other services do
-      // Allow client role to add collaborators as well
-      const allowedRoles = ['admin', 'superadmin', 'department_manager', 'client'];
-      const hasPermission = role && allowedRoles.includes(role);
-
-      logger.info('Role permission check result', {
-        userId,
-        role,
-        hasPermission,
-        allowedRoles,
-      });
-
-      if (hasPermission) {
-        return true;
+      if (!isAmexingStaff) {
+        logger.warn('Grant access denied: only the quote owner or Amexing staff may share a quote', {
+          quoteId, userId, role,
+        });
+        return false;
       }
 
-      return false;
+      return true;
     } catch (error) {
       logger.error('Failed to check grant access permission', {
         error: error.message,
@@ -846,20 +843,21 @@ class QuoteCollaborationService {
         return false;
       }
 
-      // Get the role - check both request context and database
+      // Mismo criterio que canGrantAccess, y por la misma razón: el allowlist por nombre de rol
+      // dejaba que cualquier agente revocara a los colaboradores legítimos de una cotización ajena
+      // (denegación de servicio sobre la operación de otra agencia).
       const dbRole = user.get('role');
       const role = requestUserRole || dbRole;
+      const isAmexingStaff = role === 'admin' || role === 'superadmin';
 
-      // Direct string comparison like other services do
-      // Allow client role to add collaborators as well
-      const allowedRoles = ['admin', 'superadmin', 'department_manager', 'client'];
-      const hasPermission = role && allowedRoles.includes(role);
-
-      if (hasPermission) {
-        return true;
+      if (!isAmexingStaff) {
+        logger.warn('Revoke access denied: only the quote owner or Amexing staff may revoke a share', {
+          quoteId, userId, role,
+        });
+        return false;
       }
 
-      return false;
+      return true;
     } catch (error) {
       logger.error('Failed to check revoke access permission', {
         error: error.message,
@@ -886,33 +884,25 @@ class QuoteCollaborationService {
         return true;
       }
 
-      // First check the role passed from the request (from JWT middleware)
-      const allowedRoles = ['admin', 'superadmin', 'department_manager', 'client'];
-
-      if (requestUserRole) {
-        const hasRequestRolePermission = allowedRoles.includes(requestUserRole);
-        if (hasRequestRolePermission) {
-          return true;
-        }
-      }
-
-      // Fallback: Check if user has admin or department manager privileges from database
+      // Mismo criterio que canGrantAccess y canRevokeAccess: dueño o staff de Amexing, nunca
+      // "cualquiera con rol de agencia". Degradar al colaborador de una cotización ajena era la
+      // tercera variante del mismo hueco.
       const user = await this.getUserById(userId);
       if (!user) {
         return false;
       }
 
-      // Get the role - it's stored as a string directly on the user
-      const role = user.get('role');
+      const role = requestUserRole || user.get('role');
+      const isAmexingStaff = role === 'admin' || role === 'superadmin';
 
-      // Direct string comparison like other services do
-      const hasPermission = role && allowedRoles.includes(role);
-
-      if (hasPermission) {
-        return true;
+      if (!isAmexingStaff) {
+        logger.warn('Update collaborator role denied: only the quote owner or Amexing staff may change a share', {
+          quoteId, userId, role,
+        });
+        return false;
       }
 
-      return false;
+      return true;
     } catch (error) {
       logger.error('Failed to check update role permission', {
         error: error.message,
