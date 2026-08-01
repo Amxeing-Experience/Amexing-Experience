@@ -1940,8 +1940,12 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         document.getElementById('payBarSaldo').textContent = formatCurrency(saldo, curr);
         document.getElementById('payBarFill').style.width = `${pct}%`;
+        // El monto pagado va del mismo verde que la barra: son el mismo dato dicho de dos formas —lo
+        // que ya se cubrió— y el color los ata. El total queda neutro: es la referencia, no el avance.
         document.getElementById('payBarDetalle').innerHTML =
-            `<strong>${pct}%</strong> pagado · ${formatCurrency(pagado, curr)} de ${formatCurrency(total, curr)}`;
+            `<strong>${pct}%</strong> pagado · `
+            + `<span class="pay-bar-pagado">${formatCurrency(pagado, curr)}</span>`
+            + ` de ${formatCurrency(total, curr)}`;
         document.getElementById('payBarEstado').innerHTML =
             PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus);
 

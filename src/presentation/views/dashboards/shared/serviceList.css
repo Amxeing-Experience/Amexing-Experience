@@ -598,6 +598,10 @@
   margin-top: 7px; font-size: .84rem; color: #6b6656;
 }
 
+/* El mismo verde que el relleno de la barra: lo pagado y el avance son el mismo dato dicho de dos
+   formas, y el color los ata. Si cambia el verde de la barra, cambia aquí. */
+.pay-bar-pagado { color: #4b6b3f; font-weight: 700; }
+
 .pay-bar-derecha { display: inline-flex; align-items: center; gap: 9px; }
 /* El método va como chip apagado, no como píldora de color: informa cuál de los tres precios se
    está cobrando, no anuncia un estado. La píldora de al lado sí es estado y debe ganarle. */
