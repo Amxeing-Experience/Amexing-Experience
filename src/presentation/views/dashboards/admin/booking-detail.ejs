@@ -45,16 +45,12 @@
          cada dato vivia en una celda con lineas por dos de sus lados —un box-shadow inset— y el
          conjunto parecia una tabla de base de datos. Ahora el unico trazo es el borde de la tarjeta. */
       .bkg-info{border:1px solid #ece8dd;border-radius:14px;background:#fff;padding:24px 26px 20px;}
-      .bkg-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
-      .bkg-eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.64rem;font-weight:700;color:#8a8f78;margin-bottom:4px;}
+      .bkg-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
       .bkg-title{font-size:1.35rem;font-weight:700;color:#2b2b2b;line-height:1.2;word-break:break-word;}
       .bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+      #infoServiceCustomer{font-weight:600;color:#2b2b2b;}
       /* Badges de estado suavizados SOLO en la tarjeta de info (paleta de marca, sin tocar las
          funciones compartidas getQuoteStatusBadge / getReservationOverallStatusBadge). */
-      .bkg-top-left{display:flex;align-items:center;gap:38px;flex-wrap:wrap;}
-      .bkg-cs{display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
-      .bkg-cs-lbl{text-transform:uppercase;letter-spacing:.07em;font-size:.62rem;font-weight:700;color:#8a8f78;}
-      .bkg-cs #infoServiceCustomer{font-weight:600;color:#2b2b2b;font-size:.9rem;}
       .bkg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 32px;margin-top:26px;}
       .bkg-tile{min-width:0;}
       /* Celda sin dato (hoy solo Lead Guest): se oculta el CONTENIDO, no la celda. Con d-none la celda
@@ -166,23 +162,25 @@
         background:#e6efe1;border:1px solid #cfe0c6;border-radius:6px;padding:.08rem .42rem;}
     </style>
     <div class="bkg-info mb-4">
-        <!-- [Cliente | Customer Support] a la izquierda, Estado a la derecha; el folio ya está en el título -->
+        <!-- Cliente a la izquierda, Estado a la derecha; el folio ya está en el título.
+             Customer Support BAJÓ a la rejilla: aquí arriba vivía en un flex con otro gap, así que
+             su columna no coincidía con la de Contacto —dos retículas encimadas en una tarjeta que
+             se lee por columnas—. En la rejilla, además, completa las cuatro celdas: antes eran
+             tres campos en cuatro columnas y el cuarto de ancho quedaba muerto. -->
         <div class="bkg-top">
-            <div class="bkg-top-left">
-                <div>
-                    <div class="bkg-eyebrow"><i class="ti ti-building me-1"></i>Cliente</div>
-                    <div class="bkg-title" id="infoClient">&mdash;</div>
-                </div>
-                <div class="bkg-cs">
-                    <span class="bkg-cs-lbl"><i class="ti ti-headset me-1"></i>Customer Support</span>
-                    <div id="serviceCustomerRow"><span id="infoServiceCustomer">&mdash;</span></div>
-                </div>
+            <div>
+                <div class="bkg-lbl"><i class="ti ti-building"></i> Cliente</div>
+                <div class="bkg-title" id="infoClient">&mdash;</div>
             </div>
             <div class="bkg-status" id="infoStatus">&mdash;</div>
         </div>
 
         <!-- Datos en tiles -->
         <div class="bkg-grid">
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-headset"></i> Customer Support</div>
+                <div id="serviceCustomerRow"><span id="infoServiceCustomer">&mdash;</span></div>
+            </div>
             <div class="bkg-tile">
                 <div class="bkg-lbl"><i class="ti ti-file-invoice"></i> Cotización</div>
                 <a href="#" id="infoQuoteLink" class="bkg-val bkg-link">&mdash;</a>
@@ -1243,7 +1241,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         const contactName = (d.contactPerson
             || `${d.contactFirstName || ''} ${d.contactLastName || ''}`.trim()).trim();
         const contactLines = [];
-        if (contactName) contactLines.push(`<span class="fw-semibold">${PaymentBreakdownHelpers.escapeHtml(contactName)}</span>`);
+        // Cuando el cliente es persona fisica, "Cliente" y "Contacto" traen el MISMO nombre y la
+        // tarjeta lo decia dos veces en la misma linea de lectura. Si coinciden, Contacto se queda
+        // solo con lo que Cliente no dice: correo y telefono.
+        if (contactName && contactName !== clientDisplay) {
+            contactLines.push(`<span class="fw-semibold">${PaymentBreakdownHelpers.escapeHtml(contactName)}</span>`);
+        }
         if (d.contactEmail) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactEmail));
         if (d.contactPhone) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactPhone));
         document.getElementById('infoContact').innerHTML = contactLines.length ? contactLines.join('<br>') : '&mdash;';

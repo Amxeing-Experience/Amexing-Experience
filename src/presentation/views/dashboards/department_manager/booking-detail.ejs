@@ -51,23 +51,24 @@
     <style>
     </style>
     <div class="bkg-info mb-4">
-        <!-- [Cliente | Customer Support] a la izquierda, Estado a la derecha; el folio ya está en el título -->
+        <!-- Cliente a la izquierda, Estado a la derecha; el folio ya está en el título.
+             Customer Support BAJÓ a la rejilla: aquí arriba vivía en un flex con otro gap, así que
+             su columna no coincidía con la de Contacto —dos retículas encimadas en una tarjeta que
+             se lee por columnas—. -->
         <div class="bkg-top">
-            <div class="bkg-top-left">
-                <div>
-                    <div class="bkg-eyebrow"><i class="ti ti-building me-1"></i>Cliente</div>
-                    <div class="bkg-title" id="infoClient">&mdash;</div>
-                </div>
-                <div class="bkg-cs">
-                    <span class="bkg-cs-lbl"><i class="ti ti-headset me-1"></i>Customer Support</span>
-                    <div id="infoServiceCustomer">&mdash;</div>
-                </div>
+            <div>
+                <div class="bkg-lbl"><i class="ti ti-building"></i> Cliente</div>
+                <div class="bkg-title" id="infoClient">&mdash;</div>
             </div>
             <div class="bkg-status" id="infoStatus">&mdash;</div>
         </div>
 
         <!-- Datos en tiles -->
         <div class="bkg-grid">
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-headset"></i> Customer Support</div>
+                <div id="infoServiceCustomer">&mdash;</div>
+            </div>
             <div class="bkg-tile">
                 <div class="bkg-lbl"><i class="ti ti-file-invoice"></i> Cotización</div>
                 <a href="#" id="infoQuoteLink" class="bkg-val bkg-link">&mdash;</a>

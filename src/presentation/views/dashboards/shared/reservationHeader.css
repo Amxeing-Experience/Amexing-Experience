@@ -10,16 +10,12 @@
    cada dato vivia en una celda con lineas por dos de sus lados —un box-shadow inset— y el conjunto
    parecia una tabla de base de datos. Ahora el unico trazo es el borde de la tarjeta. */
 .bkg-info{border:1px solid #ece8dd;border-radius:14px;background:#fff;padding:24px 26px 20px;}
-.bkg-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
-.bkg-eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.64rem;font-weight:700;color:#8a8f78;margin-bottom:4px;}
+.bkg-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
 .bkg-title{font-size:1.35rem;font-weight:700;color:#2b2b2b;line-height:1.2;word-break:break-word;}
 .bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+#infoServiceCustomer{font-weight:600;color:#2b2b2b;}
 /* Badges de estado suavizados SOLO en la tarjeta de info (paleta de marca, sin tocar las
    funciones compartidas getQuoteStatusBadge / getReservationStatusBadge). */
-.bkg-top-left{display:flex;align-items:center;gap:38px;flex-wrap:wrap;}
-.bkg-cs{display:flex;flex-direction:column;align-items:flex-start;gap:4px;}
-.bkg-cs-lbl{text-transform:uppercase;letter-spacing:.07em;font-size:.62rem;font-weight:700;color:#8a8f78;}
-.bkg-cs #infoServiceCustomer{font-weight:600;color:#2b2b2b;font-size:.9rem;}
 .bkg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 32px;margin-top:26px;}
 .bkg-tile{min-width:0;}
 /* Celda sin dato (hoy solo Lead Guest): se oculta el CONTENIDO, no la celda. Con d-none la celda
