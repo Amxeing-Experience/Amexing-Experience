@@ -263,7 +263,13 @@
       <div class="pay-bar-track"><span id="payBarFill"></span></div>
       <div class="pay-bar-pie">
         <span id="payBarDetalle"></span>
-        <span id="payBarEstado"></span>
+        <span class="pay-bar-derecha">
+          <!-- Qué método se está cobrando. Sin esto, el total de la barra no dice de cuál de los tres
+               precios habla: cambiarlo mueve la cifra en decenas de miles. El comparativo vive en el
+               carrito, así que aquí sólo se nombra. -->
+          <span class="pay-bar-metodo" id="payBarMetodo"></span>
+          <span id="payBarEstado"></span>
+        </span>
       </div>
     </div>
     <div class="pay-bar-acciones">
@@ -1938,6 +1944,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             `<strong>${pct}%</strong> pagado · ${formatCurrency(pagado, curr)} de ${formatCurrency(total, curr)}`;
         document.getElementById('payBarEstado').innerHTML =
             PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus);
+
+        // Método de pago: es el que decide CUÁL de los tres precios se está cobrando.
+        const metodoEl = document.getElementById('payBarMetodo');
+        const metodo = reservationData.paymentType || '';
+        metodoEl.textContent = metodo
+            ? metodo.charAt(0).toUpperCase() + metodo.slice(1)
+            : '';
+        metodoEl.classList.toggle('d-none', !metodo);
 
         // Saldo cubierto: deja de teñirse de ámbar, que es la señal de que falta algo.
         document.getElementById('payBarSaldo').classList.toggle('is-cubierto', saldo <= 0);

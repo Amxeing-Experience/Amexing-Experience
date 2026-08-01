@@ -45,10 +45,13 @@ describe('Booking Detail - Pagos Offcanvas (admin)', () => {
     expect(html).toContain('id="addAdjustmentBtn"');
   });
 
-  test('la barra de cobranza trae el saldo y el avance, no sólo un botón', () => {
+  test('la barra de cobranza trae el saldo, el avance y el método, no sólo un botón', () => {
     expect(html).toContain('id="payBarSaldo"');
     expect(html).toContain('id="payBarFill"');
     expect(html).toContain('id="payBarDetalle"');
+    // El método decide CUÁL de los tres precios se está cobrando: sin él, el total de la barra no
+    // dice de cuál habla, y la diferencia entre métodos es de decenas de miles.
+    expect(html).toContain('id="payBarMetodo"');
   });
 
   // El desglose dejó de vivir en una tarjeta de la página: sus cinco cifras clave estaban ahí y en

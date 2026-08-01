@@ -598,6 +598,16 @@
   margin-top: 7px; font-size: .84rem; color: #6b6656;
 }
 
+.pay-bar-derecha { display: inline-flex; align-items: center; gap: 9px; }
+/* El método va como chip apagado, no como píldora de color: informa cuál de los tres precios se
+   está cobrando, no anuncia un estado. La píldora de al lado sí es estado y debe ganarle. */
+.pay-bar-metodo {
+  display: inline-flex; align-items: center;
+  font-size: .72rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: #6b6656; background: #f1f2ec; border: 1px solid #e6e4dd;
+  border-radius: 999px; padding: .3rem .7rem; white-space: nowrap;
+}
+
 .pay-bar-acciones { display: flex; gap: 8px; margin-left: auto; }
 .pay-bar-btn {
   font-size: .82rem; font-weight: 700; letter-spacing: .04em;
