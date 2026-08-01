@@ -7,9 +7,10 @@
  * stripeClient singleton in production), so a) the app boots without the `stripe` package and
  * b) every test drives a mock client with zero network (plan seccion 5.1/5.8).
  *
- * Still deferred (kept as NOT_CONFIGURED, never exposed by an endpoint here): getCharge is the
- * defensive polling of PR6; refund is PR11; verifyWebhook is PR5. They remain OVERRIDDEN (so the
- * registry's own-vs-inherited check passes), they just are not wired yet.
+ * Still deferred (kept as NOT_CONFIGURED, never exposed by an endpoint here): refund is PR11. It
+ * remains OVERRIDDEN (so the registry's own-vs-inherited check passes), it just is not wired yet.
+ * getCharge IS wired (PR6): the read-only lookup the browser-return polling and the reconciliation
+ * job share.
  *
  * Money conventions (plan seccion 5.2): amount travels in the MAJOR unit and already includes
  * commission, so there is NO surcharge — unit_amount = Math.round(amount * 100) verbatim, and the
@@ -24,6 +25,7 @@ const PaymentGatewayService = require('../PaymentGatewayService');
 const PaymentGatewayError = require('../PaymentGatewayError');
 const { getStripeClient, isStripeConfigured } = require('../../../../infrastructure/payments/stripeClient');
 const { redactGatewayPayload } = require('../../../../infrastructure/payments/redactGatewayPayload');
+const { translateCheckoutStatus } = require('../stripeCheckoutStatus');
 const logger = require('../../../../infrastructure/logger');
 
 const GATEWAY_ID = 'stripe';
@@ -58,7 +60,7 @@ const SUPPORTED_CURRENCIES = Object.freeze(['USD', 'MXN']);
 const SDK_CURRENCIES = Object.freeze(['usd', 'mxn']);
 
 /**
- * Build the NOT_CONFIGURED error used by the not-yet-wired capabilities (refund/webhook/getCharge).
+ * Build the NOT_CONFIGURED error used by the not-yet-wired capabilities (refund).
  * @param {string} capability - The capability being invoked.
  * @returns {PaymentGatewayError} The typed NOT_CONFIGURED error to throw.
  */
@@ -223,6 +225,95 @@ function mapSession(session, amount, isoCurrency) {
 }
 
 /**
+ * Validate the getCharge anchors and pick which one to use. Fails CLOSED with no id at all: calling
+ * the SDK with `undefined` would either throw an opaque SDK error or, worse, retrieve something
+ * unrelated. The session id is preferred because it also yields the intent in one round-trip.
+ * @param {object} lookup - { gatewaySessionId, gatewayIntentId }.
+ * @returns {{sessionId: string, intentId: string}} The trimmed anchors (one of them non-empty).
+ * @throws {PaymentGatewayError} PROVIDER_ERROR when neither anchor is usable.
+ */
+function resolveLookup(lookup) {
+  const source = lookup && typeof lookup === 'object' ? lookup : {};
+  const sessionId = typeof source.gatewaySessionId === 'string' ? source.gatewaySessionId.trim() : '';
+  const intentId = typeof source.gatewayIntentId === 'string' ? source.gatewayIntentId.trim() : '';
+  if (!sessionId && !intentId) {
+    throw new PaymentGatewayError(
+      PaymentGatewayError.CODES.PROVIDER_ERROR,
+      'Stripe charge lookup needs a gatewaySessionId or a gatewayIntentId',
+      { gateway: GATEWAY_ID }
+    );
+  }
+  return { sessionId, intentId };
+}
+
+/**
+ * Convert a MINOR-unit provider amount into the MAJOR unit this codebase stores, or null.
+ *
+ * Fails CLOSED: 0, negatives, NaN, Infinity, null and non-numbers all become null rather than a
+ * number the amount-discrepancy check would then compare against a real origAmount. A bogus 0 that
+ * slipped through as a number would read as "Stripe says they paid nothing" and raise a false alarm
+ * on every reconciliation pass.
+ * @param {*} minorUnits - The provider amount in minor units (cents).
+ * @returns {(number|null)} The major-unit amount, or null when it is not usable.
+ */
+function toMajorUnit(minorUnits) {
+  if (typeof minorUnits !== 'number' || !Number.isFinite(minorUnits) || minorUnits <= 0) return null;
+  return Math.round(minorUnits) / 100;
+}
+
+/**
+ * Read the metadata WE put on the session/intent at creation time (reservationId/paymentId).
+ *
+ * These are our own opaque ids, never provider card data, and they are what lets the caller confirm
+ * that the object Stripe returned really belongs where the request claims it does.
+ * @param {object} session - The Checkout Session (or null).
+ * @param {object} intent - The PaymentIntent (or null).
+ * @returns {{reservationId: string, paymentId: string}} The correlation ids ('' when absent).
+ */
+function pickMetadata(session, intent) {
+  const fromSession = (session && typeof session.metadata === 'object' && session.metadata) || {};
+  const fromIntent = (intent && typeof intent.metadata === 'object' && intent.metadata) || {};
+  const pick = (key) => {
+    const value = fromSession[key] !== undefined ? fromSession[key] : fromIntent[key];
+    return typeof value === 'string' ? value.trim() : '';
+  };
+  return { reservationId: pick('reservationId'), paymentId: pick('paymentId') };
+}
+
+/**
+ * Normalize a retrieved session/intent pair into the provider-independent lookup result.
+ *
+ * `raw` goes through redactGatewayPayload for the same reason mapSession does: callers log and
+ * persist it, and the SDK object carries payment_method_details/customer_details.
+ * @param {object} session - The Checkout Session, or null.
+ * @param {object} intent - The PaymentIntent, or null.
+ * @returns {object} { ok, gatewayStatus?, crossesThreshold?, gatewaySessionId,
+ * gatewayIntentId, gatewayChargeId, amountReceived, currency, metadata, raw }.
+ * @example
+ * normalizeCharge(session, intent); // { ok: true, gatewayStatus: 'succeeded', ... }
+ */
+function normalizeCharge(session, intent) {
+  const destination = translateCheckoutStatus(session, intent);
+  const currency = (intent && typeof intent.currency === 'string' && intent.currency)
+    || (session && typeof session.currency === 'string' && session.currency)
+    || '';
+  // amount_received is what Stripe actually CAPTURED; amount_total is what the session asked for.
+  // Prefer the captured figure and only fall back to the session total when there is no intent.
+  const captured = intent ? intent.amount_received : (session && session.amount_total);
+
+  return {
+    ...destination,
+    gatewaySessionId: (session && typeof session.id === 'string' && session.id) || null,
+    gatewayIntentId: toId(session && session.payment_intent) || toId(intent) || null,
+    gatewayChargeId: toId(intent && intent.latest_charge) || null,
+    amountReceived: toMajorUnit(captured),
+    currency: String(currency).toUpperCase(),
+    metadata: pickMetadata(session, intent),
+    raw: redactGatewayPayload(session || intent),
+  };
+}
+
+/**
  * Stripe gateway adapter (real Checkout Session creation).
  * @augments PaymentGatewayService
  */
@@ -350,10 +441,65 @@ class StripeAdapter extends PaymentGatewayService {
   }
 
   /**
-   * @throws {PaymentGatewayError} NOT_CONFIGURED — defensive polling lands in PR6.
+   * Look up the CURRENT state of a charge at Stripe and normalize it (reconciliation / polling).
+   *
+   * Read-only by contract: it never writes a Payment, never transitions anything and never decides
+   * the rollup. All it answers is "what does Stripe say right now", in our vocabulary.
+   *
+   * Two anchors, because the two callers hold different ones: the browser return only has the
+   * session id from its own query string, while the reconciliation job starts from a persisted
+   * Payment that may only have kept the intent id. Whichever is present is used; both are never
+   * required. With a session id, the intent is expanded in the SAME call (that expansion is what
+   * carries amount_received and latest_charge, so no second round-trip is needed).
+   * @param {object} lookup - What to look the charge up by.
+   * @param {string} [lookup.gatewaySessionId] - Checkout Session id (preferred).
+   * @param {string} [lookup.gatewayIntentId] - PaymentIntent id (fallback).
+   * @returns {Promise<object>} The normalized shape (see normalizeCharge): never the SDK object.
+   * @throws {PaymentGatewayError} PROVIDER_ERROR (no usable id / SDK failure) or NOT_CONFIGURED (no
+   * usable client), kept distinct for the same reason verifyWebhook keeps them apart: a deployment
+   * mistake must never be indistinguishable from a provider outage.
+   * @example
+   * const charge = await adapter.getCharge({ gatewaySessionId: 'cs_test_123' });
+   * if (charge.ok && charge.gatewayStatus === 'succeeded') { ... }
    */
-  getCharge() {
-    throw notConfigured('getCharge');
+  async getCharge(lookup) {
+    // Arguments first, configuration second: a malformed call is our bug either way.
+    const { sessionId, intentId } = resolveLookup(lookup);
+
+    let client;
+    try {
+      client = this.client();
+    } catch (clientErr) {
+      throw new PaymentGatewayError(
+        PaymentGatewayError.CODES.NOT_CONFIGURED,
+        `Stripe client is not available for a charge lookup: ${clientErr && clientErr.message ? clientErr.message : 'unknown error'}`,
+        { gateway: GATEWAY_ID }
+      );
+    }
+
+    let session = null;
+    let intent = null;
+    try {
+      if (sessionId) {
+        session = await client.checkout.sessions.retrieve(sessionId, {
+          expand: ['payment_intent'],
+        });
+        const expanded = session && session.payment_intent;
+        intent = expanded && typeof expanded === 'object' ? expanded : null;
+      } else {
+        intent = await client.paymentIntents.retrieve(intentId);
+      }
+    } catch (err) {
+      // Same rule as buildCheckout: only the redacted message travels, never the SDK error object
+      // (whose own-property walk can surface card-adjacent fields).
+      throw new PaymentGatewayError(
+        PaymentGatewayError.CODES.PROVIDER_ERROR,
+        `Stripe charge lookup failed: ${err && err.message ? err.message : 'unknown error'}`,
+        { gateway: GATEWAY_ID }
+      );
+    }
+
+    return normalizeCharge(session, intent);
   }
 
   /**

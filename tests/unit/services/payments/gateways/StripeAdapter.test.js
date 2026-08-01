@@ -5,9 +5,11 @@
  * StripeAdapter.buildCheckout.test.js against a mock client. As of PR5 verifyWebhook is REAL too and
  * covered by StripeAdapter.verifyWebhook.test.js; what remains asserted here is its UNCONFIGURED
  * behavior (no signing secret in the environment), which must stay NOT_CONFIGURED rather than degrade
- * into a signature rejection. The genuinely deferred capabilities are getCharge (PR6) and refund
- * (PR11): they must keep failing NOT_CONFIGURED (an override, never the inherited NOT_IMPLEMENTED)
- * under repeated / malformed inputs.
+ * into a signature rejection. As of PR6 getCharge is REAL too (StripeAdapter.getCharge.test.js); what
+ * this suite pins about it is that with NO client it reports NOT_CONFIGURED — a deployment problem —
+ * and never a PROVIDER_ERROR that would read as a Stripe outage. The only genuinely deferred
+ * capability left is refund (PR11): it must keep failing NOT_CONFIGURED (an override, never the
+ * inherited NOT_IMPLEMENTED) under repeated / malformed inputs.
  */
 
 const StripeAdapter = require('../../../../../src/application/services/payments/gateways/StripeAdapter');
@@ -24,9 +26,10 @@ const CAPABILITIES = [
   'refund',
   'verifyWebhook',
 ];
-// Capabilities still NOT wired -> they throw NOT_CONFIGURED synchronously. createCharge (PR4) and
-// verifyWebhook (PR5) are deliberately excluded: both are real paths now, each with its own suite.
-const CHARGE_METHODS = ['getCharge', 'refund'];
+// Capabilities still NOT wired -> they throw NOT_CONFIGURED synchronously. createCharge (PR4),
+// verifyWebhook (PR5) and getCharge (PR6) are deliberately excluded: all three are real paths now,
+// each with its own suite.
+const CHARGE_METHODS = ['refund'];
 
 describe('StripeAdapter', () => {
   let adapter;
@@ -124,6 +127,21 @@ describe('StripeAdapter', () => {
           expect(error).not.toBeInstanceOf(TypeError);
           expect(error.code).toBe(PaymentGatewayError.CODES.NOT_CONFIGURED);
         });
+      });
+    });
+
+    it('getCharge with NO usable client reports NOT_CONFIGURED, not a provider outage', async () => {
+      // The distinction is operational: NOT_CONFIGURED means "fix the deployment", PROVIDER_ERROR
+      // means "Stripe is unhappy". Collapsing them would hide a missing key behind a retry loop.
+      await expect(adapter.getCharge({ gatewaySessionId: 'cs_test_1' })).rejects.toMatchObject({
+        code: PaymentGatewayError.CODES.NOT_CONFIGURED,
+        gateway: 'stripe',
+      });
+    });
+
+    it('getCharge with no usable id fails on the ARGUMENT first, before configuration matters', async () => {
+      await expect(adapter.getCharge({})).rejects.toMatchObject({
+        code: PaymentGatewayError.CODES.PROVIDER_ERROR,
       });
     });
 

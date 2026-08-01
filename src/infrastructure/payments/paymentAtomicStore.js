@@ -65,6 +65,26 @@ async function getDb() {
 }
 
 /**
+ * Normalize what findOneAndUpdate returned into { matchedCount, updatedDoc }.
+ *
+ * mongodb@6 returns the document directly; older drivers wrap it in { value, lastErrorObject, ok }.
+ * Discriminate on 'lastErrorObject'/'ok' — fields that belong ONLY to the legacy wrapper and never to
+ * a Payment document — rather than on 'value': a Payment that ever grew its own field literally named
+ * 'value' would make a 'value'-based check misread the whole document as the wrapper, silently
+ * turning a real write into "matchedCount 0" (which would skip the rollup recalculation and leave a
+ * paid reservation showing a balance).
+ * @param {*} result - Whatever the driver returned.
+ * @returns {{matchedCount: number, updatedDoc: (object|null)}} The normalized outcome.
+ */
+function normalizeResult(result) {
+  const isLegacyWrapper = !!result
+    && (Object.prototype.hasOwnProperty.call(result, 'lastErrorObject')
+      || Object.prototype.hasOwnProperty.call(result, 'ok'));
+  const updatedDoc = isLegacyWrapper ? result.value : result;
+  return { matchedCount: updatedDoc ? 1 : 0, updatedDoc: updatedDoc || null };
+}
+
+/**
  * Atomically move a Payment to `toStatus` ONLY IF its current gatewayStatus is one of `fromStatuses`.
  *
  * The filter is part of the write, so exactly one of N concurrent callers can ever match: the winner
@@ -107,17 +127,176 @@ async function atomicTransitionPayment(paymentId, options) {
     { returnDocument: 'after' }
   );
 
-  // mongodb@6 returns the document directly; older drivers wrap it in { value, lastErrorObject, ok }.
-  // Discriminate on 'lastErrorObject'/'ok' — fields that belong ONLY to the legacy wrapper and never to a
-  // Payment document — rather than on 'value': a Payment that ever grew its own field literally named
-  // 'value' would make a 'value'-based check misread the whole document as the wrapper, silently turning
-  // a real transition into "matchedCount 0" (which would skip the rollup recalculation and leave a paid
-  // reservation showing a balance).
-  const isLegacyWrapper = !!result
-    && (Object.prototype.hasOwnProperty.call(result, 'lastErrorObject')
-      || Object.prototype.hasOwnProperty.call(result, 'ok'));
-  const updatedDoc = isLegacyWrapper ? result.value : result;
-  return { matchedCount: updatedDoc ? 1 : 0, updatedDoc: updatedDoc || null };
+  return normalizeResult(result);
+}
+
+/**
+ * Statuses a pending online Payment may legally be RETIRED from. Fixed inside this module and
+ * deliberately NOT a parameter: 'processing' is excluded because expiresAt is stamped once at
+ * creation and never refreshed, so every 'processing' row satisfies the sweep threshold by
+ * construction — retiring one would be retiring money that is still in flight at the provider.
+ * @type {readonly string[]}
+ */
+const RETIRABLE_STATUSES = Object.freeze(['requires_payment']);
+
+/**
+ * Atomically retire a pending online Payment: terminal status + soft-delete + the housekeeping
+ * marker, in ONE conditional write.
+ *
+ * It replaces the old setGatewayStatus('expired') + softDelete(userId) pair, which was a
+ * fetch-then-save: between the read and the save a webhook could confirm the very same row, and the
+ * save would then push a 'succeeded' charge back to 'expired' + exists:false — money the rollup can
+ * no longer see. Here the source-status filter lives inside the write, so a row that has already
+ * moved on simply matches nothing (matchedCount 0), which every caller must treat as a clean no-op.
+ *
+ * `retiredBySystem:true` is the whole point of routing both housekeeping callers through here: it is
+ * what later authorizes reviveIfSystemRetired to bring the row back if the card really cleared. A
+ * deliberate staff delete never passes through this function and therefore never gets the marker.
+ * `deletedBy` is intentionally NOT set — there is no user behind housekeeping, and its absence next
+ * to a present deletedAt is a second, independent trace of an automatic retirement.
+ *
+ * `exists:true` is part of the filter for that same reason, and it is not decoration.
+ * PaymentController.deletePayment reaches a LIVE pending (its loadPayment filters exists:true), so a
+ * staff delete landing while this function's expireCheckout call is still in flight would otherwise
+ * find the row still at 'requires_payment' and stamp retiredBySystem:true on top of it — turning a
+ * deliberate human deletion into something the revive is authorized to resurrect. Filtering on
+ * exists:true makes that a clean no-op instead: there is genuinely nothing left to retire.
+ * @param {string} paymentId - Parse objectId of the Payment (its Mongo _id).
+ * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} 1/the new doc when the row
+ * was retired, 0/null when it had already moved past 'requires_payment' or was already deleted.
+ * @example
+ * const { matchedCount } = await atomicRetirePayment(pending.id); // 0 => already confirmed, leave it
+ */
+async function atomicRetirePayment(paymentId) {
+  if (!paymentId) throw new Error('paymentAtomicStore: paymentId is required');
+
+  const now = new Date();
+  const db = await getDb();
+  const result = await db.collection(PAYMENT_COLLECTION).findOneAndUpdate(
+    { _id: String(paymentId), gatewayStatus: { $in: [...RETIRABLE_STATUSES] }, exists: true },
+    {
+      $set: {
+        gatewayStatus: 'expired',
+        exists: false,
+        active: false,
+        deletedAt: now,
+        retiredBySystem: true,
+        _updated_at: now,
+      },
+    },
+    { returnDocument: 'after' }
+  );
+  return normalizeResult(result);
+}
+
+/**
+ * Atomically bring back a Payment that OUR housekeeping soft-deleted, once its charge is confirmed.
+ *
+ * PaymentService reads payments through queryExisting (exists:true), so a retired row stays out of
+ * paidAmount/balance forever even though the card cleared. This is the only sanctioned way back in,
+ * and it is gated by `retiredBySystem:true`: a row staff deleted on purpose has no such marker, so
+ * the filter matches nothing and the deliberate decision stands (the caller shouts instead).
+ *
+ * BaseModel.restore() is deliberately NOT used: it leaves the record active:false, it is a
+ * fetch-then-save on a row three other paths may be writing to in the same window, and it unsets
+ * deletedAt/deletedBy — erasing exactly the audit trail you want to keep on a money row that was
+ * retired and then resurrected. Those two stamps are kept here on purpose.
+ * @param {string} paymentId - Parse objectId of the Payment.
+ * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} 1/the new doc when the row
+ * was revived, 0/null when there was nothing to revive (never retired, already back, or deliberate).
+ * @example
+ * const { matchedCount } = await reviveIfSystemRetired(payment.id); // 1 => it is visible again
+ */
+async function reviveIfSystemRetired(paymentId) {
+  if (!paymentId) throw new Error('paymentAtomicStore: paymentId is required');
+
+  const db = await getDb();
+  const result = await db.collection(PAYMENT_COLLECTION).findOneAndUpdate(
+    { _id: String(paymentId), retiredBySystem: true, exists: false },
+    {
+      $set: {
+        exists: true, active: true, retiredBySystem: false, _updated_at: new Date(),
+      },
+    },
+    { returnDocument: 'after' }
+  );
+  return normalizeResult(result);
+}
+
+/**
+ * Stamp the reconciliation cursor on a Payment (unconditional on status, filtered by _id).
+ *
+ * Written ONLY after the provider actually answered, so a row whose lookup failed stays at the head
+ * of the next batch instead of being silently parked. It touches no money field and no lifecycle
+ * field, so it can never interfere with a transition racing it.
+ * @param {string} paymentId - Parse objectId of the Payment.
+ * @param {Date} [at] - The timestamp to record (defaults to now).
+ * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} 1 when the row exists.
+ * @example
+ * await stampReconciled(payment.id);
+ */
+async function stampReconciled(paymentId, at = new Date()) {
+  if (!paymentId) throw new Error('paymentAtomicStore: paymentId is required');
+
+  const db = await getDb();
+  const result = await db.collection(PAYMENT_COLLECTION).findOneAndUpdate(
+    { _id: String(paymentId) },
+    { $set: { lastReconciledAt: at, _updated_at: new Date() } },
+    { returnDocument: 'after' }
+  );
+  return normalizeResult(result);
+}
+
+/**
+ * Set ONE boolean audit marker on a Payment, filtered by _id only.
+ *
+ * Shared by the two markers below rather than exposed: a generic "set any field" on a money table is
+ * exactly the shape that turns into mass-assignment later, so the field name is never a caller's
+ * choice — each marker gets its own named, greppable function.
+ * @param {string} paymentId - Parse objectId of the Payment.
+ * @param {string} field - The marker column.
+ * @param {boolean} value - The value to store.
+ * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} 1 when the row exists.
+ */
+async function setMarker(paymentId, field, value) {
+  if (!paymentId) throw new Error('paymentAtomicStore: paymentId is required');
+
+  const db = await getDb();
+  const result = await db.collection(PAYMENT_COLLECTION).findOneAndUpdate(
+    { _id: String(paymentId) },
+    { $set: { [field]: value, _updated_at: new Date() } },
+    { returnDocument: 'after' }
+  );
+  return normalizeResult(result);
+}
+
+/**
+ * Flag a Payment as needing a refund review (a charge that landed on an already-cancelled
+ * reservation). A one-way audit marker, never a state machine.
+ * @param {string} paymentId - Parse objectId of the Payment.
+ * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} 1 when the row exists.
+ * @example
+ * await flagRefundReview(payment.id);
+ */
+function flagRefundReview(paymentId) {
+  return setMarker(paymentId, 'requiresRefundReview', true);
+}
+
+/**
+ * Flag a Payment whose charge was confirmed but whose reservation rollup then FAILED to be written.
+ *
+ * That state is the one hole the atomic transition cannot close by itself: the row is already
+ * 'succeeded' and visible, so it matches no reconciliation branch and no runbook query, yet the
+ * reservation still shows a balance for money that was really collected. The marker is what makes it
+ * findable — and, because the reconciliation treats it as its own candidate branch, self-healing.
+ * @param {string} paymentId - Parse objectId of the Payment.
+ * @param {boolean} [value] - False clears it once the rollup has been repaired.
+ * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} 1 when the row exists.
+ * @example
+ * await flagRollupRepair(payment.id); // and flagRollupRepair(id, false) once repaired
+ */
+function flagRollupRepair(paymentId, value = true) {
+  return setMarker(paymentId, 'requiresRollupRepair', value === true);
 }
 
 /**
@@ -140,4 +319,72 @@ async function closeForTests() {
   if (client) await client.close();
 }
 
-module.exports = { atomicTransitionPayment, setDbForTests, closeForTests };
+// Los ÚNICOS campos que backfillAuditFields puede escribir. Vive aquí y no en el llamador por la
+// misma razón que setMarker no expone el nombre del campo: en una tabla de dinero, "escribe lo que
+// te pasen" es la forma exacta que después se convierte en mass-assignment. Ninguno es monetario:
+// son rastro de auditoría (ids del proveedor y el crudo redactado con la discrepancia).
+const BACKFILLABLE_AUDIT_FIELDS = ['gatewayChargeId', 'gatewayIntentId', 'gatewayRaw'];
+
+/**
+ * Rellena campos de AUDITORÍA que la fila todavía no tiene, UNA escritura condicional POR CAMPO.
+ *
+ * Existe por la rama ambigua de applyConfirmation: cuando un evento hermano ya llevó la fila al
+ * destino, el update condicional no matchea y el `extraSet` del llamador se descarta ENTERO. Dos
+ * consumidores reales lo alimentan — el retorno del navegador (ids del proveedor) y la
+ * reconciliación (ids + el `gatewayRaw` que registra una discrepancia de monto/moneda contra
+ * Stripe). En el caso COMÚN (el webhook gana la carrera) esa discrepancia se quedaba solo en un log
+ * rotado, cuando es justo el dato que alguien va a querer consultar después.
+ *
+ * UNA POR CAMPO y no una sola combinada: combinarlas exigía que TODOS los campos propuestos
+ * siguieran ausentes (condiciones unidas por AND), y `gatewayIntentId` ya viene sellado desde
+ * buildChargeAndSave al crear la Checkout Session — o sea, siempre presente. El filtro no matcheaba
+ * jamás y no se rellenaba NADA, incluido el `gatewayRaw` que era el motivo del arreglo: la
+ * atomicidad se derrotaba a sí misma. Son tres escrituras como máximo, en una rama que solo corre
+ * cuando hubo carrera, así que el costo es irrelevante frente a perder el dato.
+ *
+ * Cada filtro sigue exigiendo que SU campo esté ausente, así que ninguna pisa lo que escribió el
+ * ganador; lo que cambia es que un campo ya escrito deja de bloquear a los demás.
+ * @param {string} paymentId - Parse objectId of the Payment.
+ * @param {object} fields - Campos propuestos; los que no estén en el allowlist se ignoran.
+ * @returns {Promise<{matchedCount: number, updatedDoc: (object|null)}>} Cuántos campos se rellenaron.
+ * @example
+ * await backfillAuditFields(payment.id, { gatewayChargeId: 'ch_1', gatewayRaw: { discrepancy } });
+ */
+async function backfillAuditFields(paymentId, fields) {
+  if (!paymentId) throw new Error('paymentAtomicStore: paymentId is required');
+  if (!fields || typeof fields !== 'object') return { matchedCount: 0, updatedDoc: null };
+
+  const proposed = BACKFILLABLE_AUDIT_FIELDS
+    .filter((field) => fields[field] !== undefined && fields[field] !== null && fields[field] !== '');
+  if (proposed.length === 0) return { matchedCount: 0, updatedDoc: null };
+
+  const db = await getDb();
+  let matchedCount = 0;
+  let updatedDoc = null;
+  for (const field of proposed) {
+    // eslint-disable-next-line no-await-in-loop
+    const result = await db.collection(PAYMENT_COLLECTION).findOneAndUpdate(
+      // null cubre también el campo ausente; '' cubre la fila que lo trae vacío.
+      { _id: String(paymentId), [field]: { $in: [null, ''] } },
+      { $set: { [field]: fields[field], _updated_at: new Date() } },
+      { returnDocument: 'after' }
+    );
+    const normalized = normalizeResult(result);
+    matchedCount += normalized.matchedCount;
+    if (normalized.updatedDoc) ({ updatedDoc } = normalized);
+  }
+  return { matchedCount, updatedDoc };
+}
+
+module.exports = {
+  atomicTransitionPayment,
+  atomicRetirePayment,
+  backfillAuditFields,
+  reviveIfSystemRetired,
+  stampReconciled,
+  flagRefundReview,
+  flagRollupRepair,
+  setDbForTests,
+  closeForTests,
+  RETIRABLE_STATUSES,
+};

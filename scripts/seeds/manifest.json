@@ -524,6 +524,23 @@
       ],
       "idempotent": true,
       "order": 28
+    },
+    {
+      "name": "029-payment-rollup-online-fields",
+      "file": "029-payment-rollup-online-fields.js",
+      "description": "Add Payment rollup-online fields (retiredBySystem/lastReconciledAt/requiresRefundReview) and the gatewaySessionId lookup index",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": [
+        "development",
+        "staging",
+        "production"
+      ],
+      "dependencies": [
+        "026-create-gatewayevent-class"
+      ],
+      "idempotent": true,
+      "order": 29
     }
   ],
   "notes": [

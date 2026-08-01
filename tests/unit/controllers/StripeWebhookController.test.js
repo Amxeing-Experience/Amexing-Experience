@@ -17,10 +17,13 @@
  * { gatewayStatus:'refunded', crossesThreshold:true } be tested before PR11 exists.
  */
 
-// The controller destructures atomicTransitionPayment at require time, so the module (not a property
+// The shared confirmation core destructures the store at require time, so the module (not a property
 // spy) is what has to be replaced. Layer B against a real Mongo is covered by the integration suites.
 jest.mock('../../../src/infrastructure/payments/paymentAtomicStore', () => ({
   atomicTransitionPayment: jest.fn(),
+  // Default: nothing to revive (the normal case). The tests that drive the revive opt in.
+  reviveIfSystemRetired: jest.fn().mockResolvedValue({ matchedCount: 0, updatedDoc: null }),
+  flagRefundReview: jest.fn().mockResolvedValue({ matchedCount: 1, updatedDoc: null }),
   setDbForTests: jest.fn(),
   closeForTests: jest.fn(),
 }));
@@ -488,6 +491,11 @@ describe('StripeWebhookController.applyToPayment — which transitions move the 
 
   const lastInfoMeta = () => infoSpy.mock.calls[infoSpy.mock.calls.length - 1][1];
 
+  // Parse.Query.prototype.get is shared by two very different reads now: the stale-rollup re-read of
+  // the PAYMENT, and the RESERVATION read that detects a charge confirmed on a cancelled booking.
+  // Counting by class is what keeps these assertions about the branch they actually mean.
+  const paymentReads = () => getSpy.mock.instances.filter((q) => q && q.className === 'Payment').length;
+
   beforeEach(() => {
     firstSpy = jest.spyOn(Parse.Query.prototype, 'first').mockResolvedValue(paymentDouble());
     getSpy = jest.spyOn(Parse.Query.prototype, 'get')
@@ -589,7 +597,9 @@ describe('StripeWebhookController.applyToPayment — which transitions move the 
       await StripeWebhookController.applyToPayment(anEvent(), SUCCESS);
       expect(recalcSpy).toHaveBeenCalledTimes(1);
       expect(healSpy).not.toHaveBeenCalled();
-      expect(getSpy).not.toHaveBeenCalled();
+      // No Payment is RE-READ: the stale-rollup branch was never entered. (A confirmed success does
+      // read the Reservation, to detect a charge landing on a cancelled booking — a different class.)
+      expect(paymentReads()).toBe(0);
     });
   });
 

@@ -6,6 +6,11 @@
  * is that authoritative confirmation — NOT the browser redirect, which the payer can skip, forge, or
  * simply close before it fires.
  *
+ * Since PR6 this is a THIN adapter over paymentConfirmation: it verifies the signature, applies
+ * Capa A, locates the Payment, and delegates. Everything a confirmation actually does to money — the
+ * conditional transition, the revive, the rollup — is shared with the polling endpoint and the
+ * reconciliation job, so the three can never drift apart.
+ *
  * Two independent idempotency layers, because they defend against different things.
  * Capa A (GatewayEvent + its UNIQUE (gateway,eventId) index) answers "we already saw THIS event": it is
  * written insert-first and catches the duplicate, never check-then-insert, so two simultaneous
@@ -28,12 +33,11 @@ const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 const BaseModel = require('../../../domain/models/BaseModel');
 const GatewayEvent = require('../../../domain/models/GatewayEvent');
-const PaymentService = require('../../services/PaymentService');
 const PaymentGatewayError = require('../../services/payments/PaymentGatewayError');
 const StripeAdapter = require('../../services/payments/gateways/StripeAdapter');
-const { translateEvent, allowedSourceStatuses } = require('../../services/payments/stripeWebhookEvents');
+const { translateEvent } = require('../../services/payments/stripeWebhookEvents');
+const { applyConfirmation } = require('../../services/payments/paymentConfirmation');
 const { redactGatewayPayload } = require('../../../infrastructure/payments/redactGatewayPayload');
-const { atomicTransitionPayment } = require('../../../infrastructure/payments/paymentAtomicStore');
 
 const GATEWAY_ID = 'stripe';
 
@@ -155,79 +159,17 @@ class StripeWebhookController {
   }
 
   /**
-   * Whether the Payment is ALREADY at `gatewayStatus` right now (fresh read, never the copy loaded
-   * before the conditional update).
-   *
-   * Only used to decide whether the rollup is worth CHECKING after Capa B matched nothing; it never
-   * decides the transition itself.
-   *
-   * A vanished row answers the question legitimately (it is not at the destination, and no retry would
-   * change that), so OBJECT_NOT_FOUND is the one error worth swallowing. Anything else — a Mongo blip, a
-   * timeout — is NOT swallowed: returning false there would answer 200 and stop Stripe from retrying,
-   * which is precisely how a stale rollup would become permanent, since a confirmed payment gets no
-   * further events to repair it later. Letting it propagate reaches the handler's catch, retracts the
-   * GatewayEvent and answers 500, which is the same "OUR failure, please retry" contract as the rest of
-   * this controller. The cost of being wrong in that direction is one redundant retry that finds the
-   * rollup current and writes nothing.
-   * @param {string} paymentId - Parse objectId of the Payment.
-   * @param {string} gatewayStatus - The destination status to compare against.
-   * @returns {Promise<boolean>} True when the row already holds that status.
-   * @example
-   * await StripeWebhookController.isAlreadyAt(payment.id, 'succeeded');
-   */
-  static async isAlreadyAt(paymentId, gatewayStatus) {
-    let current = null;
-    try {
-      current = await BaseModel.queryAll('Payment').get(paymentId, { useMasterKey: true });
-    } catch (readErr) {
-      if (readErr && readErr.code === Parse.Error.OBJECT_NOT_FOUND) return false;
-      throw readErr;
-    }
-    return !!current && current.get('gatewayStatus') === gatewayStatus;
-  }
-
-  /**
-   * Shout when we just confirmed money the rollup CANNOT see.
-   *
-   * `loadAndCompute` reads payments through `queryExisting` (exists:true), so a soft-deleted row — retired
-   * by `retirePending`, or removed by `PaymentController.deletePayment` — stays out of paidAmount/balance
-   * forever even though the card really cleared. Admitting 'expired' as a source toward 'succeeded' is what
-   * makes this reachable and, more to the point, DETECTABLE: the row now reads 'succeeded' instead of being
-   * indistinguishable from an abandoned checkout, so `gatewayStatus:'succeeded' AND exists:false` is an
-   * exact query for stranded money.
-   *
-   * It shouts instead of acting on purpose. Restoring `exists` here would resurrect a record staff may have
-   * deleted deliberately, which is a product decision and not this PR's to make.
-   * @param {object} event - The verified Stripe event (for the ids in the log).
-   * @param {object} payment - The Payment that was just transitioned.
-   * @param {object} destination - The translated destination.
-   * @param {boolean} movedTheRollup - True when this transition is the one that drives the rollup; a no-op
-   * or a non-counting destination has nothing to strand and stays silent.
-   * @returns {void} Nothing; the effect is the log.
-   * @example
-   * StripeWebhookController.warnIfInvisibleToRollup(event, payment, destination, shouldRecalculate);
-   */
-  static warnIfInvisibleToRollup(event, payment, destination, movedTheRollup) {
-    if (!movedTheRollup) return;
-    // Defensive read, same style as the getReservationPtr guard below: a real Parse object always has get.
-    const softDeleted = !!payment.get && payment.get('exists') === false;
-    if (!softDeleted) return;
-    logger.error('CRITICAL: confirmed a gateway payment that the rollup cannot see (soft-deleted row); the reservation balance will NOT reflect this charge until it is reconciled', {
-      eventId: event.id,
-      type: event.type,
-      paymentId: payment.id,
-      gatewayStatus: destination.gatewayStatus,
-    });
-  }
-
-  /**
    * Capa B + rollup: apply the destination status to the Payment this event points at.
    *
+   * Everything past "which Payment is this" is delegated to paymentConfirmation, the ONE
+   * implementation shared with the browser-return polling and the reconciliation job: the atomic
+   * transition, the revive of a row our housekeeping had retired, the rollup decision
+   * (recalculate vs. verify) and the reporting all live there. This controller's remaining job is
+   * webhook-specific: correlate the event to a row, and translate the outcome into the boolean the
+   * HTTP answer needs.
+   *
    * Returns false (a clean no-op, never an error) for every case that must not move money: an
-   * uncorrelatable paymentId, or a Payment already past the allowed source states. A no-op still
-   * VERIFIES the reservation rollup when the Payment is already at the destination (see below), which
-   * repairs a delivery that died between Capa B and the recalculate without ever rewriting a rollup
-   * that is already correct.
+   * uncorrelatable paymentId, or a Payment already past the allowed source states.
    * @param {object} event - The verified Stripe event.
    * @param {object} destination - The translated destination { gatewayStatus, crossesThreshold }.
    * @returns {Promise<boolean>} True when the Payment actually transitioned.
@@ -246,75 +188,13 @@ class StripeWebhookController {
       return false;
     }
 
-    // Conditional, atomic. Only 'succeeded' stamps confirmedAt. The source allowlist is per DESTINATION
-    // (stripeWebhookEvents): 'succeeded' also accepts a 'failed'/'expired' row, because a declined card
-    // leaves the session open for a retry with another card on the same PaymentIntent and paymentId.
-    const isSuccess = destination.gatewayStatus === 'succeeded';
-    const { matchedCount } = await atomicTransitionPayment(payment.id, {
-      fromStatuses: allowedSourceStatuses(destination.gatewayStatus),
-      toStatus: destination.gatewayStatus,
-      extraSet: isSuccess ? { confirmedAt: new Date() } : {},
+    const outcome = await applyConfirmation({
+      payment,
+      destination,
+      source: 'webhook',
+      logContext: { eventId: event.id, type: event.type },
     });
-
-    // The rollup moves if and only if the transition ACTUALLY crosses the counts/does-not-count line of
-    // PaymentService.countsInRollup — that is what `crossesThreshold` means (stripeWebhookEvents.js), and
-    // it is deliberately NOT the same thing as "this event means success" (`isSuccess`, used only for
-    // confirmedAt above). Today the two happen to coincide (only 'succeeded' counts), but PR11 will add
-    // charge.refunded with { gatewayStatus:'refunded', crossesThreshold:true } — keying on isSuccess would
-    // silently skip the rollup for a refund. Keying on matchedCount (not on the event type) is what makes
-    // the two success events converge into exactly one recalculate, whichever of them wins the race.
-    const shouldRecalculate = matchedCount === 1 && destination.crossesThreshold;
-    StripeWebhookController.warnIfInvisibleToRollup(event, payment, destination, shouldRecalculate);
-
-    // The OTHER branch: matchedCount 0 on a counting destination when the Payment is ALREADY at that
-    // destination. Capa B can succeed and THEN recalculate throw below, which makes the outer catch
-    // retract the GatewayEvent so Stripe retries; that retry clears Capa A but no longer matches Capa B's
-    // filter, so keying the rollup only on matchedCount would abandon it forever — a paid reservation
-    // showing a balance with nothing left to retry it.
-    //
-    // This evidence is AMBIGUOUS on purpose and must never be read as "rewrite the rollup": the exact
-    // same state is what a perfectly ordinary sibling event sees (checkout.session.completed and
-    // payment_intent.succeeded both mean 'succeeded' for the same paymentId, and the loser of that race
-    // finds the Payment already at the destination too). So it only decides "this is worth CHECKING".
-    // recalculateIfStale does the unambiguous part: inside the same per-reservation lock, it compares the
-    // persisted rollup against a fresh computation and writes only when they differ. A dead delivery left
-    // a stale rollup and gets repaired; a sibling event queues behind the winner's recalculate, re-reads
-    // what the winner persisted, finds it current and writes nothing.
-    const shouldCheckStaleRollup = !shouldRecalculate
-      && matchedCount === 0
-      && destination.crossesThreshold
-      && await StripeWebhookController.isAlreadyAt(payment.id, destination.gatewayStatus);
-
-    let repairedStaleRollup = false;
-    if (shouldRecalculate || shouldCheckStaleRollup) {
-      // The reservation comes from the Payment we just loaded from OUR database, never from
-      // metadata.reservationId: metadata travels with the event and is only as trustworthy as the event,
-      // while the Payment's own reservationPtr is the authoritative link.
-      const reservationPtr = payment.getReservationPtr && payment.getReservationPtr();
-      const reservationId = reservationPtr && reservationPtr.id;
-      if (!reservationId) {
-        logger.error('Confirmed online Payment has no reservationPtr; rollup could not be recalculated', {
-          eventId: event.id, paymentId: payment.id,
-        });
-      } else if (shouldRecalculate) {
-        await PaymentService.recalculate(reservationId);
-      } else {
-        const outcome = await PaymentService.recalculateIfStale(reservationId);
-        repairedStaleRollup = !!(outcome && outcome.healed);
-      }
-    }
-
-    logger.info('Stripe webhook processed', {
-      eventId: event.id,
-      type: event.type,
-      paymentId: payment.id,
-      gatewayStatus: destination.gatewayStatus,
-      applied: matchedCount === 1,
-      recalculated: shouldRecalculate,
-      staleRollupChecked: shouldCheckStaleRollup,
-      staleRollupRepaired: repairedStaleRollup,
-    });
-    return matchedCount === 1;
+    return outcome.applied;
   }
 
   /**
