@@ -211,36 +211,34 @@
 
     <!-- Services by Day -->
     <div class="svc-wrap">
-        <div class="fin-section-head">
-            <h5 class="fin-section-title"><i class="ti ti-list-details me-2"></i>Servicios</h5>
-            <!-- Dos acciones sobre el mismo documento, en el segmento que la página ya usa para
-                 exportar: ver en pantalla y descargar. Antes era un solo control, así que solo se
-                 podía hacer una de las dos. -->
-            <span class="hdr-seg d-none" id="exportItinerarySeg" role="group" aria-label="Itinerario">
-                <a class="hdr-seg-btn" id="previewItineraryBtn" href="#" target="_blank" rel="noopener"
-                   title="Ver el itinerario en pantalla"><i class="ti ti-eye"></i>Ver itinerario</a>
-                <a class="hdr-seg-btn" id="downloadItineraryBtn" href="#"
-                   title="Descargar el itinerario en PDF"><i class="ti ti-download"></i>PDF</a>
-            </span>
-        </div>
-        <!-- Identidad del documento: quién viaja, cuándo, cuántos y cuánto se lleva asignado. Son los
-             mismos datos que encabezan el PDF del itinerario, y vivían como celdas sueltas en la
-             tarjeta de arriba, lejos de los servicios que describen. Aquí hacen que el panel se lea
-             como el documento que se manda. -->
+        <!-- El encabezado del panel es el DOCUMENTO, no el rótulo de la sección. "Servicios" nombraba
+             lo que ya se ve —una lista de traslados y tours con sus iconos— y era uno de dos títulos
+             cuando existía el Resumen Financiero; ese se fue a la barra fija, así que ya no distingue
+             de nada. En su lugar encabezan las fechas, que es como se identifica un itinerario.
+             Eran dos filas de encabezado apiladas (rótulo + exportar, luego identidad + avance);
+             ahora es una: identidad a la izquierda, exportar y avance a la derecha. -->
         <div class="svc-doc" id="svcDocLine">
             <div class="svc-doc-id">
-                <div class="svc-doc-quien" id="docLeadGuest">&mdash;</div>
-                <div class="svc-doc-meta">
-                    <span id="docDates">&mdash;</span>
-                    <span class="svc-doc-menor" id="docNights"></span>
-                    <span class="svc-doc-sep">·</span>
-                    <span id="docPeople">&mdash;</span>
-                </div>
+                <h5 class="svc-doc-quien" id="docTitulo">&mdash;</h5>
+                <div class="svc-doc-meta" id="docMeta"></div>
             </div>
-            <div class="svc-doc-avance">
-                <div class="svc-doc-cap">Asignación</div>
-                <div class="svc-doc-cifra" id="docAssignCounter"></div>
-                <div class="svc-doc-barra d-none" id="docAssignProgress"><span id="docAssignBar"></span></div>
+            <div class="svc-doc-acciones">
+                <!-- Dos acciones sobre el mismo documento, en el segmento que la página ya usa para
+                     exportar: ver en pantalla y descargar. Antes era un solo control, así que solo se
+                     podía hacer una de las dos. -->
+                <span class="hdr-seg d-none" id="exportItinerarySeg" role="group" aria-label="Itinerario">
+                    <a class="hdr-seg-btn" id="previewItineraryBtn" href="#" target="_blank" rel="noopener"
+                       title="Ver el itinerario en pantalla"><i class="ti ti-eye"></i>Ver itinerario</a>
+                    <a class="hdr-seg-btn" id="downloadItineraryBtn" href="#"
+                       title="Descargar el itinerario en PDF"><i class="ti ti-download"></i>PDF</a>
+                </span>
+                <div class="svc-doc-avance">
+                    <div class="svc-doc-avance-linea">
+                        <span class="svc-doc-cap">Asignación</span>
+                        <span class="svc-doc-cifra" id="docAssignCounter"></span>
+                    </div>
+                    <div class="svc-doc-barra d-none" id="docAssignProgress"><span id="docAssignBar"></span></div>
+                </div>
             </div>
         </div>
         <div id="servicesContainer">
@@ -1251,45 +1249,41 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (d.contactPhone) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactPhone));
         document.getElementById('infoContact').innerHTML = contactLines.length ? contactLines.join('<br>') : '&mdash;';
         document.getElementById('infoEventType').textContent = d.eventType || '—';
-        const peopleEl = document.getElementById('docPeople');
-        if (peopleEl) {
-            const n = Number(d.numberOfPeople) || 0;
-            peopleEl.textContent = n ? `${n} ${n === 1 ? 'persona' : 'personas'}` : '—';
-        }
-
-        // Lead guest — only render row when at least one name is present. Falls back to
-        // contactFirstName/contactPerson so a reservation that has the actual traveler in
-        // the contact fields still surfaces it as the lead guest.
+        // Pasajero: lead guest si existe, y si no el contacto —muchas reservaciones traen al viajero
+        // real en los campos de contacto—. Encabeza el panel solo cuando no hay fechas.
         const leadGuestParts = [d.leadGuestFirstName, d.leadGuestLastName]
             .map((p) => (p || '').trim())
             .filter(Boolean);
         const leadGuestName = leadGuestParts.length > 0
             ? leadGuestParts.join(' ')
             : (d.contactPerson || '').trim();
-        // Encabeza la línea del documento. Ya no necesita reservar su lugar en una rejilla —era el
-        // motivo de .is-empty—: en una línea corrida, si no hay lead guest simplemente no se escribe.
-        const leadGuestEl = document.getElementById('docLeadGuest');
-        if (leadGuestEl) leadGuestEl.textContent = leadGuestName || '—';
+        // El panel se encabeza con el rango de fechas: es lo que identifica un itinerario y lo que
+        // mas veces existe. Sobre las 77 reservaciones de la base: 63 traen fechas, 45 traen pasajero
+        // (solo 6 un lead guest de verdad; el resto cae al contacto) y 13 no traen ninguno de los dos.
+        // De ahi la cascada fecha -> pasajero -> "Servicios": el rotulo generico deja de ser el titulo
+        // de siempre y pasa a ser el ultimo recurso, el unico caso en que no hay dato que poner.
+        const rango = (d.startDate ? formatDateRange(d.startDate, d.endDate) : '').trim();
+        const tituloEl = document.getElementById('docTitulo');
+        const icono = rango ? 'ti-calendar-event' : leadGuestName ? 'ti-user' : 'ti-list-details';
+        tituloEl.innerHTML = `<i class="ti ${icono} svc-doc-icono"></i>`
+            + (rango || (leadGuestName ? PaymentBreakdownHelpers.escapeHtml(leadGuestName) : 'Servicios'));
 
-        // Quote-level notes — same callout style as service notes.
-        const quoteNotesRow = document.getElementById('infoQuoteNotesRow');
-        const quoteNotesEl = document.getElementById('infoQuoteNotes');
-        const quoteNotesText = (d.notes || '').trim();
-        if (quoteNotesText && quoteNotesEl && quoteNotesRow) {
-            quoteNotesEl.textContent = quoteNotesText;
-            quoteNotesRow.classList.remove('d-none');
+        // Duración (noches) = diferencia en días; se omite en reservaciones de un solo día.
+        let noches = '';
+        if (d.startDate && d.endDate) {
+            const n = Math.max(0, Math.round((new Date(d.endDate) - new Date(d.startDate)) / 86400000));
+            noches = n <= 0 ? '' : (n === 1 ? '1 noche' : `${n} noches`);
         }
-        document.getElementById('docDates').innerHTML = formatDateRange(d.startDate, d.endDate);
-        // Duración (noches) = diferencia en días; se oculta en reservaciones de un solo día.
-        const nightsEl = document.getElementById('docNights');
-        if (nightsEl) {
-            if (d.startDate && d.endDate) {
-                const nights = Math.max(0, Math.round((new Date(d.endDate) - new Date(d.startDate)) / 86400000));
-                nightsEl.textContent = nights <= 0 ? '' : (nights === 1 ? '1 noche' : `${nights} noches`);
-            } else {
-                nightsEl.textContent = '';
-            }
-        }
+        const personas = Number(d.numberOfPeople) || 0;
+        // Se arma la lista y se une con separadores, en vez de spans fijos: asi un dato que falta no
+        // deja su "·" colgando. El pasajero solo baja aqui si NO es ya el titulo.
+        const meta = [
+            noches ? `<span class="svc-doc-menor">${noches}</span>` : '',
+            personas ? `${personas} ${personas === 1 ? 'persona' : 'personas'}` : '',
+            (rango && leadGuestName) ? PaymentBreakdownHelpers.escapeHtml(leadGuestName) : '',
+        ].filter(Boolean);
+        document.getElementById('docMeta').innerHTML = meta.join('<span class="svc-doc-sep">·</span>');
+
         // Tipo de Pago y Total se movieron fuera de este encabezado: el Tipo de Pago ahora se
         // muestra dentro del "Resumen Financiero" (renderFinancialSummary), donde también vive el
         // Total; así el encabezado queda solo con datos generales.

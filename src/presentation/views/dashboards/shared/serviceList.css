@@ -485,7 +485,7 @@
    --------------------------------------------------------------------------- */
 .svc-doc {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
@@ -502,6 +502,7 @@
 }
 .svc-doc-id { min-width: 0; }
 .svc-doc-quien {
+  margin: 0;
   font-size: 1.12rem;
   font-weight: 700;
   color: #2b2b2b;
@@ -519,9 +520,25 @@
 .svc-doc-menor { color: #8a8f78; font-style: italic; }
 .svc-doc-sep { color: #c9cdbb; }
 
+/* Columna derecha del encabezado: exportar arriba, avance abajo. Antes vivían en dos filas
+   distintas —los botones colgaban del título "Servicios" y el avance de la línea del documento—,
+   así que el panel gastaba dos encabezados apilados para dos cosas que caben en uno. */
+.svc-doc-acciones {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+/* El icono del título dice de qué clase es el encabezado: fechas, pasajero o el rótulo genérico. */
+.svc-doc-icono { margin-right: 9px; color: #6E7A50; font-size: .96em; }
+
 /* El avance es el estado del TRABAJO, no parte de la identidad: se separa al extremo opuesto y
    lleva su propio rótulo, para que no se lea como un dato más del viaje. */
 .svc-doc-avance { flex: none; text-align: right; }
+/* Rótulo y cifra en el mismo renglón: apilados sumaban un tercer nivel a una columna que ya lleva
+   los botones encima, y el encabezado crecía más alto que el dato que encabeza. */
+.svc-doc-avance-linea { display: flex; align-items: baseline; justify-content: flex-end; gap: 9px; }
 .svc-doc-cap {
   font-size: .6rem;
   font-weight: 700;
