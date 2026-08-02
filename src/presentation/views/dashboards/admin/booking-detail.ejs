@@ -220,6 +220,7 @@
         <div class="svc-doc" id="svcDocLine">
             <div class="svc-doc-id">
                 <h5 class="svc-doc-quien" id="docTitulo">&mdash;</h5>
+                <div class="svc-doc-pax d-none" id="docPax"></div>
                 <div class="svc-doc-meta" id="docMeta"></div>
             </div>
             <div class="svc-doc-acciones">
@@ -1280,9 +1281,27 @@ document.addEventListener('DOMContentLoaded', async function() {
         const meta = [
             noches ? `<span class="svc-doc-menor">${noches}</span>` : '',
             personas ? `${personas} ${personas === 1 ? 'persona' : 'personas'}` : '',
-            (rango && leadGuestName) ? PaymentBreakdownHelpers.escapeHtml(leadGuestName) : '',
         ].filter(Boolean);
         document.getElementById('docMeta').innerHTML = meta.join('<span class="svc-doc-sep">·</span>');
+
+        // El pasajero va en su propio renglon, no perdido entre las noches y las personas: es QUIEN
+        // viaja, no un dato mas de la ficha. Solo aparece aqui cuando el titulo son las fechas; si el
+        // titulo ya es el, no se dice dos veces.
+        const paxEl = document.getElementById('docPax');
+        paxEl.classList.toggle('d-none', !(rango && leadGuestName));
+        if (rango && leadGuestName) {
+            paxEl.innerHTML = `<i class="ti ti-user svc-doc-pax-icono"></i>`
+                + PaymentBreakdownHelpers.escapeHtml(leadGuestName);
+        }
+
+        // Notas de la cotización: mismo bloque de siempre, al pie de la tarjeta de arriba.
+        const quoteNotesRow = document.getElementById('infoQuoteNotesRow');
+        const quoteNotesEl = document.getElementById('infoQuoteNotes');
+        const quoteNotesText = (d.notes || '').trim();
+        if (quoteNotesText && quoteNotesEl && quoteNotesRow) {
+            quoteNotesEl.textContent = quoteNotesText;
+            quoteNotesRow.classList.remove('d-none');
+        }
 
         // Tipo de Pago y Total se movieron fuera de este encabezado: el Tipo de Pago ahora se
         // muestra dentro del "Resumen Financiero" (renderFinancialSummary), donde también vive el
