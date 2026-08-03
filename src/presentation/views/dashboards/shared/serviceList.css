@@ -605,19 +605,14 @@
 .dashboard-content:has(.pay-bar) { padding-bottom: 104px; }
 
 .pay-bar-inner {
-  /* Tope de ancho y centrado. Sin tope, el botón —que lleva margin-left:auto— se plantaba en el
-     borde derecho de la VENTANA y en una pantalla muy ancha quedaba fuera de la vista. El tope lo
-     ata a un bloque de 1400 px; el centrado reparte el sobrante a los dos lados en vez de dejarlo
-     todo a la derecha. Bajo 1400 px la barra ocupa el ancho completo y el reparto no cambia. */
-  max-width: calc(1400px + 4rem);
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 16px 2rem;
+  padding: 16px 24px;
   display: flex;
   align-items: center;
   gap: 28px;
   flex-wrap: wrap;
 }
-@media (max-width: 767.98px) { .pay-bar-inner { padding: 14px 1rem; } }
 .pay-bar-cifra { display: flex; align-items: baseline; gap: 8px; flex: none; }
 .pay-bar-lbl {
   font-size: .68rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: #8a8f78;
@@ -626,7 +621,7 @@
 /* Sin saldo no hay nada que reclamar: deja el ámbar, que es la señal de que falta algo. */
 .pay-bar-val.is-cubierto { color: #4b6b3f; }
 
-.pay-bar-prog { flex: 1 1 200px; min-width: 150px; max-width: 620px; }
+.pay-bar-prog { flex: 1 1 200px; min-width: 150px; }
 .pay-bar-track { height: 7px; border-radius: 999px; background: #eceadf; overflow: hidden; }
 .pay-bar-track > span { display: block; height: 100%; width: 0; border-radius: 999px; background: #4b6b3f; transition: width .35s ease; }
 .pay-bar-pie {
