@@ -510,3 +510,56 @@
     padding: 0.15rem 0.4rem;
     font-weight: 500;
 }
+
+/* ---------------------------------------------------------------------------
+   Cobertura del carrito de pagos (buildCoverageCard).
+   Era una tarjeta blanca con filete de acento flotando sobre un fondo gris,
+   dentro de un panel que ya es una superficie: marco dentro de marco. Ahora lo
+   que separa es la jerarquía —rótulo en versalitas, cifra grande, barra—.
+   --------------------------------------------------------------------------- */
+.pay-cob-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.pay-cob-cap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;
+  letter-spacing:.1em;font-size:.72rem;font-weight:700;color:#8a8f78;}
+.pay-cob-total{font-size:2.05rem;font-weight:700;color:#2b2b2b;line-height:1.1;margin-top:5px;}
+.pay-cob-metodo{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.05em;color:#566040;background:#eef0e6;
+  border:1px solid #dce2d0;border-radius:999px;padding:.26rem .66rem;}
+.pay-cob-estado{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;
+  border-radius:999px;padding:.44rem .85rem;white-space:nowrap;}
+.pay-cob-punto{width:8px;height:8px;border-radius:50%;background:currentColor;}
+.pay-cob-estado.is-neutro{background:#f0eee7;color:#6b6656;border:1px solid #ded9cb;}
+.pay-cob-estado.is-parcial{background:#f6efe2;color:#96682f;border:1px solid #e7d6bd;}
+.pay-cob-estado.is-pagado{background:#e6efe1;color:#3f5a34;border:1px solid #cfe0c6;}
+.pay-cob-estado.is-favor{background:#eaf1f0;color:#3a6b63;border:1px solid #cfe1dd;}
+.pay-cob-barra{height:11px;border-radius:999px;background:#f0e5d0;overflow:hidden;margin:14px 0 0;}
+.pay-cob-barra > span{display:block;height:100%;border-radius:999px;background:#4b6b3f;}
+.pay-cob-pct{text-align:right;font-size:.82rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;color:#8a8f78;margin-top:7px;}
+.pay-cob-par{display:flex;justify-content:space-between;gap:12px;margin-top:16px;}
+.pay-cob-der{text-align:right;}
+.pay-cob-cap-sm{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
+.pay-cob-cifra{font-weight:700;font-size:1.55rem;color:#b8894a;}
+.pay-cob-cifra.is-pagado,.pay-cob-cifra.is-cubierto{color:#4b6b3f;}
+.pay-cob-ahorro{margin-top:14px;}
+.pay-cob-ahorro-tit{font-weight:600;color:#146c43;display:flex;align-items:center;gap:6px;}
+.pay-cob-ahorro-sub{font-size:.85rem;color:#146c43;}
+
+/* Secciones del carrito: un rótulo en versalitas y un filete arriba, en vez de una tarjeta cada una. */
+.pay-sec{margin-top:26px;padding-top:22px;border-top:1px solid #e6e1d5;}
+.pay-cap{text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;font-weight:700;
+  color:#8a8f78;margin-bottom:12px;}
+
+/* Comparativo por método: nombre, total y la diferencia contra el actual. Sin caja y sin columnas
+   de Cubierto/Restante —esas cifras solo importan del método vigente, y ese ya va arriba—. */
+.pay-cmp-row{display:flex;align-items:center;gap:12px;padding:10px 10px;border-radius:8px;}
+.pay-cmp-row.is-actual{background:#f1f2ec;}
+.pay-cmp-met{display:flex;align-items:center;gap:8px;color:#4a4a44;font-weight:600;flex:1;min-width:0;}
+.pay-cmp-met i{color:#8a8f78;}
+.pay-cmp-monto{font-weight:700;color:#2b2b2b;white-space:nowrap;}
+.pay-cmp-dif{font-weight:700;font-size:.82rem;white-space:nowrap;min-width:76px;text-align:right;}
+.pay-cmp-dif.is-mas{color:#b8894a;}
+.pay-cmp-dif.is-menos{color:#4b6b3f;}
+.pay-cmp-dif.is-igual{color:#8a8f78;}
+.pay-cmp-dif.is-actual{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:#566040;}
+.pay-cmp-barato{font-size:.58rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;
+  color:#3f5a34;background:#e6efe1;border:1px solid #cfe0c6;border-radius:6px;padding:.08rem .42rem;}

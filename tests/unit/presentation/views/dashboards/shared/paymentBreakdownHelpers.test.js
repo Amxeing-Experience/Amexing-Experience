@@ -296,7 +296,8 @@ describe('PaymentBreakdownHelpers.buildCoverageCard', () => {
   it('coverage card muestra la línea de ahorro cuando paid + balance > 0', () => {
     const html = H.buildCoverageCard({ paymentStatus: 'paid', balance: 500, paidAmount: 2000, coveragePercent: 100 }, 'MXN');
     expect(html).toContain('Descuento de $500.00');
-    expect(html).toContain('#146c43');
+    // El verde del descuento vive en la hoja (.pay-cob-ahorro-tit), no en un style en línea.
+    expect(html).toContain('pay-cob-ahorro');
   });
 
   it('muestra el método cotizado como chip junto al Total a pagar', () => {

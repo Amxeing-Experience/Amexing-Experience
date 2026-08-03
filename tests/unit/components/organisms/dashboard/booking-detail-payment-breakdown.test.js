@@ -82,21 +82,22 @@ describe('Booking Detail Fase 3 — admin (nivel 6+)', () => {
   beforeAll(async () => { html = await render('admin'); });
 
   // El comparativo dejó de tener un enlace propio ("Ver comparativo por método de pago"): ahora lo
-  // dispara el CHIP de método del hero, que queda pegado a lo que explica en vez de ser una sección
-  // suelta. Sigue siendo un collapse inline con el mismo id.
-  it('el chip de método del hero dispara el comparativo colapsable', () => {
-    expect(html).toContain('id="paymentMethodComparison"');
-    expect(html).toContain('fin-hero-method');
-    expect(html).toContain('data-bs-target="#paymentMethodComparison"');
-    expect(html).not.toContain('id="paymentMethodComparisonToggle"');
+  // dispara el CHIP de método del hero. En ADMIN dejó de colgar de un chip: el comparativo tiene su
+  // propia sección, siempre visible, arriba del desglose (el chip además llamaba a toggleSavingsHint,
+  // que en esta vista nunca se definió). Las vistas de agencia conservan el collapse.
+  it('el comparativo de admin es una sección visible, no un collapse', () => {
+    expect(html).toContain('id="payCmp"');
+    expect(html).toContain('Total según el método');
+    expect(html).not.toContain('id="paymentMethodComparison"');
+    expect(html).not.toContain('data-bs-target="#paymentMethodComparison"');
   });
 
   // El método actual se marca con un badge "Actual" en su fila del comparativo (antes: un punto
   // ti-point-filled + el texto "Método actual:" fuera de la tabla).
   it('marca el método actual con el badge "Actual" en su fila del comparativo', () => {
-    expect(html).toContain('fin-cmp-badge');
+    expect(html).toContain('pay-cmp-dif is-actual');
     expect(html).toContain('>Actual<');
-    expect(html).toContain('fin-cmp-row');
+    expect(html).toContain('pay-cmp-row');
   });
 
   it('N2: la propina salió de scope — ni la fila resumen ni el toggle "Ver propina por servicio" están en el DOM', () => {
@@ -143,12 +144,18 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
   // desde el chip de método del hero. Es informativo (compara el mismo total en cada método, con datos
   // que ya tienen en pantalla) y no expone ninguna acción ni dato nuevo — a diferencia de los AJUSTES,
   // que siguen siendo admin-only porque su endpoint lo es.
-  it.each(['admin', ...AGENCY_ROLES])('%s: comparativo de 3 métodos desplegable desde el chip', async (role) => {
-    const html = await render(role);
-    const fuente = role === 'admin' ? html : FUENTE_FINANZAS;
-    expect(fuente).toContain('id="paymentMethodComparison"');
-    expect(fuente).toContain('Total a pagar según el método de pago:');
-    expect(fuente).toContain('fin-cmp-badge');
+  it.each(AGENCY_ROLES)('%s: comparativo de 3 métodos desplegable desde el chip', async (role) => {
+    await render(role);
+    expect(FUENTE_FINANZAS).toContain('id="paymentMethodComparison"');
+    expect(FUENTE_FINANZAS).toContain('Total a pagar según el método de pago:');
+    expect(FUENTE_FINANZAS).toContain('fin-cmp-badge');
+  });
+
+  // Admin lo tiene siempre a la vista en vez de detrás del chip.
+  it('admin: el comparativo no se esconde detrás del chip', async () => {
+    const html = await render('admin');
+    expect(html).toContain('id="payCmp"');
+    expect(html).toContain('pay-cmp-row');
   });
 
   // RBAC — /adjustments es requireRole(['admin','superadmin']); la agencia NO debe ni ver el control.
@@ -195,8 +202,16 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).toContain('id="tabPago"');
     expect(html).toContain('id="tabHistorial"');
     expect(html).toContain('id="paymentCoverageCard"');
-    expect(html).toContain('id="paymentMethodTable"');
-    expect(html).toContain('Por método de pago');
+    // En ADMIN el comparativo por método dejó de ser una tabla de cuatro columnas al fondo del
+    // carrito y pasó a su propia sección, arriba del desglose y siempre a la vista. Las vistas de
+    // agencia todavía llevan la tabla.
+    if (role === 'admin') {
+      expect(html).toContain('id="payCmp"');
+      expect(html).toContain('Total según el método');
+      expect(html).not.toContain('id="paymentMethodTable"');
+    } else {
+      expect(html).toContain('id="paymentMethodTable"');
+    }
     expect(html).not.toContain('id="viewPaymentsBtn"');
     // Consume el endpoint AMPLIO (GET .../payments), no el objeto angosto de getReservationById.
     expect(html).toContain('/payments');
