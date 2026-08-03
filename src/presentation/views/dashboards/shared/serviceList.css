@@ -605,14 +605,18 @@
 .dashboard-content:has(.pay-bar) { padding-bottom: 104px; }
 
 .pay-bar-inner {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 16px 24px;
+  /* SIN max-width ni centrado. Los tenía (1400 px, margin auto) y en una pantalla ancha la barra se
+     centraba respecto de la VENTANA mientras el contenido de la página ocupa todo el ancho con
+     2 rem de relleno: el saldo arrancaba a media pantalla y el botón quedaba flotando lejos del
+     borde, a veces fuera de la vista. Ahora la barra usa el mismo relleno que .dashboard-content,
+     así que el saldo cae bajo el borde izquierdo del contenido y el botón bajo el derecho. */
+  padding: 16px 2rem;
   display: flex;
   align-items: center;
   gap: 28px;
   flex-wrap: wrap;
 }
+@media (max-width: 767.98px) { .pay-bar-inner { padding: 14px 1rem; } }
 .pay-bar-cifra { display: flex; align-items: baseline; gap: 8px; flex: none; }
 .pay-bar-lbl {
   font-size: .68rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: #8a8f78;
@@ -621,7 +625,7 @@
 /* Sin saldo no hay nada que reclamar: deja el ámbar, que es la señal de que falta algo. */
 .pay-bar-val.is-cubierto { color: #4b6b3f; }
 
-.pay-bar-prog { flex: 1 1 200px; min-width: 150px; }
+.pay-bar-prog { flex: 1 1 200px; min-width: 150px; max-width: 620px; }
 .pay-bar-track { height: 7px; border-radius: 999px; background: #eceadf; overflow: hidden; }
 .pay-bar-track > span { display: block; height: 100%; width: 0; border-radius: 999px; background: #4b6b3f; transition: width .35s ease; }
 .pay-bar-pie {
