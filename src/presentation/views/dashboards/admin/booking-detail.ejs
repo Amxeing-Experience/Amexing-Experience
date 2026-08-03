@@ -818,16 +818,23 @@
 
 /* Comparativo por método: nombre, total y la diferencia contra el actual. Sin caja y sin columnas
    de Cubierto/Restante —esas cifras solo importan del método vigente, y ese ya va arriba—. */
-.pay-cmp-row{display:flex;align-items:center;gap:12px;padding:10px 10px;border-radius:8px;}
+/* Cuatro columnas: el método, cuánto suma en él, cuánto de eso ya está cubierto —con su
+   porcentaje, que es distinto en cada método porque el total lo es— y cuánto falta. */
+.pay-cmp-row{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;
+  column-gap:26px;padding:11px 10px;border-radius:8px;}
 .pay-cmp-row.is-actual{background:#f1f2ec;}
-.pay-cmp-met{display:flex;align-items:center;gap:8px;color:#4a4a44;font-weight:600;flex:1;min-width:0;}
+.pay-cmp-row.is-cabeza{padding-bottom:7px;text-transform:uppercase;letter-spacing:.07em;
+  font-size:.66rem;font-weight:700;color:#8a8f78;border-bottom:1px solid #ece8dd;border-radius:0;}
+.pay-cmp-row.is-cabeza > span:not(:first-child){text-align:right;}
+.pay-cmp-met{display:flex;align-items:center;gap:8px;color:#4a4a44;font-weight:600;min-width:0;}
 .pay-cmp-met i{color:#8a8f78;}
-.pay-cmp-monto{font-weight:700;color:#2b2b2b;white-space:nowrap;}
-.pay-cmp-dif{font-weight:700;font-size:.82rem;white-space:nowrap;min-width:76px;text-align:right;}
-.pay-cmp-dif.is-mas{color:#b8894a;}
-.pay-cmp-dif.is-menos{color:#4b6b3f;}
-.pay-cmp-dif.is-igual{color:#8a8f78;}
-.pay-cmp-dif.is-actual{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:#566040;}
+.pay-cmp-monto{font-weight:600;color:#6b6656;white-space:nowrap;text-align:right;}
+/* Lo cubierto en verde, como el resto del panel: es lo que ya entró. */
+.pay-cmp-cubierto{font-weight:700;color:#4b6b3f;white-space:nowrap;text-align:right;line-height:1.2;}
+.pay-cmp-pct{display:block;font-size:.76rem;font-weight:600;color:#8a8f78;}
+.pay-cmp-saldo{font-weight:700;color:#2b2b2b;white-space:nowrap;text-align:right;}
+.pay-cmp-dif.is-actual{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;
+  color:#566040;background:#e9ece0;border-radius:5px;padding:.1rem .4rem;}
 /* La acción principal del carrito: el btn-primary de Bootstrap entraba en azul, ajeno a la paleta
    de la página, y con el ancho completo era lo más llamativo del panel en un color que no es de la
    marca. Mismo olivo que el botón de la barra del pie: es el mismo acto. */
@@ -2089,24 +2096,33 @@ document.addEventListener('DOMContentLoaded', async function() {
         const cmpAmounts = cmpSubtotals.map(m => ({ ...m, amount: cmpBaseTotal + (m.subtotal - cmpCurrentSubtotal) }));
         const cmpCurrent = (cmpAmounts.find(m => m.method === d.paymentType) || {}).amount || 0;
         const cmpCheapest = Math.min(...cmpAmounts.map(m => m.amount));
+        // Lo pagado es uno solo; lo que cambia por método es el total, y con él cuánto de ese total
+        // queda cubierto y cuánto falta. El saldo se calcula como total − cubierto para que el renglón
+        // del método vigente dé EXACTAMENTE el saldo de la cobertura de arriba: dos cifras distintas
+        // para "lo que falta" en el mismo panel serían una contradicción a la vista.
+        const cmpPagado = pay ? PaymentBreakdownHelpers.round2(pay.paidAmount) : 0;
         const comparisonRows = cmpAmounts.map(m => {
             const isActive = m.method === d.paymentType;
-            const delta = m.amount - cmpCurrent;
-            let tag;
-            if (isActive) {
-                tag = '<span class="pay-cmp-dif is-actual">Actual</span>';
-            } else if (Math.abs(delta) >= 0.005) {
-                tag = `<span class="pay-cmp-dif ${delta > 0 ? 'is-mas' : 'is-menos'}">${delta > 0 ? '+' : '-'}${formatCurrency(Math.abs(delta), curr)}</span>`;
-            } else {
-                tag = '<span class="pay-cmp-dif is-igual">igual</span>';
-            }
+            // Se topa al total del método: si lo pagado supera un total más barato, el excedente es
+            // saldo a favor, no cobertura de este renglón.
+            const cubierto = Math.min(cmpPagado, m.amount);
+            const pctCubierto = m.amount > 0 ? Math.min(100, Math.round((cubierto / m.amount) * 100)) : 0;
+            const saldo = PaymentBreakdownHelpers.round2(m.amount - cubierto);
             const cheap = (!isActive && m.amount === cmpCheapest && cmpCheapest < cmpCurrent)
                 ? '<span class="pay-cmp-barato">más barato</span>' : '';
             return `<div class="pay-cmp-row ${isActive ? 'is-actual' : ''}">
-                <span class="pay-cmp-met"><i class="ti ${m.icon}"></i>${m.label}${cheap}</span>
-                <span class="pay-cmp-monto">${formatCurrency(m.amount, curr)}</span>${tag}
+                <span class="pay-cmp-met"><i class="ti ${m.icon}"></i>${m.label}${cheap}${
+                    isActive ? '<span class="pay-cmp-dif is-actual">Actual</span>' : ''}</span>
+                <span class="pay-cmp-monto">${formatCurrency(m.amount, curr)}</span>
+                <span class="pay-cmp-cubierto">${formatCurrency(cubierto, curr)}
+                    <span class="pay-cmp-pct">${pctCubierto}%</span></span>
+                <span class="pay-cmp-saldo">${formatCurrency(saldo, curr)}</span>
             </div>`;
         }).join('');
+        const comparisonHead = comparisonRows
+            ? `<div class="pay-cmp-row is-cabeza">
+                <span>Método</span><span>Total</span><span>Cubierto</span><span>Saldo</span>
+              </div>` : '';
         // Chip de método = disparador del comparativo (collapse INLINE, no dropdown flotante).
         // El comparativo se pinta en su propia sección, arriba del desglose. Ya no cuelga de un chip
         // que había que descubrir y que además llamaba a toggleSavingsHint(), una función que en esta
@@ -2114,7 +2130,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const cmpSec = document.getElementById('payCmpSec');
         if (cmpSec) {
             cmpSec.classList.toggle('d-none', !comparisonRows);
-            document.getElementById('payCmp').innerHTML = comparisonRows;
+            document.getElementById('payCmp').innerHTML = comparisonHead + comparisonRows;
         }
         // Hint de ahorro SIEMPRE visible: si otro método es más barato que el actual, lo anuncia sin
         // tener que abrir el comparativo (p. ej. "En efectivo ahorras $7,542").

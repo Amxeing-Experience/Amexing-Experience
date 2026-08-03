@@ -551,15 +551,22 @@
 
 /* Comparativo por método: nombre, total y la diferencia contra el actual. Sin caja y sin columnas
    de Cubierto/Restante —esas cifras solo importan del método vigente, y ese ya va arriba—. */
-.pay-cmp-row{display:flex;align-items:center;gap:12px;padding:10px 10px;border-radius:8px;}
+/* Cuatro columnas: el método, cuánto suma en él, cuánto de eso ya está cubierto —con su
+   porcentaje, que es distinto en cada método porque el total lo es— y cuánto falta. */
+.pay-cmp-row{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;
+  column-gap:26px;padding:11px 10px;border-radius:8px;}
 .pay-cmp-row.is-actual{background:#f1f2ec;}
-.pay-cmp-met{display:flex;align-items:center;gap:8px;color:#4a4a44;font-weight:600;flex:1;min-width:0;}
+.pay-cmp-row.is-cabeza{padding-bottom:7px;text-transform:uppercase;letter-spacing:.07em;
+  font-size:.66rem;font-weight:700;color:#8a8f78;border-bottom:1px solid #ece8dd;border-radius:0;}
+.pay-cmp-row.is-cabeza > span:not(:first-child){text-align:right;}
+.pay-cmp-met{display:flex;align-items:center;gap:8px;color:#4a4a44;font-weight:600;min-width:0;}
 .pay-cmp-met i{color:#8a8f78;}
-.pay-cmp-monto{font-weight:700;color:#2b2b2b;white-space:nowrap;}
-.pay-cmp-dif{font-weight:700;font-size:.82rem;white-space:nowrap;min-width:76px;text-align:right;}
-.pay-cmp-dif.is-mas{color:#b8894a;}
-.pay-cmp-dif.is-menos{color:#4b6b3f;}
-.pay-cmp-dif.is-igual{color:#8a8f78;}
-.pay-cmp-dif.is-actual{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:#566040;}
+.pay-cmp-monto{font-weight:600;color:#6b6656;white-space:nowrap;text-align:right;}
+/* Lo cubierto en verde, como el resto del panel: es lo que ya entró. */
+.pay-cmp-cubierto{font-weight:700;color:#4b6b3f;white-space:nowrap;text-align:right;line-height:1.2;}
+.pay-cmp-pct{display:block;font-size:.76rem;font-weight:600;color:#8a8f78;}
+.pay-cmp-saldo{font-weight:700;color:#2b2b2b;white-space:nowrap;text-align:right;}
+.pay-cmp-dif.is-actual{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;
+  color:#566040;background:#e9ece0;border-radius:5px;padding:.1rem .4rem;}
 .pay-cmp-barato{font-size:.58rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;
   color:#3f5a34;background:#e6efe1;border:1px solid #cfe0c6;border-radius:6px;padding:.08rem .42rem;}
