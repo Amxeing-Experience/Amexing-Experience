@@ -605,11 +605,12 @@
 .dashboard-content:has(.pay-bar) { padding-bottom: 104px; }
 
 .pay-bar-inner {
-  /* SIN max-width ni centrado. Los tenía (1400 px, margin auto) y en una pantalla ancha la barra se
-     centraba respecto de la VENTANA mientras el contenido de la página ocupa todo el ancho con
-     2 rem de relleno: el saldo arrancaba a media pantalla y el botón quedaba flotando lejos del
-     borde, a veces fuera de la vista. Ahora la barra usa el mismo relleno que .dashboard-content,
-     así que el saldo cae bajo el borde izquierdo del contenido y el botón bajo el derecho. */
+  /* Con tope de ancho pero SIN centrar. Centrado (margin auto) el saldo arrancaba a media pantalla,
+     desalineado del contenido; a todo lo ancho el botón se iba al extremo derecho de la ventana y en
+     una pantalla muy ancha quedaba fuera de la vista. Con el tope y el mismo relleno que
+     .dashboard-content, el saldo cae bajo el borde izquierdo del contenido y el conjunto —incluido el
+     botón— nunca se aleja más de 1400 px de ahí, se abra la ventana lo que se abra. */
+  max-width: calc(1400px + 4rem);
   padding: 16px 2rem;
   display: flex;
   align-items: center;
