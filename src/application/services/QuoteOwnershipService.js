@@ -22,8 +22,10 @@ const QuoteEdit = require('../../domain/models/QuoteEdit');
 const AmexingUser = require('../../domain/models/AmexingUser');
 const logger = require('../../infrastructure/logger');
 const AuditLog = require('../../domain/models/AuditLog');
+const { isAgencyOwnerOfQuote } = require('../utils/agencyScope');
 
-// Quién puede transferir la propiedad de una cotización SIN ser su dueño. Solo Amexing.
+// Quién puede transferir la propiedad de una cotización SIN ser su dueño por nombre de rol: solo
+// Amexing. La agencia sobre lo de sus agentes pasa aparte, por isAgencyOwnerOfQuote.
 //
 // Antes incluía 'department_manager' y 'client', y el comentario de esa línea decía "if they are the
 // owner" — pero al dueño ya lo dejó pasar el check de arriba, así que esa rama SOLO evalúa a quien NO
@@ -639,7 +641,6 @@ class QuoteOwnershipService {
 
           const roleName = roleObject && roleObject.get ? roleObject.get('name') : undefined;
           roleToCheck = roleName;
-          // Allow department_manager and client roles to transfer ownership if they are the owner
           hasAdminRole = TRANSFER_ALLOWED_ROLES.includes(roleName);
 
           logger.info('Checked rolePointer object for admin privileges', {
@@ -705,6 +706,16 @@ class QuoteOwnershipService {
           quoteId,
           userId,
           roleToCheck,
+        });
+        return true;
+      }
+
+      // La agencia puede mover lo de SUS propios agentes. Misma fuente que las guardas de colaboración
+      // para que no puedan divergir; deniega si no se puede determinar la agencia.
+      if (await isAgencyOwnerOfQuote(user, roleToCheck, quoteId)) {
+        logger.info('User can transfer ownership - is the agency that owns this agent', {
+          quoteId,
+          userId,
         });
         return true;
       }

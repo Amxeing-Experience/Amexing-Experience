@@ -15,10 +15,10 @@
  * mismo allowlist, así que un agente podía hacerse DUEÑO de una cotización ajena — y el dueño tiene
  * scope directo, sin necesidad de colaboradores. Cerrar solo la primera dejaba la casa abierta.
  *
- * Fix: en las dos, quien no es el dueño de la cotización debe ser staff de Amexing (admin/superadmin).
- * NO se compara "la agencia del solicitante contra la de la cotización": en datos reales 62 de 65
- * agencias no tienen departmentId NI clientId, así que ese criterio no se puede evaluar — y en
- * autorización, un criterio que no se puede evaluar no existe.
+ * Fix: en las dos, quien no es el dueño debe ser staff de Amexing (admin/superadmin) o la agencia
+ * dueña del agente al que pertenece la cotización. Esa comparación de agencia vive en
+ * application/utils/agencyScope y tiene sus propias pruebas en quote-collaboration-agency-scope; aquí
+ * lo que se fija es que ninguna de las dos concesiones alcanza a una agencia SIN relación.
  */
 
 const request = require('supertest');

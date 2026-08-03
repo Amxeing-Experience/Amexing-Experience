@@ -22,6 +22,7 @@ const QuoteEdit = require('../../domain/models/QuoteEdit');
 const AmexingUser = require('../../domain/models/AmexingUser');
 const logger = require('../../infrastructure/logger');
 const AuditLog = require('../../domain/models/AuditLog');
+const { isAgencyOwnerOfQuote } = require('../utils/agencyScope');
 
 /**
  * Service class for managing quote collaboration.
@@ -794,23 +795,24 @@ class QuoteCollaborationService {
       // ReservationController.getClientEligibleQuoteIds: leer, registrar, editar y borrar los pagos
       // de un cliente de otra agencia.
       //
-      // NO se compara "la agencia del solicitante contra la de la cotización", que era el arreglo
-      // obvio: en datos reales 62 de 65 agencias no tienen departmentId NI clientId, así que esa
-      // comparación negaría el paso a casi todas o pasaría por defecto — en autorización, un criterio
-      // que no se puede evaluar es un criterio que no existe. La regla del dueño no depende de
-      // ningún campo ausente, y es exactamente lo que el JSDoc de la ruta ya promete ("Owner only").
+      // La tercera vía es la agencia sobre lo de SUS agentes: ver agencyScope.isAgencyOwnerOfQuote.
       const dbRole = user.get('role');
       const role = requestUserRole || dbRole;
       const isAmexingStaff = role === 'admin' || role === 'superadmin';
 
-      if (!isAmexingStaff) {
-        logger.warn('Grant access denied: only the quote owner or Amexing staff may share a quote', {
-          quoteId, userId, role,
-        });
-        return false;
+      if (isAmexingStaff) {
+        return true;
       }
 
-      return true;
+      if (await isAgencyOwnerOfQuote(user, role, quoteId)) {
+        logger.info('Grant access allowed: actor is the agency that owns this agent', { quoteId, userId });
+        return true;
+      }
+
+      logger.warn('Grant access denied: only the owner, their agency or Amexing staff may share a quote', {
+        quoteId, userId, role,
+      });
+      return false;
     } catch (error) {
       logger.error('Failed to check grant access permission', {
         error: error.message,
@@ -850,14 +852,18 @@ class QuoteCollaborationService {
       const role = requestUserRole || dbRole;
       const isAmexingStaff = role === 'admin' || role === 'superadmin';
 
-      if (!isAmexingStaff) {
-        logger.warn('Revoke access denied: only the quote owner or Amexing staff may revoke a share', {
-          quoteId, userId, role,
-        });
-        return false;
+      if (isAmexingStaff) {
+        return true;
       }
 
-      return true;
+      if (await isAgencyOwnerOfQuote(user, role, quoteId)) {
+        return true;
+      }
+
+      logger.warn('Revoke access denied: only the owner, their agency or Amexing staff may revoke a share', {
+        quoteId, userId, role,
+      });
+      return false;
     } catch (error) {
       logger.error('Failed to check revoke access permission', {
         error: error.message,
@@ -895,14 +901,18 @@ class QuoteCollaborationService {
       const role = requestUserRole || user.get('role');
       const isAmexingStaff = role === 'admin' || role === 'superadmin';
 
-      if (!isAmexingStaff) {
-        logger.warn('Update collaborator role denied: only the quote owner or Amexing staff may change a share', {
-          quoteId, userId, role,
-        });
-        return false;
+      if (isAmexingStaff) {
+        return true;
       }
 
-      return true;
+      if (await isAgencyOwnerOfQuote(user, role, quoteId)) {
+        return true;
+      }
+
+      logger.warn('Update collaborator role denied: only the owner, their agency or Amexing staff may change a share', {
+        quoteId, userId, role,
+      });
+      return false;
     } catch (error) {
       logger.error('Failed to check update role permission', {
         error: error.message,
