@@ -552,10 +552,19 @@
 /* Comparativo por método: nombre, total y la diferencia contra el actual. Sin caja y sin columnas
    de Cubierto/Restante —esas cifras solo importan del método vigente, y ese ya va arriba—. */
 /* Cuatro columnas: el método, cuánto suma en él, cuánto de eso ya está cubierto —con su
-   porcentaje, que es distinto en cada método porque el total lo es— y cuánto falta. */
-.pay-cmp-row{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;
+   porcentaje, que es distinto en cada método porque el total lo es— y cuánto falta.
+   La rejilla la define el CONTENEDOR y cada renglón la hereda con subgrid. Cuando cada renglón
+   traía su propio grid, cada uno medía sus columnas contra su propio contenido: $99,317.13 y
+   $124,882.44 no ocupan lo mismo, así que las cifras no caían bajo su encabezado. */
+#payCmp{display:grid;grid-template-columns:1fr auto auto auto;}
+.pay-cmp-row{display:grid;grid-column:1 / -1;grid-template-columns:subgrid;align-items:center;
   column-gap:26px;padding:11px 10px;border-radius:8px;}
 .pay-cmp-row.is-actual{background:#f1f2ec;}
+/* Sin subgrid el renglón se quedaría sin columnas y las celdas se apilarían. Anchos fijos como
+   red: alinean igual, solo que sin ajustarse al monto más largo. */
+@supports not (grid-template-columns: subgrid) {
+  .pay-cmp-row{grid-template-columns:1fr 120px 120px 120px;}
+}
 .pay-cmp-row.is-cabeza{padding-bottom:7px;text-transform:uppercase;letter-spacing:.07em;
   font-size:.66rem;font-weight:700;color:#8a8f78;border-bottom:1px solid #ece8dd;border-radius:0;}
 .pay-cmp-row.is-cabeza > span:not(:first-child){text-align:right;}
