@@ -270,7 +270,6 @@
       </div>
     </div>
     <div class="pay-bar-acciones">
-      <button type="button" class="pay-bar-btn" id="payBarVerBtn">Ver desglose</button>
       <button type="button" class="pay-bar-btn is-primaria" id="payBarPagarBtn">Agregar pago</button>
     </div>
   </div>
@@ -1447,11 +1446,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     function svcPickAttrs(...args) { return ServiceListRenderer.svcPickAttrs(...args); }
     function svcTelLink(...args) { return ServiceListRenderer.svcTelLink(...args); }
 
-    // Las dos puertas de la barra abren el MISMO carrito; la de pagar además pide que el formulario
-    // se despliegue, igual que "Agregar pago" del hero cuando existía.
-    document.getElementById('payBarVerBtn')?.addEventListener('click', () => {
-        paymentsOffcanvasInstance()?.show();
-    });
+    // Una sola puerta al carrito. Eran dos —"Ver desglose" y "Agregar pago"— que abrían el MISMO
+    // panel; la única diferencia era que la segunda además desplegaba el formulario. Dos botones
+    // contiguos con el mismo destino se leen como una decisión que no existe, y lo que la barra ya
+    // muestra —saldo, avance, pagado de total, método y estado— es justo lo que se iba a "ver".
     document.getElementById('payBarPagarBtn')?.addEventListener('click', () => {
         pendingAddForm = true;
         paymentsOffcanvasInstance()?.show();
