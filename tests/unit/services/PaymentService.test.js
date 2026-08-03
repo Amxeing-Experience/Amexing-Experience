@@ -487,13 +487,35 @@ describe('PaymentService pure helpers', () => {
       expect(round2(cov)).toBe(123200); // 100000 × (123200/100000)
     });
 
-    it('guarda: base del ancla <= 0 (sin servicios cobrables) => cobertura 0, sin NaN/Infinity', () => {
+    // Antes esperaba 0 "como fail-safe". Era lo contrario de fail-safe: la cobertura alimenta
+    // remainingBase, y remainingBase alimenta el monto que se le cobra a la tarjeta. Un pago que
+    // cuenta cero deja el saldo intacto y autoriza recobrar el total completo — doble cobro
+    // reproducido ($8,000 ya pagados, checkout abierto otra vez por $8,000).
+    //
+    // 1:1 es la conversión CORRECTA aquí, no una aproximación: sin servicios cobrables no existe
+    // ratio entre métodos que aplicar. Es la misma regla que la guarda de abajo (método corrupto),
+    // que ya devolvía 1:1 por el mismo motivo.
+    it('guarda: base del ancla <= 0 (sin servicios cobrables) => 1:1 sin convertir, sin NaN/Infinity', () => {
       const cov = PaymentService.baseEquivalente(
         { amount: 500, method: 'tarjeta' },
         { serviceItems: [{ includeInTotal: false, total: 999 }], anchoredMethod: 'efectivo' }
       );
-      expect(cov).toBe(0);
+      expect(cov).toBe(500);
       expect(Number.isFinite(cov)).toBe(true);
+    });
+
+    it('sin servicios cobrables, un pago ya recibido SÍ baja el saldo (no se recobra el total)', () => {
+      const sinServicios = [{ includeInTotal: false, total: 999 }];
+      const r = PaymentService.remainingBreakdown(
+        [{ amount: 8000, method: 'transferencia' }],
+        {
+          serviceItems: sinServicios, anchoredMethod: 'efectivo', currency: 'MXN', adjustmentsNet: 8000,
+        }
+      );
+      expect(r.coverageAmount).toBe(8000);
+      expect(r.remainingBase).toBe(0);
+      // Lo que de verdad importa: es este número el que viaja a Stripe.
+      expect(r.montoParaSaldar.tarjeta).toBe(0);
     });
 
     it('guarda: método corrupto (null/no válido) => 1:1 sin convertir', () => {

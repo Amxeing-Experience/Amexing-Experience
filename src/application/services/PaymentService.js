@@ -206,7 +206,20 @@ class PaymentService {
   }) {
     const amt = Number.isFinite(payment?.amount) ? payment.amount : 0;
     const baseTotal = this.totalForMethod(serviceItems, anchoredMethod, currency);
-    if (!Number.isFinite(baseTotal) || baseTotal <= 0) return 0;
+    // Sin base de servicios cobrables, el pago cuenta 1:1 — NO cero.
+    //
+    // Devolver 0 aquí parecía fail-safe ("ante la duda, no descontar"), pero es lo contrario: la
+    // cobertura alimenta remainingBase, y remainingBase alimenta el monto que se le cobra a la
+    // tarjeta. Un pago que cuenta cero deja el saldo intacto y autoriza recobrar el total completo.
+    // Reproducido: reservación cuyo saldo son puros ajustes manuales, cliente que ya pagó $8,000 →
+    // el checkout se abre otra vez por $8,000. Doble cobro, y silencioso: el resumen dice "saldado"
+    // mientras el restante dice 100%.
+    //
+    // 1:1 es la conversión correcta, no una aproximación: si no hay servicios, no existe ratio entre
+    // métodos que aplicar — el saldo es 100% pesos planos (ajustes + propina), que por diseño nunca
+    // escalan por método. Es la misma regla que ya usa la rama `baseTotal <= 0` de remainingBreakdown
+    // (`montoParaSaldar[m] = remainingBase`) y el fallback de la línea de abajo.
+    if (!Number.isFinite(baseTotal) || baseTotal <= 0) return amt;
     const method = payment?.method;
     const isValid = validMethods.includes(method);
     const tierTotal = isValid ? this.totalForMethod(serviceItems, method, currency) : null;
