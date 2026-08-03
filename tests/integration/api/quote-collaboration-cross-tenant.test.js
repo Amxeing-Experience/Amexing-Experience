@@ -176,6 +176,53 @@ describe('cotizaciones: aislamiento entre agencias al conceder acceso (cross-ten
     });
   });
 
+  // La "tercera puerta" señalada en revisión: PUT /api/quotes/:id llega al mismo destino sin pasar por
+  // colaboradores ni por transferencia. Los tres eslabones que la revisión cita son CIERTOS (la ruta
+  // admite nivel 4; el controller traía el mismo allowlist por nombre de rol; applyChanges escribe
+  // cualquier campo sin filtro), pero al intentar explotarlo aparece un CUARTO eslabón que la cadena no
+  // contemplaba: QuoteVersioningService.recordEdit vuelve a llamar canEdit por su cuenta, sin override,
+  // y lanza. Nunca se llega a applyChanges.
+  //
+  // Es decir: el acceso cruzado NO era alcanzable por aquí. Lo que el override sí hacía era convertir un
+  // rechazo limpio en un 500: dejaba pasar la ejecución para que reventara más adelante, y de paso
+  // escribía un log diciendo "override concedido" sobre una petición que terminó denegada.
+  //
+  // Estas pruebas fijan el comportamiento CORRECTO (403 y nada escrito), no el agujero — porque el
+  // agujero no existía. Sin el arreglo, las dos primeras fallan por el código de estado.
+  describe('la tercera puerta: editar la cotización directamente', () => {
+    const putQuote = (quoteId, body, token) => request(app)
+      .put(`/api/quotes/${quoteId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send(body);
+
+    it('una agencia ajena no puede secuestrar el owner, y el dueño NO cambia', async () => {
+      const quote = await makeQuoteOwnedByA();
+
+      const res = await putQuote(
+        quote.id,
+        { owner: { __type: 'Pointer', className: 'AmexingUser', objectId: agencyBUser.id } },
+        agencyBToken
+      );
+
+      // 403 exacto, no ">= 400": con el override, esto salía 500 porque la ejecución avanzaba hasta
+      // reventar en recordEdit. Un 500 aquí es un rechazo por accidente, no por decisión.
+      expect(res.status).toBe(403);
+      expect(await ownerIdOf(quote.id)).toBe(agencyAUser.id);
+    });
+
+    it('tampoco puede escribir ningún otro campo de una cotización ajena', async () => {
+      const quote = await makeQuoteOwnedByA();
+      const folioOriginal = quote.get('folio');
+
+      const res = await putQuote(quote.id, { folio: 'SECUESTRADO', numberOfPeople: 999 }, agencyBToken);
+
+      expect(res.status).toBe(403);
+      const despues = await new Parse.Query('Quote').get(quote.id, { useMasterKey: true });
+      expect(despues.get('folio')).toBe(folioOriginal);
+      expect(despues.get('numberOfPeople')).toBe(2);
+    });
+  });
+
   describe('lo legítimo sigue funcionando (el fix no puede cerrar de más)', () => {
     it('el DUEÑO puede compartir su propia cotización', async () => {
       const quote = await makeQuoteOwnedByA();
@@ -193,6 +240,19 @@ describe('cotizaciones: aislamiento entre agencias al conceder acceso (cross-ten
 
       expect(res.status).toBeLessThan(400);
       expect(await accessCountFor(quote.id, agencyBUser.id)).toBe(1);
+    });
+
+    it('el DUEÑO puede editar su propia cotización (la tercera puerta no cierra de más)', async () => {
+      const quote = await makeQuoteOwnedByA();
+
+      const res = await request(app)
+        .put(`/api/quotes/${quote.id}`)
+        .set('Authorization', `Bearer ${agencyAToken}`)
+        .send({ numberOfPeople: 7 });
+
+      expect(res.status).toBeLessThan(400);
+      const despues = await new Parse.Query('Quote').get(quote.id, { useMasterKey: true });
+      expect(despues.get('numberOfPeople')).toBe(7);
     });
 
     it('el DUEÑO puede transferir la propiedad de su propia cotización', async () => {
