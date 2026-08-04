@@ -240,10 +240,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `<span class="badge ${s.cls}" title="Estado de cotización origen">${s.label}</span>`;
     }
     
+    // "Asignaciones pendientes" y "Asignada" hablan del reparto de proveedores, que es trabajo de
+    // admin: aquí no se ve quién está asignado ni se puede asignar a nadie, así que el chip anunciaba
+    // un estado sobre el que esta vista no puede hacer ni comprobar nada. Los dos se callan —dejar
+    // solo "Asignada" sería peor: aparecería para decir que se resolvió algo que nunca se dijo que
+    // faltaba—. Los demás estados sí describen la reservación y se quedan.
+    const ESTADOS_DE_ASIGNACION = ['pending', 'assigned'];
+
     function getReservationStatusBadge(status) {
+        if (ESTADOS_DE_ASIGNACION.includes(status)) return '';
         const map = {
-            pending: { label: 'Asignaciones pendientes', cls: 'bg-warning text-dark' },
-            assigned: { label: 'Asignada', cls: 'bg-info text-white' },
             in_progress: { label: 'En Progreso', cls: 'bg-primary text-white' },
             completed: { label: 'Completada', cls: 'bg-success text-white' },
             cancelled: { label: 'Cancelada', cls: 'bg-danger text-white' },
