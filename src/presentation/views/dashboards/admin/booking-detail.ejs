@@ -265,6 +265,9 @@
                precios habla: cambiarlo mueve la cifra en decenas de miles. El comparativo vive en el
                carrito, así que aquí sólo se nombra. -->
           <span class="pay-bar-metodo" id="payBarMetodo"></span>
+          <!-- La oportunidad de ahorro va aparte, no dentro del chip de arriba: ahí quedaban dos
+               nombres de método seguidos y no se sabía cuál era el que se cobra. -->
+          <span class="pay-bar-ahorro d-none" id="payBarAhorro"></span>
           <span id="payBarEstado"></span>
         </span>
       </div>
@@ -2079,28 +2082,34 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('payBarEstado').innerHTML =
             PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus);
 
-        // Método de pago: es el que decide CUÁL de los tres precios se está cobrando. Cuando hay uno
-        // más barato, el propio chip lo avisa —en ámbar y con la cifra— en vez de sumar un elemento
-        // más a una barra ya cargada: el ahorro es una propiedad del método, no un dato suelto. Solo
-        // aparece cuando aplica: 3 de cada 4 reservaciones ya se cotizan en el método más barato.
+        // Método de pago: es el que decide CUÁL de los tres precios se está cobrando. Se queda SIEMPRE
+        // igual —neutro, con el nombre del método y nada más—, así nunca hay duda de cuál se cobra.
+        // Meter dentro el ahorro dejaba dos nombres de método seguidos sin nada que dijera cuál era
+        // cuál.
         const metodoEl = document.getElementById('payBarMetodo');
         const metodo = reservationData.paymentType || '';
-        const mejor = ahorroMasBarato(pay, reservationData.services || [], curr);
         const H = PaymentBreakdownHelpers;
         metodoEl.textContent = metodo
             ? metodo.charAt(0).toUpperCase() + metodo.slice(1)
             : '';
-        if (metodo && mejor) {
-            // Sin centavos: en un chip la cifra es una señal de magnitud, no una cantidad a cuadrar.
-            const cifra = formatCurrency(Math.round(mejor.ahorro), curr).replace(/\.00$/, '');
-            metodoEl.textContent += ` · ${H.methodLabel(mejor.metodo)} −${cifra}`;
-            metodoEl.title = `En ${H.methodLabel(mejor.metodo).toLowerCase()} ahorras `
-                + `${formatCurrency(mejor.ahorro, curr)}. Ábrelo para ver el comparativo.`;
-        } else {
-            metodoEl.removeAttribute('title');
-        }
-        metodoEl.classList.toggle('is-ahorro', Boolean(metodo && mejor));
         metodoEl.classList.toggle('d-none', !metodo);
+
+        // La oportunidad va en su propio chip, verde y con verbo: se lee como algo distinto del
+        // método vigente, no como una segunda mitad suya. Solo aparece cuando aplica: de las 77
+        // reservaciones de la base, 59 ya se cotizan en efectivo, que es el más barato.
+        const ahorroEl = document.getElementById('payBarAhorro');
+        const mejor = metodo ? ahorroMasBarato(pay, reservationData.services || [], curr) : null;
+        if (ahorroEl) {
+            if (mejor) {
+                // Sin centavos: aquí la cifra es una señal de magnitud, no una cantidad a cuadrar.
+                const cifra = formatCurrency(Math.round(mejor.ahorro), curr).replace(/\.00$/, '');
+                ahorroEl.innerHTML = `<i class="ti ti-discount-2"></i>Ahorra ${cifra} en `
+                    + `${H.escapeHtml(H.methodLabel(mejor.metodo).toLowerCase())}`;
+                ahorroEl.title = `En ${H.methodLabel(mejor.metodo).toLowerCase()} ahorras `
+                    + `${formatCurrency(mejor.ahorro, curr)}. Abre el desglose para ver el comparativo.`;
+            }
+            ahorroEl.classList.toggle('d-none', !mejor);
+        }
 
         // Saldo cubierto: deja de teñirse de ámbar, que es la señal de que falta algo.
         document.getElementById('payBarSaldo').classList.toggle('is-cubierto', saldo <= 0);
