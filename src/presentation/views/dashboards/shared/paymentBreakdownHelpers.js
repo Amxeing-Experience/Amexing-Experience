@@ -316,7 +316,6 @@ const PaymentBreakdownHelpers = (() => {
    * @param {string} currency - Moneda.
    * @param {string} [savingsHintHtml] - HTML opcional a insertar bajo "Total a pagar".
    * @param {object} [opciones] - Ajustes de la vista.
-   * @param {boolean} [opciones.metodoInteractivo] - El chip del método abre el comparativo.
    * @param {boolean} [opciones.ocultarEstado] - Sin píldora de estado; el chip toma su esquina.
    * @returns {string} HTML de la card de cobertura.
    * @example
@@ -346,13 +345,9 @@ const PaymentBreakdownHelpers = (() => {
     const statusPill = sinEstado
       ? ''
       : `<span class="pay-cob-estado ${tonos[sm.cls] || 'is-neutro'}"><span class="pay-cob-punto"></span>${escapeHtml(sm.label)}</span>`;
-    // Método cotizado como chip a un lado de "Total a pagar". Donde hay un comparativo que abrir
-    // (hoy solo admin) el chip es el botón que lo despliega: queda pegado a lo que explica.
-    const interactivo = Boolean(opciones && opciones.metodoInteractivo);
-    const methodChip = interactivo
-      ? `<button type="button" class="pay-cob-metodo is-boton" data-cmp-toggle aria-expanded="false"
-          title="Comparar el total en cada método de pago"><i class="ti ti-credit-card"></i>${escapeHtml(methodLabel(s.anchoredMethod))}<i class="ti ti-arrows-exchange pay-cob-metodo-chev"></i></button>`
-      : `<span class="pay-cob-metodo" title="Método cotizado"><i class="ti ti-credit-card"></i>${escapeHtml(methodLabel(s.anchoredMethod))}</span>`;
+    // Método cotizado como chip a un lado de "Total a pagar". Es una etiqueta: el comparativo cuelga
+    // del chip de la barra del pie, que es donde este dato vive de forma permanente.
+    const methodChip = `<span class="pay-cob-metodo" title="Método cotizado"><i class="ti ti-credit-card"></i>${escapeHtml(methodLabel(s.anchoredMethod))}</span>`;
     // El bloque dejó de ser una tarjeta blanca con filete de acento dentro de un panel que ya es una
     // superficie: lo que separa ahora es la jerarquía —rótulo en versalitas, cifra grande, barra— y no
     // una caja. El porcentaje baja DEBAJO de la barra: es su lectura, no un dato aparte.

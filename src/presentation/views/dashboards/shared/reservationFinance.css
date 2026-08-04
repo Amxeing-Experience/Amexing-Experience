@@ -524,12 +524,6 @@
 .pay-cob-metodo{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;
   text-transform:uppercase;letter-spacing:.05em;color:#566040;background:#eef0e6;
   border:1px solid #dce2d0;border-radius:999px;padding:.26rem .66rem;}
-/* Cuando el chip abre el comparativo es un botón: hereda la tipografía, se ofrece al cursor y
-   lleva la flecha de intercambio para que se note que hay algo detrás. */
-.pay-cob-metodo.is-boton{font-family:inherit;cursor:pointer;transition:background .12s ease,border-color .12s ease;}
-.pay-cob-metodo.is-boton:hover{background:#e4e8d8;border-color:#c9d2b8;}
-.pay-cob-metodo-chev{font-size:.95rem;margin-left:1px;}
-.pay-cob-metodo.is-boton[aria-expanded="true"]{background:#dfe4d1;border-color:#c2cbad;}
 .pay-cob-estado{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;
   border-radius:999px;padding:.44rem .85rem;white-space:nowrap;}
 .pay-cob-punto{width:8px;height:8px;border-radius:50%;background:currentColor;}

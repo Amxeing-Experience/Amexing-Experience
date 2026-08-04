@@ -727,6 +727,50 @@
 /* Los tres chips de la barra —método, ahorro y estado— van en fila y deben medir lo mismo. El alto
    lo fija min-height y no el contenido: con relleno vertical, el icono del chip de ahorro (más
    grande que su texto) lo estiraba a 30 px mientras los otros dos median 26. */
+/* El chip del método es el disparador del comparativo, así que se ofrece al cursor y lleva la
+   flecha de intercambio. Sin nada que comparar vuelve a ser una etiqueta (.no-abre). */
+.pay-bar-met-caja { position: relative; display: inline-flex; }
+.pay-bar-metodo { font-family: inherit; cursor: pointer; gap: 6px;
+  transition: background .12s ease, border-color .12s ease; }
+.pay-bar-metodo::after { content: "\21C5"; font-size: .9em; opacity: .75; }
+.pay-bar-metodo:hover { background: #e6e7de; border-color: #d5d6ca; }
+.pay-bar-metodo[aria-expanded="true"] { background: #dfe1d4; border-color: #c9cbbb; }
+.pay-bar-metodo.no-abre { cursor: default; }
+.pay-bar-metodo.no-abre::after { content: none; }
+.pay-bar-metodo.no-abre:hover { background: #f1f2ec; border-color: #e6e4dd; }
+
+/* El comparativo, anclado al chip. No expande la barra —231 px permanentes para algo que se
+   consulta de vez en cuando— ni obliga a abrir el carrito. Crece hacia la izquierda desde el borde
+   derecho del chip, que es el lado por donde hay sitio. */
+.pay-pop {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  z-index: 50;
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  padding: 18px 20px 14px;
+  background: #fff;
+  border: 1px solid #dcdccf;
+  border-radius: 12px;
+  box-shadow: 0 10px 34px rgba(43, 43, 43, .16);
+  text-align: left;
+  cursor: default;
+}
+.pay-pop::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 34px;
+  border: 7px solid transparent;
+  border-top-color: #fff;
+  filter: drop-shadow(0 1px 0 #dcdccf);
+}
+.pay-pop-cap {
+  text-transform: uppercase; letter-spacing: .1em; font-size: .68rem; font-weight: 700;
+  color: #8a8f78; margin-bottom: 10px;
+}
+
 .pay-bar-metodo,
 .pay-bar-ahorro,
 .pay-bar .badge {

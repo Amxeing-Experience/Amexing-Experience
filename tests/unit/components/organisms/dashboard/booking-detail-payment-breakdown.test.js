@@ -82,15 +82,17 @@ describe('Booking Detail Fase 3 — admin (nivel 6+)', () => {
   beforeAll(async () => { html = await render('admin'); });
 
   // El comparativo dejó de tener un enlace propio ("Ver comparativo por método de pago"): ahora lo
-  // dispara el CHIP de método, que queda pegado a lo que explica. En ADMIN el chip lo escribe
-  // buildCoverageCard (marcado con data-cmp-toggle) y abre #payCmpSec; ya no usa el id viejo ni
-  // llama a toggleSavingsHint(), que en esta vista nunca se definió y tronaba al abrirlo.
-  it('el comparativo de admin se abre desde el chip del método', () => {
-    expect(html).toContain('id="payCmpSec"');
-    expect(html).toContain('pay-sec collapse');
-    expect(html).toContain('data-cmp-toggle');
+  // dispara el CHIP de método, que queda pegado a lo que explica. En ADMIN ese chip es el de la
+  // BARRA del pie —donde el método vive de forma permanente— y el comparativo sale como un globo
+  // anclado a él, no dentro del carrito: allí estaba escondido dos veces, en un panel y dentro de
+  // una sección colapsada. Tampoco llama ya a toggleSavingsHint(), que en esta vista nunca existió.
+  it('el comparativo de admin cuelga del chip de la barra', () => {
+    expect(html).toContain('id="payCmpPop"');
+    expect(html).toContain('id="payBarMetodo"');
+    expect(html).toContain('aria-controls="payCmpPop"');
     expect(html).toContain('Total según el método');
     expect(html).not.toContain('id="paymentMethodComparison"');
+    expect(html).not.toContain('id="payCmpSec"');
   });
 
   // El método actual se marca con un badge "Actual" en su fila del comparativo (antes: un punto
@@ -152,11 +154,10 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(FUENTE_FINANZAS).toContain('fin-cmp-badge');
   });
 
-  // Admin usa el mismo gesto pero con su propio disparador (data-cmp-toggle sobre el chip de la
-  // cobertura) y su propia sección, con las cuatro columnas.
-  it('admin: el comparativo cuelga del chip de la cobertura', async () => {
+  // Admin usa el mismo gesto pero desde la barra del pie y con las cuatro columnas.
+  it('admin: el comparativo cuelga del chip de la barra', async () => {
     const html = await render('admin');
-    expect(html).toContain('id="payCmpSec"');
+    expect(html).toContain('id="payCmpPop"');
     expect(html).toContain('pay-cmp-row');
   });
 

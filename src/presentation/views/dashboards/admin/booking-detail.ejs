@@ -260,9 +260,17 @@
         <span id="payBarDetalle"></span>
         <span class="pay-bar-derecha">
           <!-- Qué método se está cobrando. Sin esto, el total de la barra no dice de cuál de los tres
-               precios habla: cambiarlo mueve la cifra en decenas de miles. El comparativo vive en el
-               carrito, así que aquí sólo se nombra. -->
-          <span class="pay-bar-metodo" id="payBarMetodo"></span>
+               precios habla: cambiarlo mueve la cifra en decenas de miles. Y como el comparativo es
+               justo el detalle de ESTE dato, cuelga del propio chip: vivía dentro del carrito y
+               dentro de una sección colapsada, escondido dos veces. -->
+          <span class="pay-bar-met-caja">
+            <button type="button" class="pay-bar-metodo" id="payBarMetodo" aria-expanded="false"
+                    aria-controls="payCmpPop"></button>
+            <div class="pay-pop d-none" id="payCmpPop" role="dialog" aria-label="Total según el método">
+              <div class="pay-pop-cap">Total según el método</div>
+              <div id="payCmp"></div>
+            </div>
+          </span>
           <!-- La oportunidad de ahorro va aparte, no dentro del chip de arriba: ahí quedaban dos
                nombres de método seguidos y no se sabía cuál era el que se cobra. -->
           <span class="pay-bar-ahorro d-none" id="payBarAhorro"></span>
@@ -306,10 +314,6 @@
              cuatro columnas al fondo y un collapse que se abría desde el chip de "Tipo de
              pago"—, con los mismos tres métodos. Queda uno solo, plano y siempre visible:
              cuánto costaría con cada método y la diferencia contra el vigente. -->
-        <div class="pay-sec collapse" id="payCmpSec">
-            <div class="pay-cap">Total según el método</div>
-            <div id="payCmp"></div>
-        </div>
         <div class="pay-sec">
             <div class="pay-cap">Desglose</div>
             <div id="payDesglose" class="pay-desglose"></div>
@@ -824,12 +828,6 @@
 .pay-cob-metodo{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;
   text-transform:uppercase;letter-spacing:.05em;color:#566040;background:#eef0e6;
   border:1px solid #dce2d0;border-radius:999px;padding:.26rem .66rem;}
-/* Cuando el chip abre el comparativo es un botón: hereda la tipografía, se ofrece al cursor y
-   lleva la flecha de intercambio para que se note que hay algo detrás. */
-.pay-cob-metodo.is-boton{font-family:inherit;cursor:pointer;transition:background .12s ease,border-color .12s ease;}
-.pay-cob-metodo.is-boton:hover{background:#e4e8d8;border-color:#c9d2b8;}
-.pay-cob-metodo-chev{font-size:.95rem;margin-left:1px;}
-.pay-cob-metodo.is-boton[aria-expanded="true"]{background:#dfe4d1;border-color:#c2cbad;}
 .pay-cob-estado{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;
   border-radius:999px;padding:.44rem .85rem;white-space:nowrap;}
 .pay-cob-punto{width:8px;height:8px;border-radius:50%;background:currentColor;}
@@ -1572,16 +1570,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         return Boolean(cmp && cmp.children.length);
     }
 
-    // El chip del método abre y cierra el comparativo. Se cablea por delegación porque el chip lo
-    // vuelve a escribir buildCoverageCard en cada render del carrito.
-    document.getElementById('paymentsOffcanvas')?.addEventListener('click', (e) => {
-        const chip = e.target.closest('[data-cmp-toggle]');
-        if (!chip) return;
-        const sec = document.getElementById('payCmpSec');
-        if (!sec) return;
-        bootstrap.Collapse.getOrCreateInstance(sec, { toggle: false }).toggle();
-        chip.setAttribute('aria-expanded', String(!sec.classList.contains('show')));
+    // El comparativo sale como un globo anclado al chip del método de la barra. No expande la barra
+    // —que crecería 231 px para algo que se consulta de vez en cuando— ni obliga a abrir el carrito.
+    function cerrarCmpPop() {
+        const pop = document.getElementById('payCmpPop');
+        if (!pop || pop.classList.contains('d-none')) return;
+        pop.classList.add('d-none');
+        document.getElementById('payBarMetodo')?.setAttribute('aria-expanded', 'false');
+    }
+    document.getElementById('payBarMetodo')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const pop = document.getElementById('payCmpPop');
+        if (!pop || !hayComparativo()) return;
+        const abierto = pop.classList.toggle('d-none');
+        e.currentTarget.setAttribute('aria-expanded', String(!abierto));
     });
+    // Un clic fuera o Escape lo cierran: no guarda nada, así que cerrarlo nunca cuesta trabajo.
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('#payCmpPop') && !e.target.closest('#payBarMetodo')) cerrarCmpPop();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarCmpPop(); });
 
     document.getElementById('payBarPagarBtn')?.addEventListener('click', () => {
         paymentsOffcanvasInstance()?.show();
@@ -2114,6 +2122,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             ? metodo.charAt(0).toUpperCase() + metodo.slice(1)
             : '';
         metodoEl.classList.toggle('d-none', !metodo);
+        // Sin filas que comparar el chip no se ofrece como botón: la flecha prometería algo que no
+        // pasa al pulsar. Y si el comparativo desapareció con el globo abierto, se cierra.
+        const abre = hayComparativo();
+        metodoEl.classList.toggle('no-abre', !abre);
+        metodoEl.title = abre ? 'Ver el total en cada método de pago' : 'Método cotizado';
+        if (!abre) cerrarCmpPop();
 
         // La oportunidad va en su propio chip, verde y con verbo: se lee como algo distinto del
         // método vigente, no como una segunda mitad suya. Solo aparece cuando aplica: de las 77
@@ -2220,13 +2234,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         // El comparativo se pinta en su propia sección, arriba del desglose. Ya no cuelga de un chip
         // que había que descubrir y que además llamaba a toggleSavingsHint(), una función que en esta
         // vista nunca existió: abrirlo tiraba un ReferenceError.
-        const cmpSec = document.getElementById('payCmpSec');
-        if (cmpSec) {
-            // La sección vive colapsada: la abre el chip del método. Sin filas que comparar no hay
-            // nada que abrir, y el chip vuelve a ser una etiqueta (lo decide renderPaymentsOffcanvas).
-            document.getElementById('payCmp').innerHTML = comparisonHead + comparisonRows;
-            if (!comparisonRows) bootstrap.Collapse.getOrCreateInstance(cmpSec, { toggle: false }).hide();
-        }
+        // El comparativo se pinta dentro del globo de la barra. Sin filas no hay nada que abrir y el
+        // chip deja de ofrecerse como botón (lo decide renderPaymentBar).
+        const cmpEl = document.getElementById('payCmp');
+        if (cmpEl) cmpEl.innerHTML = comparisonHead + comparisonRows;
         let html = '';
         // El HERO se retiró de aquí: sus cifras —total, estado, %, pagado y saldo— viven en la barra
         // del pie y, completas, en la tarjeta de cobertura del carrito. Estaban en los dos lados.
@@ -2576,7 +2587,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             // la toma el chip del método, que ahí se lee como lo que es: un control.
             const hint = cheapestSavingsHint(latestSummary, services, curr);
             coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr, hint,
-                { metodoInteractivo: hayComparativo(), ocultarEstado: true });
+                { ocultarEstado: true });
         }
     }
 
