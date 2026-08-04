@@ -723,5 +723,18 @@
 .bkg-status .badge.bg-danger,
 .fin-hero-meta .badge.bg-danger,
 .pay-bar .badge.bg-danger { background: #f7ecea !important; color: #a1443a !important; border-color: #e6c9c4; }
+
+/* Los tres chips de la barra —método, ahorro y estado— van en fila y deben medir lo mismo. El alto
+   lo fija min-height y no el contenido: con relleno vertical, el icono del chip de ahorro (más
+   grande que su texto) lo estiraba a 30 px mientras los otros dos median 26. */
+.pay-bar-metodo,
+.pay-bar-ahorro,
+.pay-bar .badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
 /* En la barra la píldora convive con cifras chicas: se achica para no competir con el saldo. */
 
