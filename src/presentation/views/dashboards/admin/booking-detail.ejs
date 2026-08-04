@@ -466,14 +466,15 @@
     padding-right: 1rem;
 }
 /* Etiqueta de contexto en el pie (reemplaza al encabezado del formulario): ocupa el hueco que ya
-   existia a la izquierda de los botones, asi que no suma alto. */
+   existia a la izquierda de los botones, asi que no suma alto. A 0.8rem se leia como un pie de
+   pagina; es el titulo de lo que se esta haciendo y debe pesar como los botones que tiene enfrente. */
 #paymentsOffcanvas .pay-form-context {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 7px;
     margin-right: auto;
     align-self: center;
-    font-size: 0.8rem;
+    font-size: 1.05rem;
     font-weight: 600;
     color: #8a8f78;
     min-width: 0;
@@ -609,6 +610,13 @@
     bottom: 0;
     background: #fff;
 }
+/* El pie es pegajoso, así que necesita fondo opaco; hasta ahora era blanco y se recortaba contra el
+   crema del formulario. Se acota a #paymentFormWrap: el pie de la edición inline del historial vive
+   sobre una tabla blanca y ahí el blanco sí es el color que le toca. */
+#paymentsOffcanvas #paymentFormWrap .pay-form-actions { background: #fbfbf7; }
+/* "Cancelar" deja de ser una caja blanca sobre el crema: se apoya en el mismo fondo y solo se
+   dibuja con su borde, para que "Guardar" sea el único bloque de color del pie. */
+#paymentsOffcanvas #paymentFormWrap .pay-form-actions .btn-outline-secondary { background: transparent; }
 #paymentsOffcanvas .pay-form-actions .btn {
     font-size: 0.92rem;
     font-weight: 600;
@@ -764,7 +772,14 @@
     /* Botones a todo el ancho y "Guardar" arriba (column-reverse: va último en el DOM), que es donde
        cae el pulgar. Apilados a la derecha quedarian chicos en ~360px. */
     #paymentsOffcanvas .pay-form-actions { flex-direction: column-reverse; gap: 8px; }
-    #paymentsOffcanvas .pay-form-actions .btn { width: 100%; }
+    /* El pie es pegajoso, así que necesita fondo opaco; hasta ahora era blanco y se recortaba contra el
+   crema del formulario. Se acota a #paymentFormWrap: el pie de la edición inline del historial vive
+   sobre una tabla blanca y ahí el blanco sí es el color que le toca. */
+#paymentsOffcanvas #paymentFormWrap .pay-form-actions { background: #fbfbf7; }
+/* "Cancelar" deja de ser una caja blanca sobre el crema: se apoya en el mismo fondo y solo se
+   dibuja con su borde, para que "Guardar" sea el único bloque de color del pie. */
+#paymentsOffcanvas #paymentFormWrap .pay-form-actions .btn-outline-secondary { background: transparent; }
+#paymentsOffcanvas .pay-form-actions .btn { width: 100%; }
     /* La etiqueta de contexto sobra en movil: la tarjeta del pago que se edita está justo arriba. */
     #paymentsOffcanvas .pay-form-context { display: none; }
 }
