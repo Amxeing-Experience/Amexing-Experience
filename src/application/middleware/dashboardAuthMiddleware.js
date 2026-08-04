@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const logger = require('../../infrastructure/logger');
+const { safeReturnTo } = require('../utils/safeReturnTo');
 
 /**
  * Simplified Dashboard Authentication Middleware
@@ -380,7 +381,9 @@ class DashboardAuthMiddleware {
       try {
         const decoded = jwt.verify(accessToken, this.jwtSecret);
         if (decoded && decoded.role) {
-          const returnTo = req.query.returnTo || `/dashboard/${decoded.role}`;
+          // Validado: llega de la query, así que un `?returnTo=https://evil.com` sacaría al
+          // usuario del sitio justo al autenticarse (ver utils/safeReturnTo).
+          const returnTo = safeReturnTo(req.query.returnTo) || `/dashboard/${decoded.role}`;
           logger.info('Redirecting authenticated user from auth page:', {
             from: currentPath,
             to: returnTo,

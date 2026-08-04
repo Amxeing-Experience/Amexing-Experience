@@ -13,6 +13,16 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const Parse = require('parse/node');
 const TestDatabaseSeeder = require('./helpers/testDatabaseSeeder');
 
+// Puerto del Parse de pruebas. Es un puerto real de la máquina: si otro repo (o una corrida
+// anterior colgada) lo tiene tomado, el arranque muere con "port already in use" y ningún test
+// llega a correr. Con TEST_PARSE_PORT se puede mover sin tocar código. Debe coincidir con el de
+// tests/setup.js, que lee la misma variable.
+const TEST_PARSE_PORT = Number(process.env.TEST_PARSE_PORT) || 1339;
+
+// Puerto del MongoDB en memoria. Mismo motivo que el anterior: ver la nota en la detección de
+// "ya hay uno corriendo" más abajo.
+const TEST_MONGO_PORT = Number(process.env.TEST_MONGO_PORT) || 27018;
+
 /**
  * Initialize Parse Server instance
  */
@@ -29,7 +39,7 @@ async function initializeParseServer(uri) {
       cloud: path.join(__dirname, '../src/cloud/main.js'), // Load cloud functions including hooks
       appId: 'test-app-id',
       masterKey: 'test-master-key',
-      serverURL: 'http://localhost:1339/parse',
+      serverURL: `http://localhost:${TEST_PARSE_PORT}/parse`,
       silent: true,
       logLevel: 'error',
       maxUploadSize: '1mb',
@@ -49,7 +59,7 @@ async function initializeParseServer(uri) {
     const httpServer = http.createServer(app);
 
     await new Promise((resolve, reject) => {
-      httpServer.listen(1339, (error) => {
+      httpServer.listen(TEST_PARSE_PORT, (error) => {
         if (error) reject(error);
         else resolve();
       });
@@ -61,7 +71,7 @@ async function initializeParseServer(uri) {
 
     // Initialize Parse SDK
     Parse.initialize('test-app-id', null, 'test-master-key');
-    Parse.serverURL = 'http://localhost:1339/parse';
+    Parse.serverURL = `http://localhost:${TEST_PARSE_PORT}/parse`;
 
     console.log('   ✅ Parse Server started');
     console.log(`   ℹ️  Server URL: ${Parse.serverURL}`);
@@ -86,13 +96,16 @@ module.exports = async () => {
     process.env.JWT_SECRET = 'test-jwt-secret-at-least-32-characters-long-for-testing';
     process.env.PARSE_APP_ID = 'test-app-id';
     process.env.PARSE_MASTER_KEY = 'test-master-key';
-    process.env.PARSE_SERVER_URL = 'http://localhost:1339/parse';
+    process.env.PARSE_SERVER_URL = `http://localhost:${TEST_PARSE_PORT}/parse`;
     console.log('   ✅ Test environment variables set (NODE_ENV, JWT_SECRET, PARSE_*)');
 
-    // Check if MongoDB Memory Server is already running on port 27018
+    // Si ya hay un mongod en el puerto se reutiliza en vez de levantar otro. OJO: "reutilizar" es
+    // por PUERTO, no por proyecto — un mongod de otro repo en el mismo puerto se toma como propio y
+    // el seed termina escribiendo en SU base (choca con "email already registered" y ensucia sus
+    // datos). Por eso el puerto es configurable con TEST_MONGO_PORT.
     const { exec } = require('child_process');
     const isPortInUse = await new Promise((resolve) => {
-      exec('lsof -i :27018', (error, stdout) => {
+      exec(`lsof -i :${TEST_MONGO_PORT}`, (error, stdout) => {
         resolve(stdout.includes('mongod'));
       });
     });
@@ -102,14 +115,14 @@ module.exports = async () => {
     
     if (isPortInUse) {
       console.log('📦 MongoDB Memory Server already running, reusing existing instance...');
-      uri = 'mongodb://127.0.0.1:27018/AmexingTEST';
+      uri = `mongodb://127.0.0.1:${TEST_MONGO_PORT}/AmexingTEST`;
       console.log('   ✅ Reusing existing MongoDB Memory Server');
     } else {
       console.log('📦 Starting new MongoDB Memory Server...');
       mongod = new MongoMemoryServer({
         instance: {
           dbName: 'AmexingTEST',
-          port: 27018, // Different port to avoid conflicts
+          port: TEST_MONGO_PORT, // Different port to avoid conflicts
         },
       });
 
@@ -129,7 +142,7 @@ module.exports = async () => {
     console.log(`   ℹ️  URI: ${uri}`);
     console.log('\n⚠️  CRITICAL: Using IN-MEMORY database ONLY');
     console.log('   ⚠️  NO connections to local MongoDB (localhost:27017)');
-    console.log(`   ✅ Memory Server Port: 27018`);
+    console.log(`   ✅ Memory Server Port: ${TEST_MONGO_PORT}`);
     console.log(`   ✅ Database Name: AmexingTEST`);
 
     // Initialize Parse Server with Memory DB
