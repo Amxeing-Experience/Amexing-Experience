@@ -314,7 +314,7 @@
                      cuatro columnas al fondo y un collapse que se abría desde el chip de "Tipo de
                      pago"—, con los mismos tres métodos. Queda uno solo, plano y siempre visible:
                      cuánto costaría con cada método y la diferencia contra el vigente. -->
-                <div class="pay-sec d-none" id="payCmpSec">
+                <div class="pay-sec collapse" id="payCmpSec">
                     <div class="pay-cap">Total según el método</div>
                     <div id="payCmp"></div>
                 </div>
@@ -791,6 +791,12 @@
 .pay-cob-metodo{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;
   text-transform:uppercase;letter-spacing:.05em;color:#566040;background:#eef0e6;
   border:1px solid #dce2d0;border-radius:999px;padding:.26rem .66rem;}
+/* Cuando el chip abre el comparativo es un botón: hereda la tipografía, se ofrece al cursor y
+   lleva la flecha de intercambio para que se note que hay algo detrás. */
+.pay-cob-metodo.is-boton{font-family:inherit;cursor:pointer;transition:background .12s ease,border-color .12s ease;}
+.pay-cob-metodo.is-boton:hover{background:#e4e8d8;border-color:#c9d2b8;}
+.pay-cob-metodo-chev{font-size:.95rem;margin-left:1px;}
+.pay-cob-metodo.is-boton[aria-expanded="true"]{background:#dfe4d1;border-color:#c2cbad;}
 .pay-cob-estado{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;
   border-radius:999px;padding:.44rem .85rem;white-space:nowrap;}
 .pay-cob-punto{width:8px;height:8px;border-radius:50%;background:currentColor;}
@@ -1527,6 +1533,23 @@ document.addEventListener('DOMContentLoaded', async function() {
     // panel; la única diferencia era que la segunda además desplegaba el formulario. Dos botones
     // contiguos con el mismo destino se leen como una decisión que no existe, y lo que la barra ya
     // muestra —saldo, avance, pagado de total, método y estado— es justo lo que se iba a "ver".
+    // ¿Hay algo que comparar? Sin filas el chip del método no se ofrece como botón.
+    function hayComparativo() {
+        const cmp = document.getElementById('payCmp');
+        return Boolean(cmp && cmp.children.length);
+    }
+
+    // El chip del método abre y cierra el comparativo. Se cablea por delegación porque el chip lo
+    // vuelve a escribir buildCoverageCard en cada render del carrito.
+    document.getElementById('paymentsOffcanvas')?.addEventListener('click', (e) => {
+        const chip = e.target.closest('[data-cmp-toggle]');
+        if (!chip) return;
+        const sec = document.getElementById('payCmpSec');
+        if (!sec) return;
+        bootstrap.Collapse.getOrCreateInstance(sec, { toggle: false }).toggle();
+        chip.setAttribute('aria-expanded', String(!sec.classList.contains('show')));
+    });
+
     document.getElementById('payBarPagarBtn')?.addEventListener('click', () => {
         pendingAddForm = true;
         paymentsOffcanvasInstance()?.show();
@@ -2138,8 +2161,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         // vista nunca existió: abrirlo tiraba un ReferenceError.
         const cmpSec = document.getElementById('payCmpSec');
         if (cmpSec) {
-            cmpSec.classList.toggle('d-none', !comparisonRows);
+            // La sección vive colapsada: la abre el chip del método. Sin filas que comparar no hay
+            // nada que abrir, y el chip vuelve a ser una etiqueta (lo decide renderPaymentsOffcanvas).
             document.getElementById('payCmp').innerHTML = comparisonHead + comparisonRows;
+            if (!comparisonRows) bootstrap.Collapse.getOrCreateInstance(cmpSec, { toggle: false }).hide();
         }
         // Hint de ahorro SIEMPRE visible: si otro método es más barato que el actual, lo anuncia sin
         // tener que abrir el comparativo (p. ej. "En efectivo ahorras $7,542").
@@ -2464,7 +2489,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (coverage) {
             // Sin el hint de ahorro: la sección "Total según el método" ya está a la vista y dice lo
             // mismo —cuál cuesta menos y cuánto—, con la cifra en vez de una frase.
-            coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr);
+            coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr, null,
+                { metodoInteractivo: hayComparativo() });
         }
     }
 
