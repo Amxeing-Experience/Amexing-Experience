@@ -81,6 +81,10 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
         .ctr-cuando-cap { font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:#6b6b5f; }
         .ctr-cuando-hora { font-size:32px; font-weight:700; color:#111; line-height:1; }
         .ctr-cuando-dia { font-size:16px; color:#2b2b2b; }
+        /* Sin hora, la fecha ocupa el lugar de la cifra: el recuadro es el único sitio del cuándo y
+           no puede quedarse vacío. */
+        .ctr-cuando-hora.is-solo-dia { font-size:22px; }
+        .ctr-cuando-dia.is-aviso { color:#9a5f4f; }
 
         /* Bloque de asignación: el dato propio de este documento. Se destaca sobre la ficha del
            servicio porque es lo que el chofer viene a confirmar —que es él y con qué vehículo—. */
@@ -328,13 +332,17 @@ function bloqueAsignacion(sc) {
                 ? (sc.flightDepartureTimeSuggested || '')
                 : (sc.time || sc.startTime || '');
         %>
-        <% if (cuando) { %>
         <div class="ctr-cuando">
-            <span class="ctr-cuando-cap"><%= esAero && sc.directionType !== 'departure' ? 'Estar en el aeropuerto' : 'Recoger' %></span>
-            <span class="ctr-cuando-hora"><%= cuando %> hrs</span>
-            <span class="ctr-cuando-dia"><%= fmtFecha(it.fecha) %></span>
+            <% if (cuando) { %>
+                <span class="ctr-cuando-cap"><%= esAero && sc.directionType !== 'departure' ? 'Estar en el aeropuerto' : 'Recoger' %></span>
+                <span class="ctr-cuando-hora"><%= cuando %> hrs</span>
+                <span class="ctr-cuando-dia"><%= fmtFecha(it.fecha) || '—' %></span>
+            <% } else { %>
+                <span class="ctr-cuando-cap">Fecha</span>
+                <span class="ctr-cuando-hora is-solo-dia"><%= fmtFecha(it.fecha) || '—' %></span>
+                <span class="ctr-cuando-dia is-aviso">Sin hora registrada</span>
+            <% } %>
         </div>
-        <% } %>
         <div class="rc-tbl">
             <% if (sc.concept) { %>
             <div class="rc-tc rc-c6"><span class="rc-label">Servicio</span><span class="rc-value"><%= sc.concept %></span></div>
@@ -365,8 +373,10 @@ function bloqueAsignacion(sc) {
                     ? { rotulo: esSalida ? 'Hora de vuelo' : 'Salida del vuelo', valor: conHrs(esSalida ? propia : sugerida) }
                     : null;
             %>
-            <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(it.fecha) || '—' %></span></div>
-            <div class="rc-tc rc-c3"><span class="rc-label"><%= esAeropuerto && !esSalida ? 'Hora de llegada' : 'Hora de recolección' %></span><span class="rc-value"><%= horaRecoger || '—' %></span></div>
+            <%
+                // La fecha y la hora de estar NO se repiten aquí: las dice el recuadro de arriba, que
+                // es donde se buscan. En la tabla solo queda la otra hora del vuelo, que es contexto.
+            %>
             <% if (otraHora && otraHora.valor) { %>
             <div class="rc-tc rc-c3"><span class="rc-label"><%= otraHora.rotulo %></span><span class="rc-value"><%= otraHora.valor %></span></div>
             <% } %>
