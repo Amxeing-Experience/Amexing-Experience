@@ -30,6 +30,7 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
     <link rel="stylesheet" href="/dashboard/css/icons/tabler-icons/tabler-icons.css">
     <link rel="icon" type="image/png" href="/images/heart_black.png">
     <link rel="stylesheet" href="/css/fonts.css">
+    <link rel="stylesheet" href="/shared/services/pdfFab.css">
     <% if (ARPONA_EMBED_CSS) { %><style id="arpona-embedded">
     <%- ARPONA_EMBED_CSS %>
     </style><% } %>
@@ -48,41 +49,48 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
         .ctr-hoja:last-child { break-after: auto; page-break-after: auto; }
 
         .ctr-hoja .rc-tbl, .ctr-hoja .rc-section-title { max-width:640px; margin-left:auto; margin-right:auto; }
+        /* Un punto por encima de la confirmación: esta hoja se lee de pie, a veces impresa en blanco
+           y negro y con prisa. Se sube solo dentro de .ctr-hoja para no mover el otro documento,
+           que comparte el mismo parcial de estilos. */
+        .ctr-hoja .rc-label { font-size:11px; }
+        .ctr-hoja .rc-value { font-size:16px; }
+        .ctr-hoja .rc-section-title { font-size:16px; }
+        .ctr-hoja .rc-tc { padding:5px 12px; }
 
         .ctr-cab { display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
                    border-bottom:2px solid #8a8c6e; padding-bottom:10px; margin-bottom:14px; }
         .ctr-logo { height:34px; display:block; margin-bottom:6px; }
         .ctr-cab-tit { font-family:'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);
-                       font-size:17px; color:#111; margin:0; letter-spacing:.5px; }
-        .ctr-cab-folio { color:#8a8a8a; font-size:11px; letter-spacing:.5px; margin-top:2px; }
-        .ctr-cab-hoja { color:#8a8a8a; font-size:10px; text-transform:uppercase; letter-spacing:.8px;
+                       font-size:21px; color:#111; margin:0; letter-spacing:.5px; }
+        .ctr-cab-folio { color:#8a8a8a; font-size:13px; letter-spacing:.5px; margin-top:2px; }
+        .ctr-cab-hoja { color:#8a8a8a; font-size:11px; text-transform:uppercase; letter-spacing:.8px;
                         white-space:nowrap; text-align:right; }
 
         /* Quién viaja: lo primero que necesita quien recoge. */
         .ctr-pax { max-width:640px; margin:0 auto 14px; border:1px solid #a9a79a; }
         .ctr-pax-row { display:flex; gap:12px; padding:4px 12px; border-bottom:1px solid #a9a79a; }
         .ctr-pax-row:last-child { border-bottom:none; }
-        .ctr-pax-row .l { color:#8a8a8a; font-size:10px; text-transform:uppercase; letter-spacing:.8px;
+        .ctr-pax-row .l { color:#8a8a8a; font-size:11px; text-transform:uppercase; letter-spacing:.8px;
                           min-width:110px; flex:0 0 auto; }
-        .ctr-pax-row .v { color:#2b2b2b; font-size:14px; word-break:break-word; }
+        .ctr-pax-row .v { color:#2b2b2b; font-size:16px; word-break:break-word; }
 
         /* Bloque de asignación: el dato propio de este documento. Se destaca sobre la ficha del
            servicio porque es lo que el chofer viene a confirmar —que es él y con qué vehículo—. */
         .ctr-asig { max-width:640px; margin:0 auto 14px; border:1px solid #8a8c6e; background:#f7f7f2; }
-        .ctr-asig-cap { background:#8a8c6e; color:#fff; font-size:10px; text-transform:uppercase;
+        .ctr-asig-cap { background:#8a8c6e; color:#fff; font-size:11px; text-transform:uppercase;
                         letter-spacing:1px; padding:3px 12px; }
         .ctr-asig-row { display:flex; gap:12px; padding:5px 12px; border-bottom:1px solid #cfcfc4; }
         .ctr-asig-row:last-child { border-bottom:none; }
-        .ctr-asig-row .l { color:#6b6b5f; font-size:10px; text-transform:uppercase; letter-spacing:.8px;
+        .ctr-asig-row .l { color:#6b6b5f; font-size:11px; text-transform:uppercase; letter-spacing:.8px;
                            min-width:110px; flex:0 0 auto; }
-        .ctr-asig-row .v { color:#2b2b2b; font-size:14px; word-break:break-word; }
+        .ctr-asig-row .v { color:#2b2b2b; font-size:16px; word-break:break-word; }
         .ctr-asig-row .v .tel { color:#6b6b5f; }
-        .ctr-asig-vacio { padding:6px 12px; color:#9a5f4f; font-size:13px; }
+        .ctr-asig-vacio { padding:7px 12px; color:#9a5f4f; font-size:14px; }
 
         /* Firma: el documento se entrega y se acusa de recibido. */
         .ctr-firma { max-width:640px; margin:26px auto 0; display:flex; gap:40px; }
         .ctr-firma > div { flex:1 1 0; border-top:1px solid #a9a79a; padding-top:5px;
-                           color:#8a8a8a; font-size:10px; text-transform:uppercase; letter-spacing:.8px; }
+                           color:#8a8a8a; font-size:11px; text-transform:uppercase; letter-spacing:.8px; }
 
         .ctr-vacio { max-width:640px; margin:0 auto; padding:18px; border:1px dashed #a9a79a;
                      color:#8a8a8a; text-align:center; }
@@ -367,6 +375,23 @@ function bloqueAsignacion(sc) {
     </div>
     <div class="ctr-vacio">Esta reservación todavía no tiene servicios que contratar.</div>
 </div>
+<% } %>
+<% if (!ES_PDF && folio) { %>
+    <%
+        // El PDF respeta el corte que se está viendo: si no, quien mira "por chofer" bajaría el otro
+        // documento. wireFab descarga con fetch, que lleva las cookies de sesión —esta ruta las
+        // exige— y espera a que puppeteer arme el PDF, que tarda varios segundos.
+        const rutaPdf = `/dashboard/admin/reservations/${encodeURIComponent(folio)}/contract/pdf?corte=${CORTE}`;
+    %>
+    <a class="pdf-fab" id="pdfFab" href="<%= rutaPdf %>"
+       aria-label="Descargar el contrato en PDF">
+      <span class="pdf-fab-ico" id="pdfFabIco" aria-hidden="true"><i class="ti ti-download"></i></span>
+      <span class="pdf-fab-txt" id="pdfFabTxt">Descargar PDF</span>
+    </a>
+    <script src="/shared/services/itineraryExport.js"></script>
+    <script>
+      ItineraryExport.wireFab({ nombreArchivo: <%- JSON.stringify(`${folio}-contrato-${CORTE}.pdf`) %> });
+    </script>
 <% } %>
 </body>
 </html>
