@@ -635,12 +635,18 @@
 
 .pay-bar-derecha { display: inline-flex; align-items: center; gap: 9px; }
 /* El método va como chip apagado, no como píldora de color: informa cuál de los tres precios se
-   está cobrando, no anuncia un estado. La píldora de al lado sí es estado y debe ganarle. */
+   está cobrando, no anuncia un estado. La píldora de al lado sí es estado y debe ganarle.
+   Lo que NO puede cambiar entre ellas es la FORMA: van una junto a la otra, así que este chip copia
+   la métrica de la píldora de estado —.72rem, relleno .4/.8 y line-height 1, los de la paleta
+   consolidada de más abajo—. Antes traía la suya (.72rem pero relleno .3/.7 y sin line-height fijo)
+   y la de estado se veía más gorda: su texto lleva minúsculas con ascendentes, que estiran la caja
+   cuando el alto lo decide la línea de texto. */
 .pay-bar-metodo {
   display: inline-flex; align-items: center;
-  font-size: .72rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  font-size: .72rem; font-weight: 700; line-height: 1;
+  letter-spacing: .07em; text-transform: uppercase;
   color: #6b6656; background: #f1f2ec; border: 1px solid #e6e4dd;
-  border-radius: 999px; padding: .3rem .7rem; white-space: nowrap;
+  border-radius: 999px; padding: .4rem .8rem; white-space: nowrap;
 }
 
 .pay-bar-acciones { display: flex; gap: 8px; margin-left: auto; }
@@ -706,4 +712,4 @@
 .fin-hero-meta .badge.bg-danger,
 .pay-bar .badge.bg-danger { background: #f7ecea !important; color: #a1443a !important; border-color: #e6c9c4; }
 /* En la barra la píldora convive con cifras chicas: se achica para no competir con el saldo. */
-.pay-bar .badge { font-size: .74rem; padding: .34rem .75rem; }
+
