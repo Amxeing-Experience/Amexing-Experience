@@ -316,8 +316,27 @@ function bloqueAsignacion(sc) {
             <% if (sc.concept) { %>
             <div class="rc-tc rc-c6"><span class="rc-label">Servicio</span><span class="rc-value"><%= sc.concept %></span></div>
             <% } %>
+            <%
+                // La hora del SERVICIO y la del VUELO son dos datos distintos y hasta ahora solo se
+                // pintaba una fila, así que un traslado de aeropuerto no decía a qué hora estar.
+                // Medido sobre los 102 transportes de la base: 43 traen `time`, 18
+                // `flightDepartureTimeSuggested` y ninguno `startTime`. La etiqueta de la hora del
+                // servicio cambia con la dirección, igual que en la confirmación: en una salida es
+                // cuándo pasar por el pasajero; en una llegada, cuándo aterriza.
+                const esAeropuerto = (sc.type === 'transport' || sc.type === 'traslado')
+                    && sc.transportType === 'aeropuerto';
+                const esSalida = sc.directionType === 'departure';
+                const rotuloHora = esAeropuerto
+                    ? (esSalida ? 'Hora de recolección' : 'Hora de llegada')
+                    : 'Hora';
+                const horaServicio = sc.time || sc.startTime || '';
+                const horaVuelo = sc.flightDepartureTimeSuggested || '';
+            %>
             <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(it.fecha) || '—' %></span></div>
-            <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= sc.time || sc.startTime || '—' %></span></div>
+            <div class="rc-tc rc-c3"><span class="rc-label"><%= rotuloHora %></span><span class="rc-value"><%= horaServicio || '—' %></span></div>
+            <% if (horaVuelo) { %>
+            <div class="rc-tc rc-c3"><span class="rc-label">Hora de vuelo</span><span class="rc-value"><%= horaVuelo %></span></div>
+            <% } %>
             <% if (sc.pickupAddress || sc.originName) { %>
             <div class="rc-tc rc-c6"><span class="rc-label">Recoger en</span><span class="rc-value"><%= sc.pickupAddress || sc.originName %></span></div>
             <% } %>
