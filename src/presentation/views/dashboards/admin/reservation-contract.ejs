@@ -87,8 +87,9 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
         .ctr-asig-row .v .tel { color:#6b6b5f; }
         .ctr-asig-vacio { padding:7px 12px; color:#9a5f4f; font-size:14px; }
 
-        /* Firma: el documento se entrega y se acusa de recibido. */
-        .ctr-firma { max-width:640px; margin:26px auto 0; display:flex; gap:40px; }
+        /* Firma: el documento se entrega y se acusa de recibido. El hueco de arriba es el sitio donde
+           se firma —se firma SOBRE la línea, no debajo—, así que 26 px no daban para una rúbrica. */
+        .ctr-firma { max-width:640px; margin:64px auto 0; display:flex; gap:40px; }
         .ctr-firma > div { flex:1 1 0; border-top:1px solid #a9a79a; padding-top:5px;
                            color:#8a8a8a; font-size:11px; text-transform:uppercase; letter-spacing:.8px; }
 
