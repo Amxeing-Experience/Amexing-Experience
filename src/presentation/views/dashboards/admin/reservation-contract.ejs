@@ -42,6 +42,12 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
 
     <style>
         /* ===== Contrato ===== */
+        /* En el PDF el documento ES la hoja: sin fondo gris asomando entre páginas ni el aire que
+           en pantalla separa una hoja de la siguiente. La regla equivalente del parcial vive bajo
+           @media print y nunca se aplica, porque el renderizador emula media `screen`. */
+        body.es-pdf { background:#fff; padding:0; }
+        body.es-pdf .resv-conf { padding:0; }
+
         /* Cada hoja arranca en página nueva. Va en CSS normal y NO bajo @media print: el renderizador
            emula media `screen`, así que una regla de impresión no llegaría al PDF. La última no
            rompe, o el documento saldría con una página en blanco al final. */
@@ -66,13 +72,12 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
         .ctr-cab-hoja { color:#8a8a8a; font-size:13px; text-transform:uppercase; letter-spacing:.8px;
                         white-space:nowrap; text-align:right; }
 
-        /* Quién viaja: lo primero que necesita quien recoge. */
-        .ctr-pax { max-width:740px; margin:0 auto 14px; border:1px solid #a9a79a; }
-        .ctr-pax-row { display:flex; gap:14px; padding:7px 14px; border-bottom:1px solid #a9a79a; }
-        .ctr-pax-row:last-child { border-bottom:none; }
-        .ctr-pax-row .l { color:#8a8a8a; font-size:13px; text-transform:uppercase; letter-spacing:.6px;
-                          min-width:150px; flex:0 0 auto; }
-        .ctr-pax-row .v { color:#2b2b2b; font-size:20px; word-break:break-word; }
+        /* Quién viaja, dentro de la cabecera: son tres datos cortos y no merecían una banda propia. */
+        .ctr-cab-pax { text-align:right; flex:0 0 auto; }
+        .ctr-cab-fila { display:flex; justify-content:flex-end; gap:12px; margin-top:3px; }
+        .ctr-cab-fila .l { color:#8a8a8a; font-size:12px; text-transform:uppercase; letter-spacing:.6px;
+                           align-self:flex-end; padding-bottom:2px; }
+        .ctr-cab-fila .v { color:#2b2b2b; font-size:18px; word-break:break-word; }
 
         /* La hora a la que hay que estar, en grande. Dentro de la tabla era una celda entre diez y
            es el único dato de la hoja que no puede fallar. */
@@ -131,7 +136,7 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
         }
     </style>
 </head>
-<body>
+<body class="<%= ES_PDF ? 'es-pdf' : '' %>">
 <%
     const svcRoot = (quote && quote.serviceItems) || {};
     const dias = svcRoot.days || [];
@@ -292,24 +297,28 @@ function bloqueAsignacion(sc) {
             <h1 class="ctr-cab-tit">Contrato de servicio</h1>
             <div class="ctr-cab-folio">Reservación <%= folio %></div>
         </div>
-        <div class="ctr-cab-hoja">
-            Hoja <%= idx + 1 %> de <%= totalHojas %><br>
-            <% if (esPorChofer) { %>
-                <%= deChofer ? deChofer.fullName : 'Sin chofer asignado' %>
-            <% } else { %>
-                Servicio <%= idx + 1 %> de <%= totalHojas %>
+        <%
+            // El pasajero viaja EN la cabecera, no en una caja debajo: como bloque aparte gastaba una
+            // banda entera de la hoja para tres datos cortos, y aquí acompaña al folio, que es la otra
+            // mitad de la identidad del documento.
+        %>
+        <div class="ctr-cab-pax">
+            <div class="ctr-cab-hoja">
+                Hoja <%= idx + 1 %> de <%= totalHojas %>
+                <% if (esPorChofer) { %>
+                    · <%= deChofer ? deChofer.fullName : 'Sin chofer asignado' %>
+                <% } else { %>
+                    · Servicio <%= idx + 1 %> de <%= totalHojas %>
+                <% } %>
+            </div>
+            <div class="ctr-cab-fila"><span class="l">Pasajero</span><span class="v"><%= paxNombre || '—' %></span></div>
+            <% if (paxTel) { %>
+            <div class="ctr-cab-fila"><span class="l">Teléfono</span><span class="v"><%= paxTel %></span></div>
+            <% } %>
+            <% if (paxPersonas) { %>
+            <div class="ctr-cab-fila"><span class="l">Personas</span><span class="v"><%= paxPersonas %></span></div>
             <% } %>
         </div>
-    </div>
-
-    <div class="ctr-pax">
-        <div class="ctr-pax-row"><span class="l">Pasajero</span><span class="v"><%= paxNombre || '—' %></span></div>
-        <% if (paxTel) { %>
-        <div class="ctr-pax-row"><span class="l">Teléfono</span><span class="v"><%= paxTel %></span></div>
-        <% } %>
-        <% if (paxPersonas) { %>
-        <div class="ctr-pax-row"><span class="l">Personas</span><span class="v"><%= paxPersonas %></span></div>
-        <% } %>
     </div>
 
     <% if (esPorChofer && deChofer) { %>
@@ -415,14 +424,7 @@ function bloqueAsignacion(sc) {
             <% if (asistentes.length) { %>
             <div class="rc-tc rc-c6"><span class="rc-label"><%= asistentes.length === 1 ? 'Asistente' : 'Asistentes' %></span><span class="rc-value"><%= asistentes.join(' · ') %></span></div>
             <% } %>
-            <%
-                // Notas para quien OPERA: las del equipo y las del proveedor. Las del cliente
-                // (clientNotes) no se incluyen: son para el documento del cliente, no para el chofer.
-                const notasOperacion = [sc.teamNotes, sc.providerNotes, sc.notes].filter(Boolean).join(' · ');
-            %>
-            <% if (notasOperacion) { %>
-            <div class="rc-tc rc-c6"><span class="rc-label">Notas</span><span class="rc-value"><%= notasOperacion %></span></div>
-            <% } %>
+
         </div>
 
         <% if (!esPorChofer) { %>
