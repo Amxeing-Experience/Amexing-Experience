@@ -209,7 +209,9 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
       expect(html).toContain('id="tabPago"');
       expect(html).toContain('id="tabHistorial"');
     }
-    expect(html).toContain('id="paymentCoverageCard"');
+    // ADMIN ya no lleva cabecera de cobertura: repetía las seis cifras de la barra del pie.
+    if (role === 'admin') expect(html).not.toContain('id="paymentCoverageCard"');
+    else expect(html).toContain('id="paymentCoverageCard"');
     // En ADMIN el comparativo por método dejó de ser una tabla de cuatro columnas al fondo del
     // carrito y pasó a su propia sección, arriba del desglose y siempre a la vista. Las vistas de
     // agencia todavía llevan la tabla.

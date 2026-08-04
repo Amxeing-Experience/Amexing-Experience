@@ -68,7 +68,9 @@ describe('Booking Detail - Pagos Offcanvas (admin)', () => {
     expect(html).not.toContain('id="paymentsTabs"');
     expect(html).not.toContain('id="tabHistorial"');
     expect(html).toContain('id="payHistSec"');
-    expect(html).toContain('id="paymentCoverageCard"');
+    // Sin cabecera de cobertura: repetía las seis cifras que la barra del pie ya muestra.
+    expect(html).not.toContain('id="paymentCoverageCard"');
+    expect(html).toContain('id="payAviso"');
     // El comparativo por método vive ahora en su propia sección (#payCmp), no en una tabla aparte.
     expect(html).toContain('id="payCmp"');
     expect(html).not.toContain('id="paymentMethodTable"');

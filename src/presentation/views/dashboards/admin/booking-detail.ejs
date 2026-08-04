@@ -307,7 +307,11 @@
              está hecho, registra uno, y esto es lo que ya se pagó. La pestaña "Historial" escondía
              la mitad del contenido a cambio de nada: el panel hace scroll igual, así que no había
              espacio vertical que disputar, y obligaba a un clic para saber si había pagos. -->
-        <div id="paymentCoverageCard"></div>
+        <!-- La cabecera de cobertura se retiró: repetía las SEIS cifras que la barra del pie ya
+             muestra —total, pagado, saldo, porcentaje, método y ahorro—, así que el panel abría
+             enseñando lo que se acababa de ver. Ahora abre por el desglose, que es lo que promete el
+             botón. Este hueco queda para el esqueleto de carga y el error con reintento. -->
+        <div id="payAviso"></div>
         <!-- Desglose: subtotal, propinas y ajustes. Vivía en una tarjeta de la página, lejos
              del lugar donde se registra el pago que lo modifica. -->
         <!-- Comparativo por método: ANTES estaba dos veces en el mismo carrito —una tabla de
@@ -385,6 +389,9 @@
    marco— y ademas competian entre si por el acento. Ahora el panel es una sola hoja y lo que separa
    son los rotulos en versalitas y un filete por seccion (.pay-sec). */
 #paymentsOffcanvas .offcanvas-body { background: #fff; font-size: 1rem; padding: 1.35rem 1.5rem; }
+/* La primera sección ya no necesita su filete: al irse la cabecera de cobertura quedó pegada al
+   borde inferior del encabezado del panel, y eran dos líneas seguidas. */
+#paymentsOffcanvas #payAviso:empty + .pay-sec { border-top: 0; margin-top: 0; padding-top: 0; }
 /* Este panel es casi todo cifras y estaban en tipografía proporcional: $110,190.00 y $99,317.13 no
    ocupaban lo mismo, así que las columnas de montos bailaban aunque estuvieran alineadas a la
    derecha. tabular-nums le da el mismo ancho a cada dígito. */
@@ -813,7 +820,6 @@
 }
 /* Tabs del drawer — control segmentado full-width (mismo estilo que el catálogo de servicios) */
 /* Mismo radio de borde explicito para el bloque de descuento/ahorro (fondo verde claro propio). */
-#paymentCoverageCard .rounded { border-radius: 0.5rem; }
 
 /* ---------------------------------------------------------------------------
    Cobertura del carrito de pagos (buildCoverageCard).
@@ -2239,13 +2245,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         const cmpEl = document.getElementById('payCmp');
         if (cmpEl) cmpEl.innerHTML = comparisonHead + comparisonRows;
         let html = '';
-        // El HERO se retiró de aquí: sus cifras —total, estado, %, pagado y saldo— viven en la barra
-        // del pie y, completas, en la tarjeta de cobertura del carrito. Estaban en los dos lados.
+        // El HERO se retiró: sus cifras —total, estado, %, pagado y saldo— viven en la barra del pie,
+        // que está siempre a la vista. El aviso de ahorro tampoco se repite aquí; lo lleva el chip
+        // verde de esa misma barra.
 
-        // ===== Desglose ===== (sin rótulo; los renglones ya se leen como desglose)
-        // El aviso de ahorro NO se repite aquí: ya sale bajo el Total a pagar, unos centímetros más
-        // arriba y en el mismo panel, así que se leía dos veces seguidas. Lo pinta buildCoverageCard
-        // con el HTML de cheapestSavingsHint().
+        // ===== Desglose =====
         html += `<div class="fin-row"><span class="lbl"><i class="ti ti-list-details"></i>Subtotal servicios</span><span class="val">${formatCurrency(servicesSubtotal, curr)}</span></div>`;
 
         // Propina cobrada (Fase 2): líneas leídas del summary del servidor para que el Subtotal + propina +
@@ -2471,41 +2475,26 @@ document.addEventListener('DOMContentLoaded', async function() {
     // por método y el historial para que el contenido real entre sin saltos.
     function renderPaymentsSkeleton() {
         const bar = (w, h, extra = '') => `<div class="pay-skel" style="width:${w};height:${h};${extra}"></div>`;
-        const coverage = document.getElementById('paymentCoverageCard');
-        if (coverage) {
-            coverage.innerHTML = `<div aria-busy="true" aria-live="polite">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-                  <div style="flex:1;">
-                    ${bar('190px', '12px')}
-                    ${bar('220px', '32px', 'margin-top:9px;')}
-                  </div>
-                  ${bar('118px', '30px', 'border-radius:999px;')}
-                </div>
-                ${bar('96px', '11px', 'margin:14px 0 0 auto;')}
-                ${bar('100%', '11px', 'border-radius:999px;margin:7px 0 18px;')}
-                <div style="display:flex;justify-content:space-between;gap:12px;">
-                  <div>${bar('64px', '10px')}${bar('120px', '22px', 'margin-top:7px;')}</div>
-                  <div style="text-align:right;">${bar('64px', '10px', 'margin-left:auto;')}${bar('120px', '22px', 'margin:7px 0 0 auto;')}</div>
-                </div>
+        // Imita el DESGLOSE, que es por donde abre el panel desde que se fue la cabecera de cobertura.
+        const aviso = document.getElementById('payAviso');
+        if (aviso) {
+            const filas = [1, 2, 3, 4].map(() => `<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f1efe8;">
+                ${bar('190px', '13px')}${bar('110px', '13px')}
+              </div>`).join('');
+            aviso.innerHTML = `<div aria-busy="true" aria-live="polite">${bar('90px', '10px', 'margin-bottom:14px;')}${filas}
                 <div class="d-flex align-items-center gap-2 mt-3 text-muted" style="font-size:.82rem;">
                   <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>Cargando pagos…
                 </div>
               </div>`;
-        }
-        const body = document.getElementById('paymentsBody');
-        if (body) {
-            body.innerHTML = `<div aria-busy="true">${[1, 2, 3].map(() => `<div style="display:flex;align-items:center;gap:12px;padding:.6rem .55rem;border-bottom:1px solid #e6e6da;">
-                ${bar('86px', '12px')}${bar('96px', '12px')}<div style="flex:1;"></div>${bar('70px', '12px')}
-              </div>`).join('')}</div>`;
         }
     }
 
     // Si el GET falla no hay summary que pintar: dejar el esqueleto girando para siempre es peor que el
     // panel vacío, así que mostramos el error con reintento en la card de cobertura.
     function renderPaymentsLoadError() {
-        const coverage = document.getElementById('paymentCoverageCard');
-        if (coverage) {
-            coverage.innerHTML = `<div class="text-center py-2">
+        const aviso = document.getElementById('payAviso');
+        if (aviso) {
+            aviso.innerHTML = `<div class="text-center py-2">
                 <div class="text-muted mb-2"><i class="ti ti-alert-triangle me-1"></i>No se pudo cargar la información de pagos.</div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="retryPaymentsBtn"><i class="ti ti-refresh me-1"></i>Reintentar</button>
               </div>`;
@@ -2547,48 +2536,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Tabla "Por método de pago": un renglón por método con Total y Restante (reemplaza los chips con
 
 
-    // "En efectivo ahorras $X" bajo el total. Se había retirado cuando el comparativo vivía siempre
-    // a la vista —decía lo mismo con la cifra—, pero ahora está colapsado tras el chip del método:
-    // sin el aviso, quien no lo abra no se entera de que hay una forma más barata de cobrar.
-    // Devuelve '' si el método cotizado ya es el más barato.
-    // ¿Hay un método más barato que el cotizado? Devuelve { metodo, ahorro } o null. Lo consultan el
-    // aviso del carrito y el chip de la barra del pie: un solo cálculo para que no puedan discrepar.
-    // Los totales por método son los mismos del comparativo: subtotal del método + ajustes + propina.
-    function ahorroMasBarato(summary, services, curr) {
-        const H = PaymentBreakdownHelpers;
-        const s = summary || {};
-        const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
-        const anchor = s.anchoredMethod || (reservationData && reservationData.paymentType);
-        const cheapest = H.cheapestAvailableMethod(methods, services, curr);
-        if (!cheapest || !anchor || cheapest === anchor) return null;
-        const extras = H.round2(s.adjustments) + H.round2(s.tip);
-        const totalFor = (m) => Math.max(0, H.round2(H.computeServicesSubtotalByType(services, m, curr) + extras));
-        const ahorro = H.round2(totalFor(anchor) - totalFor(cheapest));
-        return ahorro < 0.005 ? null : { metodo: cheapest, ahorro };
-    }
-
-    function cheapestSavingsHint(summary, services, curr) {
-        const H = PaymentBreakdownHelpers;
-        const mejor = ahorroMasBarato(summary, services, curr);
-        if (!mejor) return '';
-        return `<div class="pay-savings-hint"><i class="ti ti-discount-2"></i>En ${H.escapeHtml(H.methodLabel(mejor.metodo).toLowerCase())} ahorras ${formatCurrency(mejor.ahorro, curr)}</div>`;
-    }
-
     function renderPaymentsOffcanvas() {
         if (!latestSummary) return;
-        const services = reservationData?.services || [];
-        const curr = reservationData?.currency || 'MXN';
-        const coverage = document.getElementById('paymentCoverageCard');
-        if (coverage) {
-            // Sin el hint de ahorro: la sección "Total según el método" ya está a la vista y dice lo
-            // mismo —cuál cuesta menos y cuánto—, con la cifra en vez de una frase.
-            // Sin píldora de estado: "Pago parcial" ya lo dicen el porcentaje, lo pagado y el saldo
-            // de este mismo bloque —y la barra del pie, que es de donde se abre el panel—. Su esquina
-            // la toma el chip del método, que ahí se lee como lo que es: un control.
-            const hint = cheapestSavingsHint(latestSummary, services, curr);
-            coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr, hint,
-                { ocultarEstado: true });
-        }
+        // Ya no pinta cabecera: solo retira el esqueleto o el error de carga, porque el contenido
+        // real del panel —desglose, alta e historial— lo dibujan sus propias funciones.
+        const aviso = document.getElementById('payAviso');
+        if (aviso) aviso.innerHTML = '';
     }
 
     function renderPayments() {
