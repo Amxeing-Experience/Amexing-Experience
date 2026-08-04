@@ -21,6 +21,7 @@ const QuoteEdit = require('../../domain/models/QuoteEdit');
 const QuoteOwnership = require('../../domain/models/QuoteOwnership');
 const QuoteAccess = require('../../domain/models/QuoteAccess');
 const logger = require('../../infrastructure/logger');
+const { isAgencyOwnerOfQuote } = require('../utils/agencyScope');
 
 /**
  * Service class for managing quote versions and edit history.
@@ -524,6 +525,24 @@ class QuoteVersioningService {
     const isOwner = await QuoteOwnership.isOwner(quoteId, userId);
     if (isOwner) {
       logger.info('🔓 Quote ownership edit permission granted', {
+        userId,
+        roleName,
+        userEmail,
+        quoteId,
+      });
+      return true;
+    }
+
+    // La AGENCIA edita lo de sus propios agentes. Misma fuente que las guardas de colaboración y
+    // transferencia (application/utils/agencyScope) para que las cinco no puedan divergir.
+    //
+    // canEdit nunca tuvo rama de agencia: la única que existía era la de `client` de arriba, que
+    // compara contra quote.client, no contra el dueño. Antes, un department_manager que editaba lo de
+    // su agente moría con 500 en QuoteVersioningService.recordEdit, que vuelve a llamar canEdit sin
+    // override; el override del controller nunca lo salvó. Este es el primer camino por el que de
+    // verdad puede.
+    if (await isAgencyOwnerOfQuote(user, roleName, quoteId)) {
+      logger.info('🔓 Agency edit permission granted over its own agent quote', {
         userId,
         roleName,
         userEmail,
