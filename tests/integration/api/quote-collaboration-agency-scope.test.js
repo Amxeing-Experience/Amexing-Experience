@@ -167,6 +167,21 @@ describe('cotizaciones: la agencia manda sobre lo de sus agentes (integration)',
       expect(res.status).toBeLessThan(400);
       expect(await ownerIdOf(quote.id)).toBe(agentA2.id);
     });
+
+    // El caso que faltaba: compartir pasaba pero editar seguía en 403, porque canEdit nunca tuvo rama
+    // de agencia. La asimetría era "comparte sí, edita no" sobre la MISMA cotización.
+    it('edita la cotización de su agente, y el cambio se guarda', async () => {
+      const quote = await makeQuoteOwnedBy(agentA1);
+
+      const res = await request(app)
+        .put(`/api/quotes/${quote.id}`)
+        .set('Authorization', `Bearer ${agencyAToken}`)
+        .send({ numberOfPeople: 9 });
+
+      expect(res.status).toBeLessThan(400);
+      const despues = await new Parse.Query('Quote').get(quote.id, { useMasterKey: true });
+      expect(despues.get('numberOfPeople')).toBe(9);
+    });
   });
 
   // -----------------------------------------------------------------------------------------
@@ -196,6 +211,32 @@ describe('cotizaciones: la agencia manda sobre lo de sus agentes (integration)',
 
       expect(res.status).toBeGreaterThanOrEqual(400);
       expect(await accessCountFor(quote.id, agentA2.id)).toBe(0);
+    });
+
+    it('un AGENTE no puede editar la cotización de su compañero', async () => {
+      const quote = await makeQuoteOwnedBy(agentA1);
+
+      const res = await request(app)
+        .put(`/api/quotes/${quote.id}`)
+        .set('Authorization', `Bearer ${agentA2Token}`)
+        .send({ numberOfPeople: 9 });
+
+      expect(res.status).toBe(403);
+      const despues = await new Parse.Query('Quote').get(quote.id, { useMasterKey: true });
+      expect(despues.get('numberOfPeople')).toBe(2);
+    });
+
+    it('una agencia AJENA no puede editar la cotización del agente de otra', async () => {
+      const quote = await makeQuoteOwnedBy(agentA1);
+
+      const res = await request(app)
+        .put(`/api/quotes/${quote.id}`)
+        .set('Authorization', `Bearer ${agencyBToken}`)
+        .send({ numberOfPeople: 9 });
+
+      expect(res.status).toBe(403);
+      const despues = await new Parse.Query('Quote').get(quote.id, { useMasterKey: true });
+      expect(despues.get('numberOfPeople')).toBe(2);
     });
 
     // El agujero de comparar dos ausencias: si la comparación fuera manager.clientId === agente.clientId,
