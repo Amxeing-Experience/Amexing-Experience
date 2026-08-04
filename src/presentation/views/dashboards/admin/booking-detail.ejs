@@ -360,7 +360,11 @@
 
 <link rel="stylesheet" href="/shared/services/serviceList.css">
 <style>
-#paymentsOffcanvas { --bs-offcanvas-width: 860px; }
+/* 860 px venían de cuando el panel llevaba pestañas y una tabla de cuatro columnas por método. Con
+   una sola columna, ese ancho dejaba la etiqueta y su cifra separadas por un vacío que había que
+   recorrer en cada renglón. No baja más porque el historial completo —seis columnas— necesita
+   632 px medidos; a 700 cabe holgado y el alta pasa a dos campos por renglón. */
+#paymentsOffcanvas { --bs-offcanvas-width: 700px; }
 @media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
 /* Backdrop mas oscuro que el default de Bootstrap (0.5): el carrito es el unico offcanvas de esta
    vista y conviene que se lea como una capa aparte. */
@@ -370,6 +374,19 @@
    marco— y ademas competian entre si por el acento. Ahora el panel es una sola hoja y lo que separa
    son los rotulos en versalitas y un filete por seccion (.pay-sec). */
 #paymentsOffcanvas .offcanvas-body { background: #fff; font-size: 1rem; padding: 1.35rem 1.5rem; }
+/* Este panel es casi todo cifras y estaban en tipografía proporcional: $110,190.00 y $99,317.13 no
+   ocupaban lo mismo, así que las columnas de montos bailaban aunque estuvieran alineadas a la
+   derecha. tabular-nums le da el mismo ancho a cada dígito. */
+#paymentsOffcanvas .pay-cob-total,
+#paymentsOffcanvas .pay-cob-cifra,
+#paymentsOffcanvas .pay-cob-pct,
+#paymentsOffcanvas .pay-cmp-monto,
+#paymentsOffcanvas .pay-cmp-cubierto,
+#paymentsOffcanvas .pay-cmp-saldo,
+#paymentsOffcanvas .pay-desglose .val,
+#paymentsOffcanvas .pay-hist-amount,
+#paymentsOffcanvas .pay-hist-date,
+#paymentsOffcanvas .pay-hist-meta { font-variant-numeric: tabular-nums; }
 #paymentFormWrap {
     background: #fbfbf7;
     border: 1px solid #ece8dd;
