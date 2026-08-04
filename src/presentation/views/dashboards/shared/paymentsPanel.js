@@ -143,22 +143,14 @@ const PaymentsPanel = (() => {
          * bar('60%', '12px')
          */
         const bar = (w, h, extra = '') => `<div class="pay-skel" style="width:${w};height:${h};${extra}"></div>`;
-        const coverage = document.getElementById('paymentCoverageCard');
-        if (coverage) {
-            coverage.innerHTML = `<div aria-busy="true" aria-live="polite">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-                  <div style="flex:1;">
-                    ${bar('190px', '12px')}
-                    ${bar('220px', '32px', 'margin-top:9px;')}
-                  </div>
-                  ${bar('118px', '30px', 'border-radius:999px;')}
-                </div>
-                ${bar('96px', '11px', 'margin:14px 0 0 auto;')}
-                ${bar('100%', '11px', 'border-radius:999px;margin:7px 0 18px;')}
-                <div style="display:flex;justify-content:space-between;gap:12px;">
-                  <div>${bar('64px', '10px')}${bar('120px', '22px', 'margin-top:7px;')}</div>
-                  <div style="text-align:right;">${bar('64px', '10px', 'margin-left:auto;')}${bar('120px', '22px', 'margin:7px 0 0 auto;')}</div>
-                </div>
+        // Imita la primera sección real del panel. Antes copiaba la forma de la card de cobertura,
+        // que ya no existe: el Resumen Financiero de la página muestra esas cifras.
+        const aviso = document.getElementById('payAviso');
+        if (aviso) {
+            const filas = [1, 2, 3].map(() => `<div style="display:flex;align-items:center;gap:12px;padding:.55rem 0;border-top:1px solid #f1efe8;">
+                ${bar('120px', '13px')}<div style="flex:1;"></div>${bar('80px', '13px')}${bar('90px', '13px')}
+              </div>`).join('');
+            aviso.innerHTML = `<div aria-busy="true" aria-live="polite">${bar('150px', '11px', 'margin-bottom:12px;')}${filas}
                 <div class="d-flex align-items-center gap-2 mt-3 text-muted" style="font-size:.82rem;">
                   <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>Cargando pagos…
                 </div>

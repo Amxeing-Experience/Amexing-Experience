@@ -165,8 +165,11 @@
         <div class="tab-content">
             <!-- TAB PAGO -->
             <div class="tab-pane fade show active" id="tabPago" role="tabpanel" aria-labelledby="tabPagoBtn">
-                <!-- Card de cobertura (total + estado + barra + Pagado/Saldo) -->
-                <div class="rounded p-3 mb-3 payment-coverage-highlight" id="paymentCoverageCard"></div>
+                <!-- La cabecera de cobertura se retiró: repetía las seis cifras que el Resumen
+                     Financiero de la página ya muestra —total, método, estado, porcentaje, pagado y
+                     saldo—, y el botón que abre este panel vive dentro de ese mismo resumen. Se
+                     acababan de ver. Este hueco queda para el esqueleto de carga y el error. -->
+                <div id="payAviso"></div>
                 <!-- Acción principal: registrar pago -->
                 <button class="btn btn-primary w-100 mb-3 d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
                 <!-- Formulario de pago inline (renderPaymentForm) -->
@@ -720,9 +723,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function renderPaymentsLoadError() {
-        const coverage = document.getElementById('paymentCoverageCard');
-        if (coverage) {
-            coverage.innerHTML = `<div class="text-center py-2">
+        const aviso = document.getElementById('payAviso');
+        if (aviso) {
+            aviso.innerHTML = `<div class="text-center py-2">
                 <div class="text-muted mb-2"><i class="ti ti-alert-triangle me-1"></i>No se pudo cargar la información de pagos.</div>
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="retryPaymentsBtn"><i class="ti ti-refresh me-1"></i>Reintentar</button>
               </div>`;
@@ -790,13 +793,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!latestSummary) return;
         const services = reservationData?.services || [];
         const curr = reservationData?.currency || 'MXN';
-        const coverage = document.getElementById('paymentCoverageCard');
+        // Ya no se pinta cabecera: la cobertura vive en el Resumen Financiero de la página.
+        const aviso2 = document.getElementById('payAviso');
+        if (aviso2) aviso2.innerHTML = '';
         const methodTable = document.getElementById('paymentMethodTable');
-        if (coverage) {
-            coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(
-                latestSummary, curr, cheapestSavingsHint(latestSummary, services, curr),
-            );
-        }
         if (methodTable) {
             const html = buildMethodTableHtml(latestSummary, services, curr);
             methodTable.innerHTML = html;
