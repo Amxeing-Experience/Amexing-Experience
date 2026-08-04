@@ -2499,6 +2499,26 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Tabla "Por método de pago": un renglón por método con Total y Restante (reemplaza los chips con
 
 
+    // "En efectivo ahorras $X" bajo el total. Se había retirado cuando el comparativo vivía siempre
+    // a la vista —decía lo mismo con la cifra—, pero ahora está colapsado tras el chip del método:
+    // sin el aviso, quien no lo abra no se entera de que hay una forma más barata de cobrar.
+    // Devuelve '' si el método cotizado ya es el más barato.
+    function cheapestSavingsHint(summary, services, curr) {
+        const H = PaymentBreakdownHelpers;
+        const s = summary || {};
+        const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
+        const anchor = s.anchoredMethod;
+        const cheapest = H.cheapestAvailableMethod(methods, services, curr);
+        if (!cheapest || !anchor || cheapest === anchor) return '';
+        // Mismos totales por método que el comparativo (subtotal del método + ajustes + propina), así
+        // el ahorro anunciado aquí y la diferencia que se ve al abrirlo no pueden discrepar.
+        const extras = H.round2(s.adjustments) + H.round2(s.tip);
+        const totalFor = (m) => Math.max(0, H.round2(H.computeServicesSubtotalByType(services, m, curr) + extras));
+        const savings = H.round2(totalFor(anchor) - totalFor(cheapest));
+        if (savings < 0.005) return '';
+        return `<div class="pay-savings-hint"><i class="ti ti-discount-2"></i>En ${H.escapeHtml(H.methodLabel(cheapest).toLowerCase())} ahorras ${formatCurrency(savings, curr)}</div>`;
+    }
+
     function renderPaymentsOffcanvas() {
         if (!latestSummary) return;
         const services = reservationData?.services || [];
@@ -2510,7 +2530,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Sin píldora de estado: "Pago parcial" ya lo dicen el porcentaje, lo pagado y el saldo
             // de este mismo bloque —y la barra del pie, que es de donde se abre el panel—. Su esquina
             // la toma el chip del método, que ahí se lee como lo que es: un control.
-            coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr, null,
+            const hint = cheapestSavingsHint(latestSummary, services, curr);
+            coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr, hint,
                 { metodoInteractivo: hayComparativo(), ocultarEstado: true });
         }
     }
