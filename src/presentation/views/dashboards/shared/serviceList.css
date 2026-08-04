@@ -445,16 +445,6 @@
    queda implícito en el grupo y cada botón solo nombra lo que entrega. Antes era un control único,
    así que solo se podía hacer una de las dos cosas. */
 .hdr-seg{display:inline-flex;gap:3px;background:#f1f2ec;border:1px solid #e6e4dd;border-radius:10px;padding:3px;}
-/* Menú del segmento de exportar: el contrato tiene dos cortes —por servicio o por chofer—, así que
-   su botón despliega en vez de ir directo. */
-.hdr-seg-menu{position:relative;display:inline-flex;}
-.hdr-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:60;min-width:230px;
-  display:flex;flex-direction:column;padding:6px;background:#fff;border:1px solid #dcdccf;
-  border-radius:10px;box-shadow:0 8px 26px rgba(43,43,43,.14);}
-.hdr-menu-item{display:flex;align-items:center;gap:9px;padding:.55rem .7rem;border-radius:7px;
-  font-size:.86rem;font-weight:600;color:#4f5838;text-decoration:none;white-space:nowrap;}
-.hdr-menu-item:hover{background:#f1f2ec;color:#3f4a2c;}
-.hdr-menu-item i{font-size:1.05rem;color:#8a8f78;}
 .hdr-seg-btn{display:inline-flex;align-items:center;gap:.35rem;border:none;background:transparent;border-radius:7px;
   font-size:.8rem;font-weight:600;color:#6b7256;padding:.35rem .75rem;line-height:1.2;white-space:nowrap;
   text-decoration:none;font-family:inherit;transition:background .12s,color .12s;}

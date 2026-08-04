@@ -1471,28 +1471,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Las dos exportaciones van juntas en un control segmentado: son la misma acción con dos
         // variantes, así que "Exportar" queda implícito en el grupo y cada botón solo nombra el
         // documento. El aria-label/title conserva la frase completa para lector de pantalla y hover.
-        // El contrato tiene DOS cortes —una hoja por servicio o una por chofer—, así que su botón
-        // abre un menú en vez de ir directo: son dos documentos distintos del mismo viaje y quien
-        // exporta elige según cómo vaya a repartir el trabajo. La vista pide sesión de admin, a
-        // diferencia de la confirmación, porque lleva teléfonos de choferes y placas.
+        // El contrato va directo, sin menú previo: el corte —por servicio o por chofer— se elige
+        // dentro del propio documento, así que preguntarlo antes era pedir dos veces lo mismo. La
+        // vista pide sesión de admin, a diferencia de la confirmación, porque lleva teléfonos de
+        // choferes y placas.
         const exportSegHtml = folio
             ? `<span class="hdr-seg" role="group" aria-label="Exportar">
                 <a class="hdr-seg-btn" href="/reservations/${folio}" target="_blank" rel="noopener"
                    title="Exportar confirmación — abre la vista pública, exportable a PDF"
                    aria-label="Exportar confirmación"><i class="ti ti-file-export"></i>Confirmación</a>
-                <span class="hdr-seg-menu">
-                  <button type="button" class="hdr-seg-btn" id="exportContractBtn" aria-expanded="false"
-                     title="Exportar contrato de servicio — para quien opera el viaje"
-                     aria-label="Exportar contrato de servicio"><i class="ti ti-file-text"></i>Contrato</button>
-                  <span class="hdr-menu d-none" id="exportContractMenu" role="menu">
-                    <a class="hdr-menu-item" role="menuitem" target="_blank" rel="noopener"
-                       href="/dashboard/admin/reservations/${folio}/contract?corte=servicio">
-                       <i class="ti ti-file-text"></i>Una hoja por servicio</a>
-                    <a class="hdr-menu-item" role="menuitem" target="_blank" rel="noopener"
-                       href="/dashboard/admin/reservations/${folio}/contract?corte=chofer">
-                       <i class="ti ti-users"></i>Una hoja por chofer</a>
-                  </span>
-                </span>
+                <a class="hdr-seg-btn" id="exportContractBtn" target="_blank" rel="noopener"
+                   href="/dashboard/admin/reservations/${folio}/contract"
+                   title="Exportar contrato de servicio — para quien opera el viaje"
+                   aria-label="Exportar contrato de servicio"><i class="ti ti-file-text"></i>Contrato</a>
               </span>`
             : '';
         // En vez del botón de cancelar: si ya está cancelada, mostrar etiqueta
@@ -1574,28 +1565,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     // panel; la única diferencia era que la segunda además desplegaba el formulario. Dos botones
     // contiguos con el mismo destino se leen como una decisión que no existe, y lo que la barra ya
     // muestra —saldo, avance, pagado de total, método y estado— es justo lo que se iba a "ver".
-    // El menú del contrato: se cablea por delegación porque el segmento de exportar lo reescribe
-    // renderReservation en cada carga.
-    function cerrarMenuContrato() {
-        const menu = document.getElementById('exportContractMenu');
-        if (!menu || menu.classList.contains('d-none')) return;
-        menu.classList.add('d-none');
-        document.getElementById('exportContractBtn')?.setAttribute('aria-expanded', 'false');
-    }
-    document.addEventListener('click', (e) => {
-        const btn = e.target.closest('#exportContractBtn');
-        if (btn) {
-            e.stopPropagation();
-            const menu = document.getElementById('exportContractMenu');
-            if (!menu) return;
-            const cerrado = menu.classList.toggle('d-none');
-            btn.setAttribute('aria-expanded', String(!cerrado));
-            return;
-        }
-        if (!e.target.closest('#exportContractMenu')) cerrarMenuContrato();
-    });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarMenuContrato(); });
-
     // ¿Hay algo que comparar? Sin filas el chip del método no se ofrece como botón.
     function hayComparativo() {
         const cmp = document.getElementById('payCmp');
