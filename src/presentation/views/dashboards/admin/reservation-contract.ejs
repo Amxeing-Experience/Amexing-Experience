@@ -74,6 +74,14 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
                           min-width:150px; flex:0 0 auto; }
         .ctr-pax-row .v { color:#2b2b2b; font-size:20px; word-break:break-word; }
 
+        /* La hora a la que hay que estar, en grande. Dentro de la tabla era una celda entre diez y
+           es el único dato de la hoja que no puede fallar. */
+        .ctr-cuando { max-width:740px; margin:0 auto 14px; display:flex; align-items:baseline; gap:16px;
+                      flex-wrap:wrap; border:2px solid #8a8c6e; padding:10px 16px; }
+        .ctr-cuando-cap { font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:#6b6b5f; }
+        .ctr-cuando-hora { font-size:32px; font-weight:700; color:#111; line-height:1; }
+        .ctr-cuando-dia { font-size:16px; color:#2b2b2b; }
+
         /* Bloque de asignación: el dato propio de este documento. Se destaca sobre la ficha del
            servicio porque es lo que el chofer viene a confirmar —que es él y con qué vehículo—. */
         .ctr-asig { max-width:740px; margin:0 auto 14px; border:1px solid #8a8c6e; background:#f7f7f2; }
@@ -312,33 +320,55 @@ function bloqueAsignacion(sc) {
         const filas = bloqueAsignacion(sc);
     %>
         <div class="rc-section-title"><%= tipoServicio(sc) %></div>
+        <%
+            // Se repite arriba, en grande, la hora a la que hay que estar. Dentro de la tabla es una
+            // celda más entre diez; aquí es lo primero que se ve al sacar la hoja del bolsillo.
+            const esAero = (sc.type === 'transport' || sc.type === 'traslado') && sc.transportType === 'aeropuerto';
+            const cuando = (esAero && sc.directionType === 'departure')
+                ? (sc.flightDepartureTimeSuggested || '')
+                : (sc.time || sc.startTime || '');
+        %>
+        <% if (cuando) { %>
+        <div class="ctr-cuando">
+            <span class="ctr-cuando-cap"><%= esAero && sc.directionType !== 'departure' ? 'Estar en el aeropuerto' : 'Recoger' %></span>
+            <span class="ctr-cuando-hora"><%= cuando %> hrs</span>
+            <span class="ctr-cuando-dia"><%= fmtFecha(it.fecha) %></span>
+        </div>
+        <% } %>
         <div class="rc-tbl">
             <% if (sc.concept) { %>
             <div class="rc-tc rc-c6"><span class="rc-label">Servicio</span><span class="rc-value"><%= sc.concept %></span></div>
             <% } %>
             <%
-                // La hora del SERVICIO y la del VUELO son dos datos distintos y hasta ahora solo se
-                // pintaba una fila, así que un traslado de aeropuerto no decía a qué hora estar.
-                // Medido sobre los 102 transportes de la base: 43 traen `time`, 18
-                // `flightDepartureTimeSuggested` y ninguno `startTime`. La etiqueta de la hora del
-                // servicio cambia con la dirección, igual que en la confirmación: en una salida es
-                // cuándo pasar por el pasajero; en una llegada, cuándo aterriza.
+                // Qué significa cada hora en un traslado de aeropuerto, según el campo donde se
+                // captura —"Hora de salida sugerida… confírmala como hora de pick-up"— y según lo
+                // que dicen los datos: de los 18 servicios que traen las dos, la sugerida es
+                // anterior a `time` en 13.
+                //
+                //   SALIDA  → `time` es la hora del VUELO y la sugerida es cuándo pasar por el
+                //             pasajero. Estaban al revés: el contrato llamaba "recolección" a la
+                //             hora del vuelo y "vuelo" a la del pick-up.
+                //   LLEGADA → `time` es cuándo aterriza, que es cuándo hay que estar ahí; la
+                //             sugerida queda como la salida del vuelo desde su origen (en la base,
+                //             unas cuatro horas antes de llegar).
                 const esAeropuerto = (sc.type === 'transport' || sc.type === 'traslado')
                     && sc.transportType === 'aeropuerto';
                 const esSalida = sc.directionType === 'departure';
-                const rotuloHora = esAeropuerto
-                    ? (esSalida ? 'Hora de recolección' : 'Hora de llegada')
-                    : 'Hora';
                 // Las horas se leen a distancia y en una hoja llena de números —fechas, teléfonos,
                 // placas—: la unidad las separa del resto de un vistazo.
                 const conHrs = (v) => (v ? `${v} hrs` : '');
-                const horaServicio = conHrs(sc.time || sc.startTime || '');
-                const horaVuelo = conHrs(sc.flightDepartureTimeSuggested || '');
+                const sugerida = sc.flightDepartureTimeSuggested || '';
+                const propia = sc.time || sc.startTime || '';
+                // Cuándo tiene que estar quien opera: lo único que no puede fallar de esta hoja.
+                const horaRecoger = conHrs(esAeropuerto && esSalida ? sugerida : propia);
+                const otraHora = esAeropuerto
+                    ? { rotulo: esSalida ? 'Hora de vuelo' : 'Salida del vuelo', valor: conHrs(esSalida ? propia : sugerida) }
+                    : null;
             %>
             <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(it.fecha) || '—' %></span></div>
-            <div class="rc-tc rc-c3"><span class="rc-label"><%= rotuloHora %></span><span class="rc-value"><%= horaServicio || '—' %></span></div>
-            <% if (horaVuelo) { %>
-            <div class="rc-tc rc-c3"><span class="rc-label">Hora de vuelo</span><span class="rc-value"><%= horaVuelo %></span></div>
+            <div class="rc-tc rc-c3"><span class="rc-label"><%= esAeropuerto && !esSalida ? 'Hora de llegada' : 'Hora de recolección' %></span><span class="rc-value"><%= horaRecoger || '—' %></span></div>
+            <% if (otraHora && otraHora.valor) { %>
+            <div class="rc-tc rc-c3"><span class="rc-label"><%= otraHora.rotulo %></span><span class="rc-value"><%= otraHora.valor %></span></div>
             <% } %>
             <% if (sc.pickupAddress || sc.originName) { %>
             <div class="rc-tc rc-c6"><span class="rc-label">Recoger en</span><span class="rc-value"><%= sc.pickupAddress || sc.originName %></span></div>
