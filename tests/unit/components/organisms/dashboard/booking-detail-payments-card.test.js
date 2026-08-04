@@ -24,11 +24,13 @@ describe('Booking Detail - Pagos Offcanvas (admin)', () => {
     expect(html).not.toContain('id="paymentsCountBadge"');
   });
 
-  // 860px (antes 760): el historial pasó a 6 columnas con letra más grande y necesita el ancho.
-  test('existe el Offcanvas nativo de Bootstrap con ancho 860px y breakpoint sm (576px)', () => {
+  // 700px (antes 860, y 760 antes de eso). Los 860 eran para las pestañas y la tabla por método;
+  // con una sola columna sobraban. No baja más porque el historial completo —seis columnas— pide
+  // 632 px medidos.
+  test('existe el Offcanvas nativo de Bootstrap con ancho 700px y breakpoint sm (576px)', () => {
     expect(html).toContain('id="paymentsOffcanvas"');
     expect(html).toContain('offcanvas offcanvas-end');
-    expect(html).toContain('--bs-offcanvas-width: 860px');
+    expect(html).toContain('--bs-offcanvas-width: 700px');
     expect(html).toContain('@media (max-width: 576px)');
   });
 
