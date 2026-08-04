@@ -360,11 +360,12 @@
 
 <link rel="stylesheet" href="/shared/services/serviceList.css">
 <style>
-/* 860 px venían de cuando el panel llevaba pestañas y una tabla de cuatro columnas por método. Con
-   una sola columna, ese ancho dejaba la etiqueta y su cifra separadas por un vacío que había que
-   recorrer en cada renglón. No baja más porque el historial completo —seis columnas— necesita
-   632 px medidos; a 700 cabe holgado y el alta pasa a dos campos por renglón. */
-#paymentsOffcanvas { --bs-offcanvas-width: 700px; }
+/* El panel se queda en 860. Bajarlo a 700 dejaba la tabla del historial en scroll horizontal: los
+   632 px que medí como mínimo eran con contenido corto, pero con una referencia larga, la persona
+   que recibió, la que registró y una moneda extranjera la tabla pide ~793 y el contenedor daba 652.
+   El vacío del desglose —el motivo por el que quise angostarlo— se arregla limitando el ancho de
+   ESE bloque, no el de todo el panel: la tabla necesita el ancho, el desglose no. */
+#paymentsOffcanvas { --bs-offcanvas-width: 860px; }
 @media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
 /* Backdrop mas oscuro que el default de Bootstrap (0.5): el carrito es el unico offcanvas de esta
    vista y conviene que se lea como una capa aparte. */
@@ -377,6 +378,13 @@
 /* Este panel es casi todo cifras y estaban en tipografía proporcional: $110,190.00 y $99,317.13 no
    ocupaban lo mismo, así que las columnas de montos bailaban aunque estuvieran alineadas a la
    derecha. tabular-nums le da el mismo ancho a cada dígito. */
+/* La cobertura y el desglose son pares etiqueta/cifra: a todo lo ancho del panel quedan separados
+   por un vacío que la vista tiene que recorrer en cada renglón. Se limitan; la tabla del historial
+   y el comparativo NO, que ahí el ancho es lo que hace que sus columnas quepan. */
+#paymentsOffcanvas #paymentCoverageCard,
+#paymentsOffcanvas .pay-desglose,
+#paymentsOffcanvas #paymentFormWrap { max-width: 660px; }
+
 #paymentsOffcanvas .pay-cob-total,
 #paymentsOffcanvas .pay-cob-cifra,
 #paymentsOffcanvas .pay-cob-pct,
