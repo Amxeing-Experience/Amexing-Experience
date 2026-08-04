@@ -7,9 +7,6 @@
  */
 
 .fin-wrap{border:1px solid #ece8dd;border-radius:14px;background:#fff;padding:20px 22px;}
-.fin-section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
-  margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #ece8dd;}
-.fin-section-title{margin:0;font-weight:700;color:#566040;font-size:1.1rem;display:flex;align-items:center;}
 .fin-hero{padding-bottom:18px;margin-bottom:16px;border-bottom:1px solid #ece8dd;}
 .fin-hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
 .fin-hero-lbl{text-transform:uppercase;letter-spacing:.12em;font-size:.64rem;font-weight:700;color:#8a8f78;
@@ -21,12 +18,6 @@
 .fin-hero-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 .fin-hero-meta .fin-status-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
 /* Badge de estado suavizado SOLO en el hero (no toca getPaymentStatusBadge compartido) */
-.fin-hero-meta .badge{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;padding:.4rem .8rem;border-radius:999px;border:1px solid transparent;}
-.fin-hero-meta .badge::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;}
-.fin-hero-meta .badge.bg-warning{background:#f6efe2 !important;color:#96682f !important;border-color:#e7d6bd;}
-.fin-hero-meta .badge.bg-success{background:#e6efe1 !important;color:#3f5a34 !important;border-color:#cfe0c6;}
-.fin-hero-meta .badge.bg-secondary{background:#f0eee7 !important;color:#6b6656 !important;border-color:#ded9cb;}
-.fin-hero-meta .badge.bg-info{background:#eaf1f0 !important;color:#3a6b63 !important;border-color:#cfe1dd;}
 /* Botón "Agregar pago": pastilla olivo sólida, limpia y on-brand */
 .fin-pay-btn{display:inline-flex;align-items:center;gap:6px;background:#6E7A50;color:#fff;border:1px solid #6E7A50;
   border-radius:999px;font-size:.8rem;font-weight:600;padding:.42rem .95rem;line-height:1.2;transition:background .12s,border-color .12s;}
@@ -516,3 +507,72 @@
     padding: 0.15rem 0.4rem;
     font-weight: 500;
 }
+
+/* ---------------------------------------------------------------------------
+   Cobertura del carrito de pagos (buildCoverageCard).
+   Era una tarjeta blanca con filete de acento flotando sobre un fondo gris,
+   dentro de un panel que ya es una superficie: marco dentro de marco. Ahora lo
+   que separa es la jerarquía —rótulo en versalitas, cifra grande, barra—.
+   --------------------------------------------------------------------------- */
+.pay-cob-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.pay-cob-cap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;
+  letter-spacing:.1em;font-size:.72rem;font-weight:700;color:#8a8f78;}
+.pay-cob-total{font-size:2.05rem;font-weight:700;color:#2b2b2b;line-height:1.1;margin-top:5px;}
+.pay-cob-metodo{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.05em;color:#566040;background:#eef0e6;
+  border:1px solid #dce2d0;border-radius:999px;padding:.26rem .66rem;}
+.pay-cob-estado{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;
+  border-radius:999px;padding:.44rem .85rem;white-space:nowrap;}
+.pay-cob-punto{width:8px;height:8px;border-radius:50%;background:currentColor;}
+.pay-cob-estado.is-neutro{background:#f0eee7;color:#6b6656;border:1px solid #ded9cb;}
+.pay-cob-estado.is-parcial{background:#f6efe2;color:#96682f;border:1px solid #e7d6bd;}
+.pay-cob-estado.is-pagado{background:#e6efe1;color:#3f5a34;border:1px solid #cfe0c6;}
+.pay-cob-estado.is-favor{background:#eaf1f0;color:#3a6b63;border:1px solid #cfe1dd;}
+.pay-cob-barra{height:11px;border-radius:999px;background:#f0e5d0;overflow:hidden;margin:14px 0 0;}
+.pay-cob-barra > span{display:block;height:100%;border-radius:999px;background:#4b6b3f;}
+.pay-cob-pct{text-align:right;font-size:.82rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;color:#8a8f78;margin-top:7px;}
+.pay-cob-par{display:flex;justify-content:space-between;gap:12px;margin-top:16px;}
+.pay-cob-der{text-align:right;}
+.pay-cob-cap-sm{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
+.pay-cob-cifra{font-weight:700;font-size:1.55rem;color:#b8894a;}
+.pay-cob-cifra.is-pagado,.pay-cob-cifra.is-cubierto{color:#4b6b3f;}
+.pay-cob-ahorro{margin-top:14px;}
+.pay-cob-ahorro-tit{font-weight:600;color:#146c43;display:flex;align-items:center;gap:6px;}
+.pay-cob-ahorro-sub{font-size:.85rem;color:#146c43;}
+
+/* Secciones del carrito: un rótulo en versalitas y un filete arriba, en vez de una tarjeta cada una. */
+.pay-sec{margin-top:26px;padding-top:22px;border-top:1px solid #e6e1d5;}
+.pay-cap{text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;font-weight:700;
+  color:#8a8f78;margin-bottom:12px;}
+
+/* Comparativo por método: nombre, total y la diferencia contra el actual. Sin caja y sin columnas
+   de Cubierto/Restante —esas cifras solo importan del método vigente, y ese ya va arriba—. */
+/* Cuatro columnas: el método, cuánto suma en él, cuánto de eso ya está cubierto —con su
+   porcentaje, que es distinto en cada método porque el total lo es— y cuánto falta.
+   La rejilla la define el CONTENEDOR y cada renglón la hereda con subgrid. Cuando cada renglón
+   traía su propio grid, cada uno medía sus columnas contra su propio contenido: $99,317.13 y
+   $124,882.44 no ocupan lo mismo, así que las cifras no caían bajo su encabezado. */
+#payCmp{display:grid;grid-template-columns:1fr auto auto auto;}
+.pay-cmp-row{display:grid;grid-column:1 / -1;grid-template-columns:subgrid;align-items:center;
+  column-gap:26px;padding:11px 10px;border-radius:8px;}
+.pay-cmp-row.is-actual{background:#f1f2ec;}
+/* Sin subgrid el renglón se quedaría sin columnas y las celdas se apilarían. Anchos fijos como
+   red: alinean igual, solo que sin ajustarse al monto más largo. */
+@supports not (grid-template-columns: subgrid) {
+  .pay-cmp-row{grid-template-columns:1fr 120px 120px 120px;}
+}
+.pay-cmp-row.is-cabeza{padding-bottom:7px;text-transform:uppercase;letter-spacing:.07em;
+  font-size:.66rem;font-weight:700;color:#8a8f78;border-bottom:1px solid #ece8dd;border-radius:0;}
+.pay-cmp-row.is-cabeza > span:not(:first-child){text-align:right;}
+.pay-cmp-met{display:flex;align-items:center;gap:8px;color:#4a4a44;font-weight:600;min-width:0;}
+.pay-cmp-met i{color:#8a8f78;}
+.pay-cmp-monto{font-weight:600;color:#6b6656;white-space:nowrap;text-align:right;}
+/* Lo cubierto en verde, como el resto del panel: es lo que ya entró. */
+.pay-cmp-cubierto{font-weight:700;color:#4b6b3f;white-space:nowrap;text-align:right;line-height:1.2;}
+.pay-cmp-pct{display:block;font-size:.76rem;font-weight:600;color:#8a8f78;}
+.pay-cmp-saldo{font-weight:700;color:#2b2b2b;white-space:nowrap;text-align:right;}
+.pay-cmp-dif.is-actual{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;
+  color:#566040;background:#e9ece0;border-radius:5px;padding:.1rem .4rem;}
+.pay-cmp-barato{font-size:.58rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;
+  color:#3f5a34;background:#e6efe1;border:1px solid #cfe0c6;border-radius:6px;padding:.08rem .42rem;}

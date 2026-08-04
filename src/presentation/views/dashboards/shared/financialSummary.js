@@ -130,6 +130,16 @@ const FinancialSummary = (() => {
             const heroTotal = Number(pay.total) || 0;
             const heroBal = heroResolved.displayedBalance;
             const heroPct = heroTotal > 0 ? Math.min(100, Math.round((heroPaid / heroTotal) * 100)) : 0;
+            // La píldora de estado solo sale cuando dice algo que las cifras de este mismo hero no
+            // dicen ya. Pendiente es 0% y saldo igual al total; parcial es un porcentaje entre 1 y
+            // 99; pagado es 100% y saldo cero, que además se tiñe de verde solo. Reembolsado, en
+            // cambio, no se deduce de ningún número de aquí. La lista es de lo que se CALLA, no de
+            // lo que se muestra: un estado nuevo aparecerá por omisión en vez de esconderse.
+            const ESTADOS_QUE_LAS_CIFRAS_YA_DICEN = ['pending', 'partial', 'paid'];
+            const estadoHtml = ESTADOS_QUE_LAS_CIFRAS_YA_DICEN.includes(pay.paymentStatus)
+                ? ''
+                : `<span class="fin-status-lbl">Estado de pago</span>
+                   ${PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus)}`;
             const heroSavings = heroResolved.savings
                 ? `<div class="fin-savings"><i class="ti ti-discount-2 me-2"></i><strong>${PaymentBreakdownHelpers.escapeHtml(heroResolved.savings.label)}</strong><div class="small">${PaymentBreakdownHelpers.escapeHtml(heroResolved.savings.sublabel)}</div></div>`
                 : '';
@@ -141,8 +151,7 @@ const FinancialSummary = (() => {
                         ${savingsHint}
                     </div>
                     <div class="fin-hero-meta">
-                        <span class="fin-status-lbl">Estado de pago</span>
-                        ${PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus)}
+                        ${estadoHtml}
                         ${canEdit ? '<button class="fin-pay-btn" id="addPaymentBtn"><i class="ti ti-cash"></i>Agregar pago</button>' : ''}
                     </div>
                 </div>

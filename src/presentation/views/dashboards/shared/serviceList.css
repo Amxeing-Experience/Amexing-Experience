@@ -467,3 +467,318 @@
   background:transparent;border:1px solid transparent;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
   white-space:nowrap;font-family:inherit;cursor:pointer;transition:all .12s ease;}
 .hdr-danger:hover{background:#f7ecea;border-color:#e6c9c4;color:#a1443a;}
+
+/* ---------------------------------------------------------------------------
+   Identidad del documento, al frente del panel de servicios.
+
+   Quién viaja, cuándo, cuántos y cuánto va asignado. Son los mismos datos que encabezan el PDF del
+   itinerario. Vivían como celdas sueltas en la tarjeta de arriba, a media pantalla de los servicios
+   que describen; aquí hacen que el panel se lea como el documento que se manda.
+
+   Va en DOS niveles y no en una frase corrida: el nombre de quien viaja es el sujeto y lo demás es
+   su detalle. En una sola línea con todo del mismo peso, el ojo no sabía dónde empezar y los puntos
+   separadores hacían de todo un enunciado.
+
+   No es una rejilla: en la tarjeta, la celda del lead guest tenía que reservar su lugar aunque
+   estuviera vacía —de ahí .bkg-tile.is-empty— para que el resto no se recorriera. Aquí, lo que no
+   existe simplemente no se escribe.
+   --------------------------------------------------------------------------- */
+.svc-doc {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  /* SIN relleno lateral propio: .svc-wrap ya trae 22 px y esta línea es hija suya, así que uno
+     propio se sumaba al del contenedor y la dejaba metida respecto al título "Servicios" y a los
+     botones. El que sí hace falta es el inferior, para separarla de la barra del día.
+     (La lista de abajo es el caso contrario: #servicesContainer usa margen negativo para SALIRSE
+     del relleno y sangrar a todo lo ancho.) */
+  padding: 0 0 16px;
+  margin-bottom: 0;
+  /* Sin fondo: con él se leía como una tira pegada encima de la lista, compitiendo con la barra del
+     día que va justo debajo. Lo que separa es el aire y el peso de la tipografía, no una caja. */
+  border-bottom: 1px solid #ece8dd;
+}
+.svc-doc-id { min-width: 0; }
+.svc-doc-quien {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: #2b2b2b;
+  line-height: 1.25;
+}
+.svc-doc-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  font-size: .86rem;
+  color: #6b6656;
+}
+/* El pasajero: renglón propio bajo las fechas, con peso. Iba dentro de .svc-doc-meta, al mismo
+   tamaño y color que las noches y las personas, así que QUIÉN viaja se leía igual que cuántas
+   noches dura. Solo se escribe cuando el título son las fechas: si él es el título, no se repite. */
+.svc-doc-pax {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2b2b2b;
+  line-height: 1.3;
+}
+.svc-doc-pax-icono { margin-right: 8px; color: #8a8f78; font-size: .95em; }
+
+.svc-doc-menor { color: #8a8f78; font-style: italic; }
+.svc-doc-sep { color: #c9cdbb; }
+
+/* Columna derecha del encabezado: exportar arriba, avance abajo. Antes vivían en dos filas
+   distintas —los botones colgaban del título "Servicios" y el avance de la línea del documento—,
+   así que el panel gastaba dos encabezados apilados para dos cosas que caben en uno. */
+.svc-doc-acciones {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+/* El icono del título dice de qué clase es el encabezado: fechas, pasajero o el rótulo genérico. */
+.svc-doc-icono { margin-right: 9px; color: #6E7A50; font-size: .96em; }
+
+/* El avance es el estado del TRABAJO, no parte de la identidad: se separa al extremo opuesto y
+   lleva su propio rótulo, para que no se lea como un dato más del viaje. */
+.svc-doc-avance { flex: none; text-align: right; }
+/* Rótulo y cifra en el mismo renglón: apilados sumaban un tercer nivel a una columna que ya lleva
+   los botones encima, y el encabezado crecía más alto que el dato que encabeza. */
+.svc-doc-avance-linea { display: flex; align-items: baseline; justify-content: flex-end; gap: 9px; }
+.svc-doc-cap {
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #8a8f78;
+  margin-bottom: 2px;
+}
+.svc-doc-cifra { font-size: .95rem; font-weight: 600; color: #2b2b2b; white-space: nowrap; }
+.svc-doc-barra {
+  display: block;
+  width: 132px;
+  height: 5px;
+  margin-top: 6px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: #eceadf;
+  overflow: hidden;
+}
+.svc-doc-barra > span { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .35s ease; }
+@media (max-width: 640px) {
+  .svc-doc-avance { text-align: left; }
+  .svc-doc-barra { margin-left: 0; }
+}
+
+/* ---------------------------------------------------------------------------
+   Barra de cobranza del pie.
+
+   El detalle sirve dos oficios —operar y cobrar— y antes competían por el orden vertical: el dinero
+   se metía entre «quién es esto» y «qué tengo que hacer». Aquí el saldo acompaña sin ocupar un
+   bloque en el flujo, y el desglose completo vive en el carrito, que es donde además se actúa.
+   --------------------------------------------------------------------------- */
+.pay-bar {
+  /* Anclada a la ventana, pero arrancando donde termina el sidebar. `sticky` no sirve aquí: la barra
+     es el último elemento del contenido, así que su contenedor termina justo donde ella empieza y no
+     le queda margen para despegarse — sólo se veía al llegar hasta abajo.
+     El desplazamiento NO es un número escrito a mano: --ancho-sidebar lo declara el layout y vale
+     270 px, 80 px al colapsarlo y 0 en móvil. La barra sólo lo hereda. */
+  position: fixed;
+  left: var(--ancho-sidebar, 0px);
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  background: #fff;
+  border-top: 1px solid #dcdccf;
+  box-shadow: 0 -5px 20px rgba(43, 43, 43, .10);
+  transition: left .3s ease;
+}
+/* El contenido no puede quedar tapado por la barra. */
+.dashboard-content:has(.pay-bar) { padding-bottom: 104px; }
+
+.pay-bar-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.pay-bar-cifra { display: flex; align-items: baseline; gap: 8px; flex: none; }
+.pay-bar-lbl {
+  font-size: .68rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: #8a8f78;
+}
+.pay-bar-val { font-size: 1.65rem; font-weight: 700; color: #b8894a; letter-spacing: -.01em; }
+/* Sin saldo no hay nada que reclamar: deja el ámbar, que es la señal de que falta algo. */
+.pay-bar-val.is-cubierto { color: #4b6b3f; }
+
+.pay-bar-prog { flex: 1 1 200px; min-width: 150px; }
+.pay-bar-track { height: 7px; border-radius: 999px; background: #eceadf; overflow: hidden; }
+.pay-bar-track > span { display: block; height: 100%; width: 0; border-radius: 999px; background: #4b6b3f; transition: width .35s ease; }
+.pay-bar-pie {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  margin-top: 7px; font-size: .84rem; color: #6b6656;
+}
+
+/* El mismo verde que el relleno de la barra: lo pagado y el avance son el mismo dato dicho de dos
+   formas, y el color los ata. Si cambia el verde de la barra, cambia aquí. */
+.pay-bar-pagado { color: #4b6b3f; font-weight: 700; }
+
+.pay-bar-derecha { display: inline-flex; align-items: center; gap: 9px; }
+/* El método va como chip apagado, no como píldora de color: informa cuál de los tres precios se
+   está cobrando, no anuncia un estado. La píldora de al lado sí es estado y debe ganarle.
+   Lo que NO puede cambiar entre ellas es la FORMA: van una junto a la otra, así que este chip copia
+   la métrica de la píldora de estado —.72rem, relleno .4/.8 y line-height 1, los de la paleta
+   consolidada de más abajo—. Antes traía la suya (.72rem pero relleno .3/.7 y sin line-height fijo)
+   y la de estado se veía más gorda: su texto lleva minúsculas con ascendentes, que estiran la caja
+   cuando el alto lo decide la línea de texto. */
+/* La oportunidad de ahorro es un chip APARTE, no una segunda mitad del método: dentro del mismo
+   quedaban dos nombres de método seguidos sin nada que dijera cuál era cuál. Así el de método no
+   cambia nunca —siempre dice qué se cobra— y este solo aparece cuando hay algo que ofrecer.
+   Va del verde del aviso que sale bajo el Total a pagar, que es el mismo dato en otro sitio, y no
+   del ámbar: ese lo lleva la píldora de estado, que va al lado, y dos ámbar contiguos se anulan. */
+.pay-bar-ahorro {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .72rem; font-weight: 700; line-height: 1;
+  color: #3f5a34; background: #e6efe1; border: 1px solid #cfe0c6;
+  border-radius: 999px; padding: .4rem .8rem; white-space: nowrap;
+}
+.pay-bar-ahorro i { font-size: .95rem; }
+.pay-bar-metodo {
+  display: inline-flex; align-items: center;
+  font-size: .72rem; font-weight: 700; line-height: 1;
+  letter-spacing: .07em; text-transform: uppercase;
+  color: #6b6656; background: #f1f2ec; border: 1px solid #e6e4dd;
+  border-radius: 999px; padding: .4rem .8rem; white-space: nowrap;
+}
+
+.pay-bar-acciones { display: flex; gap: 8px; margin-left: auto; }
+.pay-bar-btn {
+  font-size: .82rem; font-weight: 700; letter-spacing: .04em;
+  border: 1px solid #dcdccf; background: #fff; color: #6b7256;
+  border-radius: 9px; padding: .7rem 1.3rem; line-height: 1.2;
+  white-space: nowrap; font-family: inherit; cursor: pointer; transition: all .12s ease;
+}
+.pay-bar-btn:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
+.pay-bar-btn.is-primaria { background: #6E7A50; border-color: #6E7A50; color: #fff; }
+.pay-bar-btn.is-primaria:hover { background: #566040; border-color: #566040; color: #fff; }
+
+/* El carrito se angosta: su contenido es una columna —cobertura, desglose, acción, historial— y a
+   860 px quedaba nadando, con el vacío concentrado abajo. */
+#paymentsOffcanvas { --bs-offcanvas-width: 460px; }
+@media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
+
+.pay-desglose:empty { display: none; }
+
+/* ---------------------------------------------------------------------------
+   Píldoras de estado, en la paleta de marca.
+
+   Bootstrap las pinta en amarillo y verde de semáforo, que en esta interfaz gritan. El suavizado
+   estaba escrito CUATRO veces —una por cada contenedor donde vivía la píldora— así que cada casa
+   nueva heredaba el estilo crudo: fue lo que pasó con la barra de cobranza, que salía amarillo
+   Bootstrap mientras la de arriba salía suave.
+
+   Ahora los colores viven una sola vez y la lista de contenedores es lo único que crece.
+   --------------------------------------------------------------------------- */
+#headerActions .badge,
+.bkg-status .badge,
+.fin-hero-meta .badge,
+.pay-bar .badge {
+  font-weight: 700;
+  font-size: .72rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: .4rem .8rem;
+}
+#headerActions .badge.bg-success,
+.bkg-status .badge.bg-success,
+.fin-hero-meta .badge.bg-success,
+.pay-bar .badge.bg-success { background: #e6efe1 !important; color: #3f5a34 !important; border-color: #cfe0c6; }
+#headerActions .badge.bg-warning,
+.bkg-status .badge.bg-warning,
+.fin-hero-meta .badge.bg-warning,
+.pay-bar .badge.bg-warning { background: #f6efe2 !important; color: #96682f !important; border-color: #e7d6bd; }
+#headerActions .badge.bg-primary,
+.bkg-status .badge.bg-primary,
+.fin-hero-meta .badge.bg-primary,
+.pay-bar .badge.bg-primary { background: #eef0e6 !important; color: #566040 !important; border-color: #dce2d0; }
+#headerActions .badge.bg-info,
+.bkg-status .badge.bg-info,
+.fin-hero-meta .badge.bg-info,
+.pay-bar .badge.bg-info { background: #eaf1f0 !important; color: #3a6b63 !important; border-color: #cfe1dd; }
+#headerActions .badge.bg-secondary,
+.bkg-status .badge.bg-secondary,
+.fin-hero-meta .badge.bg-secondary,
+.pay-bar .badge.bg-secondary { background: #f0eee7 !important; color: #6b6656 !important; border-color: #ded9cb; }
+#headerActions .badge.bg-danger,
+.bkg-status .badge.bg-danger,
+.fin-hero-meta .badge.bg-danger,
+.pay-bar .badge.bg-danger { background: #f7ecea !important; color: #a1443a !important; border-color: #e6c9c4; }
+
+/* Los tres chips de la barra —método, ahorro y estado— van en fila y deben medir lo mismo. El alto
+   lo fija min-height y no el contenido: con relleno vertical, el icono del chip de ahorro (más
+   grande que su texto) lo estiraba a 30 px mientras los otros dos median 26. */
+/* El chip del método es el disparador del comparativo, así que se ofrece al cursor y lleva la
+   flecha de intercambio. Sin nada que comparar vuelve a ser una etiqueta (.no-abre). */
+.pay-bar-met-caja { position: relative; display: inline-flex; }
+.pay-bar-metodo { font-family: inherit; cursor: pointer; gap: 6px;
+  transition: background .12s ease, border-color .12s ease; }
+.pay-bar-metodo::after { content: "\21C5"; font-size: .9em; opacity: .75; }
+.pay-bar-metodo:hover { background: #e6e7de; border-color: #d5d6ca; }
+.pay-bar-metodo[aria-expanded="true"] { background: #dfe1d4; border-color: #c9cbbb; }
+.pay-bar-metodo.no-abre { cursor: default; }
+.pay-bar-metodo.no-abre::after { content: none; }
+.pay-bar-metodo.no-abre:hover { background: #f1f2ec; border-color: #e6e4dd; }
+
+/* El comparativo, anclado al chip. No expande la barra —231 px permanentes para algo que se
+   consulta de vez en cuando— ni obliga a abrir el carrito. Crece hacia la izquierda desde el borde
+   derecho del chip, que es el lado por donde hay sitio. */
+.pay-pop {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  z-index: 50;
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  padding: 18px 20px 14px;
+  background: #fff;
+  border: 1px solid #dcdccf;
+  border-radius: 12px;
+  box-shadow: 0 10px 34px rgba(43, 43, 43, .16);
+  text-align: left;
+  cursor: default;
+}
+.pay-pop::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 34px;
+  border: 7px solid transparent;
+  border-top-color: #fff;
+  filter: drop-shadow(0 1px 0 #dcdccf);
+}
+.pay-pop-cap {
+  text-transform: uppercase; letter-spacing: .1em; font-size: .68rem; font-weight: 700;
+  color: #8a8f78; margin-bottom: 10px;
+}
+
+.pay-bar-metodo,
+.pay-bar-ahorro,
+.pay-bar .badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+/* En la barra la píldora convive con cifras chicas: se achica para no competir con el saldo. */
+

@@ -6,34 +6,18 @@
  * conjunto de campos, así que la misma reservación se leía distinta según quién la abriera.
  */
 
-.bkg-info{border:1px solid #ece8dd;border-radius:14px;overflow:hidden;background:#fff;}
-.bkg-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
-  padding:20px 26px;background:linear-gradient(135deg,#f7f6f1 0%,#ffffff 60%);border-bottom:1px solid #ece8dd;}
-.bkg-eyebrow{text-transform:uppercase;letter-spacing:.18em;font-size:.64rem;font-weight:700;color:#8a8f78;margin-bottom:4px;}
+/* Sin overflow:hidden ni rejilla dibujada: el bloque se lee por su AIRE, no por las cajas. Antes
+   cada dato vivia en una celda con lineas por dos de sus lados —un box-shadow inset— y el conjunto
+   parecia una tabla de base de datos. Ahora el unico trazo es el borde de la tarjeta. */
+.bkg-info{border:1px solid #ece8dd;border-radius:14px;background:#fff;padding:24px 26px 20px;}
+.bkg-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
 .bkg-title{font-size:1.35rem;font-weight:700;color:#2b2b2b;line-height:1.2;word-break:break-word;}
 .bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+#infoServiceCustomer{font-weight:600;color:#2b2b2b;}
 /* Badges de estado suavizados SOLO en la tarjeta de info (paleta de marca, sin tocar las
    funciones compartidas getQuoteStatusBadge / getReservationStatusBadge). */
-.bkg-status .badge{font-weight:700;font-size:.72rem;border:1px solid transparent;border-radius:999px;padding:.4rem .8rem;}
-.bkg-status .badge.bg-success{background:#e6efe1 !important;color:#3f5a34 !important;border-color:#cfe0c6;}
-.bkg-status .badge.bg-warning{background:#f6efe2 !important;color:#96682f !important;border-color:#e7d6bd;}
-.bkg-status .badge.bg-primary{background:#eef0e6 !important;color:#566040 !important;border-color:#dce2d0;}
-.bkg-status .badge.bg-info{background:#eaf1f0 !important;color:#3a6b63 !important;border-color:#cfe1dd;}
-.bkg-status .badge.bg-secondary{background:#f0eee7 !important;color:#6b6656 !important;border-color:#ded9cb;}
-.bkg-status .badge.bg-danger{background:#f7ecea !important;color:#a1443a !important;border-color:#e6c9c4;}
-.bkg-top-left{display:flex;align-items:center;gap:26px;flex-wrap:wrap;}
-.bkg-cs{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding-left:26px;border-left:1px solid #e6e1d5;}
-.bkg-cs-lbl{text-transform:uppercase;letter-spacing:.07em;font-size:.62rem;font-weight:700;color:#8a8f78;}
-.bkg-cs #infoServiceCustomer{font-weight:600;color:#2b2b2b;font-size:.9rem;}
-.bkg-grid{display:grid;grid-template-columns:repeat(4,1fr);background:#fff;}
-/* Hairlines con inset box-shadow: solo aparecen en tiles reales, así una fila
-   incompleta queda en blanco (no muestra el fondo de la rejilla). */
-.bkg-tile{background:#fff;padding:16px 22px;min-width:0;box-shadow:inset -1px -1px 0 #efeadf;}
-/* Celda sin dato (hoy solo Lead Guest): se oculta el CONTENIDO, no la celda. Con d-none la celda
-   salia del flujo del grid y todo lo de atras se recorria una posicion, cambiando el orden de las
-   demas. Asi conserva su lugar y sus lineas de rejilla, y visibility:hidden ademas la saca del
-   arbol de accesibilidad (el lector no anuncia "Lead Guest —"). */
-.bkg-tile.is-empty > *{visibility:hidden;}
+.bkg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 32px;margin-top:26px;}
+.bkg-tile{min-width:0;}
 @media(max-width:992px){.bkg-grid{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:576px){.bkg-grid{grid-template-columns:1fr;}}
 .bkg-lbl{display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.07em;font-size:.72rem;

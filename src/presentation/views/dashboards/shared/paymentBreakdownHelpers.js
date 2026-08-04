@@ -30,9 +30,9 @@ const PaymentBreakdownHelpers = (() => {
   // Etiquetas legibles de los métodos de pago (mismo set en las 3 plantillas del carrito).
   const METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
 
-  // Verde de descuento del proyecto (mismo token literal que reservation-public.ejs .rc-adj-discount).
-  // NO usar text-success de Bootstrap: el dueño fijó este color exacto para el énfasis de descuento.
-  const DISCOUNT_GREEN = '#146c43';
+  // El verde de descuento del proyecto (#146c43, el mismo token que reservation-public.ejs usa en
+  // .rc-adj-discount) pasó a la hoja: .pay-cob-ahorro-tit lo aplica. Aquí quedaba una constante sin
+  // uso. NO usar text-success de Bootstrap: el dueño fijó ese color exacto para el énfasis.
 
   /**
    * Redondea a 2 decimales (0 para entradas no numericas), igual que round2 del servidor.
@@ -315,53 +315,62 @@ const PaymentBreakdownHelpers = (() => {
    * @param {object} summary - Summary del backend.
    * @param {string} currency - Moneda.
    * @param {string} [savingsHintHtml] - HTML opcional a insertar bajo "Total a pagar".
+   * @param {object} [opciones] - Ajustes de la vista.
+   * @param {boolean} [opciones.ocultarEstado] - Sin píldora de estado; el chip toma su esquina.
    * @returns {string} HTML de la card de cobertura.
    * @example
    * buildCoverageCard(summary, 'MXN')
    */
-  function buildCoverageCard(summary, currency, savingsHintHtml) {
+  function buildCoverageCard(summary, currency, savingsHintHtml, opciones) {
     const s = summary || {};
     const coverage = round2(s.coveragePercent);
     const coverageWidth = Math.max(0, Math.min(100, coverage));
     const resolved = resolveDisplayedBalance(s);
-    const balanceColor = resolved.displayedBalance > 0 ? '#b8894a' : '#4b6b3f';
     const savingsHtml = resolved.savings
-      ? `<div class="mt-2 p-2 rounded" style="background:#e8f5ee;">
-          <div class="fw-semibold" style="color:${DISCOUNT_GREEN};"><i class="ti ti-discount-2 me-1"></i>${escapeHtml(resolved.savings.label)}</div>
-          <div class="small" style="color:${DISCOUNT_GREEN};">${escapeHtml(resolved.savings.sublabel)}</div>
+      ? `<div class="pay-cob-ahorro">
+          <div class="pay-cob-ahorro-tit"><i class="ti ti-discount-2"></i>${escapeHtml(resolved.savings.label)}</div>
+          <div class="pay-cob-ahorro-sub">${escapeHtml(resolved.savings.sublabel)}</div>
         </div>` : '';
-    // Píldora de estado suavizada (paleta de marca), coherente con el hero del Resumen Financiero.
-    const softColors = {
-      'bg-secondary text-white': ['#f0eee7', '#6b6656', '#ded9cb'],
-      'bg-warning text-dark': ['#f6efe2', '#96682f', '#e7d6bd'],
-      'bg-success text-white': ['#e6efe1', '#3f5a34', '#cfe0c6'],
-      'bg-info text-white': ['#eaf1f0', '#3a6b63', '#cfe1dd'],
+    // Píldora de estado: la clase la resuelve la hoja (.pay-cob-estado.is-*), no un estilo en línea.
+    const tonos = {
+      'bg-secondary text-white': 'is-neutro',
+      'bg-warning text-dark': 'is-parcial',
+      'bg-success text-white': 'is-pagado',
+      'bg-info text-white': 'is-favor',
     };
     const sm = PAYMENT_STATUS_MAP[s.paymentStatus] || { label: s.paymentStatus, cls: 'bg-secondary text-white' };
-    const [bg, fg, bd] = softColors[sm.cls] || ['#f0eee7', '#6b6656', '#ded9cb'];
-    const statusPill = `<span style="display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;background:${bg};color:${fg};border:1px solid ${bd};border-radius:999px;padding:.44rem .85rem;white-space:nowrap;"><span style="width:8px;height:8px;border-radius:50%;background:currentColor;"></span>${escapeHtml(sm.label)}</span>`;
-    // Método cotizado como CHIP a un lado de "Total a pagar" (como el hero del Resumen Financiero).
-    const methodChip = `<span style="display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#566040;background:#eef0e6;border:1px solid #dce2d0;border-radius:999px;padding:.26rem .66rem;" title="Método cotizado"><i class="ti ti-credit-card"></i>${escapeHtml(methodLabel(s.anchoredMethod))}</span>`;
-    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+    // La píldora se calla donde el estado ya se dice de otras formas —el porcentaje, lo pagado, el
+    // saldo, y en admin además la barra del pie, que es de donde se abre este panel—.
+    const sinEstado = Boolean(opciones && opciones.ocultarEstado);
+    const statusPill = sinEstado
+      ? ''
+      : `<span class="pay-cob-estado ${tonos[sm.cls] || 'is-neutro'}"><span class="pay-cob-punto"></span>${escapeHtml(sm.label)}</span>`;
+    // Método cotizado como chip a un lado de "Total a pagar". Es una etiqueta: el comparativo cuelga
+    // del chip de la barra del pie, que es donde este dato vive de forma permanente.
+    const methodChip = `<span class="pay-cob-metodo" title="Método cotizado"><i class="ti ti-credit-card"></i>${escapeHtml(methodLabel(s.anchoredMethod))}</span>`;
+    // El bloque dejó de ser una tarjeta blanca con filete de acento dentro de un panel que ya es una
+    // superficie: lo que separa ahora es la jerarquía —rótulo en versalitas, cifra grande, barra— y no
+    // una caja. El porcentaje baja DEBAJO de la barra: es su lectura, no un dato aparte.
+    return `<div class="pay-cob-top">
         <div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;font-weight:700;color:#8a8f78;">Total a pagar ${methodChip}</div>
-          <div style="font-size:2.05rem;font-weight:700;color:#2b2b2b;line-height:1.1;margin-top:5px;">${formatMoney(round2(s.total), currency)}</div>
+          <div class="pay-cob-cap">Total a pagar${sinEstado ? '' : ` ${methodChip}`}</div>
+          <div class="pay-cob-total">${formatMoney(round2(s.total), currency)}</div>
           ${savingsHintHtml || ''}
         </div>
-        ${statusPill}
+        ${sinEstado ? methodChip : statusPill}
       </div>
-      <div style="text-align:right;font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#8a8f78;margin-top:8px;">${coverage}% pagado</div>
-      <div style="height:11px;border-radius:999px;background:#f0e5d0;overflow:hidden;margin:7px 0 18px;" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
-        <div style="width:${coverageWidth}%;height:100%;border-radius:999px;background:#4b6b3f;"></div>
+      <div class="pay-cob-barra" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
+        <span style="width:${coverageWidth}%"></span>
       </div>
-      <div style="display:flex;justify-content:space-between;gap:12px;">
+      <div class="pay-cob-pct">${coverage}% pagado</div>
+      <div class="pay-cob-par">
         <div>
-          <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;">Pagado</div>
-          <div style="font-weight:700;font-size:1.55rem;color:#4b6b3f;">${formatMoney(round2(s.paidAmount), currency)}</div>
+          <div class="pay-cob-cap-sm">Pagado</div>
+          <div class="pay-cob-cifra is-pagado">${formatMoney(round2(s.paidAmount), currency)}</div>
         </div>
-        <div style="text-align:right;">
-          <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;">Saldo</div>
-          <div style="font-weight:700;font-size:1.55rem;color:${balanceColor};">${formatMoney(resolved.displayedBalance, currency)}</div>
+        <div class="pay-cob-der">
+          <div class="pay-cob-cap-sm">Saldo</div>
+          <div class="pay-cob-cifra${resolved.displayedBalance > 0 ? '' : ' is-cubierto'}">${formatMoney(resolved.displayedBalance, currency)}</div>
         </div>
       </div>
       ${savingsHtml}`;
