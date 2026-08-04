@@ -2079,12 +2079,27 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('payBarEstado').innerHTML =
             PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus);
 
-        // Método de pago: es el que decide CUÁL de los tres precios se está cobrando.
+        // Método de pago: es el que decide CUÁL de los tres precios se está cobrando. Cuando hay uno
+        // más barato, el propio chip lo avisa —en ámbar y con la cifra— en vez de sumar un elemento
+        // más a una barra ya cargada: el ahorro es una propiedad del método, no un dato suelto. Solo
+        // aparece cuando aplica: 3 de cada 4 reservaciones ya se cotizan en el método más barato.
         const metodoEl = document.getElementById('payBarMetodo');
         const metodo = reservationData.paymentType || '';
+        const mejor = ahorroMasBarato(pay, reservationData.services || [], curr);
+        const H = PaymentBreakdownHelpers;
         metodoEl.textContent = metodo
             ? metodo.charAt(0).toUpperCase() + metodo.slice(1)
             : '';
+        if (metodo && mejor) {
+            // Sin centavos: en un chip la cifra es una señal de magnitud, no una cantidad a cuadrar.
+            const cifra = formatCurrency(Math.round(mejor.ahorro), curr).replace(/\.00$/, '');
+            metodoEl.textContent += ` · ${H.methodLabel(mejor.metodo)} −${cifra}`;
+            metodoEl.title = `En ${H.methodLabel(mejor.metodo).toLowerCase()} ahorras `
+                + `${formatCurrency(mejor.ahorro, curr)}. Ábrelo para ver el comparativo.`;
+        } else {
+            metodoEl.removeAttribute('title');
+        }
+        metodoEl.classList.toggle('is-ahorro', Boolean(metodo && mejor));
         metodoEl.classList.toggle('d-none', !metodo);
 
         // Saldo cubierto: deja de teñirse de ámbar, que es la señal de que falta algo.
@@ -2503,20 +2518,27 @@ document.addEventListener('DOMContentLoaded', async function() {
     // a la vista —decía lo mismo con la cifra—, pero ahora está colapsado tras el chip del método:
     // sin el aviso, quien no lo abra no se entera de que hay una forma más barata de cobrar.
     // Devuelve '' si el método cotizado ya es el más barato.
-    function cheapestSavingsHint(summary, services, curr) {
+    // ¿Hay un método más barato que el cotizado? Devuelve { metodo, ahorro } o null. Lo consultan el
+    // aviso del carrito y el chip de la barra del pie: un solo cálculo para que no puedan discrepar.
+    // Los totales por método son los mismos del comparativo: subtotal del método + ajustes + propina.
+    function ahorroMasBarato(summary, services, curr) {
         const H = PaymentBreakdownHelpers;
         const s = summary || {};
         const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
-        const anchor = s.anchoredMethod;
+        const anchor = s.anchoredMethod || (reservationData && reservationData.paymentType);
         const cheapest = H.cheapestAvailableMethod(methods, services, curr);
-        if (!cheapest || !anchor || cheapest === anchor) return '';
-        // Mismos totales por método que el comparativo (subtotal del método + ajustes + propina), así
-        // el ahorro anunciado aquí y la diferencia que se ve al abrirlo no pueden discrepar.
+        if (!cheapest || !anchor || cheapest === anchor) return null;
         const extras = H.round2(s.adjustments) + H.round2(s.tip);
         const totalFor = (m) => Math.max(0, H.round2(H.computeServicesSubtotalByType(services, m, curr) + extras));
-        const savings = H.round2(totalFor(anchor) - totalFor(cheapest));
-        if (savings < 0.005) return '';
-        return `<div class="pay-savings-hint"><i class="ti ti-discount-2"></i>En ${H.escapeHtml(H.methodLabel(cheapest).toLowerCase())} ahorras ${formatCurrency(savings, curr)}</div>`;
+        const ahorro = H.round2(totalFor(anchor) - totalFor(cheapest));
+        return ahorro < 0.005 ? null : { metodo: cheapest, ahorro };
+    }
+
+    function cheapestSavingsHint(summary, services, curr) {
+        const H = PaymentBreakdownHelpers;
+        const mejor = ahorroMasBarato(summary, services, curr);
+        if (!mejor) return '';
+        return `<div class="pay-savings-hint"><i class="ti ti-discount-2"></i>En ${H.escapeHtml(H.methodLabel(mejor.metodo).toLowerCase())} ahorras ${formatCurrency(mejor.ahorro, curr)}</div>`;
     }
 
     function renderPaymentsOffcanvas() {

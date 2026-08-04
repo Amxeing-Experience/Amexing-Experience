@@ -641,6 +641,13 @@
    consolidada de más abajo—. Antes traía la suya (.72rem pero relleno .3/.7 y sin line-height fijo)
    y la de estado se veía más gorda: su texto lleva minúsculas con ascendentes, que estiran la caja
    cuando el alto lo decide la línea de texto. */
+/* Con un método más barato disponible, el chip deja de ser neutro y suma la cifra del ahorro. No es
+   un elemento nuevo: es el mismo diciendo una cosa más. Va del verde del aviso que aparece bajo el
+   Total a pagar —es el mismo dato— y no del ámbar, que aquí ya lo lleva la píldora de estado: dos
+   píldoras ámbar contiguas se anulan entre sí. */
+.pay-bar-metodo.is-ahorro {
+  color: #3f5a34; background: #e6efe1; border-color: #cfe0c6;
+}
 .pay-bar-metodo {
   display: inline-flex; align-items: center;
   font-size: .72rem; font-weight: 700; line-height: 1;
