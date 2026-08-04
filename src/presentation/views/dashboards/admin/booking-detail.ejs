@@ -295,75 +295,64 @@
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
     </div>
     <div class="offcanvas-body">
-        <!-- Tabs: Pago (resumen + registrar + por método) | Historial -->
-        <ul class="nav payments-seg mb-3" id="paymentsTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="tabPagoBtn" data-bs-toggle="tab" data-bs-target="#tabPago" type="button" role="tab" aria-selected="true"><i class="ti ti-cash me-1"></i>Pago</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="tabHistorialBtn" data-bs-toggle="tab" data-bs-target="#tabHistorial" type="button" role="tab" aria-selected="false"><i class="ti ti-history me-1"></i>Historial <span id="historialCount" class="badge rounded-pill ms-1" style="background:#eef0e6;color:#566040;"></span></button>
-            </li>
-        </ul>
-        <div class="tab-content">
-            <!-- TAB PAGO -->
-            <div class="tab-pane fade show active" id="tabPago" role="tabpanel" aria-labelledby="tabPagoBtn">
-                <!-- Card de cobertura (total + estado + barra + Pagado/Saldo) -->
-                <div id="paymentCoverageCard"></div>
-                <!-- Desglose: subtotal, propinas y ajustes. Vivía en una tarjeta de la página, lejos
-                     del lugar donde se registra el pago que lo modifica. -->
-                <!-- Comparativo por método: ANTES estaba dos veces en el mismo carrito —una tabla de
-                     cuatro columnas al fondo y un collapse que se abría desde el chip de "Tipo de
-                     pago"—, con los mismos tres métodos. Queda uno solo, plano y siempre visible:
-                     cuánto costaría con cada método y la diferencia contra el vigente. -->
-                <div class="pay-sec collapse" id="payCmpSec">
-                    <div class="pay-cap">Total según el método</div>
-                    <div id="payCmp"></div>
+        <!-- Sin pestañas. El panel se lee de corrido y en el orden de un recibo: cuánto es, de qué
+             está hecho, registra uno, y esto es lo que ya se pagó. La pestaña "Historial" escondía
+             la mitad del contenido a cambio de nada: el panel hace scroll igual, así que no había
+             espacio vertical que disputar, y obligaba a un clic para saber si había pagos. -->
+        <div id="paymentCoverageCard"></div>
+        <!-- Desglose: subtotal, propinas y ajustes. Vivía en una tarjeta de la página, lejos
+             del lugar donde se registra el pago que lo modifica. -->
+        <!-- Comparativo por método: ANTES estaba dos veces en el mismo carrito —una tabla de
+             cuatro columnas al fondo y un collapse que se abría desde el chip de "Tipo de
+             pago"—, con los mismos tres métodos. Queda uno solo, plano y siempre visible:
+             cuánto costaría con cada método y la diferencia contra el vigente. -->
+        <div class="pay-sec collapse" id="payCmpSec">
+            <div class="pay-cap">Total según el método</div>
+            <div id="payCmp"></div>
+        </div>
+        <div class="pay-sec">
+            <div class="pay-cap">Desglose</div>
+            <div id="payDesglose" class="pay-desglose"></div>
+        <!-- Agregar ajuste: vivía en la tarjeta financiera de la página. Al mudarse el
+             desglose aquí, su disparador tenía que venir con él o admin se quedaba viendo
+             los ajustes sin poder crear uno. Sigue siendo admin-only. -->
+        <button type="button" id="addAdjustmentBtn" class="fin-add-adj d-none"><i class="ti ti-plus me-1"></i>Agregar ajuste</button>
+        <div id="adjustmentInlineForm" class="fin-adj d-none">
+            <div class="fin-adj-row">
+                <div class="fin-seg fin-seg-sm" role="group" aria-label="Tipo de ajuste">
+                    <input type="radio" class="btn-check" name="adjType" id="adjTypeCharge" value="charge" checked>
+                    <label class="fin-seg-btn fin-seg-charge" for="adjTypeCharge">Cargo</label>
+                    <input type="radio" class="btn-check" name="adjType" id="adjTypeDiscount" value="discount">
+                    <label class="fin-seg-btn fin-seg-discount" for="adjTypeDiscount">Descuento</label>
                 </div>
-                <div class="pay-sec">
-                    <div class="pay-cap">Desglose</div>
-                    <div id="payDesglose" class="pay-desglose"></div>
-                <!-- Agregar ajuste: vivía en la tarjeta financiera de la página. Al mudarse el
-                     desglose aquí, su disparador tenía que venir con él o admin se quedaba viendo
-                     los ajustes sin poder crear uno. Sigue siendo admin-only. -->
-                <button type="button" id="addAdjustmentBtn" class="fin-add-adj d-none"><i class="ti ti-plus me-1"></i>Agregar ajuste</button>
-                <div id="adjustmentInlineForm" class="fin-adj d-none">
-                    <div class="fin-adj-row">
-                        <div class="fin-seg fin-seg-sm" role="group" aria-label="Tipo de ajuste">
-                            <input type="radio" class="btn-check" name="adjType" id="adjTypeCharge" value="charge" checked>
-                            <label class="fin-seg-btn fin-seg-charge" for="adjTypeCharge">Cargo</label>
-                            <input type="radio" class="btn-check" name="adjType" id="adjTypeDiscount" value="discount">
-                            <label class="fin-seg-btn fin-seg-discount" for="adjTypeDiscount">Descuento</label>
-                        </div>
-                        <input type="text" class="form-control form-control-sm fin-adj-desc" id="adjDescription" maxlength="150" placeholder="Descripción (ej. Estacionamiento)">
-                        <div class="fin-seg fin-seg-sm" id="adjAmountModeGroup" style="display:none;">
-                            <input type="radio" class="btn-check" name="adjAmountMode" id="adjModeFixed" value="fixed" checked>
-                            <label class="fin-seg-btn" for="adjModeFixed" title="Monto fijo">$</label>
-                            <input type="radio" class="btn-check" name="adjAmountMode" id="adjModePercent" value="percentage">
-                            <label class="fin-seg-btn" for="adjModePercent" title="Porcentaje">%</label>
-                        </div>
-                        <div class="input-group input-group-sm fin-adj-amt">
-                            <span class="input-group-text" id="adjAmountPrefix">$</span>
-                            <input type="text" inputmode="decimal" maxlength="17" class="form-control" id="adjAmount" placeholder="0.00">
-                        </div>
-                        <button class="btn btn-sm btn-primary" id="saveAdjustmentBtn" type="button" title="Guardar"><i class="ti ti-check"></i></button>
-                        <button class="btn btn-sm btn-outline-secondary" id="cancelAdjustmentBtn" type="button" title="Cancelar"><i class="ti ti-x"></i></button>
-                        <span id="adjAmountLabel" class="d-none"></span>
-                    </div>
-                    <div class="fin-adj-note" id="adjNote"></div>
-                    <div class="fin-adj-preview" id="adjPreview"></div>
+                <input type="text" class="form-control form-control-sm fin-adj-desc" id="adjDescription" maxlength="150" placeholder="Descripción (ej. Estacionamiento)">
+                <div class="fin-seg fin-seg-sm" id="adjAmountModeGroup" style="display:none;">
+                    <input type="radio" class="btn-check" name="adjAmountMode" id="adjModeFixed" value="fixed" checked>
+                    <label class="fin-seg-btn" for="adjModeFixed" title="Monto fijo">$</label>
+                    <input type="radio" class="btn-check" name="adjAmountMode" id="adjModePercent" value="percentage">
+                    <label class="fin-seg-btn" for="adjModePercent" title="Porcentaje">%</label>
                 </div>
-                <!-- Acción principal: registrar pago -->
+                <div class="input-group input-group-sm fin-adj-amt">
+                    <span class="input-group-text" id="adjAmountPrefix">$</span>
+                    <input type="text" inputmode="decimal" maxlength="17" class="form-control" id="adjAmount" placeholder="0.00">
                 </div>
-                <button class="pay-accion d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
-                <!-- Inline payment form (aparece bajo el botón al registrar) -->
-                <div id="paymentFormWrap" style="display:none;"></div>
-                <!-- Por método de pago: total + cubierto + restante (el ahorro va en el tag "Más barato") -->
+                <button class="btn btn-sm btn-primary" id="saveAdjustmentBtn" type="button" title="Guardar"><i class="ti ti-check"></i></button>
+                <button class="btn btn-sm btn-outline-secondary" id="cancelAdjustmentBtn" type="button" title="Cancelar"><i class="ti ti-x"></i></button>
+                <span id="adjAmountLabel" class="d-none"></span>
             </div>
-            <!-- TAB HISTORIAL -->
-            <div class="tab-pane fade" id="tabHistorial" role="tabpanel" aria-labelledby="tabHistorialBtn">
-                <div id="paymentsBody">
-                    <!-- Payments table — rendered by JS -->
-                </div>
+            <div class="fin-adj-note" id="adjNote"></div>
+            <div class="fin-adj-preview" id="adjPreview"></div>
+        </div>
+        <!-- Acción principal: registrar pago -->
+        </div>
+        <button class="pay-accion d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
+        <!-- Inline payment form (aparece bajo el botón al registrar) -->
+        <div id="paymentFormWrap" style="display:none;"></div>
+        <!-- El historial cierra el panel: es lo que YA pasó, después de lo que hay que hacer. -->
+        <div class="pay-sec" id="payHistSec">
+            <div class="pay-cap">Historial<span id="historialCount"></span></div>
+            <div id="paymentsBody">
+                <!-- Payments table — rendered by JS -->
             </div>
         </div>
     </div>
@@ -787,12 +776,6 @@
     #paymentsOffcanvas .pay-form-context { display: none; }
 }
 /* Tabs del drawer — control segmentado full-width (mismo estilo que el catálogo de servicios) */
-#paymentsTabs.payments-seg { flex-wrap: nowrap; gap: 4px; background: #f1f2ec; border: 1px solid #e6e4dd; border-radius: 12px; padding: 4px; }
-#paymentsTabs.payments-seg .nav-item { flex: 1 1 0; min-width: 0; }
-#paymentsTabs.payments-seg .nav-link { width: 100%; border: none; border-radius: 9px; font-size: 0.92rem; font-weight: 600; padding: 0.55rem 0.4rem; color: #6b7256; background: transparent; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; transition: all 0.12s ease; }
-#paymentsTabs.payments-seg .nav-link:hover { color: #4f5838; background: rgba(110,122,80,0.08); }
-#paymentsTabs.payments-seg .nav-link.active { background: #6E7A50; color: #fff; font-weight: 700; box-shadow: 0 1px 3px rgba(79,88,56,0.25); }
-#paymentsTabs.payments-seg .nav-link.active .badge { background: rgba(255,255,255,0.28) !important; color: #fff !important; }
 /* Mismo radio de borde explicito para el bloque de descuento/ahorro (fondo verde claro propio). */
 #paymentCoverageCard .rounded { border-radius: 0.5rem; }
 
@@ -2574,8 +2557,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         // "Registrar pago" (dentro del carrito) depende además de que no haya un formulario abierto.
         syncAddPaymentBtn();
         // Contador de pagos en el tab "Historial".
+        // El conteo vivía como badge dentro de la pestaña; ahora acompaña al rótulo de la sección.
         const histCount = document.getElementById('historialCount');
-        if (histCount) histCount.textContent = paymentsCache.length ? String(paymentsCache.length) : '';
+        if (histCount) {
+            const n = paymentsCache.length;
+            histCount.textContent = n ? ` · ${n} ${n === 1 ? 'pago' : 'pagos'}` : '';
+        }
 
         if (!paymentsCache.length) {
             body.innerHTML = `<div class="text-center py-4">
@@ -2585,6 +2572,18 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
             return;
         }
+
+        // Columnas según lo que traiga el conjunto, no según una lista fija: una reservación de un
+        // solo pago en efectivo mostraba tres columnas de guiones. No se decide de antemano cuáles
+        // sobran —eso dependería de cómo sean los datos, y en producción pueden ser otros—: se
+        // dibuja la columna si algún pago de esta reservación la llena.
+        const hayReferencia = paymentsCache.some((p) => (p.reference || '').trim());
+        // "Registro" es el par de "Pago": cuándo se capturó y quién. Solo aporta cuando dice algo
+        // distinto —otra persona, u otro día—; si se capturó el mismo día y sin nombre, repite.
+        const hayRegistro = paymentsCache.some((p) => p.registeredByName
+            || (p.createdAt && p.paidAt && formatDate(p.createdAt) !== formatDate(p.paidAt)));
+        const hayAcciones = canEdit || paymentsCache.some((p) => p.receiptUrl);
+        const numColumnas = 3 + (hayReferencia ? 1 : 0) + (hayRegistro ? 1 : 0) + (hayAcciones ? 1 : 0);
 
         // El backend entrega los pagos ascendentes por paidAt; el historial los muestra por defecto del
         // más reciente al más viejo (lo último es lo que se viene a revisar).
@@ -2614,7 +2613,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 lastMonth = monthKey(p, paymentsSort.key);
                 const inMonth = sorted.filter((q) => monthKey(q, paymentsSort.key) === lastMonth);
                 const monthSum = inMonth.reduce((acc, q) => acc + (q.amount || 0), 0);
-                groupRow = `<tr class="pay-hist-group"><td colspan="6">${PaymentBreakdownHelpers.escapeHtml(monthLabel(p, paymentsSort.key))}
+                groupRow = `<tr class="pay-hist-group"><td colspan="${numColumnas}">${PaymentBreakdownHelpers.escapeHtml(monthLabel(p, paymentsSort.key))}
                     <span class="pay-hist-group-sum">${inMonth.length} ${inMonth.length === 1 ? 'pago' : 'pagos'} · ${formatCurrency(monthSum, curr)}</span></td></tr>`;
             }
             const refLine = p.reference
@@ -2643,18 +2642,18 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Fila expandida con el formulario de edición, justo bajo el pago tocado. El contenido lo
             // dibuja renderPaymentForm después de montar la tabla (necesita el nodo ya en el DOM).
             const editRow = p.id === editingPaymentId
-                ? `<tr class="pay-hist-edit"><td colspan="6"><div class="pay-hist-form" id="paymentEditWrap"></div></td></tr>` : '';
+                ? `<tr class="pay-hist-edit"><td colspan="${numColumnas}"><div class="pay-hist-form" id="paymentEditWrap"></div></td></tr>` : '';
             return `${groupRow}<tr${p.id === editingPaymentId ? ' class="is-editing"' : ''}>
                 <td class="pay-hist-date" data-label="Pago">${formatDate(p.paidAt || p.createdAt)}${receivedLine}</td>
                 <td data-label="Método"><span class="pay-hist-method" style="background:${mBg};color:${mFg};border-color:${mBd};">${PaymentBreakdownHelpers.escapeHtml(PAYMENT_METHOD_LABELS[p.method] || p.method || '—')}</span></td>
-                <td data-label="Referencia">${refLine}</td>
-                <td class="pay-hist-meta" data-label="Registro"><div class="pay-hist-stack">${registeredAt}${registeredLine}</div></td>
+                ${hayReferencia ? `<td data-label="Referencia">${refLine}</td>` : ''}
+                ${hayRegistro ? `<td class="pay-hist-meta" data-label="Registro"><div class="pay-hist-stack">${registeredAt}${registeredLine}</div></td>` : ''}
                 <td class="pay-hist-amount" data-label="Monto">${formatCurrency(p.amount, curr)}<span class="pay-hist-curr${isForeign ? ' is-foreign' : ''}">${PaymentBreakdownHelpers.escapeHtml(p.origCurrency || curr)}</span>${origLine}</td>
-                <td class="pay-hist-actions" data-label="Acciones">
+                ${hayAcciones ? `<td class="pay-hist-actions" data-label="Acciones">
                     ${receipt}
                     ${canEdit ? `<button type="button" class="pay-hist-act edit-payment-btn" data-payment-id="${p.id}" title="Editar" aria-label="Editar pago"><i class="ti ti-edit"></i></button>
                     <button type="button" class="pay-hist-act is-danger delete-payment-btn" data-payment-id="${p.id}" title="Eliminar" aria-label="Eliminar pago"><i class="ti ti-trash"></i></button>` : ''}
-                </td>
+                </td>` : ''}
             </tr>${editRow}`;
         }).join('');
 
@@ -2675,18 +2674,18 @@ document.addEventListener('DOMContentLoaded', async function() {
                     <tr>
                         ${sortTh('date', 'Pago', 'left')}
                         <th>Método</th>
-                        <th>Referencia</th>
-                        ${sortTh('created', 'Registro', 'left')}
+                        ${hayReferencia ? '<th>Referencia</th>' : ''}
+                        ${hayRegistro ? sortTh('created', 'Registro', 'left') : ''}
                         ${sortTh('amount', 'Monto', 'right')}
-                        <th style="text-align:right;">Acciones</th>
+                        ${hayAcciones ? '<th style="text-align:right;">Acciones</th>' : ''}
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
                 <tfoot>
                     <tr>
-                        <td colspan="4" class="pay-hist-foot-label">Total registrado · ${paymentsCache.length} ${paymentsCache.length === 1 ? 'pago' : 'pagos'}</td>
+                        <td colspan="${numColumnas - 1 - (hayAcciones ? 1 : 0)}" class="pay-hist-foot-label">Total registrado · ${paymentsCache.length} ${paymentsCache.length === 1 ? 'pago' : 'pagos'}</td>
                         <td class="pay-hist-amount" data-label="Total">${formatCurrency(total, curr)}</td>
-                        <td></td>
+                        ${hayAcciones ? '<td></td>' : ''}
                     </tr>
                 </tfoot>
             </table>`;

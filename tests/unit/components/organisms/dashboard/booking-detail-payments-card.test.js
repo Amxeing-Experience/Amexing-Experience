@@ -61,10 +61,11 @@ describe('Booking Detail - Pagos Offcanvas (admin)', () => {
     expect(html).not.toContain('class="fin-wrap mb-4" id="financialSummaryCard"');
   });
 
-  test('el offcanvas contiene los contenedores clave: pestañas, cobertura, tabla por método, historial', () => {
-    expect(html).toContain('id="paymentsTabs"');
-    expect(html).toContain('id="tabPago"');
-    expect(html).toContain('id="tabHistorial"');
+  test('el offcanvas contiene los contenedores clave: cobertura, comparativo, historial', () => {
+    // Sin pestañas: el panel se lee de corrido y el historial es la última sección.
+    expect(html).not.toContain('id="paymentsTabs"');
+    expect(html).not.toContain('id="tabHistorial"');
+    expect(html).toContain('id="payHistSec"');
     expect(html).toContain('id="paymentCoverageCard"');
     // El comparativo por método vive ahora en su propia sección (#payCmp), no en una tabla aparte.
     expect(html).toContain('id="payCmp"');

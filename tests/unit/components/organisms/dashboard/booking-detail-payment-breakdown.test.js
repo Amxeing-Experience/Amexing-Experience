@@ -193,16 +193,21 @@ describe('Booking Detail Fase 3 — agencia/agente (nivel 4+, patrón idéntico)
     expect(html).not.toContain('id="paymentsCard"');
   });
 
-  // El carrito pasó a PESTAÑAS (Pago / Historial), igual que admin. Los chips de progreso + la sección
-  // "saldo restante por método" + el bloque de descuento se fusionaron en una sola tabla "Por método de
-  // pago" (Método · Total · Cubierto · Restante): antes las mismas barras se dibujaban dos veces.
-  it.each(['admin', ...AGENCY_ROLES])('%s: Offcanvas con pestañas Pago/Historial y tabla por método', async (role) => {
+  // Las vistas de agencia conservan las PESTAÑAS (Pago / Historial) y la tabla "Por método de pago".
+  // ADMIN ya no: su carrito se lee de corrido y el historial es la última sección.
+  it.each(['admin', ...AGENCY_ROLES])('%s: Offcanvas con cobertura, comparativo e historial', async (role) => {
     const html = await render(role);
     expect(html).toContain('id="paymentsOffcanvas"');
     expect(html).toContain('offcanvas offcanvas-end');
-    expect(html).toContain('id="paymentsTabs"');
-    expect(html).toContain('id="tabPago"');
-    expect(html).toContain('id="tabHistorial"');
+    if (role === 'admin') {
+      expect(html).toContain('id="payHistSec"');
+      expect(html).not.toContain('id="paymentsTabs"');
+      expect(html).not.toContain('id="tabHistorial"');
+    } else {
+      expect(html).toContain('id="paymentsTabs"');
+      expect(html).toContain('id="tabPago"');
+      expect(html).toContain('id="tabHistorial"');
+    }
     expect(html).toContain('id="paymentCoverageCard"');
     // En ADMIN el comparativo por método dejó de ser una tabla de cuatro columnas al fondo del
     // carrito y pasó a su propia sección, arriba del desglose y siempre a la vista. Las vistas de
