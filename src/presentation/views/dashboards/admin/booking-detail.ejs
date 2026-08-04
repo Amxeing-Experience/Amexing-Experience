@@ -345,9 +345,15 @@
         </div>
         <!-- Acción principal: registrar pago -->
         </div>
-        <button class="pay-accion d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
-        <!-- Inline payment form (aparece bajo el botón al registrar) -->
-        <div id="paymentFormWrap" style="display:none;"></div>
+        <!-- Con su propio rótulo. El formulario salía abierto justo debajo de "Agregar ajuste" y sin
+             nada que los separara, así que parecía que ese botón era el que lo había abierto. El
+             rótulo y el filete de .pay-sec lo declaran un bloque aparte. -->
+        <div class="pay-sec" id="payAltaSec">
+            <div class="pay-cap">Registrar pago</div>
+            <button class="pay-accion d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
+            <!-- Inline payment form (aparece bajo el botón al registrar) -->
+            <div id="paymentFormWrap" style="display:none;"></div>
+        </div>
         <!-- El historial cierra el panel: es lo que YA pasó, después de lo que hay que hacer. -->
         <div class="pay-sec" id="payHistSec">
             <div class="pay-cap">Historial<span id="historialCount"></span></div>
@@ -483,6 +489,9 @@
 /* Etiqueta de contexto en el pie (reemplaza al encabezado del formulario): ocupa el hueco que ya
    existia a la izquierda de los botones, asi que no suma alto. A 0.8rem se leia como un pie de
    pagina; es el titulo de lo que se esta haciendo y debe pesar como los botones que tiene enfrente. */
+/* En el alta el rótulo de la sección ya dice "Registrar pago"; el pie no lo repite. En la edición
+   inline del historial sí se queda: allí no hay rótulo que diga qué pago se está tocando. */
+#paymentsOffcanvas #paymentFormWrap .pay-form-context { display: none; }
 #paymentsOffcanvas .pay-form-context {
     display: inline-flex;
     align-items: center;
@@ -2362,6 +2371,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         const canEdit = status !== 'cancelled' && status !== 'completed';
         const formOpen = addPaymentFormOpen || !!editingPaymentId;
         btn.classList.toggle('d-none', !canEdit || formOpen);
+        // Sin botón y sin formulario la sección se quedaría con el rótulo solo colgando.
+        const altaSec = document.getElementById('payAltaSec');
+        if (altaSec) altaSec.classList.toggle('d-none', !canEdit && !addPaymentFormOpen);
     }
 
     // Cierra el formulario abierto, sea el del alta (tab "Pago") o el inline del historial. NUNCA puede
