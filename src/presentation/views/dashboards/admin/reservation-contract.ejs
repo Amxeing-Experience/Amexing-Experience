@@ -1,0 +1,346 @@
+<%
+/**
+ * CONTRATO DE SERVICIO — el documento que recibe quien opera el viaje.
+ *
+ * Comparte formato con la confirmación (mismo parcial de estilos, mismas tablas rc-*) pero cambia
+ * de destinatario: la confirmación va al cliente y dice cuánto pagó; esta va al chofer y dice a
+ * quién recoge, cuándo, dónde y con qué vehículo. Por eso NO lleva ni un importe.
+ *
+ * Dos cortes, que elige quien exporta:
+ *   · por servicio — una hoja por cada uno, con el chofer que le toca. Predecible: 5 servicios,
+ *     5 hojas, aunque el mismo chofer repita.
+ *   · por chofer   — una hoja por persona, con todos sus servicios en orden. Menos papel y cada
+ *     quien ve su día completo.
+ *
+ * Created by Denisse Maldonado.
+ */
+const ARPONA_EMBED_CSS = typeof arponaEmbedCss === 'string' ? arponaEmbedCss : '';
+const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '';
+const ES_PDF = typeof esPdf !== 'undefined' && esPdf;
+const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'servicio';
+%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title><%= pageTitle || 'Contrato de servicio' %></title>
+
+    <link rel="stylesheet" href="/dashboard/css/icons/tabler-icons/tabler-icons.css">
+    <link rel="icon" type="image/png" href="/images/heart_black.png">
+    <link rel="stylesheet" href="/css/fonts.css">
+    <% if (ARPONA_EMBED_CSS) { %><style id="arpona-embedded">
+    <%- ARPONA_EMBED_CSS %>
+    </style><% } %>
+    <% if (MYRIAD_EMBED_CSS) { %><style id="myriad-embedded">
+    <%- MYRIAD_EMBED_CSS %>
+    </style><% } %>
+
+    <%- include('partials/_documento-css') %>
+
+    <style>
+        /* ===== Contrato ===== */
+        /* Cada hoja arranca en página nueva. Va en CSS normal y NO bajo @media print: el renderizador
+           emula media `screen`, así que una regla de impresión no llegaría al PDF. La última no
+           rompe, o el documento saldría con una página en blanco al final. */
+        .ctr-hoja { break-after: page; page-break-after: always; }
+        .ctr-hoja:last-child { break-after: auto; page-break-after: auto; }
+
+        .ctr-hoja .rc-tbl, .ctr-hoja .rc-section-title { max-width:640px; margin-left:auto; margin-right:auto; }
+
+        .ctr-cab { display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+                   border-bottom:2px solid #8a8c6e; padding-bottom:10px; margin-bottom:14px; }
+        .ctr-logo { height:34px; display:block; margin-bottom:6px; }
+        .ctr-cab-tit { font-family:'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);
+                       font-size:17px; color:#111; margin:0; letter-spacing:.5px; }
+        .ctr-cab-folio { color:#8a8a8a; font-size:11px; letter-spacing:.5px; margin-top:2px; }
+        .ctr-cab-hoja { color:#8a8a8a; font-size:10px; text-transform:uppercase; letter-spacing:.8px;
+                        white-space:nowrap; text-align:right; }
+
+        /* Quién viaja: lo primero que necesita quien recoge. */
+        .ctr-pax { max-width:640px; margin:0 auto 14px; border:1px solid #a9a79a; }
+        .ctr-pax-row { display:flex; gap:12px; padding:4px 12px; border-bottom:1px solid #a9a79a; }
+        .ctr-pax-row:last-child { border-bottom:none; }
+        .ctr-pax-row .l { color:#8a8a8a; font-size:10px; text-transform:uppercase; letter-spacing:.8px;
+                          min-width:110px; flex:0 0 auto; }
+        .ctr-pax-row .v { color:#2b2b2b; font-size:14px; word-break:break-word; }
+
+        /* Bloque de asignación: el dato propio de este documento. Se destaca sobre la ficha del
+           servicio porque es lo que el chofer viene a confirmar —que es él y con qué vehículo—. */
+        .ctr-asig { max-width:640px; margin:0 auto 14px; border:1px solid #8a8c6e; background:#f7f7f2; }
+        .ctr-asig-cap { background:#8a8c6e; color:#fff; font-size:10px; text-transform:uppercase;
+                        letter-spacing:1px; padding:3px 12px; }
+        .ctr-asig-row { display:flex; gap:12px; padding:5px 12px; border-bottom:1px solid #cfcfc4; }
+        .ctr-asig-row:last-child { border-bottom:none; }
+        .ctr-asig-row .l { color:#6b6b5f; font-size:10px; text-transform:uppercase; letter-spacing:.8px;
+                           min-width:110px; flex:0 0 auto; }
+        .ctr-asig-row .v { color:#2b2b2b; font-size:14px; word-break:break-word; }
+        .ctr-asig-row .v .tel { color:#6b6b5f; }
+        .ctr-asig-vacio { padding:6px 12px; color:#9a5f4f; font-size:13px; }
+
+        /* Firma: el documento se entrega y se acusa de recibido. */
+        .ctr-firma { max-width:640px; margin:26px auto 0; display:flex; gap:40px; }
+        .ctr-firma > div { flex:1 1 0; border-top:1px solid #a9a79a; padding-top:5px;
+                           color:#8a8a8a; font-size:10px; text-transform:uppercase; letter-spacing:.8px; }
+
+        .ctr-vacio { max-width:640px; margin:0 auto; padding:18px; border:1px dashed #a9a79a;
+                     color:#8a8a8a; text-align:center; }
+
+        /* Conmutador de corte: es un control de pantalla, no parte del documento. */
+        .ctr-corte { max-width:820px; margin:0 auto 14px; display:flex; justify-content:flex-end; gap:6px; }
+        .ctr-corte a { font-size:12px; font-weight:600; text-decoration:none; color:#6b6b5f;
+                       border:1px solid #cfcfc4; background:#fff; border-radius:999px; padding:5px 14px; }
+        .ctr-corte a.is-actual { background:#8a8c6e; border-color:#8a8c6e; color:#fff; }
+    </style>
+</head>
+<body>
+<%
+    const svcRoot = (quote && quote.serviceItems) || {};
+    const dias = svcRoot.days || [];
+    const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+        'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+    function fmtFecha(v) {
+        if (!v) return '';
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+        if (!m) return String(v);
+        const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+        return `${DIAS_SEM[d.getUTCDay()]} ${+m[3]} de ${MESES[+m[2] - 1]} de ${m[1]}`;
+    }
+
+    // Nombre legible del servicio. Mismo criterio que la confirmación, para que el chofer y el
+    // cliente llamen igual a la misma cosa.
+    function tipoServicio(sc) {
+        if (sc.type === 'transport') {
+            const t = sc.transportType || '';
+            if (t === 'aeropuerto') {
+                return sc.directionType === 'departure'
+                    ? 'Transportación — Salida a aeropuerto'
+                    : 'Transportación — Llegada de aeropuerto';
+            }
+            return `Transportación — ${t === 'local' ? 'Traslado local' : 'Punto a punto'}`;
+        }
+        if (sc.type === 'tour') return 'Tour';
+        if (sc.type === 'experiencia') return 'Experiencia';
+        if (sc.type === 'disposicion') return 'Servicio a disposición';
+        if (sc.type === 'concepto') return 'Concepto';
+        return 'Servicio';
+    }
+
+    // Se aplana el árbol día → servicios a una lista, arrastrando la fecha de su día: las dos
+    // vistas del documento la necesitan y en el corte por chofer el día deja de ser el eje.
+    const items = [];
+    dias.forEach((dia) => {
+        (dia.subconcepts || []).forEach((sc) => {
+            items.push({ sc, fecha: dia.date, dayTitle: dia.dayTitle || '', city: dia.city || '' });
+        });
+    });
+
+    // Personas que conducen en un servicio: la asignada al servicio y las de los vehículos extra.
+    // Sin ellas no hay a quién entregarle la hoja en el corte por chofer.
+    function choferesDe(sc) {
+        const a = sc.assignments || {};
+        const lista = [];
+        if (a.driver) lista.push(a.driver);
+        (a.extras || []).forEach((e) => { if (e.driver) lista.push(e.driver); });
+        const vistos = new Set();
+        return lista.filter((p) => p && p.id && !vistos.has(p.id) && vistos.add(p.id));
+    }
+
+    // Corte por chofer: cada persona con los servicios que le tocan, en el orden del itinerario.
+    // Los servicios sin chofer no se pierden —se agrupan aparte— porque son justo los que hay que
+    // resolver antes de que empiece el viaje.
+    const porChofer = [];
+    if (CORTE === 'chofer') {
+        const mapa = new Map();
+        const huerfanos = [];
+        items.forEach((it) => {
+            const chs = choferesDe(it.sc);
+            if (chs.length === 0) { huerfanos.push(it); return; }
+            chs.forEach((ch) => {
+                if (!mapa.has(ch.id)) mapa.set(ch.id, { chofer: ch, items: [] });
+                mapa.get(ch.id).items.push(it);
+            });
+        });
+        mapa.forEach((v) => porChofer.push(v));
+        if (huerfanos.length) porChofer.push({ chofer: null, items: huerfanos });
+    }
+
+    const hojas = CORTE === 'chofer' ? porChofer : items;
+    const totalHojas = hojas.length;
+
+    // Identidad del viaje: se repite en TODAS las hojas a propósito. Cada una viaja sola en manos
+    // de una persona distinta, así que ninguna puede depender de lo que diga otra.
+    const paxNombre = [quote.leadGuestFirstName || quote.contactFirstName || '',
+        quote.leadGuestLastName || quote.contactLastName || ''].join(' ').trim()
+        || quote.contactPerson || '';
+    const paxTel = quote.contactPhone || '';
+    const paxPersonas = Number(quote.numberOfPeople) || 0;
+    const folio = quote.reservationFolio || quote.folio || '';
+%>
+
+<% if (!ES_PDF) { %>
+<div class="ctr-corte">
+    <a href="?corte=servicio" class="<%= CORTE === 'servicio' ? 'is-actual' : '' %>">Una hoja por servicio</a>
+    <a href="?corte=chofer" class="<%= CORTE === 'chofer' ? 'is-actual' : '' %>">Una hoja por chofer</a>
+</div>
+<% } %>
+
+<%
+/**
+ * Ficha de asignación de un servicio. Se saca a función porque los dos cortes la pintan igual:
+ * lo único que cambia entre ellos es cómo se agrupan las hojas, no qué dice cada servicio.
+ */
+function bloqueAsignacion(sc) {
+    const a = sc.assignments || {};
+    const filas = [];
+    const persona = (p) => `${p.fullName}${p.phone ? ` <span class="tel">· ${p.phone}</span>` : ''}`;
+    const vehiculo = (v) => [v.name, v.plate, v.color].filter(Boolean).join(' · ');
+    if (a.driver) filas.push(['Chofer', persona(a.driver)]);
+    if (a.vehicle) filas.push(['Vehículo', vehiculo(a.vehicle)]);
+    (a.extras || []).forEach((e, i) => {
+        if (e.driver) filas.push([`Chofer ${i + 2}`, persona(e.driver)]);
+        if (e.vehicle) filas.push([`Vehículo ${i + 2}`, vehiculo(e.vehicle)]);
+    });
+    if (a.guide) filas.push(['Guía', persona(a.guide)]);
+    if (a.greeter) filas.push(['Greeter', persona(a.greeter)]);
+    if (a.serviceCustomer) filas.push(['Customer Support', persona(a.serviceCustomer)]);
+    return filas;
+}
+%>
+
+<% hojas.forEach(function (hoja, idx) {
+    const esPorChofer = CORTE === 'chofer';
+    const deChofer = esPorChofer ? hoja.chofer : null;
+    const suyos = esPorChofer ? hoja.items : [hoja];
+%>
+<div class="resv-conf ctr-hoja">
+    <div class="ctr-cab">
+        <div class="ctr-cab-id">
+            <img class="ctr-logo" src="/images/logos/light_amexing.png" alt="Amexing">
+            <h1 class="ctr-cab-tit">Contrato de servicio</h1>
+            <div class="ctr-cab-folio">Reservación <%= folio %></div>
+        </div>
+        <div class="ctr-cab-hoja">
+            Hoja <%= idx + 1 %> de <%= totalHojas %><br>
+            <% if (esPorChofer) { %>
+                <%= deChofer ? deChofer.fullName : 'Sin chofer asignado' %>
+            <% } else { %>
+                Servicio <%= idx + 1 %> de <%= totalHojas %>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="ctr-pax">
+        <div class="ctr-pax-row"><span class="l">Pasajero</span><span class="v"><%= paxNombre || '—' %></span></div>
+        <% if (paxTel) { %>
+        <div class="ctr-pax-row"><span class="l">Teléfono</span><span class="v"><%= paxTel %></span></div>
+        <% } %>
+        <% if (paxPersonas) { %>
+        <div class="ctr-pax-row"><span class="l">Personas</span><span class="v"><%= paxPersonas %></span></div>
+        <% } %>
+    </div>
+
+    <% if (esPorChofer && deChofer) { %>
+    <div class="ctr-asig">
+        <div class="ctr-asig-cap">Asignado a</div>
+        <div class="ctr-asig-row"><span class="l">Chofer</span><span class="v"><%= deChofer.fullName %><% if (deChofer.phone) { %> <span class="tel">· <%= deChofer.phone %></span><% } %></span></div>
+    </div>
+    <% } %>
+
+    <% suyos.forEach(function (it) {
+        const sc = it.sc;
+        const filas = bloqueAsignacion(sc);
+    %>
+        <div class="rc-section-title"><%= tipoServicio(sc) %></div>
+        <div class="rc-tbl">
+            <% if (sc.concept) { %>
+            <div class="rc-tc rc-c6"><span class="rc-label">Servicio</span><span class="rc-value"><%= sc.concept %></span></div>
+            <% } %>
+            <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(it.fecha) || '—' %></span></div>
+            <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= sc.time || sc.startTime || '—' %></span></div>
+            <% if (sc.pickupAddress || sc.originName) { %>
+            <div class="rc-tc rc-c6"><span class="rc-label">Recoger en</span><span class="rc-value"><%= sc.pickupAddress || sc.originName %></span></div>
+            <% } %>
+            <% if (sc.dropoffAddress || sc.destination) { %>
+            <div class="rc-tc rc-c6"><span class="rc-label">Destino</span><span class="rc-value"><%= sc.dropoffAddress || sc.destination %></span></div>
+            <% } %>
+            <% if (sc.airline || sc.flightNumber) { %>
+            <div class="rc-tc rc-c3"><span class="rc-label">Aerolínea</span><span class="rc-value"><%= sc.airline || '—' %></span></div>
+            <div class="rc-tc rc-c3"><span class="rc-label">Vuelo</span><span class="rc-value"><%= sc.flightNumber || '—' %></span></div>
+            <% } %>
+            <% if (sc.vehicleTypeName || sc.categoryName) { %>
+            <div class="rc-tc rc-c3"><span class="rc-label">Tipo de vehículo</span><span class="rc-value"><%= sc.vehicleTypeName || '—' %></span></div>
+            <div class="rc-tc rc-c3"><span class="rc-label">Clase</span><span class="rc-value"><%= sc.categoryName || '—' %></span></div>
+            <% } %>
+            <% if (sc.duration || sc.hours) { %>
+            <div class="rc-tc rc-c3"><span class="rc-label">Duración</span><span class="rc-value"><%= /^\d+(\.\d+)?$/.test(String(sc.duration || sc.hours)) ? `${sc.duration || sc.hours} h` : (sc.duration || sc.hours) %></span></div>
+            <% } %>
+            <% const pax = Number(sc.numberOfPeople) || 0; if (pax) { %>
+            <div class="rc-tc rc-c3"><span class="rc-label">Personas</span><span class="rc-value"><%= pax %></span></div>
+            <% } %>
+            <%
+                // Notas para quien OPERA: las del equipo y las del proveedor. Las del cliente
+                // (clientNotes) no se incluyen: son para el documento del cliente, no para el chofer.
+                const notasOperacion = [sc.teamNotes, sc.providerNotes, sc.notes].filter(Boolean).join(' · ');
+            %>
+            <% if (notasOperacion) { %>
+            <div class="rc-tc rc-c6"><span class="rc-label">Notas</span><span class="rc-value"><%= notasOperacion %></span></div>
+            <% } %>
+        </div>
+
+        <% if (!esPorChofer) { %>
+            <div class="ctr-asig">
+                <div class="ctr-asig-cap">Asignaciones</div>
+                <% if (filas.length) { %>
+                    <% filas.forEach(function (f) { %>
+                    <div class="ctr-asig-row"><span class="l"><%= f[0] %></span><span class="v"><%- f[1] %></span></div>
+                    <% }); %>
+                <% } else { %>
+                    <div class="ctr-asig-vacio">Sin asignaciones registradas para este servicio.</div>
+                <% } %>
+            </div>
+        <% } else { %>
+            <%
+                // En el corte por chofer, la persona a la que va dirigida la hoja ya está arriba: aquí
+                // solo se nombra a los demás, que es con quien va a coincidir en el servicio.
+                const otros = filas.filter((f) => !(f[0] === 'Chofer' && deChofer && f[1].indexOf(deChofer.fullName) === 0));
+            %>
+            <% if (otros.length) { %>
+            <div class="ctr-asig">
+                <div class="ctr-asig-cap">En este servicio también van</div>
+                <% otros.forEach(function (f) { %>
+                <div class="ctr-asig-row"><span class="l"><%= f[0] %></span><span class="v"><%- f[1] %></span></div>
+                <% }); %>
+            </div>
+            <% } %>
+        <% } %>
+    <% }); %>
+
+    <% if (!suyos.length) { %>
+    <div class="ctr-vacio">Esta reservación no tiene servicios registrados.</div>
+    <% } %>
+
+    <div class="ctr-firma">
+        <div>Recibí — nombre y firma</div>
+        <div>Fecha de entrega</div>
+    </div>
+</div>
+<% }); %>
+
+<% if (!totalHojas) { %>
+<div class="resv-conf">
+    <div class="ctr-cab">
+        <div class="ctr-cab-id">
+            <img class="ctr-logo" src="/images/logos/light_amexing.png" alt="Amexing">
+            <h1 class="ctr-cab-tit">Contrato de servicio</h1>
+            <div class="ctr-cab-folio">Reservación <%= folio %></div>
+        </div>
+    </div>
+    <div class="ctr-vacio">Esta reservación todavía no tiene servicios que contratar.</div>
+</div>
+<% } %>
+</body>
+</html>

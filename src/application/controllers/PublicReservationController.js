@@ -37,6 +37,12 @@ const MARGENES_A_SANGRE = {
 const MARGENES_CONFIRMACION = {
   top: '14mm', bottom: '14mm', left: '0', right: '0',
 };
+// El contrato es una hoja de trabajo que se imprime y se firma: necesita margen por los cuatro
+// lados —incluidos los laterales, que en la confirmación son cero porque su tarjeta ya se centra
+// sola— para que nada quede pegado al filo ni se pierda al perforar o engargolar.
+const MARGENES_CONTRATO = {
+  top: '14mm', bottom: '14mm', left: '10mm', right: '10mm',
+};
 
 /**
  * Controller for viewing reservations publicly without authentication, where the
@@ -53,6 +59,8 @@ class PublicReservationController {
     this.viewReservationItinerary = this.viewReservationItinerary.bind(this);
     this.downloadReservationPdf = this.downloadReservationPdf.bind(this);
     this.downloadItineraryPdf = this.downloadItineraryPdf.bind(this);
+    this.viewReservationContract = this.viewReservationContract.bind(this);
+    this.downloadContractPdf = this.downloadContractPdf.bind(this);
     this.renderPdf = this.renderPdf.bind(this);
     this.preparePublicReservationData = this.preparePublicReservationData.bind(this);
 
@@ -167,6 +175,97 @@ class PublicReservationController {
         myriadEmbedCss: getMyriadEmbedCss(),
       });
     } catch (error) {
+      return this.handleError(error, folio, req, res);
+    }
+  }
+
+  /**
+   * Contrato de servicio: el documento que recibe quien OPERA el viaje.
+   *
+   * Vive en este controlador porque reusa entero el shaping de las otras dos vistas
+   * —preparePublicReservationData ya resuelve chofer, vehículo y asignaciones extra por servicio—,
+   * pero a diferencia de ellas se monta en una ruta CON SESIÓN: lleva teléfonos de los choferes,
+   * placas y direcciones de recogida, que son datos de terceros y no deben quedar tras una URL
+   * adivinable por folio.
+   * GET /dashboard/admin/reservations/:folio/contract?corte=servicio|chofer.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} La vista renderizada, o el error.
+   * @example
+   * GET /dashboard/admin/reservations/MAY-2605-001/contract?corte=chofer
+   */
+  async viewReservationContract(req, res) {
+    const { folio } = req.params;
+    try {
+      const folioError = this.validateFolio(folio, req, res);
+      if (folioError) return folioError;
+
+      const reservation = await this.fetchReservationByFolio(folio, req, res);
+      if (!reservation) return;
+
+      const services = await this.fetchReservationServices(reservation);
+      const quoteShaped = await this.preparePublicReservationData(reservation, services);
+
+      return res.render('dashboards/admin/reservation-contract', {
+        quote: quoteShaped,
+        corte: req.query.corte === 'chofer' ? 'chofer' : 'servicio',
+        // El conmutador de corte es un control de pantalla y no debe salir impreso. No basta con
+        // @media print: PdfRenderService emula media `screen`, así que la única señal fiable de que
+        // esto es una exportación es el ?pdf=1 con el que se abre la página.
+        esPdf: req.query.pdf === '1',
+        isPublicView: false,
+        isReservationView: true,
+        pageTitle: `Contrato ${folio}`,
+        arponaEmbedCss: getArponaEmbedCss(),
+        myriadEmbedCss: getMyriadEmbedCss(),
+      });
+    } catch (error) {
+      return this.handleError(error, folio, req, res);
+    }
+  }
+
+  /**
+   * Contrato de servicio en PDF — el mismo documento que se ve en pantalla.
+   *
+   * A diferencia de los otros dos PDF, la página que abre puppeteer exige sesión, así que se le
+   * pasan las cookies de quien pidió la descarga. Sin ellas el navegador headless recibiría el
+   * redirect al login y el PDF saldría con la pantalla de acceso.
+   * GET /dashboard/admin/reservations/:folio/contract/pdf?corte=servicio|chofer.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} La respuesta con el PDF.
+   * @example
+   * GET /dashboard/admin/reservations/MAY-2605-001/contract/pdf
+   */
+  async downloadContractPdf(req, res) {
+    const { folio } = req.params;
+    try {
+      const folioError = this.validateFolio(folio, req, res);
+      if (folioError) return folioError;
+
+      const reservation = await this.fetchReservationByFolio(folio, req, res);
+      if (!reservation) return;
+
+      const proto = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.get('host');
+      const corte = req.query.corte === 'chofer' ? 'chofer' : 'servicio';
+      const url = `${proto}://${host}/dashboard/admin/reservations/${encodeURIComponent(folio)}`
+        + `/contract?corte=${corte}&pdf=1`;
+
+      const cookies = Object.entries(req.cookies || {}).map(([name, value]) => ({ name, value, url }));
+      const pdfBuffer = await renderUrlToPdf(url, {
+        footer: false,
+        margin: MARGENES_CONTRATO,
+        cookies,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${folio}-contrato-${corte}.pdf"`);
+      return res.send(pdfBuffer);
+    } catch (error) {
+      logger.error('PublicReservationController.downloadContractPdf failed', {
+        folio, error: error.message,
+      });
       return this.handleError(error, folio, req, res);
     }
   }
