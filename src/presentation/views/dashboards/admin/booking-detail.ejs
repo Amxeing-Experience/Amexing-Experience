@@ -2077,8 +2077,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             `<strong>${pct}%</strong> pagado · `
             + `<span class="pay-bar-pagado">${formatCurrency(pagado, curr)}</span>`
             + ` de ${formatCurrency(total, curr)}`;
-        document.getElementById('payBarEstado').innerHTML =
-            PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus);
+        // La píldora de estado solo sale cuando dice algo que las cifras de la barra no dicen ya.
+        // Pendiente es 0% y saldo igual al total; parcial es un porcentaje entre 1 y 99; pagado es
+        // 100% y saldo cero en verde. Reembolsado, en cambio, no se deduce de ningún número de aquí.
+        // La lista es de lo que se CALLA, no de lo que se muestra: un estado nuevo aparecerá por
+        // omisión en vez de esconderse sin que nadie lo note.
+        const ESTADOS_QUE_LAS_CIFRAS_YA_DICEN = ['pending', 'partial', 'paid'];
+        const estadoEl = document.getElementById('payBarEstado');
+        estadoEl.innerHTML = ESTADOS_QUE_LAS_CIFRAS_YA_DICEN.includes(pay.paymentStatus)
+            ? ''
+            : PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus);
 
         // Método de pago: es el que decide CUÁL de los tres precios se está cobrando. Se queda SIEMPRE
         // igual —neutro, con el nombre del método y nada más—, así nunca hay duda de cuál se cobra.
