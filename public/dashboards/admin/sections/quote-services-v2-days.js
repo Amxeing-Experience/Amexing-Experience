@@ -16,12 +16,12 @@ ItineraryBuilder.prototype.updateSaveStatus = function (status) {
     };
     const html = badges[status] || badges.saved;
 
-    // Refresca el indicador del pie Y el espejo bajo el panel de totales, para que al modificar solo
-    // la propina/total (guardado que puede tardar) el usuario vea el estado sin bajar hasta abajo.
-    ['saveStatusIndicator', 'saveStatusIndicatorTotals'].forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) el.innerHTML = html;
-    });
+    // Un solo indicador: vive en la barra fija del pie (#itineraryActionBar), visible siempre.
+    // Antes había además un espejo bajo el panel de totales (#saveStatusIndicatorTotals) porque el
+    // indicador real estaba al final del itinerario y no se veía sin bajar hasta abajo; con la barra
+    // fija ese duplicado dejó de tener sentido y se eliminó.
+    const statusEl = document.getElementById('saveStatusIndicator');
+    if (statusEl) statusEl.innerHTML = html;
 
     // Update continue button state
     this.updateContinueButton(status);
