@@ -1,0 +1,512 @@
+<%
+/**
+ * CONTRATO DE SERVICIO — el documento que recibe quien opera el viaje.
+ *
+ * Comparte formato con la confirmación (mismo parcial de estilos, mismas tablas rc-*) pero cambia
+ * de destinatario: la confirmación va al cliente y dice cuánto pagó; esta va al chofer y dice a
+ * quién recoge, cuándo, dónde y con qué vehículo. Por eso NO lleva ni un importe.
+ *
+ * Dos cortes, que elige quien exporta:
+ *   · por servicio — una hoja por cada uno, con el chofer que le toca. Predecible: 5 servicios,
+ *     5 hojas, aunque el mismo chofer repita.
+ *   · por chofer   — una hoja por persona, con todos sus servicios en orden. Menos papel y cada
+ *     quien ve su día completo.
+ *
+ * Created by Denisse Maldonado.
+ */
+const ARPONA_EMBED_CSS = typeof arponaEmbedCss === 'string' ? arponaEmbedCss : '';
+const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '';
+const ES_PDF = typeof esPdf !== 'undefined' && esPdf;
+const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'servicio';
+%>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title><%= pageTitle || 'Contrato de servicio' %></title>
+
+    <link rel="stylesheet" href="/dashboard/css/icons/tabler-icons/tabler-icons.css">
+    <link rel="icon" type="image/png" href="/images/heart_black.png">
+    <link rel="stylesheet" href="/css/fonts.css">
+    <link rel="stylesheet" href="/shared/services/pdfFab.css">
+    <% if (ARPONA_EMBED_CSS) { %><style id="arpona-embedded">
+    <%- ARPONA_EMBED_CSS %>
+    </style><% } %>
+    <% if (MYRIAD_EMBED_CSS) { %><style id="myriad-embedded">
+    <%- MYRIAD_EMBED_CSS %>
+    </style><% } %>
+
+    <%- include('partials/_documento-css') %>
+
+    <style>
+        /* ===== Contrato ===== */
+        /* Blanco SIEMPRE, no solo cuando la bandera dice que es un PDF. El parcial pinta el cuerpo
+           de gris y su regla blanca vive bajo @media print, que nunca llega porque el renderizador
+           emula media `screen`; atarlo a esPdf dejaba el resultado a merced de que esa bandera
+           viajara intacta hasta la plantilla. Un contrato es una hoja, no una tarjeta sobre una
+           mesa: en pantalla las hojas se separan con su propio filete y no con el fondo. */
+        html, body { background:#fff; padding:0; }
+        /* El relleno de .resv-conf tampoco depende de la bandera: son 24 px por hoja y con catorce
+           hojas empujaban el documento de 14 páginas a 16, partiendo servicios a la mitad. El aire
+           de la hoja lo ponen los márgenes del PDF, y en pantalla el filete de abajo separa una de
+           otra sin ocupar sitio. */
+        .ctr-hoja { padding:0; }
+        /* El filete que separa las hojas en pantalla se dibuja con box-shadow y no con border: un
+           borde ocupa sitio en el flujo y, con catorce hojas, ese píxel de más bastaba para empujar
+           el documento a una página extra. La sombra no ocupa nada. */
+        .ctr-hoja { box-shadow:0 1px 0 #dcdccf; }
+        .ctr-hoja:last-child { box-shadow:none; }
+        /* En el PDF ni ese filete: cada hoja ya es una página. */
+        body.es-pdf .ctr-hoja { box-shadow:none; }
+
+        /* Cada hoja arranca en página nueva. Va en CSS normal y NO bajo @media print: el renderizador
+           emula media `screen`, así que una regla de impresión no llegaría al PDF. La última no
+           rompe, o el documento saldría con una página en blanco al final. */
+        .ctr-hoja { break-after: page; page-break-after: always; }
+        .ctr-hoja:last-child { break-after: auto; page-break-after: auto; }
+
+        .ctr-hoja .rc-tbl, .ctr-hoja .rc-section-title { max-width:740px; margin-left:auto; margin-right:auto; }
+        /* Un punto por encima de la confirmación: esta hoja se lee de pie, a veces impresa en blanco
+           y negro y con prisa. Se sube solo dentro de .ctr-hoja para no mover el otro documento,
+           que comparte el mismo parcial de estilos. */
+        .ctr-hoja .rc-label { font-size:13px; letter-spacing:.6px; }
+        .ctr-hoja .rc-value { font-size:20px; line-height:1.35; }
+        .ctr-hoja .rc-section-title { font-size:20px; }
+        .ctr-hoja .rc-tc { padding:8px 14px; }
+
+        .ctr-cab { display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+                   border-bottom:2px solid #8a8c6e; padding-bottom:10px; margin-bottom:14px; }
+        .ctr-logo { height:42px; display:block; margin-bottom:6px; }
+        .ctr-cab-tit { font-family:'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);
+                       font-size:27px; color:#111; margin:0; letter-spacing:.5px; }
+        .ctr-cab-folio { color:#8a8a8a; font-size:15px; letter-spacing:.5px; margin-top:2px; }
+        .ctr-cab-hoja { color:#8a8a8a; font-size:13px; text-transform:uppercase; letter-spacing:.8px;
+                        white-space:nowrap; text-align:right; }
+
+        /* Quién viaja, dentro de la cabecera: son tres datos cortos y no merecían una banda propia. */
+        .ctr-cab-pax { text-align:right; flex:0 0 auto; }
+        .ctr-cab-fila { display:flex; justify-content:flex-end; gap:12px; margin-top:3px; }
+        .ctr-cab-fila .l { color:#8a8a8a; font-size:12px; text-transform:uppercase; letter-spacing:.6px;
+                           align-self:flex-end; padding-bottom:2px; }
+        .ctr-cab-fila .v { color:#2b2b2b; font-size:18px; word-break:break-word; }
+
+        /* La hora a la que hay que estar, en grande. Dentro de la tabla era una celda entre diez y
+           es el único dato de la hoja que no puede fallar. */
+        .ctr-cuando { max-width:740px; margin:0 auto 14px; display:flex; align-items:baseline; gap:16px;
+                      flex-wrap:wrap; border:2px solid #8a8c6e; padding:10px 16px; }
+        .ctr-cuando-cap { font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:#6b6b5f; }
+        .ctr-cuando-hora { font-size:32px; font-weight:700; color:#111; line-height:1; }
+        .ctr-cuando-dia { font-size:16px; color:#2b2b2b; }
+        /* Sin hora, la fecha ocupa el lugar de la cifra: el recuadro es el único sitio del cuándo y
+           no puede quedarse vacío. */
+        .ctr-cuando-hora.is-solo-dia { font-size:22px; }
+        .ctr-cuando-dia.is-aviso { color:#9a5f4f; }
+
+        /* Bloque de asignación: el dato propio de este documento. Se destaca sobre la ficha del
+           servicio porque es lo que el chofer viene a confirmar —que es él y con qué vehículo—. */
+        .ctr-asig { max-width:740px; margin:0 auto 14px; border:1px solid #8a8c6e; background:#f7f7f2; }
+        .ctr-asig-cap { background:#8a8c6e; color:#fff; font-size:13px; text-transform:uppercase;
+                        letter-spacing:1px; padding:5px 14px; }
+        .ctr-asig-row { display:flex; gap:14px; padding:8px 14px; border-bottom:1px solid #cfcfc4; }
+        .ctr-asig-row:last-child { border-bottom:none; }
+        .ctr-asig-row .l { color:#6b6b5f; font-size:13px; text-transform:uppercase; letter-spacing:.6px;
+                           min-width:150px; flex:0 0 auto; }
+        .ctr-asig-row .v { color:#2b2b2b; font-size:20px; word-break:break-word; }
+        .ctr-asig-row .v .tel { color:#6b6b5f; }
+        .ctr-asig-vacio { padding:9px 14px; color:#9a5f4f; font-size:17px; }
+
+        /* Firma: el documento se entrega y se acusa de recibido. El hueco de arriba es el sitio donde
+           se firma —se firma SOBRE la línea, no debajo—, así que 26 px no daban para una rúbrica. */
+        .ctr-firma { max-width:740px; margin:64px auto 0; display:flex; gap:40px; }
+        .ctr-firma > div { flex:1 1 0; border-top:1px solid #a9a79a; padding-top:5px;
+                           color:#8a8a8a; font-size:13px; text-transform:uppercase; letter-spacing:.6px; }
+
+        .ctr-vacio { max-width:740px; margin:0 auto; padding:18px; border:1px dashed #a9a79a;
+                     color:#8a8a8a; text-align:center; }
+
+        /* Conmutador de corte: es un control de pantalla, no parte del documento. */
+        .ctr-corte { max-width:860px; margin:0 auto 14px; display:flex; justify-content:flex-end; gap:6px; }
+        .ctr-corte a { display:inline-flex; align-items:center; gap:9px; font-size:17px; font-weight:600;
+                       text-decoration:none; color:#6b6b5f; border:1px solid #cfcfc4; background:#fff;
+                       border-radius:999px; padding:10px 24px; }
+        .ctr-corte a.is-actual { background:#8a8c6e; border-color:#8a8c6e; color:#fff; }
+        /* Cambiar de corte recarga la página, y armarla lleva su tiempo: el servidor vuelve a
+           resolver los servicios con sus choferes y vehículos. Sin señal, el clic parecía no hacer
+           nada y se pulsaba otra vez. El enlace pulsado se apaga y saca su rueda; los demás quedan
+           inertes para que no se acumulen navegaciones. */
+        .ctr-corte a.is-cargando::before {
+            content:""; width:15px; height:15px; border-radius:50%;
+            border:2px solid currentColor; border-top-color:transparent;
+            animation:ctr-giro .6s linear infinite;
+        }
+        .ctr-corte.is-ocupado a { pointer-events:none; opacity:.55; }
+        .ctr-corte.is-ocupado a.is-cargando { opacity:1; }
+        @keyframes ctr-giro { to { transform:rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+            .ctr-corte a.is-cargando::before { animation:none; border-top-color:currentColor; opacity:.5; }
+        }
+    </style>
+</head>
+<body class="<%= ES_PDF ? 'es-pdf' : '' %>">
+<%
+    const svcRoot = (quote && quote.serviceItems) || {};
+    const dias = svcRoot.days || [];
+    const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+        'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+
+    function fmtFecha(v) {
+        if (!v) return '';
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
+        if (!m) return String(v);
+        const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+        return `${DIAS_SEM[d.getUTCDay()]} ${+m[3]} de ${MESES[+m[2] - 1]} de ${m[1]}`;
+    }
+
+    // Nombre legible del servicio. Mismo criterio que la confirmación, para que el chofer y el
+    // cliente llamen igual a la misma cosa.
+    // Los valores de `type` que trae la base, contados sobre los 305 servicios registrados:
+    // transport 92, tour 67, experience 47, concepto 43, traslado 28, a-disposicion 19,
+    // experiencia 4, regular 5. Hay dos parejas históricas que nombran lo mismo —transport/traslado
+    // y experience/experiencia—, así que ambas caen en la misma etiqueta.
+    function tipoServicio(sc) {
+        const t = sc.type;
+        if (t === 'transport' || t === 'traslado') {
+            const tt = sc.transportType || '';
+            if (tt === 'aeropuerto') {
+                return sc.directionType === 'departure'
+                    ? 'Transportación — Salida a aeropuerto'
+                    : 'Transportación — Llegada de aeropuerto';
+            }
+            return `Transportación — ${tt === 'local' ? 'Traslado local' : 'Punto a punto'}`;
+        }
+        if (t === 'tour') return 'Tour';
+        if (t === 'experience' || t === 'experiencia') return 'Experiencia';
+        if (t === 'a-disposicion' || t === 'disposicion') return 'Servicio a disposición';
+        if (t === 'concepto') return 'Concepto';
+        return 'Servicio';
+    }
+
+    // Cuántos van en ESTE servicio. Mismo criterio que la confirmación —adultos, niños e infantes
+    // sumando las cantidades de experiencia y las de transporte—, para que el chofer y el cliente
+    // cuenten igual a la misma gente. Cae a numberOfPeople cuando el servicio no desglosa.
+    function pasajeDe(sc) {
+        const adultos = (Number(sc.adultsQuantity) || 0) + (Number(sc.adultsNoAlcoholQuantity) || 0)
+            + (Number(sc.transportAdults) || 0);
+        const ninos = (Number(sc.childrenQuantity) || 0) + (Number(sc.transportChildren) || 0);
+        const infantes = (Number(sc.infantsQuantity) || 0) + (Number(sc.transportInfants) || 0);
+        const partes = [];
+        if (adultos) partes.push(`${adultos} ${adultos === 1 ? 'adulto' : 'adultos'}`);
+        if (ninos) partes.push(`${ninos} ${ninos === 1 ? 'niño' : 'niños'}`);
+        if (infantes) partes.push(`${infantes} ${infantes === 1 ? 'infante' : 'infantes'}`);
+        if (partes.length) return partes.join(' · ');
+        const n = Number(sc.numberOfPeople) || 0;
+        return n ? `${n} ${n === 1 ? 'persona' : 'personas'}` : '';
+    }
+
+    // Se aplana el árbol día → servicios a una lista, arrastrando la fecha de su día: las dos
+    // vistas del documento la necesitan y en el corte por chofer el día deja de ser el eje.
+    const items = [];
+    dias.forEach((dia) => {
+        (dia.subconcepts || []).forEach((sc) => {
+            items.push({ sc, fecha: dia.date, dayTitle: dia.dayTitle || '', city: dia.city || '' });
+        });
+    });
+
+    // Personas que conducen en un servicio: la asignada al servicio y las de los vehículos extra.
+    // Sin ellas no hay a quién entregarle la hoja en el corte por chofer.
+    function choferesDe(sc) {
+        const a = sc.assignments || {};
+        const lista = [];
+        if (a.driver) lista.push(a.driver);
+        (a.extras || []).forEach((e) => { if (e.driver) lista.push(e.driver); });
+        const vistos = new Set();
+        return lista.filter((p) => p && p.id && !vistos.has(p.id) && vistos.add(p.id));
+    }
+
+    // Corte por chofer: cada persona con los servicios que le tocan, en el orden del itinerario.
+    // Los servicios sin chofer no se pierden —se agrupan aparte— porque son justo los que hay que
+    // resolver antes de que empiece el viaje.
+    const porChofer = [];
+    if (CORTE === 'chofer') {
+        const mapa = new Map();
+        const huerfanos = [];
+        items.forEach((it) => {
+            const chs = choferesDe(it.sc);
+            if (chs.length === 0) { huerfanos.push(it); return; }
+            chs.forEach((ch) => {
+                if (!mapa.has(ch.id)) mapa.set(ch.id, { chofer: ch, items: [] });
+                mapa.get(ch.id).items.push(it);
+            });
+        });
+        mapa.forEach((v) => porChofer.push(v));
+        if (huerfanos.length) porChofer.push({ chofer: null, items: huerfanos });
+    }
+
+    const hojas = CORTE === 'chofer' ? porChofer : items;
+    const totalHojas = hojas.length;
+
+    // Identidad del viaje: se repite en TODAS las hojas a propósito. Cada una viaja sola en manos
+    // de una persona distinta, así que ninguna puede depender de lo que diga otra.
+    const paxNombre = [quote.leadGuestFirstName || quote.contactFirstName || '',
+        quote.leadGuestLastName || quote.contactLastName || ''].join(' ').trim()
+        || quote.contactPerson || '';
+    const paxTel = quote.contactPhone || '';
+    const paxPersonas = Number(quote.numberOfPeople) || 0;
+    const folio = quote.reservationFolio || quote.folio || '';
+%>
+
+<% if (!ES_PDF) { %>
+<div class="ctr-corte" id="ctrCorte">
+    <a href="?corte=servicio" class="<%= CORTE === 'servicio' ? 'is-actual' : '' %>">Una hoja por servicio</a>
+    <a href="?corte=chofer" class="<%= CORTE === 'chofer' ? 'is-actual' : '' %>">Una hoja por chofer</a>
+</div>
+<script>
+    // El corte que ya está puesto no navega: recargaría la misma página para nada.
+    document.getElementById('ctrCorte').addEventListener('click', function (e) {
+        var a = e.target.closest('a');
+        if (!a) return;
+        if (a.classList.contains('is-actual')) { e.preventDefault(); return; }
+        a.classList.add('is-cargando');
+        this.classList.add('is-ocupado');
+    });
+</script>
+<% } %>
+
+<%
+/**
+ * Ficha de asignación de un servicio. Se saca a función porque los dos cortes la pintan igual:
+ * lo único que cambia entre ellos es cómo se agrupan las hojas, no qué dice cada servicio.
+ */
+function bloqueAsignacion(sc) {
+    const a = sc.assignments || {};
+    const filas = [];
+    const persona = (p) => `${p.fullName}${p.phone ? ` <span class="tel">· ${p.phone}</span>` : ''}`;
+    const vehiculo = (v) => [v.name, v.plate, v.color].filter(Boolean).join(' · ');
+    if (a.driver) filas.push(['Chofer', persona(a.driver)]);
+    if (a.vehicle) filas.push(['Vehículo', vehiculo(a.vehicle)]);
+    (a.extras || []).forEach((e, i) => {
+        if (e.driver) filas.push([`Chofer ${i + 2}`, persona(e.driver)]);
+        if (e.vehicle) filas.push([`Vehículo ${i + 2}`, vehiculo(e.vehicle)]);
+    });
+    if (a.guide) filas.push(['Guía', persona(a.guide)]);
+    if (a.greeter) filas.push(['Greeter', persona(a.greeter)]);
+    if (a.serviceCustomer) filas.push(['Customer Support', persona(a.serviceCustomer)]);
+    return filas;
+}
+%>
+
+<% hojas.forEach(function (hoja, idx) {
+    const esPorChofer = CORTE === 'chofer';
+    const deChofer = esPorChofer ? hoja.chofer : null;
+    const suyos = esPorChofer ? hoja.items : [hoja];
+%>
+<div class="resv-conf ctr-hoja">
+    <div class="ctr-cab">
+        <div class="ctr-cab-id">
+            <img class="ctr-logo" src="/images/logos/light_amexing.png" alt="Amexing">
+            <h1 class="ctr-cab-tit">Contrato de servicio</h1>
+            <div class="ctr-cab-folio">Reservación <%= folio %></div>
+        </div>
+        <%
+            // El pasajero viaja EN la cabecera, no en una caja debajo: como bloque aparte gastaba una
+            // banda entera de la hoja para tres datos cortos, y aquí acompaña al folio, que es la otra
+            // mitad de la identidad del documento.
+        %>
+        <div class="ctr-cab-pax">
+            <div class="ctr-cab-hoja">
+                Hoja <%= idx + 1 %> de <%= totalHojas %>
+                <% if (esPorChofer) { %>
+                    · <%= deChofer ? deChofer.fullName : 'Sin chofer asignado' %>
+                <% } else { %>
+                    · Servicio <%= idx + 1 %> de <%= totalHojas %>
+                <% } %>
+            </div>
+            <div class="ctr-cab-fila"><span class="l">Pasajero</span><span class="v"><%= paxNombre || '—' %></span></div>
+            <% if (paxTel) { %>
+            <div class="ctr-cab-fila"><span class="l">Teléfono</span><span class="v"><%= paxTel %></span></div>
+            <% } %>
+            <% if (paxPersonas) { %>
+            <div class="ctr-cab-fila"><span class="l">Personas</span><span class="v"><%= paxPersonas %></span></div>
+            <% } %>
+        </div>
+    </div>
+
+    <% if (esPorChofer && deChofer) { %>
+    <div class="ctr-asig">
+        <div class="ctr-asig-cap">Asignado a</div>
+        <div class="ctr-asig-row"><span class="l">Chofer</span><span class="v"><%= deChofer.fullName %><% if (deChofer.phone) { %> <span class="tel">· <%= deChofer.phone %></span><% } %></span></div>
+    </div>
+    <% } %>
+
+    <% suyos.forEach(function (it) {
+        const sc = it.sc;
+        const filas = bloqueAsignacion(sc);
+    %>
+        <div class="rc-section-title"><%= tipoServicio(sc) %></div>
+        <%
+            // Se repite arriba, en grande, la hora a la que hay que estar. Dentro de la tabla es una
+            // celda más entre diez; aquí es lo primero que se ve al sacar la hoja del bolsillo.
+            const esAero = (sc.type === 'transport' || sc.type === 'traslado') && sc.transportType === 'aeropuerto';
+            const cuando = (esAero && sc.directionType === 'departure')
+                ? (sc.flightDepartureTimeSuggested || '')
+                : (sc.time || sc.startTime || '');
+        %>
+        <div class="ctr-cuando">
+            <% if (cuando) { %>
+                <span class="ctr-cuando-cap"><%= esAero && sc.directionType !== 'departure' ? 'Estar en el aeropuerto' : 'Recoger' %></span>
+                <span class="ctr-cuando-hora"><%= cuando %> hrs</span>
+                <span class="ctr-cuando-dia"><%= fmtFecha(it.fecha) || '—' %></span>
+            <% } else { %>
+                <span class="ctr-cuando-cap">Fecha</span>
+                <span class="ctr-cuando-hora is-solo-dia"><%= fmtFecha(it.fecha) || '—' %></span>
+                <span class="ctr-cuando-dia is-aviso">Sin hora registrada</span>
+            <% } %>
+        </div>
+        <div class="rc-tbl">
+            <% if (sc.concept) { %>
+            <div class="rc-tc rc-c6"><span class="rc-label">Servicio</span><span class="rc-value"><%= sc.concept %></span></div>
+            <% } %>
+            <%
+                // Qué significa cada hora en un traslado de aeropuerto, según el campo donde se
+                // captura —"Hora de salida sugerida… confírmala como hora de pick-up"— y según lo
+                // que dicen los datos: de los 18 servicios que traen las dos, la sugerida es
+                // anterior a `time` en 13.
+                //
+                //   SALIDA  → `time` es la hora del VUELO y la sugerida es cuándo pasar por el
+                //             pasajero. Estaban al revés: el contrato llamaba "recolección" a la
+                //             hora del vuelo y "vuelo" a la del pick-up.
+                //   LLEGADA → `time` es cuándo aterriza, que es cuándo hay que estar ahí; la
+                //             sugerida queda como la salida del vuelo desde su origen (en la base,
+                //             unas cuatro horas antes de llegar).
+                const esAeropuerto = (sc.type === 'transport' || sc.type === 'traslado')
+                    && sc.transportType === 'aeropuerto';
+                const esSalida = sc.directionType === 'departure';
+                // Las horas se leen a distancia y en una hoja llena de números —fechas, teléfonos,
+                // placas—: la unidad las separa del resto de un vistazo.
+                const conHrs = (v) => (v ? `${v} hrs` : '');
+                const sugerida = sc.flightDepartureTimeSuggested || '';
+                const propia = sc.time || sc.startTime || '';
+                // Cuándo tiene que estar quien opera: lo único que no puede fallar de esta hoja.
+                const horaRecoger = conHrs(esAeropuerto && esSalida ? sugerida : propia);
+                const otraHora = esAeropuerto
+                    ? { rotulo: esSalida ? 'Hora de vuelo' : 'Salida del vuelo', valor: conHrs(esSalida ? propia : sugerida) }
+                    : null;
+            %>
+            <%
+                // La fecha y la hora de estar NO se repiten aquí: las dice el recuadro de arriba, que
+                // es donde se buscan. En la tabla solo queda la otra hora del vuelo, y va junto a la
+                // aerolínea y al número: los tres describen el mismo vuelo y se leen de corrido.
+            %>
+            <% if (sc.pickupAddress || sc.originName) { %>
+            <div class="rc-tc rc-c6"><span class="rc-label">Recoger en</span><span class="rc-value"><%= sc.pickupAddress || sc.originName %></span></div>
+            <% } %>
+            <% if (sc.dropoffAddress || sc.destination) { %>
+            <div class="rc-tc rc-c6"><span class="rc-label">Destino</span><span class="rc-value"><%= sc.dropoffAddress || sc.destination %></span></div>
+            <% } %>
+            <%
+                const hayVuelo = sc.airline || sc.flightNumber || (otraHora && otraHora.valor);
+                // Tres en la fila cuando hay hora: la rejilla es de 6, así que caben a dos columnas
+                // cada uno. Con solo aerolínea y número se quedan a la mitad, como estaban.
+                const anchoVuelo = (otraHora && otraHora.valor) ? 'rc-c2' : 'rc-c3';
+            %>
+            <% if (hayVuelo) { %>
+            <div class="rc-tc <%= anchoVuelo %>"><span class="rc-label">Aerolínea</span><span class="rc-value"><%= sc.airline || '—' %></span></div>
+            <div class="rc-tc <%= anchoVuelo %>"><span class="rc-label">Vuelo</span><span class="rc-value"><%= sc.flightNumber || '—' %></span></div>
+            <% if (otraHora && otraHora.valor) { %>
+            <div class="rc-tc rc-c2"><span class="rc-label"><%= otraHora.rotulo %></span><span class="rc-value"><%= otraHora.valor %></span></div>
+            <% } %>
+            <% } %>
+            <% if (sc.vehicleTypeName || sc.categoryName) { %>
+            <div class="rc-tc rc-c3"><span class="rc-label">Tipo de vehículo</span><span class="rc-value"><%= sc.vehicleTypeName || '—' %></span></div>
+            <div class="rc-tc rc-c3"><span class="rc-label">Clase</span><span class="rc-value"><%= sc.categoryName || '—' %></span></div>
+            <% } %>
+            <% if (sc.duration || sc.hours) { %>
+            <div class="rc-tc rc-c3"><span class="rc-label">Duración</span><span class="rc-value"><%= /^\d+(\.\d+)?$/.test(String(sc.duration || sc.hours)) ? `${sc.duration || sc.hours} h` : (sc.duration || sc.hours) %></span></div>
+            <% } %>
+            <% const pasaje = pasajeDe(sc); if (pasaje) { %>
+            <div class="rc-tc rc-c3"><span class="rc-label">Personas</span><span class="rc-value"><%= pasaje %></span></div>
+            <% } %>
+            <%
+                // Quién va, por nombre, cuando el servicio los tiene registrados. Es lo que permite
+                // a quien recoge llamar a alguien en concreto en vez de buscar "al grupo".
+                const asistentes = (sc.attendees || []).filter(Boolean);
+            %>
+            <% if (asistentes.length) { %>
+            <div class="rc-tc rc-c6"><span class="rc-label"><%= asistentes.length === 1 ? 'Asistente' : 'Asistentes' %></span><span class="rc-value"><%= asistentes.join(' · ') %></span></div>
+            <% } %>
+
+        </div>
+
+        <% if (!esPorChofer) { %>
+            <div class="ctr-asig">
+                <div class="ctr-asig-cap">Asignaciones</div>
+                <% if (filas.length) { %>
+                    <% filas.forEach(function (f) { %>
+                    <div class="ctr-asig-row"><span class="l"><%= f[0] %></span><span class="v"><%- f[1] %></span></div>
+                    <% }); %>
+                <% } else { %>
+                    <div class="ctr-asig-vacio">Sin asignaciones registradas para este servicio.</div>
+                <% } %>
+            </div>
+        <% } else { %>
+            <%
+                // En el corte por chofer, la persona a la que va dirigida la hoja ya está arriba: aquí
+                // solo se nombra a los demás, que es con quien va a coincidir en el servicio.
+                const otros = filas.filter((f) => !(f[0] === 'Chofer' && deChofer && f[1].indexOf(deChofer.fullName) === 0));
+            %>
+            <% if (otros.length) { %>
+            <div class="ctr-asig">
+                <div class="ctr-asig-cap">En este servicio también van</div>
+                <% otros.forEach(function (f) { %>
+                <div class="ctr-asig-row"><span class="l"><%= f[0] %></span><span class="v"><%- f[1] %></span></div>
+                <% }); %>
+            </div>
+            <% } %>
+        <% } %>
+    <% }); %>
+
+    <% if (!suyos.length) { %>
+    <div class="ctr-vacio">Esta reservación no tiene servicios registrados.</div>
+    <% } %>
+
+    <div class="ctr-firma">
+        <div>Recibí — nombre y firma</div>
+        <div>Fecha de entrega</div>
+    </div>
+</div>
+<% }); %>
+
+<% if (!totalHojas) { %>
+<div class="resv-conf">
+    <div class="ctr-cab">
+        <div class="ctr-cab-id">
+            <img class="ctr-logo" src="/images/logos/light_amexing.png" alt="Amexing">
+            <h1 class="ctr-cab-tit">Contrato de servicio</h1>
+            <div class="ctr-cab-folio">Reservación <%= folio %></div>
+        </div>
+    </div>
+    <div class="ctr-vacio">Esta reservación todavía no tiene servicios que contratar.</div>
+</div>
+<% } %>
+<% if (!ES_PDF && folio) { %>
+    <%
+        // El PDF respeta el corte que se está viendo: si no, quien mira "por chofer" bajaría el otro
+        // documento. wireFab descarga con fetch, que lleva las cookies de sesión —esta ruta las
+        // exige— y espera a que puppeteer arme el PDF, que tarda varios segundos.
+        const rutaPdf = `/dashboard/admin/reservations/${encodeURIComponent(folio)}/contract/pdf?corte=${CORTE}`;
+    %>
+    <a class="pdf-fab" id="pdfFab" href="<%= rutaPdf %>"
+       aria-label="Descargar el contrato en PDF">
+      <span class="pdf-fab-ico" id="pdfFabIco" aria-hidden="true"><i class="ti ti-download"></i></span>
+      <span class="pdf-fab-txt" id="pdfFabTxt">Descargar PDF</span>
+    </a>
+    <script src="/shared/services/itineraryExport.js"></script>
+    <script>
+      ItineraryExport.wireFab({ nombreArchivo: <%- JSON.stringify(`${folio}-contrato-${CORTE}.pdf`) %> });
+    </script>
+<% } %>
+</body>
+</html>

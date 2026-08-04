@@ -1,0 +1,108 @@
+<%
+/**
+ * Estilos del DOCUMENTO impreso de la reservación: los comparten la confirmación
+ * (reservation-public.ejs) y el contrato de servicio (reservation-contract.ejs). Salió tal cual
+ * estaba en la confirmación —misma tipografía, mismas tablas rc-*, misma paginación— para que
+ * extraerlo no cambiara ni un píxel de un documento que ya está afinado contra el PDF real.
+ *
+ * Ojo con la paginación: va en CSS normal y NO bajo @media print, porque PdfRenderService emula
+ * media `screen` a propósito y una regla de impresión nunca llegaría a la exportación.
+ *
+ * Created by Denisse Maldonado.
+ */
+%>
+    <style>
+        body { background:#f5f5f5; margin:0; padding:2rem 0; font-family:'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif); }
+        /* .rc-actions y .rc-export-btn se retiraron con el botón del encabezado: la descarga es ahora
+           el flotante compartido, que la hoja pdfFab.css ya oculta en el PDF. El azul #4b5bdc de ese
+           botón era además el último resto fuera de la paleta en esta vista. */
+        @media print { body { background:#fff; padding:0; } }
+
+        /* ===== Confirmation card (page-1 section) ===== */
+        .resv-conf{max-width:820px;margin:0 auto;background:#fff;padding:24px;box-sizing:border-box;font-family:'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif);color:#2b2b2b;box-shadow:0 0 20px rgba(0,0,0,.08);border-radius:8px}
+        .resv-conf *{box-sizing:border-box}
+        .resv-conf .rc-logo{text-align:center;margin-bottom:18px}
+        .resv-conf .rc-banner{background:#8a8c6e;color:#fff;text-align:center;padding:7px 16px;margin:0 0 8px}
+        .resv-conf .rc-banner-title{font-size:15px;font-weight:300;text-transform:none;letter-spacing:1px;margin:0}
+        .resv-conf .rc-banner-sub{font-size:18px;font-weight:300;text-transform:uppercase;letter-spacing:2px;margin:3px 0 0}
+        .resv-conf .rc-folio{text-align:center;color:#8a8a8a;font-size:11px;letter-spacing:.5px;margin-bottom:28px}
+        /* Un título no se queda solo al pie de una hoja: viaja con el bloque que encabeza. */
+        .resv-conf .rc-section-title{break-after:avoid;page-break-after:avoid;color:#111;font-family:'ArponaPDF', var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);font-weight:700;text-transform:uppercase;font-size:16px;letter-spacing:2px;text-align:left;max-width:640px;margin:22px auto 4px}
+        .resv-conf .rc-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid #a9a79a;border-bottom:none}
+        /* Info recuadros narrower than the green banner (left-aligned). */
+        .resv-conf .rc-grid, .resv-conf .rc-service { max-width: 640px; margin-left: auto; margin-right: auto; }
+        .resv-conf .rc-upper { text-transform: uppercase; }
+        .resv-conf .rc-cell{padding:3px 12px;border-bottom:1px solid #a9a79a}
+        .resv-conf .rc-cell:nth-child(odd){border-right:1px solid #a9a79a}
+        /* Odd cell count: the last one spans the full row instead of leaving an empty half-cell. */
+        .resv-conf .rc-grid > .rc-cell:last-child:nth-child(odd){grid-column:1 / -1;border-right:none}
+        .resv-conf .rc-cell.rc-full{grid-column:1 / -1;border-right:none}
+        .resv-conf .rc-label{display:block;color:#8a8a8a;font-size:10px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:1px}
+        .resv-conf .rc-value{display:block;color:#2b2b2b;font-size:14px;word-break:break-word}
+        /* Paginación del PDF. Va en el CSS NORMAL y no bajo @media print: PdfRenderService emula
+           media `screen` a propósito, así que una regla de impresión no llegaría a la exportación.
+           En pantalla no estorba, porque ahí no hay páginas.
+           `break-inside` en el servicio COMPLETO para que su número y su tabla no se separen; y
+           también en cada .rc-tbl, que es la unidad mínima: si un servicio no cabe entero en lo que
+           queda de hoja, se pasa a la siguiente, y si ni siquiera cabe en una hoja, al menos corta
+           entre tablas y no a media fila. */
+        .resv-conf .rc-service{margin-bottom:18px;break-inside:avoid;page-break-inside:avoid}
+        .resv-conf .rc-tbl{break-inside:avoid;page-break-inside:avoid}
+        .resv-conf .rc-badge{width:26px;height:26px;background:#8a8c6e;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:6px}
+        .resv-conf .rc-card{flex:1 1 auto;min-width:0}
+        .resv-conf .rc-tbl{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid #a9a79a;border-left:1px solid #a9a79a}
+        .resv-conf .rc-tc{padding:3px 12px;border-right:1px solid #a9a79a;border-bottom:1px solid #a9a79a;min-width:0}
+        .resv-conf .rc-c6{grid-column:span 6}
+        .resv-conf .rc-c3{grid-column:span 3}
+        .resv-conf .rc-c2{grid-column:span 2}
+        /* El resumen de pago no se parte: si no cabe en lo que queda de hoja, se pasa entero a la
+           siguiente. Se partía entre "PAGADO" y "TIPO DE PAGO". */
+        .resv-conf .rc-pay{max-width:640px;margin:4px auto 0;border:1px solid #a9a79a;break-inside:avoid;page-break-inside:avoid}
+        .resv-conf .rc-pay-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:5px 12px;border-bottom:1px solid #a9a79a}
+        .resv-conf .rc-pay-row:last-child{border-bottom:none}
+        .resv-conf .rc-pay-row .l{color:#8a8a8a;font-size:10px;text-transform:uppercase;letter-spacing:.8px}
+        .resv-conf .rc-pay-row .v{font-size:14px;color:#2b2b2b;text-align:right}
+        .resv-conf .rc-pay-row.rc-pay-total{background:#f3f3ee}
+        .resv-conf .rc-pay-row.rc-pay-total .l{color:#111}
+        .resv-conf .rc-pay-row.rc-pay-total .v{font-weight:700;font-size:16px;color:#111}
+        /* Outstanding balance: emphasize the amount due. */
+        .resv-conf .rc-pay-row.rc-pay-balance .v{font-weight:700;color:#b8860b}
+        /* Adjustment sign tokens — scoped (no Bootstrap here). Sign is ALSO in the text, never
+           color alone. Both >= 4.5:1 contrast on white (#b02a37 ~7:1, #146c43 ~5.8:1). */
+        .resv-conf .rc-adj-charge{color:#b02a37}
+        .resv-conf .rc-adj-discount{color:#146c43}
+        .resv-conf .rc-pay-row .l i{font-size:12px;vertical-align:-1px;margin-right:2px}
+        /* Per-service breakdown by method (native <details>, keyboard-operable, no JS). */
+        .resv-conf .rc-mini{margin-top:4px}
+        .resv-conf .rc-mini>summary{cursor:pointer;color:#4b5bdc;font-size:11px;letter-spacing:.3px;list-style:none}
+        .resv-conf .rc-mini>summary::-webkit-details-marker{display:none}
+        .resv-conf .rc-mini>summary::before{content:'\25B8';margin-right:5px;font-size:10px}
+        .resv-conf .rc-mini[open]>summary::before{content:'\25BE'}
+        .resv-conf .rc-mini-body{border:1px solid #d8d7cd;border-radius:4px;margin-top:5px}
+        .resv-conf .rc-mini-row{display:flex;justify-content:space-between;gap:12px;padding:3px 10px;border-bottom:1px solid #e6e5db;font-size:12px}
+        .resv-conf .rc-mini-row:last-child{border-bottom:none}
+        .resv-conf .rc-mini-active{color:#4b5bdc;font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
+        /* Status pill (scoped — no Bootstrap badges on this standalone page). */
+        .resv-conf .rc-pay-status{display:inline-block;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;line-height:1.5;color:#fff;background:#8a8a8a}
+        .resv-conf .rc-pay-status-paid{background:#2bb673}
+        .resv-conf .rc-pay-status-partial{background:#b8860b}
+        .resv-conf .rc-pay-status-pending{background:#8a8a8a}
+        .resv-conf .rc-pay-status-refunded{background:#6b7a8f}
+        @media (max-width:560px){.resv-conf .rc-grid{grid-template-columns:1fr}.resv-conf .rc-cell:nth-child(odd){border-right:none}.resv-conf .rc-c6,.resv-conf .rc-c3,.resv-conf .rc-c2{grid-column:span 6}}
+
+        /* ===== Experiences / tours (page-2 section) ===== */
+        .resv-conf .resv-exp{font-family:'MyriadPDF', var(--font-myriad, 'Segoe UI', Tahoma, sans-serif);color:#2b2b2b;background:#fff;text-align:center;padding:32px 24px 8px}
+        .resv-conf .resv-exp-divider{border:0;border-top:1px solid #a9a79a;margin:0 0 28px}
+        .resv-conf .resv-exp-icons{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:22px;margin-bottom:22px}
+        .resv-conf .resv-exp-icons img{width:56px;height:56px;object-fit:contain;opacity:.65;filter:grayscale(35%)}
+        .resv-conf .resv-exp-lead{max-width:560px;margin:0 auto 24px;color:#8a8a8a;font-size:.95rem;line-height:1.6}
+        .resv-conf .resv-exp-lead strong{color:#2b2b2b;font-weight:700}
+        .resv-conf .resv-exp-cta{display:inline-block;background:#8a8c6e;color:#fff;text-decoration:none;text-transform:uppercase;letter-spacing:2px;font-size:.8rem;font-weight:600;padding:14px 34px;border-radius:2px;margin-bottom:26px}
+        .resv-conf .resv-exp-cta:hover{background:#797b5f}
+        .resv-conf .resv-exp-social{display:flex;justify-content:center;gap:14px;margin-bottom:18px}
+        .resv-conf .resv-exp-social a{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid #a9a79a;border-radius:50%;color:#8a8a8a;font-size:1.05rem;text-decoration:none}
+        .resv-conf .resv-exp-social a:hover{color:#8a8c6e;border-color:#8a8c6e}
+        .resv-conf .resv-exp-site{margin:0 0 12px;font-size:.9rem}
+        .resv-conf .resv-exp-site a{color:#2b2b2b;text-decoration:none;font-weight:600}
+        .resv-conf .resv-exp-agent{color:#8a8a8a;font-size:.85rem;line-height:1.55;margin:0}
+    </style>

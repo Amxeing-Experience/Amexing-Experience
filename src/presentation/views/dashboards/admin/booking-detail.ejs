@@ -1471,15 +1471,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Las dos exportaciones van juntas en un control segmentado: son la misma acción con dos
         // variantes, así que "Exportar" queda implícito en el grupo y cada botón solo nombra el
         // documento. El aria-label/title conserva la frase completa para lector de pantalla y hover.
-        // El contrato es un placeholder: la vista/ruta aún no existe; se cablea después.
+        // El contrato va directo, sin menú previo: el corte —por servicio o por chofer— se elige
+        // dentro del propio documento, así que preguntarlo antes era pedir dos veces lo mismo. La
+        // vista pide sesión de admin, a diferencia de la confirmación, porque lleva teléfonos de
+        // choferes y placas.
         const exportSegHtml = folio
             ? `<span class="hdr-seg" role="group" aria-label="Exportar">
                 <a class="hdr-seg-btn" href="/reservations/${folio}" target="_blank" rel="noopener"
                    title="Exportar confirmación — abre la vista pública, exportable a PDF"
                    aria-label="Exportar confirmación"><i class="ti ti-file-export"></i>Confirmación</a>
-                <button type="button" class="hdr-seg-btn" id="exportContractBtn"
-                   title="Exportar contrato de servicio — próximamente"
-                   aria-label="Exportar contrato de servicio" disabled><i class="ti ti-file-text"></i>Contrato</button>
+                <a class="hdr-seg-btn" id="exportContractBtn" target="_blank" rel="noopener"
+                   href="/dashboard/admin/reservations/${folio}/contract"
+                   title="Exportar contrato de servicio — para quien opera el viaje"
+                   aria-label="Exportar contrato de servicio"><i class="ti ti-file-text"></i>Contrato</a>
               </span>`
             : '';
         // En vez del botón de cancelar: si ya está cancelada, mostrar etiqueta
