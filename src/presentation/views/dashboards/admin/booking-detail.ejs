@@ -104,8 +104,6 @@
       .fin-chev{font-size:.9rem;margin-left:2px;}
       .fin-cmp-inline{margin-top:14px;padding:14px;border:1px solid #e6e1d5;border-radius:12px;background:#fbfaf6;}
       .fin-cmp-inline .fin-cmp-cap{margin-bottom:8px;}
-      .fin-hero-hint{display:inline-flex;align-items:center;gap:5px;margin-top:7px;font-size:.75rem;font-weight:600;color:#4b6b3f;}
-      .fin-hero-hint i{font-size:.95rem;}
       .fin-hero-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
       .fin-hero-foot .lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
       .fin-hero-foot .val{font-weight:700;font-size:1.05rem;line-height:1.2;}
@@ -2206,25 +2204,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.getElementById('payCmp').innerHTML = comparisonHead + comparisonRows;
             if (!comparisonRows) bootstrap.Collapse.getOrCreateInstance(cmpSec, { toggle: false }).hide();
         }
-        // Hint de ahorro SIEMPRE visible: si otro método es más barato que el actual, lo anuncia sin
-        // tener que abrir el comparativo (p. ej. "En efectivo ahorras $7,542").
-        const cmpCheapestMethod = cmpAmounts.find(m => m.amount === cmpCheapest);
-        const cmpSavings = cmpCurrent - cmpCheapest;
-        const savingsHint = (cmpCheapestMethod && cmpCheapestMethod.method !== d.paymentType && cmpSavings >= 0.005)
-            ? `<div class="fin-hero-hint"><i class="ti ti-discount-2"></i>En ${PaymentBreakdownHelpers.escapeHtml(cmpCheapestMethod.label.toLowerCase())} ahorras ${formatCurrency(cmpSavings, curr)}</div>`
-            : '';
-
         let html = '';
         // El HERO se retiró de aquí: sus cifras —total, estado, %, pagado y saldo— viven en la barra
         // del pie y, completas, en la tarjeta de cobertura del carrito. Estaban en los dos lados.
 
         // ===== Desglose ===== (sin rótulo; los renglones ya se leen como desglose)
-        // El chip de método y su comparativo van SIEMPRE, no sólo cuando falta el summary. Vivían
-        // dentro del hero; al mudarse el hero a la barra del pie se habrían quedado sin dónde
-        // insertarse, y con ellos el aviso de ahorro, que es el único que sugiere cambiar de método.
-        if (savingsHint) {
-            html += savingsHint;
-        }
+        // El aviso de ahorro NO se repite aquí: ya sale bajo el Total a pagar, unos centímetros más
+        // arriba y en el mismo panel, así que se leía dos veces seguidas. Lo pinta buildCoverageCard
+        // con el HTML de cheapestSavingsHint().
         html += `<div class="fin-row"><span class="lbl"><i class="ti ti-list-details"></i>Subtotal servicios</span><span class="val">${formatCurrency(servicesSubtotal, curr)}</span></div>`;
 
         // Propina cobrada (Fase 2): líneas leídas del summary del servidor para que el Subtotal + propina +
