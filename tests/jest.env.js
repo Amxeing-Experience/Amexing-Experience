@@ -33,7 +33,10 @@ if (fs.existsSync(envTestPath)) {
 // Override specific test configurations (MongoDB Memory Server)
 process.env.PARSE_APP_ID = 'test-app-id';
 process.env.PARSE_MASTER_KEY = 'test-master-key';
-process.env.PARSE_SERVER_URL = 'http://localhost:1339/parse';
+// Debe apuntar al Parse que levanta globalSetup: si no coincide, la app bajo prueba habla con lo
+// que sea que esté escuchando en ese puerto (incluido el Parse de OTRO proyecto, que responde con
+// el mismo appId de pruebas) y los tests pasan o fallan por razones que no son el código.
+process.env.PARSE_SERVER_URL = `http://localhost:${Number(process.env.TEST_PARSE_PORT) || 1339}/parse`;
 process.env.DATABASE_URI = process.env.TEST_DATABASE_URI || 'mongodb://localhost:27017/AmexingTEST';
 process.env.PORT = '1340'; // Use different port for main app in tests
 process.env.DASHBOARD_PORT = '4041'; // Use different port for dashboard in tests

@@ -15,6 +15,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 // bcrypt is handled by AmexingUser model, not needed here
 const AuthenticationService = require('../../application/services/AuthenticationService');
+const { safeReturnTo } = require('../../application/utils/safeReturnTo');
 // const OAuthService = require('../../application/services/OAuthService'); // Unused import
 const jwtMiddleware = require('../../application/middleware/jwtMiddleware');
 const dashboardAuthMiddleware = require('../../application/middleware/dashboardAuthMiddleware');
@@ -174,7 +175,12 @@ router.get('/credentials', dashboardAuthMiddleware.requireAuth, authController.g
 // Login endpoint
 router.post('/login', async (req, res) => {
   try {
-    const { identifier, password, returnTo } = req.body;
+    const { identifier, password } = req.body;
+    // El formulario manda el campo como `redirectTo` (login-form.ejs, y el enlace de OAuth usa ese
+    // mismo nombre), pero aquí se leía `returnTo`: nombres distintos, así que el valor NUNCA llegaba
+    // y el login siempre caía al dashboard. Se aceptan los dos y se valida, porque el body lo puede
+    // fabricar cualquiera aunque la vista haya renderizado algo seguro.
+    const returnTo = safeReturnTo(req.body.redirectTo) || safeReturnTo(req.body.returnTo);
 
     // Validate required fields
     // Check if identifier or password is missing

@@ -1,6 +1,7 @@
 const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 const securityMiddlewares = require('../../infrastructure/security/securityMiddleware');
+const { safeReturnTo } = require('../utils/safeReturnTo');
 const emailService = require('../services/EmailService');
 
 /**
@@ -124,6 +125,11 @@ class AuthController {
       parseAppId: process.env.PARSE_APP_ID,
       oauthProviders,
       oauthLinkingData,
+      // Destino tras iniciar sesión. Cuando la sesión expira, dashboardAuthMiddleware manda a
+      // /login?returnTo=<la url donde estaba>; sin pasarlo aquí la vista evaluaba
+      // `typeof returnTo !== 'undefined'` contra una variable que nunca llegaba, así que el campo
+      // oculto del formulario salía SIEMPRE vacío y el login terminaba en el dashboard.
+      returnTo: safeReturnTo(req.query.returnTo),
     });
   }
 

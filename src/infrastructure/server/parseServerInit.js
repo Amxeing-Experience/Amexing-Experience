@@ -36,7 +36,10 @@ const initializeParseServer = async () => {
     // These values match what globalSetup.js uses
     const testAppId = 'test-app-id';
     const testMasterKey = 'test-master-key';
-    const testServerURL = 'http://localhost:1339/parse';
+    // El puerto lo publica el setup de pruebas (tests/jest.env.js), que a su vez lo toma de
+    // TEST_PARSE_PORT. Fijarlo aquí hacía que la app hablara con lo que hubiera en el 1339 —
+    // incluido el Parse de otro proyecto, que responde igual porque comparte el appId de pruebas.
+    const testServerURL = process.env.PARSE_SERVER_URL || 'http://localhost:1339/parse';
 
     Parse.initialize(testAppId, null, testMasterKey);
     Parse.serverURL = testServerURL;
