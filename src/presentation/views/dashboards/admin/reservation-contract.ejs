@@ -42,11 +42,24 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
 
     <style>
         /* ===== Contrato ===== */
-        /* En el PDF el documento ES la hoja: sin fondo gris asomando entre páginas ni el aire que
-           en pantalla separa una hoja de la siguiente. La regla equivalente del parcial vive bajo
-           @media print y nunca se aplica, porque el renderizador emula media `screen`. */
-        body.es-pdf { background:#fff; padding:0; }
-        body.es-pdf .resv-conf { padding:0; }
+        /* Blanco SIEMPRE, no solo cuando la bandera dice que es un PDF. El parcial pinta el cuerpo
+           de gris y su regla blanca vive bajo @media print, que nunca llega porque el renderizador
+           emula media `screen`; atarlo a esPdf dejaba el resultado a merced de que esa bandera
+           viajara intacta hasta la plantilla. Un contrato es una hoja, no una tarjeta sobre una
+           mesa: en pantalla las hojas se separan con su propio filete y no con el fondo. */
+        html, body { background:#fff; padding:0; }
+        /* El relleno de .resv-conf tampoco depende de la bandera: son 24 px por hoja y con catorce
+           hojas empujaban el documento de 14 páginas a 16, partiendo servicios a la mitad. El aire
+           de la hoja lo ponen los márgenes del PDF, y en pantalla el filete de abajo separa una de
+           otra sin ocupar sitio. */
+        .ctr-hoja { padding:0; }
+        /* El filete que separa las hojas en pantalla se dibuja con box-shadow y no con border: un
+           borde ocupa sitio en el flujo y, con catorce hojas, ese píxel de más bastaba para empujar
+           el documento a una página extra. La sombra no ocupa nada. */
+        .ctr-hoja { box-shadow:0 1px 0 #dcdccf; }
+        .ctr-hoja:last-child { box-shadow:none; }
+        /* En el PDF ni ese filete: cada hoja ya es una página. */
+        body.es-pdf .ctr-hoja { box-shadow:none; }
 
         /* Cada hoja arranca en página nueva. Va en CSS normal y NO bajo @media print: el renderizador
            emula media `screen`, así que una regla de impresión no llegaría al PDF. La última no
