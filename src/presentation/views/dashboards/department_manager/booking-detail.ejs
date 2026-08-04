@@ -56,10 +56,9 @@
              su columna no coincidía con la de Contacto —dos retículas encimadas en una tarjeta que
              se lee por columnas—. -->
         <div class="bkg-top">
-            <div>
-                <div class="bkg-lbl"><i class="ti ti-building"></i> Cliente</div>
-                <div class="bkg-title" id="infoClient">&mdash;</div>
-            </div>
+            <!-- Sin rótulo: el nombre del cliente encabeza la tarjeta y no necesita que le digan
+                 qué es. Los rótulos de la rejilla sí hacen falta, que ahí compiten varios datos. -->
+            <div class="bkg-title" id="infoClient">&mdash;</div>
             <div class="bkg-status" id="infoStatus">&mdash;</div>
         </div>
 
@@ -76,19 +75,6 @@
             <div class="bkg-tile">
                 <div class="bkg-lbl"><i class="ti ti-mail"></i> Contacto</div>
                 <div class="bkg-val" id="infoContact">&mdash;</div>
-            </div>
-            <div class="bkg-tile is-empty" id="infoLeadGuestRow">
-                <div class="bkg-lbl"><i class="ti ti-user"></i> Lead Guest</div>
-                <div class="bkg-val" id="infoLeadGuest">&mdash;</div>
-            </div>
-            <div class="bkg-tile">
-                <div class="bkg-lbl"><i class="ti ti-calendar"></i> Fechas</div>
-                <div class="bkg-val bkg-dates" id="infoDates">&mdash;</div>
-                <div class="bkg-sub" id="infoNights"></div>
-            </div>
-            <div class="bkg-tile">
-                <div class="bkg-lbl"><i class="ti ti-users"></i> Personas</div>
-                <div class="bkg-val" id="infoPeople">&mdash;</div>
             </div>
             <div class="bkg-tile">
                 <div class="bkg-lbl"><i class="ti ti-plane"></i> Motivo de viaje</div>
@@ -117,16 +103,27 @@
 
     <!-- Services by Day -->
     <div class="svc-wrap">
-        <div class="fin-section-head">
-            <h5 class="fin-section-title"><i class="ti ti-list-details me-2"></i>Servicios</h5>
-            <!-- Dos acciones sobre el mismo documento: verlo en pantalla y descargarlo. Antes era un
-                 solo control, así que solo se podía hacer una de las dos. -->
-            <span class="hdr-seg d-none" id="exportItinerarySeg" role="group" aria-label="Itinerario">
-                <a class="hdr-seg-btn" id="previewItineraryBtn" href="#" target="_blank" rel="noopener"
-                   title="Ver el itinerario en pantalla"><i class="ti ti-eye"></i>Ver itinerario</a>
-                <a class="hdr-seg-btn" id="downloadItineraryBtn" href="#"
-                   title="Descargar el itinerario en PDF"><i class="ti ti-download"></i>PDF</a>
-            </span>
+        <!-- El encabezado del panel es el DOCUMENTO, no el rótulo de la sección. "Servicios" nombraba
+             lo que ya se ve —una lista de traslados y tours con sus iconos— y era uno de dos títulos
+             de la página. En su lugar encabezan las fechas, que es como se identifica un itinerario,
+             y debajo el pasajero. Quién viaja, cuándo y cuántos vivían como celdas sueltas en la
+             tarjeta de arriba, lejos de los servicios que describen. -->
+        <div class="svc-doc" id="svcDocLine">
+            <div class="svc-doc-id">
+                <h5 class="svc-doc-quien" id="docTitulo">&mdash;</h5>
+                <div class="svc-doc-pax d-none" id="docPax"></div>
+                <div class="svc-doc-meta" id="docMeta"></div>
+            </div>
+            <div class="svc-doc-acciones">
+                <!-- Dos acciones sobre el mismo documento: verlo en pantalla y descargarlo. Antes era
+                     un solo control, así que solo se podía hacer una de las dos. -->
+                <span class="hdr-seg d-none" id="exportItinerarySeg" role="group" aria-label="Itinerario">
+                    <a class="hdr-seg-btn" id="previewItineraryBtn" href="#" target="_blank" rel="noopener"
+                       title="Ver el itinerario en pantalla"><i class="ti ti-eye"></i>Ver itinerario</a>
+                    <a class="hdr-seg-btn" id="downloadItineraryBtn" href="#"
+                       title="Descargar el itinerario en PDF"><i class="ti ti-download"></i>PDF</a>
+                </span>
+            </div>
         </div>
         <div id="servicesContainer">
             <!-- Services will be rendered here -->
@@ -335,37 +332,57 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (d.contactPhone) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactPhone));
         document.getElementById('infoContact').innerHTML = contactLines.length ? contactLines.join('<br>') : '&mdash;';
         document.getElementById('infoEventType').textContent = d.eventType || '—';
-        document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';
-        // Fecha inicio y fin se fusionaron en un rango compacto; el Total dejó de repetirse aquí porque
-        // el Resumen Financiero ya lo muestra ("Total a pagar").
-        document.getElementById('infoDates').innerHTML = formatDateRange(d.startDate, d.endDate);
-        // Duración (noches) = diferencia en días; se oculta en reservaciones de un solo día.
-        const nightsEl = document.getElementById('infoNights');
-        if (nightsEl) {
-            if (d.startDate && d.endDate) {
-                const nights = Math.max(0, Math.round((new Date(d.endDate) - new Date(d.startDate)) / 86400000));
-                nightsEl.textContent = nights <= 0 ? '' : (nights === 1 ? '1 noche' : `${nights} noches`);
-            } else {
-                nightsEl.textContent = '';
-            }
-        }
         // El método de pago dejó de tener tile propio: se muestra como chip junto al "Total a pagar"
         // del Resumen Financiero, que es donde tiene contexto.
 
-        // Lead guest — la celda siempre ocupa su lugar en la rejilla; solo se vacía cuando no hay uno.
-        // Cae a contactPerson para que una reservación que trae al viajero en los campos de contacto
-        // igual lo muestre como lead guest.
+        // Pasajero: lead guest si existe, y si no el contacto —muchas reservaciones traen al viajero
+        // real en los campos de contacto—. Encabeza el panel solo cuando no hay fechas.
         const leadGuestParts = [d.leadGuestFirstName, d.leadGuestLastName]
             .map((p) => (p || '').trim())
             .filter(Boolean);
         const leadGuestName = leadGuestParts.length > 0
             ? leadGuestParts.join(' ')
             : (d.contactPerson || '').trim();
-        const leadGuestRow = document.getElementById('infoLeadGuestRow');
-        const leadGuestEl = document.getElementById('infoLeadGuest');
-        if (leadGuestEl && leadGuestRow) {
-            leadGuestEl.textContent = leadGuestName || '—';
-            leadGuestRow.classList.toggle('is-empty', !leadGuestName);
+
+        // El panel de servicios se encabeza con el rango de fechas: es lo que identifica un itinerario
+        // y lo que más veces existe. De ahí la cascada fecha -> pasajero -> "Servicios": el rótulo
+        // genérico es el último recurso, el único caso en que no hay dato que poner. El icono dice de
+        // cuál de los tres se trata.
+        const rango = (d.startDate ? formatDateRange(d.startDate, d.endDate) : '').trim();
+        const tituloEl = document.getElementById('docTitulo');
+        if (tituloEl) {
+            const icono = rango ? 'ti-calendar-event' : leadGuestName ? 'ti-user' : 'ti-list-details';
+            tituloEl.innerHTML = `<i class="ti ${icono} svc-doc-icono"></i>`
+                + (rango || (leadGuestName ? PaymentBreakdownHelpers.escapeHtml(leadGuestName) : 'Servicios'));
+        }
+
+        // Duración (noches) = diferencia en días; se omite en reservaciones de un solo día.
+        let noches = '';
+        if (d.startDate && d.endDate) {
+            const n = Math.max(0, Math.round((new Date(d.endDate) - new Date(d.startDate)) / 86400000));
+            noches = n <= 0 ? '' : (n === 1 ? '1 noche' : `${n} noches`);
+        }
+        const personas = Number(d.numberOfPeople) || 0;
+        // Se arma la lista y se une con separadores, en vez de spans fijos: así un dato que falta no
+        // deja su "·" colgando.
+        const metaEl = document.getElementById('docMeta');
+        if (metaEl) {
+            metaEl.innerHTML = [
+                noches ? `<span class="svc-doc-menor">${noches}</span>` : '',
+                personas ? `${personas} ${personas === 1 ? 'persona' : 'personas'}` : '',
+            ].filter(Boolean).join('<span class="svc-doc-sep">·</span>');
+        }
+
+        // El pasajero va en su propio renglón, no perdido entre las noches y las personas: es QUIÉN
+        // viaja, no un dato más de la ficha. Solo aquí cuando el título son las fechas; si el título
+        // ya es él, no se dice dos veces.
+        const paxEl = document.getElementById('docPax');
+        if (paxEl) {
+            paxEl.classList.toggle('d-none', !(rango && leadGuestName));
+            if (rango && leadGuestName) {
+                paxEl.innerHTML = '<i class="ti ti-user svc-doc-pax-icono"></i>'
+                    + PaymentBreakdownHelpers.escapeHtml(leadGuestName);
+            }
         }
 
         // Service Customer — de solo lectura: reasignarlo es admin-only, así que aquí no hay botón.

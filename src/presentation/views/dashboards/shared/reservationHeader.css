@@ -18,11 +18,6 @@
    funciones compartidas getQuoteStatusBadge / getReservationStatusBadge). */
 .bkg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 32px;margin-top:26px;}
 .bkg-tile{min-width:0;}
-/* Celda sin dato (hoy solo Lead Guest): se oculta el CONTENIDO, no la celda. Con d-none la celda
-   salia del flujo del grid y todo lo de atras se recorria una posicion, cambiando el orden de las
-   demas. Asi conserva su lugar en la rejilla, y visibility:hidden ademas la saca del
-   arbol de accesibilidad (el lector no anuncia "Lead Guest —"). */
-.bkg-tile.is-empty > *{visibility:hidden;}
 @media(max-width:992px){.bkg-grid{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:576px){.bkg-grid{grid-template-columns:1fr;}}
 .bkg-lbl{display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.07em;font-size:.72rem;
