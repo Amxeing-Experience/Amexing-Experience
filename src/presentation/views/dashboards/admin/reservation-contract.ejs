@@ -375,20 +375,27 @@ function bloqueAsignacion(sc) {
             %>
             <%
                 // La fecha y la hora de estar NO se repiten aquí: las dice el recuadro de arriba, que
-                // es donde se buscan. En la tabla solo queda la otra hora del vuelo, que es contexto.
+                // es donde se buscan. En la tabla solo queda la otra hora del vuelo, y va junto a la
+                // aerolínea y al número: los tres describen el mismo vuelo y se leen de corrido.
             %>
-            <% if (otraHora && otraHora.valor) { %>
-            <div class="rc-tc rc-c3"><span class="rc-label"><%= otraHora.rotulo %></span><span class="rc-value"><%= otraHora.valor %></span></div>
-            <% } %>
             <% if (sc.pickupAddress || sc.originName) { %>
             <div class="rc-tc rc-c6"><span class="rc-label">Recoger en</span><span class="rc-value"><%= sc.pickupAddress || sc.originName %></span></div>
             <% } %>
             <% if (sc.dropoffAddress || sc.destination) { %>
             <div class="rc-tc rc-c6"><span class="rc-label">Destino</span><span class="rc-value"><%= sc.dropoffAddress || sc.destination %></span></div>
             <% } %>
-            <% if (sc.airline || sc.flightNumber) { %>
-            <div class="rc-tc rc-c3"><span class="rc-label">Aerolínea</span><span class="rc-value"><%= sc.airline || '—' %></span></div>
-            <div class="rc-tc rc-c3"><span class="rc-label">Vuelo</span><span class="rc-value"><%= sc.flightNumber || '—' %></span></div>
+            <%
+                const hayVuelo = sc.airline || sc.flightNumber || (otraHora && otraHora.valor);
+                // Tres en la fila cuando hay hora: la rejilla es de 6, así que caben a dos columnas
+                // cada uno. Con solo aerolínea y número se quedan a la mitad, como estaban.
+                const anchoVuelo = (otraHora && otraHora.valor) ? 'rc-c2' : 'rc-c3';
+            %>
+            <% if (hayVuelo) { %>
+            <div class="rc-tc <%= anchoVuelo %>"><span class="rc-label">Aerolínea</span><span class="rc-value"><%= sc.airline || '—' %></span></div>
+            <div class="rc-tc <%= anchoVuelo %>"><span class="rc-label">Vuelo</span><span class="rc-value"><%= sc.flightNumber || '—' %></span></div>
+            <% if (otraHora && otraHora.valor) { %>
+            <div class="rc-tc rc-c2"><span class="rc-label"><%= otraHora.rotulo %></span><span class="rc-value"><%= otraHora.valor %></span></div>
+            <% } %>
             <% } %>
             <% if (sc.vehicleTypeName || sc.categoryName) { %>
             <div class="rc-tc rc-c3"><span class="rc-label">Tipo de vehículo</span><span class="rc-value"><%= sc.vehicleTypeName || '—' %></span></div>
