@@ -39,145 +39,100 @@
 
 <!-- Reservation Content -->
 <div id="reservationContent" style="display: none;">
-    <!-- Info Card -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Folio</small>
-                    <strong id="infoFolio">—</strong>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Cotización</small>
-                    <a href="#" id="infoQuoteLink" class="fw-semibold text-decoration-none">—</a>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Estado</small>
-                    <span id="infoStatus">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Creación</small>
-                    <span id="infoCreatedAt">—</span>
-                </div>
+    <!-- Info Card — mismo diseño que admin (bkg-*). Diferencias intencionales por permisos:
+         · SIN tile "Servicios asignados": la asignación de proveedores es admin-only (canAssign=false
+           más abajo), así que su avance no se expone aquí.
+         · SIN botón de cambiar Customer Support: reasignarlo es admin-only; aquí es de solo lectura.
+         · SIN bloque "Notas de la cotización": esta vista nunca ha mostrado d.notes y son notas
+           internas; no se agrega. -->
+    <link rel="stylesheet" href="/shared/services/serviceList.css">
+<link rel="stylesheet" href="/shared/services/reservationHeader.css">
+<link rel="stylesheet" href="/shared/services/reservationFinance.css">
+    <style>
+    </style>
+    <div class="bkg-info mb-4">
+        <!-- Cliente a la izquierda, Estado a la derecha; el folio ya está en el título.
+             Customer Support BAJÓ a la rejilla: aquí arriba vivía en un flex con otro gap, así que
+             su columna no coincidía con la de Contacto —dos retículas encimadas en una tarjeta que
+             se lee por columnas—. -->
+        <div class="bkg-top">
+            <!-- Sin rótulo: el nombre del cliente encabeza la tarjeta y no necesita que le digan
+                 qué es. Los rótulos de la rejilla sí hacen falta, que ahí compiten varios datos. -->
+            <div class="bkg-title" id="infoClient">&mdash;</div>
+            <div class="bkg-status" id="infoStatus">&mdash;</div>
+        </div>
+
+        <!-- Datos en tiles -->
+        <div class="bkg-grid">
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-headset"></i> Customer Support</div>
+                <div id="infoServiceCustomer">&mdash;</div>
             </div>
-            <hr>
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Cliente</small>
-                    <strong id="infoClient">—</strong>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Contacto</small>
-                    <span id="infoContact">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Motivo de viaje</small>
-                    <span id="infoEventType">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Personas</small>
-                    <span id="infoPeople">—</span>
-                </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-file-invoice"></i> Cotización</div>
+                <a href="#" id="infoQuoteLink" class="bkg-val bkg-link">&mdash;</a>
             </div>
-            <hr>
-            <div class="row g-3">
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Inicio</small>
-                    <span id="infoStartDate">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Fecha Fin</small>
-                    <span id="infoEndDate">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Tipo de Pago</small>
-                    <span id="infoPaymentType">—</span>
-                </div>
-                <div class="col-md-3">
-                    <small class="text-muted d-block">Total</small>
-                    <strong id="infoTotal" class="text-success fs-5">—</strong>
-                </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-mail"></i> Contacto</div>
+                <div class="bkg-val" id="infoContact">&mdash;</div>
             </div>
-            <hr>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <small class="text-muted d-block">Seguidor de Servicio (Amexing)</small>
-                    <span id="infoServiceCustomer" class="fw-semibold">—</span>
-                </div>
+            <div class="bkg-tile">
+                <div class="bkg-lbl"><i class="ti ti-plane"></i> Motivo de viaje</div>
+                <div class="bkg-val" id="infoEventType">&mdash;</div>
             </div>
         </div>
     </div>
 
-    <!-- Financial Summary Card (read-only) -->
-    <div class="card border-0 shadow-sm mb-4" id="financialSummaryCard" style="display:none;">
-        <div class="card-header" style="background: linear-gradient(135deg, #0d9488 0%, #5eead4 100%); border: none;">
-            <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-calculator me-2"></i>Resumen Financiero
-                </h5>
-                <button class="btn btn-sm btn-light d-none" id="addPaymentBtn">
-                    <i class="ti ti-cash me-1"></i>Agregar pago
-                </button>
-            </div>
+    <!-- Resumen Financiero — mismo diseño que admin (fin-*). Diferencias intencionales por permisos:
+         · SIN comparativo por método de pago: fuera de alcance para agencia/agente, así que el chip de
+           método es estático (en admin es el disparador del colapsable).
+         · SIN "+ Agregar ajuste" ni botones de eliminar ajuste: /adjustments es admin-only, y el control
+           no debe ni existir en el DOM. Los ajustes YA creados sí se listan, con framing neutral
+           (cargo/ajuste, nunca "descuento").
+         · "Agregar pago" vive ahora dentro del hero, como en admin. -->
+    <style>
+    </style>
+    <div class="fin-wrap mb-4" id="financialSummaryCard" style="display:none;">
+        <!-- Sin rótulo. "Resumen Financiero" nombraba la familia a la que pertenece el bloque, no
+             lo que dice: dentro ya está "Total a pagar" con la cifra debajo, un centímetro más
+             abajo, y ese sí informa. Eran dos encabezados apilados donde el de abajo hacía el
+             trabajo. Mismo motivo por el que el panel de al lado dejó de titularse "Servicios". -->
+        <div id="financialSummaryBody">
+            <!-- Resumen (totales + saldo) — rendered by JS -->
         </div>
-        <div class="card-body" id="financialSummaryBody"></div>
     </div>
 
     <!-- Services by Day -->
-    <div class="card border-0 shadow-sm">
-        <div class="card-header text-white" style="background: linear-gradient(135deg, #059669 0%, #34d399 100%); border: none;">
-            <h5 class="card-title mb-0 text-white">
-                <i class="ti ti-list-details me-2"></i>Servicios
-            </h5>
+    <div class="svc-wrap">
+        <!-- El encabezado del panel es el DOCUMENTO, no el rótulo de la sección. "Servicios" nombraba
+             lo que ya se ve —una lista de traslados y tours con sus iconos— y era uno de dos títulos
+             de la página. En su lugar encabezan las fechas, que es como se identifica un itinerario,
+             y debajo el pasajero. Quién viaja, cuándo y cuántos vivían como celdas sueltas en la
+             tarjeta de arriba, lejos de los servicios que describen. -->
+        <div class="svc-doc" id="svcDocLine">
+            <div class="svc-doc-id">
+                <h5 class="svc-doc-quien" id="docTitulo">&mdash;</h5>
+                <div class="svc-doc-pax d-none" id="docPax"></div>
+                <div class="svc-doc-meta" id="docMeta"></div>
+            </div>
+            <div class="svc-doc-acciones">
+                <!-- Dos acciones sobre el mismo documento: verlo en pantalla y descargarlo. Antes era
+                     un solo control, así que solo se podía hacer una de las dos. -->
+                <span class="hdr-seg d-none" id="exportItinerarySeg" role="group" aria-label="Itinerario">
+                    <a class="hdr-seg-btn" id="previewItineraryBtn" href="#" target="_blank" rel="noopener"
+                       title="Ver el itinerario en pantalla"><i class="ti ti-eye"></i>Ver itinerario</a>
+                    <a class="hdr-seg-btn" id="downloadItineraryBtn" href="#"
+                       title="Descargar el itinerario en PDF"><i class="ti ti-download"></i>PDF</a>
+                </span>
+            </div>
         </div>
-        <div class="card-body p-0" id="servicesContainer">
+        <div id="servicesContainer">
             <!-- Services will be rendered here -->
         </div>
     </div>
 </div>
 
 <!-- Assign Employee Modal -->
-<div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h6 class="modal-title fw-bold">Asignar Personal</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="assignServiceId">
-                <div class="mb-3">
-                    <label class="form-label">Conductor</label>
-                    <select id="assignDriver" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Guía</label>
-                    <select id="assignGuide" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Greeter</label>
-                    <select id="assignGreeter" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Vehículo</label>
-                    <select id="assignVehicle" class="form-select form-select-sm">
-                        <option value="">Sin asignar</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button class="btn btn-sm btn-primary" id="saveAssignmentBtn">Guardar</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Pagos — Offcanvas (Bootstrap 5 nativo). Agencia (department_manager) y agente (client) registran,
      editan y eliminan pagos de SUS reservaciones (backend nivel 4+), con el mismo formulario, validación y
@@ -188,82 +143,55 @@
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
     </div>
     <div class="offcanvas-body">
-        <div class="rounded p-3 mb-3 payment-coverage-highlight" id="paymentCoverageCard"></div>
-        <div class="mb-3" id="paymentDiscountEmphasis" style="display:none;"></div>
-        <div class="text-muted fw-semibold small mb-2"><i class="ti ti-credit-card me-1"></i>Progreso por método de pago</div>
-        <div class="mb-3" id="paymentChips"></div>
-        <div class="p-3 mb-3" id="paymentRemainingByMethod" style="display:none;"></div>
-        <!-- Historial de pagos (colapsado) + registro (agencia/agente) -->
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <button class="btn btn-sm btn-link text-decoration-none ps-0 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#paymentsHistoryCollapse" id="paymentsHistoryToggle">
-                <i class="ti ti-history me-1"></i>Historial de pagos <i class="ti ti-chevron-down ms-1" style="font-size:0.75rem;"></i>
-            </button>
-            <button class="btn btn-sm btn-primary d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
-        </div>
-        <!-- Formulario de pago inline (mismo patrón que admin: renderPaymentForm) -->
-        <div id="paymentFormWrap" class="p-3 mb-3" style="display:none;"></div>
-        <div class="collapse" id="paymentsHistoryCollapse">
-            <div class="p-2" id="paymentsBody"></div>
+        <!-- Tabs: Pago (resumen + registrar + por método) | Historial. Reemplazan la columna única con
+             chips + "saldo restante" + historial colapsado: el carrito crecía hacia abajo y obligaba a
+             desplazarse para llegar al historial. -->
+        <ul class="nav payments-seg mb-3" id="paymentsTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tabPagoBtn" data-bs-toggle="tab" data-bs-target="#tabPago" type="button" role="tab" aria-selected="true"><i class="ti ti-cash me-1"></i>Pago</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tabHistorialBtn" data-bs-toggle="tab" data-bs-target="#tabHistorial" type="button" role="tab" aria-selected="false"><i class="ti ti-history me-1"></i>Historial <span id="historialCount" class="badge rounded-pill ms-1" style="background:#eef0e6;color:#566040;"></span></button>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <!-- TAB PAGO -->
+            <div class="tab-pane fade show active" id="tabPago" role="tabpanel" aria-labelledby="tabPagoBtn">
+                <!-- La cabecera de cobertura se retiró: repetía las seis cifras que el Resumen
+                     Financiero de la página ya muestra —total, método, estado, porcentaje, pagado y
+                     saldo—, y el botón que abre este panel vive dentro de ese mismo resumen. Se
+                     acababan de ver. Este hueco queda para el esqueleto de carga y el error. -->
+                <div id="payAviso"></div>
+                <!-- Acción principal: registrar pago -->
+                <button class="btn btn-primary w-100 mb-3 d-none" id="showPaymentFormBtn"><i class="ti ti-plus me-1"></i>Registrar pago</button>
+                <!-- Formulario de pago inline (renderPaymentForm) -->
+                <div id="paymentFormWrap" class="p-3 mb-3" style="display:none;"></div>
+                <!-- Por método de pago: total + cubierto + restante (reemplaza chips y saldo restante) -->
+                <div class="text-muted fw-semibold mb-2"><i class="ti ti-credit-card me-1"></i>Por método de pago</div>
+                <div class="p-3 mb-3" id="paymentMethodTable" style="display:none;"></div>
+            </div>
+            <!-- TAB HISTORIAL -->
+            <div class="tab-pane fade" id="tabHistorial" role="tabpanel" aria-labelledby="tabHistorialBtn">
+                <div id="paymentsBody">
+                    <!-- Payments table — rendered by JS -->
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <style>
-#paymentsOffcanvas { --bs-offcanvas-width: 760px; }
-@media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
-.offcanvas-backdrop.show { background-color: rgba(15,23,32,0.72) !important; opacity: 1 !important; }
-#paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 0.86rem; }
-#paymentCoverageCard.payment-coverage-highlight,
-#paymentChips .payment-chip-card,
-#paymentRemainingByMethod,
-#paymentFormWrap,
-#paymentsBody {
-    background: #fff;
-    border: 1px solid #e0e6ed;
-    border-radius: 0.5rem;
-}
-#paymentChips > div { background: transparent; border: none; }
-#paymentCoverageCard.payment-coverage-highlight { border-left: 4px solid #969b81; }
-#paymentChips .payment-chip-card,
-#paymentRemainingByMethod,
-#paymentFormWrap,
-#paymentsBody {
-    border-left: 4px solid #c0c3b3;
-}
-#paymentsBody { overflow: hidden; }
-#paymentsOffcanvas #paymentsBody table { font-size: 0.72rem; }
-#paymentsOffcanvas #paymentsBody .badge { font-size: 0.68rem; }
-#paymentDiscountEmphasis > div, #paymentCoverageCard .rounded { border-radius: 0.5rem; }
-.service-row {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid #f0f0f0;
-    transition: background-color 0.15s;
-}
-.service-row:hover {
-    background-color: #f8f9fa;
-}
-.service-row:last-child {
-    border-bottom: none;
-}
-.day-header {
-    background-color: #f8f9fa;
-    padding: 0.5rem 1rem;
-    font-weight: 600;
-    border-bottom: 2px solid #e9ecef;
-}
-.assignment-badge {
-    font-size: 0.75rem;
-    padding: 0.2rem 0.5rem;
-}
-.detail-tag {
-    font-size: 0.9rem;
-    padding: 0.15rem 0.4rem;
-    font-weight: 500;
-}
+/* 860px (antes 760): la tabla del historial pasó a 6 columnas con letra mas grande. */
 </style>
 
 <!-- Shared payment breakdown helpers (isomorphic; also require'd by Jest) -->
 <script src="/shared/payments/paymentBreakdownHelpers.js"></script>
+<script src="/shared/services/financialSummary.js"></script>
+<script src="/shared/services/paymentsPanel.js"></script>
+<script src="/shared/services/paymentForm.js"></script>
+<script src="/shared/services/serviceListHelpers.js"></script>
+<script src="/shared/services/serviceListRenderer.js"></script>
+<script src="/shared/services/itineraryExport.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
@@ -300,26 +228,6 @@ document.addEventListener('DOMContentLoaded', async function() {
             </div>`;
     }
 
-    function buildVehicleCard(vehicle) {
-        if (!vehicle) return '';
-        const name = vehicle.name || 'Vehiculo';
-        const photo = vehicle.imageUrl || '';
-        const initials = name.substring(0, 2).toUpperCase();
-        const photoHtml = photo
-            ? `<img src="${photo}" class="rounded-circle photo-preview-trigger" width="36" height="36" style="object-fit:cover;cursor:pointer" data-photo="${photo}" data-name="${name.replace(/"/g, '&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-            : '';
-        const initialsDisplay = photo ? 'display:none' : 'display:flex';
-        return `
-            <div class="d-flex align-items-center gap-2 mb-2">
-                ${photoHtml}
-                <span class="rounded-circle bg-secondary-subtle text-secondary align-items-center justify-content-center flex-shrink-0" style="width:36px;height:36px;${initialsDisplay};font-size:0.8rem;font-weight:600">${initials}</span>
-                <div>
-                    <div class="fw-semibold small">${name}</div>
-                    <small class="text-secondary"><i class="ti ti-car me-1"></i>Vehiculo</small>
-                </div>
-            </div>`;
-    }
-
     function getQuoteStatusBadge(status) {
         if (!status) return '';
         const map = {
@@ -333,10 +241,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         return `<span class="badge ${s.cls}" title="Estado de cotización origen">${s.label}</span>`;
     }
     
+    // "Asignaciones pendientes" y "Asignada" hablan del reparto de proveedores, que es trabajo de
+    // admin: aquí no se ve quién está asignado ni se puede asignar a nadie, así que el chip anunciaba
+    // un estado sobre el que esta vista no puede hacer ni comprobar nada. Los dos se callan —dejar
+    // solo "Asignada" sería peor: aparecería para decir que se resolvió algo que nunca se dijo que
+    // faltaba—. Los demás estados sí describen la reservación y se quedan.
+    const ESTADOS_DE_ASIGNACION = ['pending', 'assigned'];
+
     function getReservationStatusBadge(status) {
+        if (ESTADOS_DE_ASIGNACION.includes(status)) return '';
         const map = {
-            pending: { label: 'Asignaciones pendientes', cls: 'bg-warning text-dark' },
-            assigned: { label: 'Asignada', cls: 'bg-info text-white' },
             in_progress: { label: 'En Progreso', cls: 'bg-primary text-white' },
             completed: { label: 'Completada', cls: 'bg-success text-white' },
             cancelled: { label: 'Cancelada', cls: 'bg-danger text-white' },
@@ -352,20 +266,33 @@ document.addEventListener('DOMContentLoaded', async function() {
         return new Date(dateStr).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
     }
 
+    // Rango de fechas compacto (es-MX, UTC): mismo día → una sola fecha; mismo mes → "16 → 17 ago
+    // 2026"; mismo año → "28 jul → 03 ago 2026"; años distintos → ambas completas.
+    function formatDateRange(startStr, endStr) {
+        if (!startStr) return '—';
+        const start = new Date(startStr);
+        if (Number.isNaN(start.getTime())) return '—';
+        if (!endStr) return formatDate(startStr);
+        const end = new Date(endStr);
+        if (Number.isNaN(end.getTime())) return formatDate(startStr);
+        // Se formatea día y mes por separado para evitar el guion del locale ("28-jul" → "28 jul").
+        const fmt = (dt, o) => dt.toLocaleDateString('es-MX', Object.assign({ timeZone: 'UTC' }, o));
+        const day = (dt) => fmt(dt, { day: '2-digit' });
+        const dayMonth = (dt) => `${fmt(dt, { day: '2-digit' })} ${fmt(dt, { month: 'short' })}`;
+        const full = (dt) => `${dayMonth(dt)} ${fmt(dt, { year: 'numeric' })}`;
+        const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+        const sameMonth = sameYear && start.getUTCMonth() === end.getUTCMonth();
+        const sameDay = sameMonth && start.getUTCDate() === end.getUTCDate();
+        const arrow = ' <span class="bkg-arrow">&rarr;</span> ';
+        if (sameDay) return formatDate(startStr);
+        if (sameMonth) return `${day(start)}${arrow}${full(end)}`;
+        if (sameYear) return `${dayMonth(start)}${arrow}${full(end)}`;
+        return `${full(start)}${arrow}${full(end)}`;
+    }
+
     function formatCurrency(amount, currency) {
         const sym = currency === 'USD' ? 'USD $' : '$';
         return `${sym}${(amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    }
-
-    function getServiceTypeIcon(type) {
-        const icons = {
-            transport: 'ti-car',
-            tour: 'ti-map-pin',
-            experience: 'ti-sparkles',
-            concepto: 'ti-tag',
-            'a-disposicion': 'ti-clock',
-        };
-        return icons[type] || 'ti-point';
     }
 
     async function loadReservation() {
@@ -391,8 +318,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         const d = reservationData;
 
         document.getElementById('breadcrumbFolio').textContent = d.folio;
+        // El folio ya encabeza la página: la tarjeta de info dejó de repetirlo en un tile propio.
         document.getElementById('pageTitle').innerHTML = `<i class="ti ti-clipboard-list me-2 text-primary"></i>${d.folio}`;
-        document.getElementById('infoFolio').textContent = d.folio;
 
         const quoteLink = document.getElementById('infoQuoteLink');
         if (d.quoteId) {
@@ -403,39 +330,100 @@ document.addEventListener('DOMContentLoaded', async function() {
         const quoteBadge = getQuoteStatusBadge(d.quoteStatus);
         const reservationBadge = getReservationStatusBadge(d.status);
         document.getElementById('infoStatus').innerHTML = `${quoteBadge} ${reservationBadge}`;
-        document.getElementById('infoCreatedAt').textContent = formatDate(d.createdAt);
         // Display company name first, then fallback to fullName or contactPerson
         const clientDisplay = d.client?.companyName || d.client?.fullName || d.contactPerson || '—';
         document.getElementById('infoClient').textContent = clientDisplay;
-        document.getElementById('infoContact').innerHTML = `${d.contactEmail || ''}${d.contactPhone ? '<br>' + d.contactPhone : ''}`;
+        // Contacto: nombre (si existe) + email + teléfono, cada uno en su línea y solo si viene.
+        const contactName = (d.contactPerson
+            || `${d.contactFirstName || ''} ${d.contactLastName || ''}`.trim()).trim();
+        const contactLines = [];
+        if (contactName) contactLines.push(`<span class="fw-semibold">${PaymentBreakdownHelpers.escapeHtml(contactName)}</span>`);
+        if (d.contactEmail) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactEmail));
+        if (d.contactPhone) contactLines.push(PaymentBreakdownHelpers.escapeHtml(d.contactPhone));
+        document.getElementById('infoContact').innerHTML = contactLines.length ? contactLines.join('<br>') : '&mdash;';
         document.getElementById('infoEventType').textContent = d.eventType || '—';
-        document.getElementById('infoPeople').textContent = d.numberOfPeople || '—';
-        document.getElementById('infoStartDate').textContent = formatDate(d.startDate);
-        document.getElementById('infoEndDate').textContent = formatDate(d.endDate);
-        document.getElementById('infoPaymentType').textContent = d.paymentType || '—';
-        document.getElementById('infoTotal').textContent = formatCurrency(d.totalAmount, d.currency);
+        // El método de pago dejó de tener tile propio: se muestra como chip junto al "Total a pagar"
+        // del Resumen Financiero, que es donde tiene contexto.
 
-        // Service Customer
+        // Pasajero: lead guest si existe, y si no el contacto —muchas reservaciones traen al viajero
+        // real en los campos de contacto—. Encabeza el panel solo cuando no hay fechas.
+        const leadGuestParts = [d.leadGuestFirstName, d.leadGuestLastName]
+            .map((p) => (p || '').trim())
+            .filter(Boolean);
+        const leadGuestName = leadGuestParts.length > 0
+            ? leadGuestParts.join(' ')
+            : (d.contactPerson || '').trim();
+
+        // El panel de servicios se encabeza con el rango de fechas: es lo que identifica un itinerario
+        // y lo que más veces existe. De ahí la cascada fecha -> pasajero -> "Servicios": el rótulo
+        // genérico es el último recurso, el único caso en que no hay dato que poner. El icono dice de
+        // cuál de los tres se trata.
+        const rango = (d.startDate ? formatDateRange(d.startDate, d.endDate) : '').trim();
+        const tituloEl = document.getElementById('docTitulo');
+        if (tituloEl) {
+            const icono = rango ? 'ti-calendar-event' : leadGuestName ? 'ti-user' : 'ti-list-details';
+            tituloEl.innerHTML = `<i class="ti ${icono} svc-doc-icono"></i>`
+                + (rango || (leadGuestName ? PaymentBreakdownHelpers.escapeHtml(leadGuestName) : 'Servicios'));
+        }
+
+        // Duración (noches) = diferencia en días; se omite en reservaciones de un solo día.
+        let noches = '';
+        if (d.startDate && d.endDate) {
+            const n = Math.max(0, Math.round((new Date(d.endDate) - new Date(d.startDate)) / 86400000));
+            noches = n <= 0 ? '' : (n === 1 ? '1 noche' : `${n} noches`);
+        }
+        const personas = Number(d.numberOfPeople) || 0;
+        // Se arma la lista y se une con separadores, en vez de spans fijos: así un dato que falta no
+        // deja su "·" colgando.
+        const metaEl = document.getElementById('docMeta');
+        if (metaEl) {
+            metaEl.innerHTML = [
+                noches ? `<span class="svc-doc-menor">${noches}</span>` : '',
+                personas ? `${personas} ${personas === 1 ? 'persona' : 'personas'}` : '',
+            ].filter(Boolean).join('<span class="svc-doc-sep">·</span>');
+        }
+
+        // El pasajero va en su propio renglón, no perdido entre las noches y las personas: es QUIÉN
+        // viaja, no un dato más de la ficha. Solo aquí cuando el título son las fechas; si el título
+        // ya es él, no se dice dos veces.
+        const paxEl = document.getElementById('docPax');
+        if (paxEl) {
+            paxEl.classList.toggle('d-none', !(rango && leadGuestName));
+            if (rango && leadGuestName) {
+                paxEl.innerHTML = '<i class="ti ti-user svc-doc-pax-icono"></i>'
+                    + PaymentBreakdownHelpers.escapeHtml(leadGuestName);
+            }
+        }
+
+        // Service Customer — de solo lectura: reasignarlo es admin-only, así que aquí no hay botón.
         const scEl = document.getElementById('infoServiceCustomer');
         if (d.serviceCustomer) {
-            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Seguidor', 'ti-user-star', 'primary');
+            scEl.innerHTML = buildPersonCard(d.serviceCustomer, 'Customer Support', 'ti-headset', 'primary');
         } else {
             scEl.innerHTML = '<span class="text-muted">Sin asignar</span>';
         }
 
-        // Header actions — "Exportar" opens the public reservation view in a new tab,
+        // Header actions — "Exportar confirmación" opens the public reservation view in a new tab,
         // which has the PDF export + print-friendly layout. "Cancelar" only shows when
         // the reservation can still be cancelled.
         const actions = document.getElementById('headerActions');
         const folio = encodeURIComponent(d.folio || '');
         const canCancel = d.status !== 'cancelled' && d.status !== 'completed';
+        // Aquí solo existe UNA exportación (el contrato de servicio es admin-only), así que va como
+        // botón suelto: un control segmentado de un solo elemento no agruparía nada. Mismo peso visual
+        // que un elemento del segmento de admin.
         const exportBtnHtml = folio
-            ? `<a class="btn btn-sm btn-outline-secondary" href="/reservations/${folio}" target="_blank" rel="noopener" title="Abrir vista pública (incluye Exportar a PDF)"><i class="ti ti-file-export me-1"></i>Exportar</a>`
+            ? `<a class="hdr-btn" href="/reservations/${folio}" target="_blank" rel="noopener" title="Exportar confirmación — abre la vista pública, exportable a PDF"><i class="ti ti-file-export"></i>Exportar confirmación</a>`
             : '';
+        // La única acción irreversible no debe ser lo más llamativo: discreta, se tiñe al hover.
         const cancelBtnHtml = canCancel
-            ? `<button class="btn btn-sm btn-outline-danger" id="cancelResBtn"><i class="ti ti-x me-1"></i>Cancelar Reservación</button>`
+            ? `<button type="button" class="hdr-danger" id="cancelResBtn"><i class="ti ti-x"></i>Cancelar reservación</button>`
             : '';
         actions.innerHTML = `<div class="d-flex gap-2 align-items-center">${exportBtnHtml}${cancelBtnHtml}</div>`;
+        // Los dos botones del itinerario los cablea ItineraryExport, el mismo módulo que usa el
+        // detalle de admin. Son rutas públicas por folio, la misma familia que "Exportar
+        // confirmación", así que no abren acceso nuevo para este rol.
+        ItineraryExport.wire({ folio, alFallar: (msg) => pmToast(msg, 'warning') });
         if (canCancel) {
             document.getElementById('cancelResBtn')?.addEventListener('click', cancelReservation);
         }
@@ -449,99 +437,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('reservationContent').style.display = '';
     }
 
+    // El resumen lo arma FinancialSummary, compartido con department_manager y end_client. La vista
+    // solo decide dónde va y engancha "Agregar pago", que no todas pueden ofrecer.
     function renderFinancialSummary() {
-        const d = reservationData;
         const card = document.getElementById('financialSummaryCard');
-        const body = document.getElementById('financialSummaryBody');
-        const adjustments = d.adjustments || [];
-        const servicesSubtotal = d.servicesSubtotal || d.totalAmount || 0;
-        const curr = d.currency || 'MXN';
-        const pay = d.payment;
-        // Propina cobrada (Fase 2): del summary del servidor (d.payment), NUNCA de d.globalTip del snapshot
-        // bruto ni recalculada localmente. d.totalAmount ya la incluye vía recalculateTotal.
-        const generalTip = pay ? PaymentBreakdownHelpers.round2(pay.generalTip) : 0;
-        const serviceTipsTotal = pay ? PaymentBreakdownHelpers.round2(pay.serviceTipsTotal) : 0;
-
-        // La tarjeta financiera se pinta SIEMPRE que haya datos de reservación, con o sin ajustes.
-        // (Antes un early-return con 0 ajustes ocultaba también Subtotal/Total/Saldo — bug corregido.)
         card.style.display = '';
-        document.getElementById('addPaymentBtn')?.classList.remove('d-none');
-
-        // Esta plantilla es SIEMPRE de agencia: los ajustes se enmarcan como cargo/ajuste, nunca como
-        // "descuento".
-
-        let html = '';
-        html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-            <span class="text-muted"><i class="ti ti-list-details me-2"></i>Subtotal Servicios</span>
-            <span class="fw-semibold">${formatCurrency(servicesSubtotal, curr)}</span>
-        </div>`;
-
-        adjustments.filter(a => a.type === 'charge').forEach(adj => {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-plus text-danger me-1"></i><span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span></div>
-                <span class="text-danger fw-semibold">+${formatCurrency(adj.amount, curr)}</span>
-            </div>`;
+        document.getElementById('financialSummaryBody').innerHTML = FinancialSummary.buildHtml({
+            reservationData,
+            formatCurrency,
+            allowEdit: true,
         });
-
-        // Ajustes de tipo discount: se muestran como reducción (nunca se pierde dinero real) pero con
-        // framing neutral de "ajuste" — sin la palabra "descuento" ni el ícono de descuento.
-        adjustments.filter(a => a.type === 'discount').forEach(adj => {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-minus text-success me-1"></i><span class="small">${PaymentBreakdownHelpers.escapeHtml(adj.description)}</span></div>
-                <span class="text-success fw-semibold">-${formatCurrency(adj.amount, curr)}</span>
-            </div>`;
-        });
-
-        // Propina cobrada (Fase 2): líneas del summary del servidor para que Subtotal + ajustes + propina
-        // reconcilie con el Total a pagar. La general en su línea; la de por-servicio agregada (los tips por
-        // servicio también aparecen por servicio en el itinerario, aquí es el agregado).
-        if (generalTip > 0) {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propina general</span></div>
-                <span class="text-info fw-semibold">+${formatCurrency(generalTip, curr)}</span>
-            </div>`;
-        }
-        if (serviceTipsTotal > 0) {
-            html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom ps-3">
-                <div><i class="ti ti-coin text-info me-1"></i><span class="small">Propinas por servicio</span></div>
-                <span class="text-info fw-semibold">+${formatCurrency(serviceTipsTotal, curr)}</span>
-            </div>`;
-        }
-
-        // Bloque de pago (agencia/agente): Estado / Total a pagar / Pagado / Saldo. El "Saldo" se resuelve
-        // con resolveDisplayedBalance (0 cuando está pagado; línea de ahorro aparte si se pagó en un método
-        // más barato que el ancla). El detalle completo (chips, cobertura, saldo por método, descuento e
-        // historial) vive en #paymentsOffcanvas, junto al formulario de registro ("Agregar pago").
-        if (pay) {
-            const resolved = PaymentBreakdownHelpers.resolveDisplayedBalance(pay);
-            const balanceCls = resolved.displayedBalance > 0 ? 'text-danger' : 'text-success';
-            const savingsRow = resolved.savings
-                ? `<div class="py-2 border-top" style="color:#146c43;">
-                    <div class="fw-semibold"><i class="ti ti-discount-2 me-2"></i>${PaymentBreakdownHelpers.escapeHtml(resolved.savings.label)}</div>
-                    <div class="small">${PaymentBreakdownHelpers.escapeHtml(resolved.savings.sublabel)}</div>
-                </div>` : '';
-            html += `<div class="border-top mt-2 pt-2">
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <span class="text-muted"><i class="ti ti-cash me-2"></i>Estado de pago</span>
-                    ${PaymentBreakdownHelpers.getPaymentStatusBadge(pay.paymentStatus)}
-                </div>
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <span class="text-muted"><i class="ti ti-receipt-2 me-2"></i>Total a pagar</span>
-                    <span class="fw-semibold">${formatCurrency(pay.total, curr)}</span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
-                    <span class="text-muted"><i class="ti ti-check me-2"></i>Pagado</span>
-                    <span class="fw-semibold text-success">${formatCurrency(pay.paidAmount, curr)}</span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center py-2">
-                    <span class="text-muted"><i class="ti ti-wallet me-2"></i>Saldo</span>
-                    <span class="fw-semibold ${balanceCls}">${formatCurrency(resolved.displayedBalance, curr)}</span>
-                </div>
-                ${savingsRow}
-            </div>`;
-        }
-
-        body.innerHTML = html;
     }
 
     // ===== PAGOS (registrar / editar / eliminar) =====
@@ -558,6 +463,119 @@ document.addEventListener('DOMContentLoaded', async function() {
     let paymentsCache = [];
 
     const PAYMENT_METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
+    // [fondo, texto, borde] por método para el chip del historial. Misma paleta suave de marca que la
+    // píldora de estado de la card de cobertura, para que el drawer se lea como una sola pieza.
+    const PAYMENT_METHOD_COLORS = {
+        efectivo: ['#e6efe1', '#3f5a34', '#cfe0c6'],
+        transferencia: ['#eaf1f0', '#3a6b63', '#cfe1dd'],
+        tarjeta: ['#f6efe2', '#96682f', '#e7d6bd'],
+        _default: ['#f0eee7', '#6b6656', '#ded9cb'],
+    };
+    // Orden del historial. Vive fuera de renderPayments para sobrevivir a los re-render que dispara
+    // cada alta/edición/borrado de pago.
+    let paymentsSort = { key: 'date', dir: 'desc' };
+    // Pago que se está editando. El formulario de edición se abre INLINE, en una fila expandida bajo el
+    // pago tocado: el #paymentFormWrap del alta vive arriba, así que editar desde el historial dibujaba
+    // el formulario lejos de la fila y podía quedar fuera de vista.
+    // Formulario de alta abierto. Su par de edición es paymentForm.getEditingId().
+    // El carrito solo se abre desde "Agregar pago", así que la intención al abrirlo es siempre registrar
+    // uno: el formulario se despliega solo.
+
+    // El formulario de pago lo arma PaymentForm, compartido con las otras dos vistas. Es una fábrica
+    // porque tiene estado propio —qué pago se edita, si el alta está abierta— y la vista solo le
+    // entrega lo suyo. Antes este bloque eran 386 líneas duplicadas palabra por palabra entre client y
+    // department_manager.
+    const paymentForm = PaymentForm.create({
+        reservationId,
+        token: () => token,
+        reservationData: () => reservationData,
+        payments: () => paymentsCache,
+        summary: () => latestSummary,
+        formatCurrency,
+        formatDate,
+        toast: pmToast,
+        confirm: pmConfirm,
+        attachThousands,
+        parseAmount,
+        applySummary: applyPaymentSummary,
+        reload: loadPayments,
+        repaint: renderPayments,
+        methodLabels: PAYMENT_METHOD_LABELS,
+    });
+    const renderPaymentForm = (...a) => paymentForm.renderPaymentForm(...a);
+    const closePaymentForm = (...a) => paymentForm.closePaymentForm(...a);
+    const maybeOpenAddForm = (...a) => paymentForm.maybeOpenAddForm(...a);
+    const syncAddPaymentBtn = (...a) => paymentForm.syncAddPaymentBtn(...a);
+    const savePayment = (...a) => paymentForm.savePayment(...a);
+    const deletePayment = (...a) => paymentForm.deletePayment(...a);
+
+
+
+
+    // Las dos fechas del historial son de naturaleza distinta y por eso se leen distinto:
+    //  · PAGO (paidAt): viene de un <input type="date">, se guarda como medianoche UTC y NO tiene hora
+    //    útil. Se lee en UTC — en local (México, offset negativo) caería un día antes.
+    //  · REGISTRO (createdAt): instante real en que se capturó el pago. Se lee en hora local.
+    // Cada una trae además su propia persona: quién recibió el dinero vs. quién lo capturó.
+    const PAYMENT_DATE_FIELDS = {
+        date: { get: (p) => p.paidAt || p.createdAt, utc: true },
+        created: { get: (p) => p.createdAt, utc: false },
+    };
+    const paymentMs = (p, key) => {
+        const field = PAYMENT_DATE_FIELDS[key] || PAYMENT_DATE_FIELDS.date;
+        const t = new Date(field.get(p) || 0).getTime();
+        return Number.isNaN(t) ? 0 : t;
+    };
+    const monthKey = (p, key) => {
+        const utc = (PAYMENT_DATE_FIELDS[key] || PAYMENT_DATE_FIELDS.date).utc;
+        const dt = new Date(paymentMs(p, key));
+        const year = utc ? dt.getUTCFullYear() : dt.getFullYear();
+        const month = (utc ? dt.getUTCMonth() : dt.getMonth()) + 1;
+        return `${year}-${String(month).padStart(2, '0')}`;
+    };
+    const monthLabel = (p, key) => {
+        const utc = (PAYMENT_DATE_FIELDS[key] || PAYMENT_DATE_FIELDS.date).utc;
+        const opts = { month: 'long', year: 'numeric' };
+        if (utc) opts.timeZone = 'UTC';
+        const s = new Date(paymentMs(p, key)).toLocaleDateString('es-MX', opts);
+        return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+    // Fecha + hora de registro, en hora local (ver PAYMENT_DATE_FIELDS).
+    function formatDateTimeShort(dateStr) {
+        const dt = new Date(dateStr);
+        if (Number.isNaN(dt.getTime())) return '—';
+        // Día y mes por separado para evitar el guion del locale ("10-jun" → "10 jun"). Hora en 24h: más
+        // compacta que "02:32 p.m." y sin ambigüedad.
+        const day = dt.toLocaleDateString('es-MX', { day: '2-digit' });
+        const month = dt.toLocaleDateString('es-MX', { month: 'short' });
+        const time = dt.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+        return `${day} ${month}, ${time}`;
+    }
+
+    // Copiar al portapapeles con respaldo para contextos sin navigator.clipboard (HTTP, navegadores
+    // viejos), donde la API no existe y el botón quedaría muerto sin avisar.
+    async function copyToClipboard(text) {
+        if (!text) return;
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+            pmToast('Referencia copiada', 'success');
+        } catch (err) {
+            console.error('Error copiando al portapapeles:', err);
+            pmToast('No se pudo copiar la referencia', 'warning');
+        }
+    }
 
     // Live thousands formatting for the amount input (mismo comportamiento que admin).
     function formatThousandsInput(el) {
@@ -598,108 +616,201 @@ document.addEventListener('DOMContentLoaded', async function() {
         return el ? bootstrap.Offcanvas.getOrCreateInstance(el) : null;
     }
 
+    function renderPaymentsSkeleton() {
+        const body = document.getElementById('paymentsBody');
+        if (body) body.innerHTML = PaymentsPanel.renderPaymentsSkeleton();
+    }
+
+    // El aviso lo arma el módulo; "Reintentar" lo engancha aquí, porque reintentar es volver a
+    // llamar a la carga de ESTA vista.
+    function renderPaymentsLoadError() {
+        const aviso = document.getElementById('payAviso');
+        if (aviso) {
+            aviso.innerHTML = `<div class="text-center py-2">
+                <div class="text-muted mb-2"><i class="ti ti-alert-triangle me-1"></i>No se pudo cargar la información de pagos.</div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="retryPaymentsBtn"><i class="ti ti-refresh me-1"></i>Reintentar</button>
+              </div>`;
+            document.getElementById('retryPaymentsBtn')?.addEventListener('click', () => loadPayments());
+        }
+        const methodTable = document.getElementById('paymentMethodTable');
+        if (methodTable) { methodTable.innerHTML = ''; methodTable.style.display = 'none'; }
+        const body = document.getElementById('paymentsBody');
+        if (body) body.innerHTML = PaymentsPanel.renderPaymentsLoadError();
+    }
+
     async function loadPayments() {
+        // Solo en la primera carga: las recargas posteriores a registrar/editar/borrar un pago ya tienen
+        // contenido en pantalla y reemplazarlo por barras se vería como un parpadeo.
+        if (!latestSummary) renderPaymentsSkeleton();
+        let loaded = false;
         try {
             const response = await fetch(`/api/reservations/${reservationId}/payments`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
-            const result = await response.json();
-            paymentsCache = result?.data?.payments || [];
-            if (result?.data?.summary) applyPaymentSummary(result.data.summary);
+            const result = await response.json().catch(() => null);
+            loaded = response.ok && !!result?.data;
+            if (loaded) {
+                paymentsCache = result.data.payments || [];
+                if (result.data.summary) applyPaymentSummary(result.data.summary);
+            } else {
+                console.error('Error loading payments:', response.status, result);
+            }
         } catch (err) {
             console.error('Error loading payments:', err);
         }
+        if (!loaded && !latestSummary) { renderPaymentsLoadError(); return; }
         renderPayments();
     }
 
+    // La tabla la arma PaymentsPanel, compartido con las otras dos vistas. Aquí se quedan el ORDEN y
+    // el pago en edición —los cambia el usuario al hacer clic, y esos clics los escucha esta vista— y
+    // el formulario inline, que solo existe donde se pueden registrar pagos.
     function renderPayments() {
         const body = document.getElementById('paymentsBody');
-        const showFormBtn = document.getElementById('showPaymentFormBtn');
         if (!body) return;
+        // "Registrar pago" depende de que la reservación siga editable Y de que no haya formulario abierto.
+        syncAddPaymentBtn();
+        const histCount = document.getElementById('historialCount');
+        if (histCount) histCount.textContent = paymentsCache.length ? String(paymentsCache.length) : '';
+        body.innerHTML = PaymentsPanel.renderPayments({
+            reservationData,
+            formatCurrency,
+            payments: paymentsCache,
+            sort: paymentsSort,
+            editingId: paymentForm.getEditingId(),
+            allowEdit: true,
+        });
 
-        const d = reservationData;
-        const canEdit = d.status !== 'cancelled' && d.status !== 'completed';
-        const curr = d.currency || 'MXN';
-
-        // "Registrar pago" (dentro del carrito) solo si la reservación sigue editable (no cancelada/completada).
-        if (showFormBtn) { if (canEdit) showFormBtn.classList.remove('d-none'); else showFormBtn.classList.add('d-none'); }
-
-        if (!paymentsCache.length) {
-            body.innerHTML = '<div class="text-center py-3 text-muted">Sin pagos registrados</div>';
-            return;
-        }
-
-        const rows = paymentsCache.map((p) => {
-            const ref = p.reference ? PaymentBreakdownHelpers.escapeHtml(p.reference) : '<span class="text-muted">—</span>';
-            // "Recibió" solo aplica al efectivo; en otros métodos es irrelevante y se muestra un guion.
-            const received = (p.method === 'efectivo' && p.receivedBy)
-                ? PaymentBreakdownHelpers.escapeHtml(p.receivedBy) : '<span class="text-muted">—</span>';
-            const receipt = p.receiptUrl
-                ? `<a href="${PaymentBreakdownHelpers.escapeHtml(p.receiptUrl)}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Ver comprobante"><i class="ti ti-file-invoice"></i></a>`
-                : '<span class="text-muted">—</span>';
-            return `<tr>
-                <td>${formatDate(p.paidAt || p.createdAt)}</td>
-                <td><span class="badge bg-secondary-subtle text-secondary">${PAYMENT_METHOD_LABELS[p.method] || p.method || '—'}</span></td>
-                <td>${ref}</td>
-                <td>${received}</td>
-                <td class="text-end">${formatCurrency(p.amount, curr)}</td>
-                <td>${p.origCurrency || curr}</td>
-                <td class="text-center">${receipt}</td>
-                <td class="text-end">
-                    ${canEdit ? `<button class="btn btn-sm btn-outline-primary py-0 px-1 edit-payment-btn" data-payment-id="${p.id}" title="Editar"><i class="ti ti-edit"></i></button>
-                    <button class="btn btn-sm btn-outline-danger py-0 px-1 delete-payment-btn" data-payment-id="${p.id}" title="Eliminar"><i class="ti ti-trash"></i></button>` : ''}
-                </td>
-            </tr>`;
-        }).join('');
-
-        body.innerHTML = `<div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0 small">
-                <thead class="table-light">
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Método</th>
-                        <th>Referencia</th>
-                        <th>Recibió</th>
-                        <th class="text-end">Monto</th>
-                        <th>Moneda</th>
-                        <th class="text-center">Comprobante</th>
-                        <th class="text-end">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
-        </div>`;
-
+        body.querySelectorAll('.pay-hist-sort').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.sortKey;
+                // Volver a la misma columna invierte el sentido; cambiar de columna arranca descendente
+                // (lo más nuevo / lo más grande primero, que es lo que se busca en ambos casos).
+                if (paymentsSort.key === key) paymentsSort.dir = paymentsSort.dir === 'asc' ? 'desc' : 'asc';
+                else paymentsSort = { key, dir: 'desc' };
+                renderPayments();
+            });
+        });
+        body.querySelectorAll('.copy-ref-btn').forEach((btn) => {
+            btn.addEventListener('click', () => copyToClipboard(btn.dataset.ref || ''));
+        });
         body.querySelectorAll('.edit-payment-btn').forEach((btn) => {
-            btn.addEventListener('click', () => renderPaymentForm(btn.dataset.paymentId));
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.paymentId;
+                // Cerrar primero descarta el otro formulario (alta u otra fila) antes de abrir este.
+                closePaymentForm();
+                paymentForm.setEditingId(id);
+                renderPayments();
+            });
         });
         body.querySelectorAll('.delete-payment-btn').forEach((btn) => {
             btn.addEventListener('click', () => deletePayment(btn.dataset.paymentId));
         });
+
+        // El formulario inline se dibuja al final, cuando su contenedor ya está en el DOM. Si el pago
+        // en edición desapareció (lo borró otra pestaña), el estado se limpia solo.
+        if (paymentForm.getEditingId()) {
+            const editWrap = document.getElementById('paymentEditWrap');
+            if (editWrap) renderPaymentForm(paymentForm.getEditingId(), editWrap);
+            else paymentForm.setEditingId(null);
+        }
     }
 
     // Rellena las secciones del offcanvas (chips / cobertura / saldo restante / descuento) desde el
     // summary AMPLIO. Los % de cada chip y la barra usan coveragePercent/remainingPercent del backend TAL
     // CUAL (no re-derivar en cliente: rompería con ajustes manuales).
+    // "En efectivo ahorras $X" bajo el total: el mismo hint del hero del Resumen Financiero, para que
+    // el ahorro se vea al registrar el pago y no solo al bajar al desglose por método. Devuelve '' si no
+    // hay un método más barato que el cotizado.
+    function cheapestSavingsHint(summary, services, curr) {
+        const H = PaymentBreakdownHelpers;
+        const s = summary || {};
+        const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
+        const anchor = s.anchoredMethod;
+        const cheapest = H.cheapestAvailableMethod(methods, services, curr);
+        if (!cheapest || !anchor || cheapest === anchor) return '';
+        // Mismos totales por método que el resto del panel (subtotal del método + ajustes + propina).
+        const extras = H.round2(s.adjustments) + H.round2(s.tip);
+        const totalFor = (m) => Math.max(0, H.round2(H.computeServicesSubtotalByType(services, m, curr) + extras));
+        const savings = H.round2(totalFor(anchor) - totalFor(cheapest));
+        if (savings < 0.005) return '';
+        return `<div class="pay-savings-hint"><i class="ti ti-discount-2"></i>En ${H.escapeHtml(H.methodLabel(cheapest).toLowerCase())} ahorras ${formatCurrency(savings, curr)}</div>`;
+    }
+
+    // Tabla "Por método de pago": un renglón por método con Total, Cubierto y Restante. Reemplaza los
+    // chips de progreso + la sección de saldo restante, que repetían las mismas barras dos veces.
+    // Total = subtotal por método + ajustes + propina; restante = montoParaSaldar del backend.
+    function buildMethodTableHtml(summary, services, curr) {
+        const H = PaymentBreakdownHelpers;
+        const s = summary || {};
+        const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
+        if (!methods.length) return '';
+        const adjustments = H.round2(s.adjustments);
+        const tip = H.round2(s.tip);
+        const mps = s.montoParaSaldar || {};
+        const isPaid = s.paymentStatus === 'paid';
+        const paid = H.round2(s.paidAmount);
+        const rows = methods.map((m) => {
+            const total = Math.max(0, H.round2(H.computeServicesSubtotalByType(services, m, curr) + adjustments + tip));
+            return {
+                method: m,
+                label: H.methodLabel(m),
+                total,
+                // % cubierto CORRECTO por método = pagado ÷ total del método (distinto en cada método).
+                pct: total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0,
+                // Monto cubierto de ESTE total. Se topa al total del método por la misma razón que el
+                // porcentaje: si lo pagado supera el total de un método más barato, lo excedente es
+                // saldo a favor, no cobertura de este renglón.
+                covered: Math.min(paid, total),
+                remaining: H.round2(mps[m]),
+            };
+        });
+        const cheapest = H.cheapestAvailableMethod(methods, services, curr);
+        const anchor = s.anchoredMethod;
+        const showCheaper = cheapest && anchor && cheapest !== anchor;
+        // Ahorro del método más barato vs. el cotizado, dentro del tag "Más barato".
+        const anchorTotal = (rows.find((r) => r.method === anchor) || {}).total || 0;
+        const savingsVsAnchor = H.round2(anchorTotal - ((rows.find((r) => r.method === cheapest) || {}).total || 0));
+        const thR = 'text-align:right;padding:.45rem .3rem;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#8a8f78;font-weight:700;';
+        const body = rows.map((r) => {
+            const cheap = (showCheaper && r.method === cheapest)
+                ? `<span class="badge ms-2" style="background:#146c43;color:#fff;font-size:.74rem;padding:.32em .6em;">Más barato · ahorra ${formatCurrency(savingsVsAnchor, curr)}</span>` : '';
+            const remainingCell = isPaid
+                ? '<span style="color:#4b6b3f;font-weight:700;">Pagado</span>'
+                : `<span style="font-weight:700;color:#2b2b2b;">${formatCurrency(r.remaining, curr)}</span>`;
+            return `<tr style="border-top:1px solid #f1efe8;">
+                <td style="padding:.55rem .3rem;font-weight:600;">${H.escapeHtml(r.label)}${cheap}</td>
+                <td style="padding:.55rem .3rem;text-align:right;color:#6b6656;">${formatCurrency(r.total, curr)}</td>
+                <td style="padding:.55rem .3rem;text-align:right;">
+                    <div style="font-weight:700;color:#4b6b3f;">${formatCurrency(r.covered, curr)}</div>
+                    <div style="font-size:.76rem;font-weight:600;color:#8a8f78;">${r.pct}%</div>
+                </td>
+                <td style="padding:.55rem .3rem;text-align:right;">${remainingCell}</td>
+            </tr>`;
+        }).join('');
+        return `<table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="text-align:left;padding:.45rem .3rem;font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;color:#8a8f78;font-weight:700;">Método</th>
+              <th style="${thR}">Total</th>
+              <th style="${thR}">Cubierto</th>
+              <th style="${thR}">Restante</th>
+            </tr></thead>
+            <tbody>${body}</tbody>
+          </table>`;
+    }
+
     function renderPaymentsOffcanvas() {
         if (!latestSummary) return;
         const services = reservationData?.services || [];
         const curr = reservationData?.currency || 'MXN';
-        const chips = document.getElementById('paymentChips');
-        const coverage = document.getElementById('paymentCoverageCard');
-        const remaining = document.getElementById('paymentRemainingByMethod');
-        const discount = document.getElementById('paymentDiscountEmphasis');
-        if (chips) chips.innerHTML = PaymentBreakdownHelpers.buildMethodChips(latestSummary, services, curr);
-        if (coverage) coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr);
-        if (remaining) {
-            const html = PaymentBreakdownHelpers.buildRemainingByMethod(latestSummary, curr);
-            remaining.innerHTML = html;
-            remaining.style.display = html ? '' : 'none';
-        }
-        if (discount) {
-            const html = PaymentBreakdownHelpers.buildDiscountEmphasis(latestSummary, services, curr);
-            discount.innerHTML = html;
-            discount.style.display = html ? '' : 'none';
+        // Ya no se pinta cabecera: la cobertura vive en el Resumen Financiero de la página.
+        const aviso2 = document.getElementById('payAviso');
+        if (aviso2) aviso2.innerHTML = '';
+        const methodTable = document.getElementById('paymentMethodTable');
+        if (methodTable) {
+            const html = buildMethodTableHtml(latestSummary, services, curr);
+            methodTable.innerHTML = html;
+            methodTable.style.display = html ? '' : 'none';
         }
     }
 
@@ -710,255 +821,53 @@ document.addEventListener('DOMContentLoaded', async function() {
         else reservationData.payment = { ...summary };
         renderFinancialSummary();
         renderPaymentsOffcanvas();
+        // Si el panel se abrió antes de que llegara el summary, este es el momento de desplegar el alta.
+        maybeOpenAddForm();
     }
 
-    // Read a File as base64 (strip the "data:...;base64," prefix) for the JSON receipt upload.
-    function fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
-            reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
-            reader.readAsDataURL(file);
-        });
-    }
 
-    // Upload a payment receipt in a SEPARATE request (decoupled from the save). El pago ya está
-    // persistido, así que esto nunca lo arriesga: devuelve null si sube, o un aviso si falla.
-    async function uploadReceipt(paymentId, file) {
-        try {
-            const body = JSON.stringify({
-                fileBase64: await fileToBase64(file), fileName: file.name, mimeType: file.type,
-            });
-            const resp = await fetch(`/api/reservations/${reservationId}/payments/${paymentId}/receipt`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body,
-            });
-            const r = await resp.json().catch(() => ({}));
-            if (resp.ok && r.success) return null;
-            return r.error
-                ? `Pago guardado, pero el comprobante no se subió: ${r.error}`
-                : 'Pago guardado, pero el comprobante no se subió. Reinténtalo editando el pago.';
-        } catch (err) {
-            console.error('Receipt upload error:', err);
-            return 'Pago guardado, pero el comprobante no se subió (se cortó la conexión). Reinténtalo editando el pago.';
+
+
+    // "Agregar pago": abre el carrito. Como es la ÚNICA puerta de entrada al panel, la intención es
+    // siempre registrar un pago: el formulario se despliega solo (ver maybeOpenAddForm).
+    // El botón vive dentro del hero, que se re-renderiza en cada pago, así que se cablea por delegación
+    // sobre el contenedor estable del Resumen Financiero.
+    document.getElementById('financialSummaryCard')?.addEventListener('click', (e) => {
+        if (e.target.closest('#addPaymentBtn')) {
+            paymentForm.requestAddForm();
+            paymentsOffcanvasInstance()?.show();
         }
-    }
-
-    // Inline payment form (dentro de #paymentsOffcanvas). null = nuevo, id = editar el pago.
-    function renderPaymentForm(paymentId) {
-        const wrap = document.getElementById('paymentFormWrap');
-        if (!wrap) return;
-        const existing = paymentId ? paymentsCache.find((p) => p.id === paymentId) : null;
-        const curr = existing?.origCurrency || 'MXN';
-        const paidAt = existing?.paidAt ? new Date(existing.paidAt).toISOString().slice(0, 10) : '';
-        // Payment date allows the future (reservations later); shared standard 1900 .. today + 20y.
-        const paidAtMax = (() => { const dt = new Date(); dt.setFullYear(dt.getFullYear() + 20); return dt.toISOString().slice(0, 10); })();
-        const opt = (v, label, sel) => `<option value="${v}" ${sel === v ? 'selected' : ''}>${label}</option>`;
-        const receiptLink = existing?.receiptUrl
-            ? `<a href="${existing.receiptUrl}" target="_blank" class="small d-block mt-1"><i class="ti ti-file-invoice me-1"></i>Ver comprobante actual</a>` : '';
-
-        // Método: poblado dinámicamente desde availableMethods (Fase C), NUNCA hardcodeado a 3 opciones.
-        // Al editar, se conserva el método guardado aunque ya no esté disponible (no cambiarlo en silencio).
-        // Sin métodos disponibles (H3): select deshabilitado con mensaje y guardado bloqueado.
-        const available = (latestSummary && Array.isArray(latestSummary.availableMethods)) ? latestSummary.availableMethods.slice() : [];
-        const method = existing?.method || available[0] || '';
-        const methodOrder = available.slice();
-        if (existing?.method && !methodOrder.includes(existing.method)) methodOrder.push(existing.method);
-        const methodDisabled = methodOrder.length === 0;
-        const methodSelectHtml = methodDisabled
-            ? `<select class="form-select form-select-sm" id="paymentMethod" disabled><option value="">Sin métodos disponibles</option></select>
-               <div class="form-text text-danger">No hay métodos de pago disponibles para esta reservación.</div>`
-            : `<select class="form-select form-select-sm" id="paymentMethod">${methodOrder.map((m) => opt(m, PAYMENT_METHOD_LABELS[m] || m, method)).join('')}</select>`;
-
-        const amountInit = existing ? (existing.origAmount ?? existing.amount ?? '') : '';
-
-        wrap.innerHTML = `
-            <h6 class="fw-bold mb-2">${existing ? '<i class="ti ti-edit me-1"></i>Editar pago' : '<i class="ti ti-cash me-1"></i>Registrar pago'}</h6>
-            <input type="hidden" id="paymentId" value="${existing ? existing.id : ''}">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentAmount">Monto</label>
-                    <input type="text" inputmode="decimal" maxlength="17" class="form-control form-control-sm" id="paymentAmount" placeholder="0.00" value="${amountInit}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentCurrency">Moneda</label>
-                    <select class="form-select form-select-sm" id="paymentCurrency">${opt('MXN', 'MXN', curr)}${opt('USD', 'USD', curr)}</select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentMethod">Método</label>
-                    ${methodSelectHtml}
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold small" for="paymentPaidAt">Fecha de pago</label>
-                    <input type="date" class="form-control form-control-sm" id="paymentPaidAt" min="1900-01-01" max="${paidAtMax}" value="${paidAt}" required>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold small" for="paymentReference">Referencia</label>
-                    <input type="text" class="form-control form-control-sm" id="paymentReference" maxlength="100" placeholder="Folio / autorización" value="${PaymentBreakdownHelpers.escapeHtml(existing?.reference || '')}">
-                </div>
-                <div class="col-md-6" id="paymentReceivedByWrap" style="display:${method === 'efectivo' ? '' : 'none'};">
-                    <label class="form-label fw-semibold small" for="paymentReceivedBy">¿Quién recibió el efectivo?</label>
-                    <input type="text" class="form-control form-control-sm" id="paymentReceivedBy" maxlength="100" placeholder="Nombre de quien recibió" value="${PaymentBreakdownHelpers.escapeHtml(existing?.receivedBy || '')}" ${method === 'efectivo' ? 'required' : ''}>
-                </div>
-                <div class="col-12">
-                    <label class="form-label fw-semibold small" for="paymentReceipt">Comprobante (imagen o PDF)</label>
-                    <input type="file" class="form-control form-control-sm" id="paymentReceipt" accept="image/*,application/pdf">
-                    ${receiptLink}
-                </div>
-                <div class="col-12">
-                    <label class="form-label fw-semibold small" for="paymentNotes">Notas</label>
-                    <textarea class="form-control form-control-sm" id="paymentNotes" rows="2" maxlength="300" placeholder="Notas del pago">${PaymentBreakdownHelpers.escapeHtml(existing?.notes || '')}</textarea>
-                </div>
-            </div>
-            <div class="d-flex justify-content-end gap-2 mt-3">
-                <button type="button" class="btn btn-sm btn-outline-secondary" id="cancelPaymentBtn">Cancelar</button>
-                <button type="button" class="btn btn-sm btn-primary px-4" id="savePaymentBtn"><i class="ti ti-check me-1"></i>Guardar</button>
-            </div>`;
-        // El formulario vive dentro del offcanvas (posición fija con scroll propio): se muestra en su
-        // sitio y se desplaza a la vista dentro del panel, sin scrollIntoView de página ni borde inline.
-        wrap.style.display = '';
-        wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        const saveBtn = document.getElementById('savePaymentBtn');
-        // Sin métodos disponibles (H3): no se puede registrar/editar el pago — bloquea el guardado.
-        if (methodDisabled && saveBtn) saveBtn.disabled = true;
-        document.getElementById('cancelPaymentBtn').addEventListener('click', () => { wrap.style.display = 'none'; wrap.innerHTML = ''; });
-        saveBtn.addEventListener('click', () => savePayment(existing ? existing.id : ''));
-        attachThousands(document.getElementById('paymentAmount'));
-
-        // "¿Quién recibió el efectivo?" es visible + required SOLO cuando el método es efectivo, y
-        // reacciona en vivo si el usuario cambia el método DESPUÉS de abrir el formulario.
-        const methodSel = document.getElementById('paymentMethod');
-        function syncReceivedByVisibility() {
-            const isCash = methodSel && methodSel.value === 'efectivo';
-            const wrapEl = document.getElementById('paymentReceivedByWrap');
-            const inputEl = document.getElementById('paymentReceivedBy');
-            if (wrapEl) wrapEl.style.display = isCash ? '' : 'none';
-            if (inputEl) inputEl.required = !!isCash;
-        }
-        if (methodSel) methodSel.addEventListener('change', syncReceivedByVisibility);
-        syncReceivedByVisibility();
-    }
-
-    // "Agregar pago" (header): abre el carrito. El formulario queda colapsado detrás de "Registrar pago".
-    document.getElementById('addPaymentBtn')?.addEventListener('click', () => {
-        paymentsOffcanvasInstance()?.show();
     });
+    // El hint "En efectivo ahorras…" solo tiene sentido colapsado (al expandir se duplica con la fila
+    // del comparativo), así que se oculta mientras el comparativo está abierto. Eventos de Bootstrap
+    // Collapse (burbujean) delegados en el contenedor estable, para sobrevivir al re-render del hero.
+    const toggleSavingsHint = (show) => {
+        const hint = document.querySelector('.fin-hero-hint');
+        if (hint) hint.style.display = show ? '' : 'none';
+    };
+    document.getElementById('financialSummaryCard')?.addEventListener('show.bs.collapse', (e) => {
+        if (e.target.id === 'paymentMethodComparison') toggleSavingsHint(false);
+    });
+    document.getElementById('financialSummaryCard')?.addEventListener('hide.bs.collapse', (e) => {
+        if (e.target.id === 'paymentMethodComparison') toggleSavingsHint(true);
+    });
+    // Al terminar la animación de apertura: si el summary ya está, el formulario se despliega solo.
+    document.getElementById('paymentsOffcanvas')?.addEventListener('shown.bs.offcanvas', () => maybeOpenAddForm());
     // "Registrar pago" (dentro del carrito): muestra el formulario de nuevo pago sin reabrir el panel.
-    document.getElementById('showPaymentFormBtn')?.addEventListener('click', () => renderPaymentForm(null));
+    // Cierra antes cualquier edición inline abierta en el historial (un solo formulario a la vez).
+    document.getElementById('showPaymentFormBtn')?.addEventListener('click', () => {
+        closePaymentForm();
+        renderPaymentForm(null);
+    });
     // Cerrar el carrito (backdrop-click / Escape / botón) descarta el formulario en silencio (H5).
     document.getElementById('paymentsOffcanvas')?.addEventListener('hidden.bs.offcanvas', () => {
-        const wrap = document.getElementById('paymentFormWrap');
-        if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
+        // Cerrar con el summary aún en vuelo dejaría la bandera levantada y el formulario se abriría
+        // solo la próxima vez, sin que nadie lo pidiera. La bandera vive DENTRO de paymentForm.js:
+        // asignarla desde aquí no la tocaba —creaba otra suelta— y el formulario se seguía abriendo.
+        paymentForm.cancelAddForm();
+        closePaymentForm();
     });
 
-    async function savePayment(paymentId) {
-        const amount = parseAmount(document.getElementById('paymentAmount').value);
-        const paidAt = document.getElementById('paymentPaidAt').value;
-        const method = document.getElementById('paymentMethod').value;
-        const receivedByEl = document.getElementById('paymentReceivedBy');
-        const receivedBy = receivedByEl ? receivedByEl.value.trim() : '';
-
-        if (!amount || amount <= 0) { pmToast('El monto debe ser mayor a 0', 'warning'); return; }
-        if (amount > 100000000) { pmToast('El monto no puede exceder 100,000,000', 'warning'); return; }
-        if (!paidAt) { pmToast('La fecha de pago es obligatoria', 'warning'); return; }
-        if (method === 'efectivo' && !receivedBy) { pmToast('Indica quién recibió el efectivo', 'warning'); return; }
-
-        const payload = {
-            amount,
-            currency: document.getElementById('paymentCurrency').value,
-            method,
-            reference: document.getElementById('paymentReference').value.trim(),
-            notes: document.getElementById('paymentNotes').value.trim(),
-        };
-        if (paidAt) payload.paidAt = paidAt;
-        if (receivedBy) payload.receivedBy = receivedBy;
-
-        // Receipt (optional) — validado aquí pero subido en una petición SEPARADA DESPUÉS de guardar el
-        // pago (ver uploadReceipt), para que una subida lenta a S3 nunca bloquee ni pierda el pago.
-        const fileInput = document.getElementById('paymentReceipt');
-        const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
-        if (file) {
-            if (file.size > 10 * 1024 * 1024) { pmToast('El comprobante supera el límite de 10MB', 'warning'); return; }
-            if (!/^image\//.test(file.type) && file.type !== 'application/pdf') { pmToast('El comprobante debe ser imagen o PDF', 'warning'); return; }
-        }
-
-        const isEdit = !!paymentId;
-        const url = isEdit
-            ? `/api/reservations/${reservationId}/payments/${paymentId}`
-            : `/api/reservations/${reservationId}/payments`;
-        const httpMethod = isEdit ? 'PUT' : 'POST';
-        // Snapshot del conteo actual para reconciliar si la RESPUESTA se pierde: el request suele llegar
-        // al servidor y guardar aunque la respuesta no regrese.
-        const prevCount = paymentsCache.length;
-
-        const btn = document.getElementById('savePaymentBtn');
-        if (btn) btn.disabled = true;
-        try {
-            const response = await fetch(url, {
-                method: httpMethod,
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-            // Leer el body crudo primero para que una respuesta no-JSON (p. ej. página HTML de error)
-            // muestre un mensaje claro en vez del genérico.
-            const rawBody = await response.text();
-            let result;
-            try {
-                result = JSON.parse(rawBody);
-            } catch (parseErr) {
-                pmToast(`Error del servidor (HTTP ${response.status})`, 'error');
-                if (btn) btn.disabled = false;
-                return;
-            }
-            if (result.success) {
-                const savedId = result.data?.payment?.id || paymentId;
-                // Sube el comprobante en su propia petición ahora que el pago está guardado. Si falla,
-                // el pago se queda — solo avisamos para que el usuario reintente el comprobante.
-                let receiptWarn = result.warning || null;
-                if (file && savedId) receiptWarn = await uploadReceipt(savedId, file);
-                const wrap = document.getElementById('paymentFormWrap');
-                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
-                applyPaymentSummary(result.data?.summary);
-                await loadPayments();
-                if (receiptWarn) pmToast(receiptWarn, 'warning');
-                else pmToast('Pago guardado', 'success');
-            } else {
-                let msg = result.error || 'No se pudo guardar el pago';
-                if (result.detail) msg += ` — ${result.detail}`;
-                if (response.status === 401) {
-                    msg = `Sesión/token inválido (${result.detail || result.code || '401'}). Recarga la página (Ctrl+Shift+R) e intenta de nuevo.`;
-                }
-                pmToast(msg, 'error');
-                if (btn) btn.disabled = false;
-            }
-        } catch (err) {
-            // Error de red: el request suele llegar al servidor y guardar aunque la respuesta se pierda.
-            // En vez de un falso fallo, reconciliamos desde el servidor (lo mismo que un Ctrl+R manual).
-            console.error('Save payment network error, reconciling from server:', err);
-            await loadPayments();
-            let saved = !isEdit && paymentsCache.length > prevCount;
-            if (!saved && !isEdit) {
-                await new Promise((resolve) => setTimeout(resolve, 700));
-                await loadPayments();
-                saved = paymentsCache.length > prevCount;
-            }
-            const wrap = document.getElementById('paymentFormWrap');
-            if (saved) {
-                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
-                pmToast('Pago guardado (se recuperó tras un corte de conexión)', 'success');
-            } else if (isEdit) {
-                if (wrap) { wrap.style.display = 'none'; wrap.innerHTML = ''; }
-                pmToast('La respuesta se perdió, pero la lista ya se actualizó — verifica que el pago sea correcto.', 'warning');
-            } else {
-                pmToast('No se pudo confirmar el guardado. Revisa la lista; si el pago no aparece, regístralo otra vez.', 'warning');
-                if (btn) btn.disabled = false;
-            }
-        }
-    }
 
     // ---- Styled confirm + toasts (reemplazan el confirm/alert nativo en el carrito de pagos) ----
     const pmEsc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
@@ -1026,354 +935,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         wrap.addEventListener('hidden.bs.toast', () => wrap.remove());
     }
 
-    async function deletePayment(paymentId) {
-        if (!(await pmConfirm({
-            title: 'Eliminar pago', message: '¿Eliminar este pago? Esta acción no se puede deshacer.',
-            confirmText: 'Eliminar', danger: true,
-        }))) return;
-        const existedBefore = paymentsCache.some((p) => p.id === paymentId);
-        try {
-            const response = await fetch(`/api/reservations/${reservationId}/payments/${paymentId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-            const result = await response.json();
-            if (result.success) {
-                applyPaymentSummary(result.data?.summary);
-                await loadPayments();
-                pmToast('Pago eliminado', 'success');
-            } else {
-                pmToast(result.error || 'Error al eliminar el pago', 'error');
-            }
-        } catch (err) {
-            // Respuesta perdida — el delete pudo haber pasado. Reconciliamos desde el servidor en vez de
-            // reportar un falso fallo (misma idea que el guardado).
-            console.error('Delete payment network error, reconciling from server:', err);
-            await loadPayments();
-            const stillThere = paymentsCache.some((p) => p.id === paymentId);
-            if (existedBefore && !stillThere) {
-                pmToast('Pago eliminado (se recuperó tras un corte de conexión)', 'success');
-            } else {
-                pmToast('No se pudo confirmar la eliminación. Revisa la lista; si el pago sigue ahí, inténtalo otra vez.', 'warning');
-            }
-        }
-    }
 
-    function getSubconceptDetails(svc) {
-        const sub = svc.subconcept;
-        if (!sub) return '';
-        const tags = [];
-        const tag = (icon, text, color) => `<span class="badge detail-tag bg-${color}-subtle text-${color}"><i class="ti ti-${icon} me-1"></i>${text}</span>`;
-
-        // Fase 2d: descuento y propina por servicio (ya reflejados en el total del servicio).
-        if (Number(sub.discountAmount) > 0) {
-            const dPct = (sub.discountType === 'percent' && sub.discountValue) ? ` ${sub.discountValue}%` : '';
-            tags.push(tag('discount-2', `Descuento${dPct} −${formatCurrency(sub.discountAmount, reservationData.currency)}`, 'success'));
-        }
-        if (Number(sub.tipAmount) > 0) {
-            const tPct = (sub.tipType === 'percent' && sub.tipValue) ? ` ${sub.tipValue}%` : '';
-            const tMand = sub.tipMandatory ? ' (oblig.)' : '';
-            tags.push(tag('coin', `Propina${tPct} +${formatCurrency(sub.tipAmount, reservationData.currency)}${tMand}`, 'info'));
-        }
-
-        // Vehicle quantity (applies to transport, a-disposicion, etc.)
-        if (sub.quantity && sub.quantity > 1) tags.push(tag('car', `${sub.quantity} vehículos`, 'primary'));
-
-        // Guide & Greeter status (applies to ALL service types)
-        if (sub.includeGuide === true) {
-            tags.push(tag('map-pin', 'Guía: Sí', 'success'));
-        } else if (sub.includeGuide === false && (svc.type === 'transport' || svc.type === 'tour')) {
-            tags.push(tag('map-pin', 'Guía: No', 'secondary'));
-        }
-        if (sub.includeGreeter === true) {
-            const inVehicle = sub.greeterInVehicle ? ' (en vehículo)' : ' (en punto)';
-            tags.push(tag('hand-stop', `Greeter: Sí${inVehicle}`, 'warning'));
-        } else if (sub.includeGreeter === false && (svc.type === 'transport' || svc.type === 'tour')) {
-            tags.push(tag('hand-stop', 'Greeter: No', 'secondary'));
-        }
-
-        // Transport-specific details
-        if (svc.type === 'transport') {
-            if (sub.tripType) {
-                const tripLabel = sub.tripType === 'round-trip' ? 'Redondo' : 'Sencillo';
-                const dirLabel = sub.directionType === 'arrival' ? 'Llegada' : 'Salida';
-                tags.push(tag('arrows-exchange', `${tripLabel} — ${dirLabel}`, 'info'));
-            }
-            const pax = [];
-            if (sub.transportAdults) pax.push(`${sub.transportAdults} adulto${sub.transportAdults > 1 ? 's' : ''}`);
-            if (sub.transportChildren) pax.push(`${sub.transportChildren} niño${sub.transportChildren > 1 ? 's' : ''}`);
-            if (sub.transportInfants) pax.push(`${sub.transportInfants} infante${sub.transportInfants > 1 ? 's' : ''}`);
-            if (sub.persons && !pax.length) pax.push(`${sub.persons} persona${sub.persons > 1 ? 's' : ''}`);
-            if (pax.length) tags.push(tag('users', pax.join(', '), 'primary'));
-            if (sub.airline || sub.flightNumber) {
-                const flightLabel = `${sub.airline || ''} ${sub.flightNumber || ''}`.trim();
-                // Hora real del vuelo (llegada o salida del avión), distinta al pick-up del Horario.
-                const fm = String(svc.time || sub.selectedSchedule || sub.time || '').match(/^(\d{1,2}:\d{2})/);
-                const flightTime = fm ? fm[1] : '';
-                tags.push(tag('plane', flightTime ? `${flightLabel} @ ${flightTime}` : flightLabel, 'info'));
-            }
-            if (sub.waitingTimeHours) tags.push(tag('clock-pause', `Espera: ${sub.waitingTimeHours}h`, 'warning'));
-            if (Array.isArray(sub.extraAdditionalVehicles)) {
-                sub.extraAdditionalVehicles.forEach((v) => {
-                    const wh = parseFloat(v && v.waitingHours) || 0;
-                    if (wh > 0) tags.push(tag('clock-pause', `Espera ${(v.vehicleTypeName || 'adicional')}: ${wh}h`, 'warning'));
-                });
-            }
-            if (sub.routeDuration) tags.push(tag('route', `Duración: ${sub.routeDuration} min`, 'secondary'));
-
-            // Horario = hora de pick-up del servicio (aeropuerto). Salida: la hora sugerida ES el
-            // pick-up; llegada: el pick-up ocurre a la hora de llegada del pasajero.
-            if (sub.transportType === 'aeropuerto') {
-                let pickup = '';
-                if (sub.directionType === 'departure') {
-                    pickup = sub.flightDepartureTimeSuggested || '';
-                } else if (sub.directionType === 'arrival') {
-                    const am = String(sub.time || svc.time || sub.selectedSchedule || '').match(/^(\d{1,2}:\d{2})/);
-                    pickup = am ? am[1] : '';
-                }
-                if (pickup) tags.push(tag('clock-hour-4', `Horario: ${pickup}`, 'success'));
-            }
-            if (sub.roundTripDepartureTimeSuggestedIda) {
-                tags.push(tag('clock-hour-4', `Horario ida: ${sub.roundTripDepartureTimeSuggestedIda}`, 'success'));
-            }
-            if (sub.roundTripDepartureTimeSuggestedVuelta) {
-                tags.push(tag('clock-hour-4', `Horario vuelta: ${sub.roundTripDepartureTimeSuggestedVuelta}`, 'success'));
-            }
-        }
-
-        // Tour-specific details
-        if (svc.type === 'tour') {
-            if (sub.hotelName) tags.push(tag('building', sub.hotelName, 'secondary'));
-            if (sub.isWalkingTour) tags.push(tag('walk', `Walking tour (${sub.walkingTourPeopleCount || 0} pax)`, 'info'));
-            if (sub.persons) tags.push(tag('users', `${sub.persons} persona${sub.persons > 1 ? 's' : ''}`, 'primary'));
-            // Entradas asociadas al/los destino(s) del tour (boletos de acceso): nombre + ×cantidad si > 1.
-            if (Array.isArray(sub.tourEntradas)) {
-                const incEntradas = sub.tourEntradas.filter((e) => e && e.included !== false);
-                if (incEntradas.length) {
-                    const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
-                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
-                    }[ch]));
-                    const listEnt = incEntradas
-                        .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
-                        .join(', ');
-                    tags.push(tag('ticket', `Entradas: ${listEnt}`, 'primary'));
-                }
-            }
-        }
-
-        // Experience-specific details
-        if (svc.type === 'experience') {
-            const tickets = [];
-            if (sub.adultsQuantity) tickets.push(`${sub.adultsQuantity} adulto${sub.adultsQuantity > 1 ? 's' : ''}`);
-            if (sub.childrenQuantity) tickets.push(`${sub.childrenQuantity} niño${sub.childrenQuantity > 1 ? 's' : ''}`);
-            if (sub.adultsNoAlcoholQuantity) tickets.push(`${sub.adultsNoAlcoholQuantity} sin alcohol`);
-            if (tickets.length) tags.push(tag('ticket', tickets.join(', '), 'primary'));
-            if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
-            // Entradas asociadas a la experiencia (boletos de acceso): nombre + ×cantidad si > 1.
-            if (Array.isArray(sub.experienceEntradas)) {
-                const incEntradas = sub.experienceEntradas.filter((e) => e && e.included !== false);
-                if (incEntradas.length) {
-                    const escEnt = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (ch) => ({
-                        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;',
-                    }[ch]));
-                    const listEnt = incEntradas
-                        .map((e) => `${escEnt(e.name || 'Entrada')}${Number(e.quantity) > 1 ? ` ×${e.quantity}` : ''}`)
-                        .join(', ');
-                    tags.push(tag('ticket', `Entradas: ${listEnt}`, 'primary'));
-                }
-            }
-        }
-
-        // A Disposición-specific details
-        if (svc.type === 'a-disposicion') {
-            if (sub.selectedSchedule) tags.push(tag('clock', sub.selectedSchedule, 'info'));
-            if (sub.discountPercent) tags.push(tag('discount-2', `${sub.discountPercent}% desc.`, 'success'));
-        }
-
-        // General fields
-        if (sub.notes) tags.push(tag('note', `Admin: ${sub.notes}`, 'secondary'));
-        if (sub.agencyNotes) tags.push(tag('user', `Cliente: ${sub.agencyNotes}`, 'info'));
-
-        return tags.length ? `<div class="mt-1 d-flex flex-wrap gap-1">${tags.join('')}</div>` : '';
-    }
-
+    // La lista la arma ServiceListRenderer, la MISMA que pinta el detalle de admin. Antes esta
+    // vista traía su propia versión de dos columnas: cada mejora al detalle había que copiarla a
+    // mano y en la práctica no se copiaba, así que aquí seguía el layout de hace varias versiones.
+    //
+    // `allowAssign: false` — asignar es de admin. No es solo que no haya botón: sin eso los círculos
+    // saldrían clicables y el selector escribiría contra un endpoint que este rol no puede llamar.
+    //
+    // El rol va LITERAL y no leído de una variable inyectada: de él depende qué canales de notas se
+    // pintan —las de proveedor, equipo e internas son de admin— y si llegara vacío el renderizador
+    // asume el rol menos privilegiado, con lo que este usuario perdería hasta sus propias notas.
     function renderServices(services) {
         const container = document.getElementById('servicesContainer');
-
-        // Group by dayNumber
-        const days = {};
-        services.forEach(svc => {
-            const key = svc.dayNumber || 1;
-            if (!days[key]) days[key] = { title: svc.dayTitle || `Día ${key}`, date: svc.serviceDate, services: [] };
-            days[key].services.push(svc);
-        });
-
-        if (Object.keys(days).length === 0) {
-            container.innerHTML = '<div class="text-center py-4 text-muted">No hay servicios en esta reservación</div>';
-            return;
-        }
-
-        let html = '';
-        Object.keys(days).sort((a, b) => a - b).forEach(dayNum => {
-            const day = days[dayNum];
-            html += `<div class="day-header"><i class="ti ti-calendar-event me-1"></i>Día ${dayNum} — ${day.title}${day.date ? ' (' + formatDate(day.date) + ')' : ''}</div>`;
-
-            day.services.forEach(svc => {
-                const icon = getServiceTypeIcon(svc.type);
-                // Build person cards for assigned employees
-                let peopleHtml = '';
-                let vehiclesHtml = '';
-                peopleHtml += buildPersonCard(svc.assignedDriver, 'Conductor', 'ti-steering-wheel', 'info');
-                peopleHtml += buildPersonCard(svc.assignedGuide, 'Guía', 'ti-map-pin', 'success');
-                peopleHtml += buildPersonCard(svc.assignedGreeter, 'Greeter', 'ti-hand-stop', 'warning');
-                peopleHtml += buildPersonCard(svc.assignedServiceCustomer, 'Seguidor', 'ti-user-star', 'primary');
-
-                // Vehicle card
-                if (svc.assignedVehicle) vehiclesHtml += buildVehicleCard(svc.assignedVehicle);
-
-                // Extra assignments (additional vehicles/drivers)
-                const extras = svc.extraAssignments || [];
-                extras.forEach(ea => {
-                    if (ea.driverName) peopleHtml += buildPersonCard({ fullName: ea.driverName, phone: '', profilePhotoUrl: '' }, 'Conductor', 'ti-steering-wheel', 'info');
-                    if (ea.vehicleName) vehiclesHtml += buildVehicleCard({ name: ea.vehicleName, imageUrl: ea.vehicleImageUrl || '' });
-                });
-
-                const hasAssignments = peopleHtml || vehiclesHtml;
-
-                const route = svc.originName || svc.destinationName
-                    ? `<small class="text-muted">${svc.originName || ''}${svc.originName && svc.destinationName ? ' → ' : ''}${svc.destinationName || ''}</small>`
-                    : '';
-
-                // "Pago externo" (includeInTotal:false): el cliente lo paga directo a un tercero, NO es un
-                // cargo que la agencia deba cobrar. Se marca junto al título (el precio ya se muestra
-                // completo). Estilo tomado de .service-badge.external (services-renderer.js), no cargado aquí.
-                const externalBadge = svc.subconcept?.includeInTotal === false
-                    ? '<span class="badge me-1" style="background:rgba(150,155,129,0.15);color:#969b81;border:1px solid rgba(150,155,129,0.3);font-weight:600;">Pago externo</span>'
-                    : '';
-
-                const canAssign = false; // Assignment is admin-only
-
-                html += `
-                <div class="service-row d-flex align-items-center justify-content-between">
-                    <div class="d-flex align-items-center flex-grow-1">
-                        <div>
-                            <div class="fw-semibold">${externalBadge}${svc.concept || '—'}${svc.time ? ` <small class="text-muted">@ ${svc.time}</small>` : ''}</div>
-                            ${route}
-                            ${svc.vehicleTypeName ? `<small class="text-muted d-block">${svc.vehicleTypeName}</small>` : ''}
-                            ${getSubconceptDetails(svc)}
-                            ${hasAssignments ? `<div class="row mt-2"><div class="col-md-7">${peopleHtml}</div><div class="col-md-5">${vehiclesHtml}</div></div>` : (svc.type === 'concepto' ? '<div class="mt-2"><small class="text-muted">No requiere asignación</small></div>' : '<div class="mt-2"><small class="text-muted">Sin asignar</small></div>')}
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        ${svc.type === 'concepto' && svc.status !== 'cancelled' ? '<span class="badge bg-success text-white">Lista</span>' : getReservationStatusBadge(svc.status)}
-                        <span class="text-end" style="min-width: 80px;">${formatCurrency(svc.total, reservationData.currency)}</span>
-                        ${canAssign ? `<button class="btn btn-sm btn-outline-primary assign-btn" data-service-id="${svc.id}" data-driver-id="${svc.assignedDriver?.id || ''}" data-guide-id="${svc.assignedGuide?.id || ''}" data-greeter-id="${svc.assignedGreeter?.id || ''}" data-vehicle-id="${svc.assignedVehicle?.id || ''}"><i class="ti ti-user-plus"></i></button>` : ''}
-                    </div>
-                </div>`;
-            });
-        });
-
-        container.innerHTML = html;
-
-        // Bind assign buttons
-        container.querySelectorAll('.assign-btn').forEach(btn => {
-            btn.addEventListener('click', () => openAssignModal(btn));
+        container.innerHTML = ServiceListRenderer.buildHtml(services, {
+            reservationData,
+            formatCurrency,
+            allowAssign: false,
+            userRole: 'client',
         });
     }
-
-    async function loadEmployees() {
-        if (employeesCache) return employeesCache;
-        try {
-            const response = await fetch('/api/employees?limit=500', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const result = await response.json();
-            employeesCache = result.data?.users || result.data || result.results || [];
-            return employeesCache;
-        } catch { return []; }
-    }
-
-    async function loadVehicles() {
-        if (vehiclesCache) return vehiclesCache;
-        try {
-            const response = await fetch('/api/vehicles?limit=500', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const result = await response.json();
-            vehiclesCache = result.data || result.results || [];
-            return vehiclesCache;
-        } catch { return []; }
-    }
-
-    async function openAssignModal(btn) {
-        const serviceId = btn.dataset.serviceId;
-        const driverId = btn.dataset.driverId;
-        const guideId = btn.dataset.guideId;
-        const greeterId = btn.dataset.greeterId;
-        const vehicleId = btn.dataset.vehicleId;
-
-        document.getElementById('assignServiceId').value = serviceId;
-
-        // Load employees and vehicles
-        const [employees, vehicles] = await Promise.all([loadEmployees(), loadVehicles()]);
-
-        // Populate dropdowns
-        const driverSelect = document.getElementById('assignDriver');
-        const guideSelect = document.getElementById('assignGuide');
-        const greeterSelect = document.getElementById('assignGreeter');
-        const vehicleSelect = document.getElementById('assignVehicle');
-
-        // Filter employees by role
-        const drivers = employees.filter(e => e.role === 'driver' || e.role === 'employee_amexing');
-        const guides = employees.filter(e => e.role === 'guia' || e.role === 'employee_amexing');
-        const greeters = employees.filter(e => e.role === 'greeter' || e.role === 'employee_amexing');
-
-        function populateSelect(select, items, selectedId, nameField) {
-            select.innerHTML = '<option value="">Sin asignar</option>';
-            items.forEach(item => {
-                const name = item[nameField] || item.fullName || item.username || item.name || 'Sin nombre';
-                const id = item.id || item.objectId;
-                select.innerHTML += `<option value="${id}" ${id === selectedId ? 'selected' : ''}>${name}</option>`;
-            });
-        }
-
-        populateSelect(driverSelect, drivers, driverId, 'fullName');
-        populateSelect(guideSelect, guides, guideId, 'fullName');
-        populateSelect(greeterSelect, greeters, greeterId, 'fullName');
-        populateSelect(vehicleSelect, vehicles, vehicleId, 'name');
-
-        const modal = new bootstrap.Modal(document.getElementById('assignModal'));
-        modal.show();
-    }
-
-    document.getElementById('saveAssignmentBtn')?.addEventListener('click', async function() {
-        const serviceId = document.getElementById('assignServiceId').value;
-        const driverId = document.getElementById('assignDriver').value;
-        const guideId = document.getElementById('assignGuide').value;
-        const greeterId = document.getElementById('assignGreeter').value;
-        const vehicleId = document.getElementById('assignVehicle').value;
-
-        try {
-            const response = await fetch(`/api/reservations/${reservationId}/services/${serviceId}/assign`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ driverId, guideId, greeterId, vehicleId }),
-            });
-            const result = await response.json();
-            if (result.success) {
-                bootstrap.Modal.getInstance(document.getElementById('assignModal'))?.hide();
-                await loadReservation(); // Reload to show updated assignments
-            } else {
-                alert(result.error || 'Error al guardar asignación');
-            }
-        } catch (err) {
-            console.error('Assignment error:', err);
-            alert('Error al guardar asignación');
-        }
-    });
 
     async function cancelReservation() {
         if (!confirm('¿Estás seguro de cancelar esta reservación? Se cancelarán todos los servicios.')) return;

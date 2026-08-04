@@ -12,12 +12,37 @@ const FileStorageService = require('../services/FileStorageService');
 const PaymentService = require('../services/PaymentService');
 const { renderUrlToPdf } = require('../services/PdfRenderService');
 const { getArponaEmbedCss, getMyriadEmbedCss } = require('../../infrastructure/utils/fontEmbed');
+// Modelo compartido de la lista de servicios: el MISMO archivo que el navegador carga en el detalle
+// de reservación como /shared/services/serviceListHelpers.js. Se pasa como local porque dentro de
+// una plantilla EJS no hay `require`.
+const serviceListHelpers = require('../../presentation/views/dashboards/shared/serviceListHelpers');
 
 const fileStorageService = new FileStorageService({
   baseFolder: 'general',
   isPublic: false,
   presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
 });
+
+// Márgenes de página de cada documento público.
+//
+// El itinerario va A SANGRE: su encabezado llega a los bordes de la hoja y el espacio superior de
+// cada página lo pone la propia plantilla.
+const MARGENES_A_SANGRE = {
+  top: '0', bottom: '0', left: '0', right: '0',
+};
+// La confirmación NO va a sangre: es una tarjeta centrada de ancho fijo sobre fondo blanco. Heredó
+// los márgenes en cero de cuando los dos documentos compartían endpoint, y por eso cada página nueva
+// arrancaba pegada al borde. Los laterales se quedan en cero porque el centrado ya lo hace la
+// tarjeta con su max-width.
+const MARGENES_CONFIRMACION = {
+  top: '14mm', bottom: '14mm', left: '0', right: '0',
+};
+// El contrato es una hoja de trabajo que se imprime y se firma: necesita margen por los cuatro
+// lados —incluidos los laterales, que en la confirmación son cero porque su tarjeta ya se centra
+// sola— para que nada quede pegado al filo ni se pierda al perforar o engargolar.
+const MARGENES_CONTRATO = {
+  top: '14mm', bottom: '14mm', left: '10mm', right: '10mm',
+};
 
 /**
  * Controller for viewing reservations publicly without authentication, where the
@@ -33,6 +58,10 @@ class PublicReservationController {
     this.viewPublicReservation = this.viewPublicReservation.bind(this);
     this.viewReservationItinerary = this.viewReservationItinerary.bind(this);
     this.downloadReservationPdf = this.downloadReservationPdf.bind(this);
+    this.downloadItineraryPdf = this.downloadItineraryPdf.bind(this);
+    this.viewReservationContract = this.viewReservationContract.bind(this);
+    this.downloadContractPdf = this.downloadContractPdf.bind(this);
+    this.renderPdf = this.renderPdf.bind(this);
     this.preparePublicReservationData = this.preparePublicReservationData.bind(this);
 
     this.experiencesCache = null;
@@ -41,42 +70,73 @@ class PublicReservationController {
   }
 
   /**
-   * Download reservation as PDF via headless Chrome (puppeteer).
-   * GET /reservations/:folio/pdf.
-   * @param req
-   * @param res
+   * Renderiza a PDF una de las dos vistas públicas de la reservación.
+   *
+   * Cada ruta de PDF refleja la vista de su MISMA ruta base: /reservations/:folio/pdf entrega la
+   * confirmación —lo que se ve en /reservations/:folio— y /reservations/:folio/itinerary/pdf entrega
+   * el itinerario. Desde el PR #162 la primera devolvía el itinerario, así que el botón "Exportar a
+   * PDF" de la confirmación bajaba un documento distinto del que el usuario tenía enfrente.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @param {string} vista - '' para la confirmación, '/itinerary' para el itinerario.
+   * @param {string} sufijo - Se agrega al nombre del archivo para distinguir los dos documentos.
+   * @param {object} margenes - Márgenes de página; cada documento tiene los suyos.
+   * @returns {Promise<object>} La respuesta con el PDF, o el error.
    * @example
+   * await this.renderPdf(req, res, '/itinerary', '-itinerario', A_SANGRE);
    */
-  async downloadReservationPdf(req, res) {
+  async renderPdf(req, res, vista, sufijo, margenes) {
     const { folio } = req.params;
     try {
       const folioError = this.validateFolio(folio, req, res);
       if (folioError) return folioError;
 
       const reservation = await this.fetchReservationByFolio(folio, req, res);
-      if (!reservation) return;
+      if (!reservation) return undefined;
 
       const proto = req.headers['x-forwarded-proto'] || req.protocol;
       const host = req.get('host');
-      const url = `${proto}://${host}/reservations/${encodeURIComponent(folio)}/itinerary?pdf=1`;
+      const url = `${proto}://${host}/reservations/${encodeURIComponent(folio)}${vista}?pdf=1`;
 
-      // Full-bleed: header reaches the page edges; per-page top spacing comes from the template, not the margin.
-      const pdfBuffer = await renderUrlToPdf(url, {
-        footer: false,
-        margin: {
-          top: '0', bottom: '0', left: '0', right: '0',
-        },
-      });
+      const pdfBuffer = await renderUrlToPdf(url, { footer: false, margin: margenes });
 
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${folio}.pdf"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${folio}${sufijo}.pdf"`);
       return res.end(pdfBuffer);
     } catch (error) {
       logger.error('Failed to render reservation PDF', {
-        folio, error: error.message, stack: error.stack,
+        folio, vista, error: error.message, stack: error.stack,
       });
       return res.status(500).json({ success: false, error: 'Error al generar el PDF' });
     }
+  }
+
+  /**
+   * Confirmación de la reservación en PDF — el mismo documento que se ve en pantalla.
+   * GET /reservations/:folio/pdf.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} La respuesta con el PDF.
+   * @example
+   * GET /reservations/MAY-2605-001/pdf
+   */
+  async downloadReservationPdf(req, res) {
+    return this.renderPdf(req, res, '', '', MARGENES_CONFIRMACION);
+  }
+
+  /**
+   * Itinerario de viaje en PDF.
+   * GET /reservations/:folio/itinerary/pdf.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} La respuesta con el PDF.
+   * @example
+   * GET /reservations/MAY-2605-001/itinerary/pdf
+   */
+  async downloadItineraryPdf(req, res) {
+    // El sufijo evita que los dos documentos de la misma reservación se pisen en la carpeta de
+    // descargas: antes ambos se llamaban igual.
+    return this.renderPdf(req, res, '/itinerary', '-itinerario', MARGENES_A_SANGRE);
   }
 
   /**
@@ -103,6 +163,11 @@ class PublicReservationController {
 
       return res.render('dashboards/admin/reservation-public', {
         quote: quoteShaped,
+        // El botón flotante NO debe salir impreso. No basta con @media print: PdfRenderService
+        // emula media `screen` a propósito —con `print` las reglas de estas vistas colapsan el
+        // layout y puppeteer devuelve un PDF en blanco—, así que la única señal fiable de que
+        // esto es una exportación es el ?pdf=1 con el que se abre la página.
+        esPdf: req.query.pdf === '1',
         isPublicView: true,
         isReservationView: true,
         pageTitle: `Reservación ${folio}`,
@@ -110,6 +175,97 @@ class PublicReservationController {
         myriadEmbedCss: getMyriadEmbedCss(),
       });
     } catch (error) {
+      return this.handleError(error, folio, req, res);
+    }
+  }
+
+  /**
+   * Contrato de servicio: el documento que recibe quien OPERA el viaje.
+   *
+   * Vive en este controlador porque reusa entero el shaping de las otras dos vistas
+   * —preparePublicReservationData ya resuelve chofer, vehículo y asignaciones extra por servicio—,
+   * pero a diferencia de ellas se monta en una ruta CON SESIÓN: lleva teléfonos de los choferes,
+   * placas y direcciones de recogida, que son datos de terceros y no deben quedar tras una URL
+   * adivinable por folio.
+   * GET /dashboard/admin/reservations/:folio/contract?corte=servicio|chofer.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} La vista renderizada, o el error.
+   * @example
+   * GET /dashboard/admin/reservations/MAY-2605-001/contract?corte=chofer
+   */
+  async viewReservationContract(req, res) {
+    const { folio } = req.params;
+    try {
+      const folioError = this.validateFolio(folio, req, res);
+      if (folioError) return folioError;
+
+      const reservation = await this.fetchReservationByFolio(folio, req, res);
+      if (!reservation) return;
+
+      const services = await this.fetchReservationServices(reservation);
+      const quoteShaped = await this.preparePublicReservationData(reservation, services);
+
+      return res.render('dashboards/admin/reservation-contract', {
+        quote: quoteShaped,
+        corte: req.query.corte === 'chofer' ? 'chofer' : 'servicio',
+        // El conmutador de corte es un control de pantalla y no debe salir impreso. No basta con
+        // @media print: PdfRenderService emula media `screen`, así que la única señal fiable de que
+        // esto es una exportación es el ?pdf=1 con el que se abre la página.
+        esPdf: req.query.pdf === '1',
+        isPublicView: false,
+        isReservationView: true,
+        pageTitle: `Contrato ${folio}`,
+        arponaEmbedCss: getArponaEmbedCss(),
+        myriadEmbedCss: getMyriadEmbedCss(),
+      });
+    } catch (error) {
+      return this.handleError(error, folio, req, res);
+    }
+  }
+
+  /**
+   * Contrato de servicio en PDF — el mismo documento que se ve en pantalla.
+   *
+   * A diferencia de los otros dos PDF, la página que abre puppeteer exige sesión, así que se le
+   * pasan las cookies de quien pidió la descarga. Sin ellas el navegador headless recibiría el
+   * redirect al login y el PDF saldría con la pantalla de acceso.
+   * GET /dashboard/admin/reservations/:folio/contract/pdf?corte=servicio|chofer.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @returns {Promise<object>} La respuesta con el PDF.
+   * @example
+   * GET /dashboard/admin/reservations/MAY-2605-001/contract/pdf
+   */
+  async downloadContractPdf(req, res) {
+    const { folio } = req.params;
+    try {
+      const folioError = this.validateFolio(folio, req, res);
+      if (folioError) return folioError;
+
+      const reservation = await this.fetchReservationByFolio(folio, req, res);
+      if (!reservation) return;
+
+      const proto = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.get('host');
+      const corte = req.query.corte === 'chofer' ? 'chofer' : 'servicio';
+      const url = `${proto}://${host}/dashboard/admin/reservations/${encodeURIComponent(folio)}`
+        + `/contract?corte=${corte}&pdf=1`;
+
+      const cookies = Object.entries(req.cookies || {}).map(([name, value]) => ({ name, value, url }));
+      const pdfBuffer = await renderUrlToPdf(url, {
+        footer: false,
+        margin: MARGENES_CONTRATO,
+        cookies,
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${folio}-contrato-${corte}.pdf"`);
+      return res.send(pdfBuffer);
+    } catch (error) {
+      logger.error('PublicReservationController.downloadContractPdf failed', {
+        folio, error: error.message,
+      });
       return this.handleError(error, folio, req, res);
     }
   }
@@ -134,15 +290,27 @@ class PublicReservationController {
       this.logPublicAccess(reservation, req);
 
       const quoteShaped = await this.preparePublicReservationData(reservation, services);
-      await this.injectServiceImages(quoteShaped);
+      // En paralelo: son consultas a clases distintas y ninguna depende de la otra. Solo en el
+      // itinerario, que es la vista que muestra descripción e "incluye / no incluye"; agregarlo al
+      // resumen público costaría dos consultas que su plantilla no usa.
+      await Promise.all([
+        this.injectServiceImages(quoteShaped),
+        this.injectServiceCatalogDetails(quoteShaped),
+      ]);
 
       return res.render('dashboards/admin/reservation-itinerary', {
         quote: quoteShaped,
+        // El botón flotante NO debe salir impreso. No basta con @media print: PdfRenderService
+        // emula media `screen` a propósito —con `print` las reglas de estas vistas colapsan el
+        // layout y puppeteer devuelve un PDF en blanco—, así que la única señal fiable de que
+        // esto es una exportación es el ?pdf=1 con el que se abre la página.
+        esPdf: req.query.pdf === '1',
         isPublicView: true,
         isReservationView: true,
         pageTitle: `Itinerario ${folio}`,
         arponaEmbedCss: getArponaEmbedCss(),
         myriadEmbedCss: getMyriadEmbedCss(),
+        svcHelpers: serviceListHelpers,
       });
     } catch (error) {
       return this.handleError(error, folio, req, res);
@@ -540,6 +708,11 @@ class PublicReservationController {
       const subconcepts = await Promise.all(
         bucket.services.map((svc) => this.formatServiceAsSubconcept(svc, segmentNames, vehicleImageMap))
       );
+      // La consulta ya pide addAscending('time'), pero ese es un orden de CADENA: una hora sin cero
+      // a la izquierda ("9:00") quedaría después de "14:15". Se reordena con el comparador que usa
+      // también el detalle interno, para que las dos vistas no puedan separarse. Hoy no cambia nada
+      // —no hay ninguna hora así en la base—; es para el día que la haya.
+      subconcepts.sort(serviceListHelpers.compareByTime);
       return {
         id: `day_${bucket.dayNumber}`,
         dayNumber: bucket.dayNumber,
@@ -873,6 +1046,10 @@ class PublicReservationController {
       additionalVehicleSegmentName,
       additionalVehicleSegmentColor,
       duration: sub.duration || null,
+      // Duración REAL de la ruta, en MINUTOS (los traslados no usan `duration`: ese campo viene del
+      // catálogo de experiencias y en ellos llega con un 1 espurio). La vista la necesita para poder
+      // mostrar la duración correcta de un traslado en vez de ese 1.
+      routeDuration: sub.routeDuration || null,
       isWalkingTour: sub.isWalkingTour || false,
       pricesByType: sub.pricesByType || null,
       includeInTotal: sub.includeInTotal !== false,
@@ -1006,6 +1183,83 @@ class PublicReservationController {
       });
     } catch (err) {
       logger.warn('Failed to inject service images for public reservation', { error: err.message });
+    }
+  }
+
+  /**
+   * Inject the catalog detail of tours and experiences: description plus the "incluye / no incluye"
+   * lists.
+   *
+   * The stored subconcept snapshots NONE of them — of 115 tour/experience services in the database,
+   * zero carry a description and zero carry the lists — so they have to be resolved from
+   * Tour/Experience by id. Same approach injectServiceImages already uses for the photos, kept as a
+   * separate pass because it queries different classes and must not fail the images if the catalog
+   * read breaks.
+   *
+   * The catalog fields are `description`, `includes` and `notincludes` (lowercase, the last two
+   * arrays of strings); they are exposed as `catalogDescription` / `includes` / `notIncludes`. The
+   * description is renamed on purpose: `description` alone would read as the service's own text and
+   * collide with the notes the view already renders.
+   * @param {object} quoteData - Reservation data shaped like a quote. Mutated in place.
+   * @returns {Promise<void>} Resolves once the catalog detail is attached to each subconcept.
+   * @example
+   *   await this.injectServiceCatalogDetails(quoteShaped);
+   */
+  async injectServiceCatalogDetails(quoteData) {
+    try {
+      const tourIds = [];
+      const experienceIds = [];
+      (quoteData.serviceItems?.days || []).forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          if (sc.tourId) tourIds.push(sc.tourId);
+          if (sc.experienceId) experienceIds.push(sc.experienceId);
+        });
+      });
+
+      const uniqueTourIds = [...new Set(tourIds.filter(Boolean))];
+      const uniqueExpIds = [...new Set(experienceIds.filter(Boolean))];
+      if (uniqueTourIds.length === 0 && uniqueExpIds.length === 0) return;
+
+      const clean = (list) => (Array.isArray(list)
+        ? list.map((item) => String(item == null ? '' : item).trim()).filter(Boolean)
+        : []);
+
+      const fetchLists = async (className, ids) => {
+        const map = {};
+        if (ids.length === 0) return map;
+        const q = new Parse.Query(className);
+        q.containedIn('objectId', ids);
+        q.limit(ids.length);
+        const rows = await q.find({ useMasterKey: true });
+        rows.forEach((row) => {
+          map[row.id] = {
+            description: String(row.get('description') == null ? '' : row.get('description')).trim(),
+            includes: clean(row.get('includes')),
+            notIncludes: clean(row.get('notincludes')),
+          };
+        });
+        return map;
+      };
+
+      const [tourMap, expMap] = await Promise.all([
+        fetchLists('Tour', uniqueTourIds),
+        fetchLists('Experience', uniqueExpIds),
+      ]);
+
+      quoteData.serviceItems.days.forEach((day) => {
+        (day.subconcepts || []).forEach((sc) => {
+          // Un servicio de tour no debe heredar el detalle de una experiencia: si trae tourId, la
+          // entrada del mapa manda incluso cuando viene vacía.
+          const detail = (sc.tourId && tourMap[sc.tourId])
+            || (sc.experienceId && expMap[sc.experienceId]);
+          if (!detail) return;
+          if (detail.description) Object.assign(sc, { catalogDescription: detail.description });
+          if (detail.includes.length) Object.assign(sc, { includes: detail.includes });
+          if (detail.notIncludes.length) Object.assign(sc, { notIncludes: detail.notIncludes });
+        });
+      });
+    } catch (err) {
+      logger.warn('Failed to inject catalog detail for public reservation', { error: err.message });
     }
   }
 

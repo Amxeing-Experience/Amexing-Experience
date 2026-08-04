@@ -1,21 +1,18 @@
 /**
- * Candado de seguridad: los 4 endpoints de ESCRITURA de pagos niegan al Cliente Directo (end_client)
- * con 403, aunque su reservación sea SUYA. Complementa reservation-ownership-scope.test.js (que cubre
- * el scoping de ownership 404) cerrando el hueco por ROL: end_client alcanza requireRoleLevel(4) vía
- * el mapa de fallback de requireRoleLevel (roleObject null — no hay Role sembrado para él, solo puede
- * LEER lo suyo), así que sin denyRoles('end_client') un endpoint de escritura que solo pida nivel 4
- * coincidía sin querer con él. denyRoles corre DESPUÉS de requireRoleLevel y responde 403
- * 'Insufficient permissions'.
+ * Candado de seguridad: el Cliente Directo (end_client) escribe pagos SOLO en sus propias
+ * reservaciones.
  *
- * Estructura del candado: el 403 se dispara en el MIDDLEWARE, antes del scoping de ownership del
- * controller, por lo que se usa la reservación PROPIA del end_client — el único motivo de rechazo
- * posible es el rol (nunca un 404 de scope). La prueba lo comprueba de dos formas:
- *   1. body.error === 'Insufficient permissions' (denyRoles), NO 'Insufficient role level'
- *      (requireRoleLevel) NI 'Reservación no encontrada' (ownership 404).
- *   2. GET /payments sobre la MISMA reservación propia SÍ da 200 — prueba que el nivel del end_client
- *      alcanza requireRoleLevel(4) y que lo único que frena las escrituras es denyRoles.
- * Contraste de regresión (mismo archivo): department_manager (agencia) sobre SU reservación sigue en
- * 200 — denyRoles solo excluye a end_client, no a los demás roles nivel 4+.
+ * Este archivo defendía lo contrario: los 4 endpoints de escritura llevaban denyRoles('end_client') y
+ * respondían 403 aunque la reservación fuera suya, porque el negocio lo quería de solo lectura. Esa
+ * restricción se retiró a petición del negocio: ahora registra sus propios pagos igual que agencia y
+ * agente. El archivo se conserva —renombrado— porque lo que queda protegido es lo que de verdad
+ * importa ahora.
+ *
+ * Al quitar el guard por ROL, lo único que separa a un cliente de los pagos de OTRO es el scoping de
+ * propiedad, que vive en el controller (PaymentController.loadReservation aplica applyOwnershipScope y
+ * devuelve 404 si la reservación no cae en su scope). Antes ese scoping era una segunda línea que
+ * nunca se alcanzaba, porque el 403 del middleware disparaba primero. Ahora es la ÚNICA línea, así que
+ * estos tests la ejercitan directamente sobre los cuatro verbos.
  */
 
 const request = require('supertest');
@@ -26,7 +23,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 // PNG 1x1 válido para ejercitar el endpoint de comprobante (el 403 es previo, pero el body es realista).
 const TINY_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
-describe('Payment writes — end_client denegado por rol (integration)', () => {
+describe('Payment writes — end_client acotado por propiedad (integration)', () => {
   let app;
   let adminToken;
   let deptRoleId;
@@ -144,57 +141,92 @@ describe('Payment writes — end_client denegado por rol (integration)', () => {
     await destroyAll(created.users);
   });
 
-  describe('end_client sobre SU PROPIA reservación', () => {
-    it('POST /payments => 403 por rol (denyRoles), no por scope', async () => {
+  describe('end_client sobre SU PROPIA reservación: ya puede escribir', () => {
+    it('POST /payments => 200', async () => {
       const r = await postPayment(ownReservation.id, endClientToken, {
-        amount: 50, method: 'efectivo', paidAt: new Date().toISOString(), receivedBy: 'x',
+        amount: 50, method: 'efectivo', paidAt: new Date().toISOString(), receivedBy: 'QA Cajero',
       });
-      expect(r.status).toBe(403);
-      // 'Insufficient permissions' = denyRoles; NO 'Insufficient role level' (sí alcanza el nivel) ni
-      // 'Reservación no encontrada' (la reservación es suya).
-      expect(r.body.error).toBe('Insufficient permissions');
+      expect(r.status).toBe(200);
+      if (r.body.data?.payment?.id) {
+        const payPtr = new Parse.Object('Payment');
+        payPtr.id = r.body.data.payment.id;
+        created.payments.push(payPtr);
+      }
     });
 
-    it('PUT /payments/:paymentId (pago real existente) => 403', async () => {
+    it('PUT /payments/:paymentId => 200 y el importe queda aplicado', async () => {
       const r = await putPayment(ownReservation.id, realPaymentId, endClientToken, { amount: 200 });
-      expect(r.status).toBe(403);
-      expect(r.body.error).toBe('Insufficient permissions');
+      expect(r.status).toBe(200);
+      const lista = await listPayments(ownReservation.id, adminToken);
+      const p = (lista.body.data.payments || []).find((x) => x.id === realPaymentId);
+      expect(p.amount).toBe(200);
     });
 
-    it('DELETE /payments/:paymentId => 403', async () => {
-      const r = await delPayment(ownReservation.id, realPaymentId, endClientToken);
-      expect(r.status).toBe(403);
-      expect(r.body.error).toBe('Insufficient permissions');
-    });
-
-    it('POST /payments/:paymentId/receipt => 403', async () => {
-      const r = await postReceipt(ownReservation.id, realPaymentId, endClientToken, {
-        fileBase64: TINY_PNG, fileName: 'r.png', mimeType: 'image/png',
-      });
-      expect(r.status).toBe(403);
-      expect(r.body.error).toBe('Insufficient permissions');
-    });
-
-    it('GET /payments SIGUE en 200 (lectura de su propio historial es intencional)', async () => {
+    it('GET /payments sigue en 200', async () => {
       const r = await listPayments(ownReservation.id, endClientToken);
       expect(r.status).toBe(200);
-      expect(r.body.success).toBe(true);
-      // El pago real registrado por admin aparece en su historial de solo lectura.
       const ids = (r.body.data.payments || []).map((p) => p.id);
       expect(ids).toContain(realPaymentId);
     });
 
-    it('el pago real sigue intacto tras los intentos de escritura (denyRoles bloquea antes del controller)', async () => {
-      // DELETE/PUT nunca corrieron en el controller, así que el pago no se tocó.
-      const r = await listPayments(ownReservation.id, adminToken);
+    it('DELETE /payments/:paymentId => 200', async () => {
+      const r = await delPayment(ownReservation.id, realPaymentId, endClientToken);
       expect(r.status).toBe(200);
-      const p = (r.body.data.payments || []).find((x) => x.id === realPaymentId);
-      expect(p).toBeTruthy();
-      expect(p.amount).toBe(100); // el PUT a 200 del end_client nunca aplicó
     });
   });
 
-  describe('regresión: agencia (department_manager) NO queda bloqueada por denyRoles', () => {
+  // Lo que de verdad hay que blindar ahora. Sin el guard por rol, el scoping de propiedad es lo ÚNICO
+  // que impide que un cliente toque los pagos de otro; antes era una segunda línea que nunca se
+  // alcanzaba porque el 403 del middleware disparaba primero.
+  describe('end_client sobre una reservación AJENA: 404 por scope', () => {
+    let ajena;
+    let pagoAjeno;
+
+    beforeAll(async () => {
+      const otro = await makeUser({ role: 'end_client' });
+      ajena = await makeReservation({ quotePtr: await makeQuote(otro) });
+      const create = await postPayment(ajena.id, adminToken, {
+        amount: 100, method: 'efectivo', paidAt: new Date().toISOString(), receivedBy: 'QA Cajero',
+      });
+      pagoAjeno = create.body.data.payment.id;
+      const payPtr = new Parse.Object('Payment');
+      payPtr.id = pagoAjeno;
+      created.payments.push(payPtr);
+    }, 30000);
+
+    it('POST /payments => 404', async () => {
+      const r = await postPayment(ajena.id, endClientToken, {
+        amount: 50, method: 'efectivo', paidAt: new Date().toISOString(), receivedBy: 'x',
+      });
+      expect(r.status).toBe(404);
+    });
+
+    it('PUT /payments/:paymentId => 404', async () => {
+      const r = await putPayment(ajena.id, pagoAjeno, endClientToken, { amount: 999 });
+      expect(r.status).toBe(404);
+    });
+
+    it('DELETE /payments/:paymentId => 404', async () => {
+      const r = await delPayment(ajena.id, pagoAjeno, endClientToken);
+      expect(r.status).toBe(404);
+    });
+
+    it('POST /payments/:paymentId/receipt => 404', async () => {
+      const r = await postReceipt(ajena.id, pagoAjeno, endClientToken, {
+        fileBase64: TINY_PNG, fileName: 'r.png', mimeType: 'image/png',
+      });
+      expect(r.status).toBe(404);
+    });
+
+    it('el pago ajeno queda INTACTO tras los cuatro intentos', async () => {
+      const r = await listPayments(ajena.id, adminToken);
+      const p = (r.body.data.payments || []).find((x) => x.id === pagoAjeno);
+      expect(p).toBeTruthy();
+      expect(p.amount).toBe(100);
+    });
+  });
+
+  describe('regresión: agencia (department_manager) sigue pudiendo cobrar', () => {
     it('POST /payments sobre SU reservación => 200', async () => {
       const agency = await makeUser({ role: 'department_manager', departmentId: 'deny-agency-A' });
       const member = await makeUser({ role: 'end_client', departmentId: 'deny-agency-A' });

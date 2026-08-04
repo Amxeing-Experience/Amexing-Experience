@@ -15,27 +15,36 @@
         <p class="text-muted fw-medium">Cargando itinerario...</p>
     </div>
 
-    <!-- Header with Title and Main Actions -->
-    <div class="itinerary-header mb-4">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h4 class="fw-bold mb-1">
-                    <i class="ti ti-route me-2"></i>Itinerario
-                </h4>
-                <p class="text-muted mb-0">Organiza los servicios por día</p>
-            </div>
-            <div class="d-flex gap-2">
-                <button type="button" class="btn btn-outline-secondary" id="quoteActivityBtn" title="Actividad de la cotización">
-                    <i class="ti ti-timeline-event me-1"></i>Actividad
-                </button>
-                <button type="button" class="btn btn-outline-secondary position-relative" id="changeRequestsBtn" title="Historial de solicitudes de cambio">
-                    <i class="ti ti-inbox me-1"></i>Solicitudes
-                    <span id="changeRequestsCounter" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" id="toggleCatalogBtn" title="Catálogo de servicios">
-                    <i class="ti ti-layout-grid me-1"></i>Catálogo
-                </button>
-                <button type="button" class="btn btn-outline-primary" id="previewItineraryBtn">
+    <!-- Toolbar del itinerario.
+         Sin título de sección: el stepper de la cabecera ya indica que estás en "Servicios", así que
+         "Itinerario" repetía la misma información con otra palabra (el Resumen tampoco tiene título).
+         Al quedarse sin nada a la izquierda, la fila pasa de justify-content-between a -end: dejar un
+         <span> vacío sosteniendo el espaciado habría sido un maquillaje frágil. -->
+    <div class="itinerary-header mb-3">
+        <div class="d-flex justify-content-end align-items-center">
+            <!-- Jerarquía: eran CINCO botones de peso casi igual compitiendo entre sí. Ahora son
+                 TRES bloques, sin ocultar nada ni mover funciones de sitio:
+                   1) las utilidades de INSPECCIÓN (Actividad / Solicitudes / Catálogo) unidas en un
+                      btn-group, que visualmente se lee como una sola herramienta;
+                   2) Vista Previa, que es "ver el resultado";
+                   3) Nuevo Día, la acción principal, único sólido.
+                 Se conservan visibles a propósito en vez de esconderlas en un overflow: Solicitudes
+                 lleva un contador de pendientes (#changeRequestsCounter) y meterlo en un menú lo
+                 volvería invisible, que es lo contrario de para lo que existe. -->
+            <div class="d-flex gap-2 align-items-center">
+                <div class="btn-group" role="group" aria-label="Herramientas del itinerario">
+                    <button type="button" class="btn btn-outline-secondary" id="quoteActivityBtn" title="Actividad de la cotización">
+                        <i class="ti ti-timeline-event me-1"></i>Actividad
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary position-relative" id="changeRequestsBtn" title="Historial de solicitudes de cambio">
+                        <i class="ti ti-inbox me-1"></i>Solicitudes
+                        <span id="changeRequestsCounter" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="toggleCatalogBtn" title="Catálogo de servicios">
+                        <i class="ti ti-layout-grid me-1"></i>Catálogo
+                    </button>
+                </div>
+                <button type="button" class="btn btn-outline-secondary" id="previewItineraryBtn">
                     <i class="ti ti-eye me-1"></i>Vista Previa
                 </button>
                 <button type="button" class="btn btn-primary" id="addNewDayBtn">
@@ -50,12 +59,11 @@
         <!-- Days Sidebar -->
         <div class="col-md-3">
             <div class="days-sidebar sticky-top" style="top: 20px;">
+                <!-- Sin card-header: el rótulo "Días del Itinerario" era redundante (la columna solo
+                     contiene días, cada uno rotulado, y la sección ya se llama Itinerario). Se quita
+                     el header completo y no solo el <h6>, porque vacío seguiría pintando su padding
+                     y su border-bottom como una línea suelta. -->
                 <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white border-bottom">
-                        <h6 class="mb-0 text-uppercase text-muted" style="font-size: 0.85rem; letter-spacing: 0.5px;">
-                            Días del Itinerario
-                        </h6>
-                    </div>
                     <div class="card-body p-2">
                         <div id="daysList" class="days-navigation">
                             <!-- Days will be dynamically loaded here -->
@@ -162,11 +170,11 @@
                             </div>
                             <small class="text-muted" id="personCount">(0 personas)</small>
                         </div>
-                        <!-- Espejo del estado de guardado (mismo que el del pie): al modificar solo la
-                             propina/total, el usuario ve aquí que ya se guardó sin bajar hasta abajo. -->
-                        <div class="d-flex justify-content-center mt-3" id="saveStatusIndicatorTotals">
-                            <span class="badge bg-success"><i class="ti ti-check me-1"></i>Guardado</span>
-                        </div>
+                        <!-- Se quitó el espejo del estado de guardado (#saveStatusIndicatorTotals):
+                             existía porque el indicador real vivía al final del itinerario y había que
+                             bajar hasta abajo para verlo. Ahora vive en la barra fija del pie
+                             (#itineraryActionBar), visible en todo momento, así que el duplicado
+                             sobraba: dos fuentes del mismo estado en pantalla. -->
                     </div>
                 </div>
             </div>
@@ -214,26 +222,38 @@
                 <!-- Days will be dynamically loaded here -->
             </div>
 
-            <!-- Save Status Indicator -->
-            <div class="save-status-bar mt-4 p-3 bg-light rounded d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center">
-                    <div id="saveStatusIndicator" class="me-3">
-                        <span class="badge bg-success">
-                            <i class="ti ti-check me-1"></i>Guardado
-                        </span>
-                    </div>
-                    <small class="text-muted">Los cambios se guardan automáticamente</small>
-                </div>
-            </div>
-
-            <!-- Continue to Third Step Button -->
-            <div class="continue-step-section mt-4 d-flex justify-content-center">
-                <button type="button" class="btn btn-primary btn-lg px-4 py-2" id="continueToSummaryBtn" disabled>
-                    <i class="ti ti-arrow-right me-2"></i>
-                    <span id="continueButtonText">Continuar al Resumen</span>
-                </button>
-            </div>
+            <!-- El estado de guardado y "Continuar al Resumen" se movieron a la barra fija del pie
+                 (#itineraryActionBar, al cierre de este contenedor). Estaban al final del itinerario,
+                 que es el punto más incómodo: para saber si tus cambios se guardaron o para pasar al
+                 Resumen había que recorrer todos los días. -->
         </div>
+    </div>
+</div>
+
+<!-- Reserva el alto de la barra fija para que el último día no quede tapado. -->
+<div class="itinerary-action-bar-spacer" aria-hidden="true"></div>
+
+<!-- Barra fija del itinerario: estado de guardado (información) a la izquierda, avance del wizard
+     (acción) a la derecha.
+     Deliberadamente NO lleva las utilidades de la toolbar (Actividad / Solicitudes / Catálogo) ni
+     "Nuevo Día": las primeras son de consulta y no merecen peso permanente, y la segunda ya tiene
+     tres accesos (toolbar, pie del sidebar de días, y el + de cada día).
+     Se mantiene DELGADA a propósito: esta pantalla es drag & drop y una franja alta reduciría el
+     área de suelte y estorbaría al arrastrar cerca del borde inferior. -->
+<div id="itineraryActionBar" class="itinerary-action-bar d-print-none">
+    <div class="itinerary-action-bar-inner">
+        <div class="d-flex align-items-center gap-2">
+            <div id="saveStatusIndicator">
+                <span class="badge bg-success">
+                    <i class="ti ti-check me-1"></i>Guardado
+                </span>
+            </div>
+            <small class="text-muted d-none d-md-inline">Los cambios se guardan automáticamente</small>
+        </div>
+        <button type="button" class="btn btn-primary" id="continueToSummaryBtn" disabled>
+            <span id="continueButtonText">Continuar al Resumen</span>
+            <i class="ti ti-arrow-right ms-2"></i>
+        </button>
     </div>
 </div>
 
@@ -395,12 +415,43 @@
         transition: box-shadow 0.2s ease;
     }
 
-    .save-status-bar {
-        position: sticky;
-        bottom: 20px;
-        z-index: 10;
-        backdrop-filter: blur(10px);
-        background-color: rgba(248, 249, 250, 0.95) !important;
+    /* Barra fija del itinerario (estado de guardado + Continuar al Resumen).
+       Reemplaza a la vieja .save-status-bar, que se declaraba `position: sticky; bottom: 20px` y
+       NUNCA pegó: `main.dashboard-content` declara `overflow-y: auto` (dashboard.ejs:95) sin altura
+       acotada, así que se vuelve el contenedor de scroll de referencia de cualquier sticky de
+       adentro pero él mismo no scrollea — scrollea la ventana, y el elemento se va con ella. Le pasa
+       igual al .days-sidebar de esta misma pantalla.
+       Con fixed hay que espejar a mano el margen de .main-content, que tiene TRES estados
+       (dashboard.ejs): 270px normal, 80px con el sidebar colapsado, y 0 en móvil.
+       MISMO patrón que #summaryActionBar en quote-summary.ejs; si se toca uno, revisar el otro. */
+    .itinerary-action-bar {
+        position: fixed;
+        left: 270px;
+        right: 0;
+        bottom: 0;
+        z-index: 1030; /* por debajo de los modales de Bootstrap (1055) */
+        background: #fff;
+        border-top: 1px solid #e5e7eb;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+        padding: 0.6rem 1.25rem;
+    }
+    .itinerary-action-bar-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .itinerary-action-bar-spacer { height: 68px; }
+
+    @media (min-width: 992px) {
+        .main-content.sidebar-collapsed .itinerary-action-bar { left: 80px; }
+    }
+    @media (max-width: 991.98px) {
+        .itinerary-action-bar { left: 0; }
+    }
+    @media print {
+        .itinerary-action-bar,
+        .itinerary-action-bar-spacer { display: none !important; }
     }
 
     @keyframes fadeInUp {

@@ -1,4 +1,5 @@
 const RoleBasedController = require('./base/RoleBasedController');
+const { getAdminDashboardSummary } = require('./adminDashboardSummary');
 
 /**
  * AdminController - Implements admin-specific dashboard functionality.
@@ -26,9 +27,13 @@ class AdminController extends RoleBasedController {
    */
   async index(req, res) {
     try {
+      // Resumen del tablero (segmentos globales + conteos + recientes + actividad). Resiliente:
+      // si algo falla, el agregador ya devuelve ceros/vacío, así que el tablero siempre renderiza.
+      const summary = await getAdminDashboardSummary(req);
       await this.renderRoleView(req, res, 'index', {
         title: 'Tablero de Control',
         breadcrumb: null,
+        dashboardData: { basePath: 'admin', ...summary },
       });
     } catch (error) {
       this.handleError(res, error);

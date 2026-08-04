@@ -13,6 +13,11 @@ const driverController = require('../../application/controllers/dashboard/Driver
 const guestController = require('../../application/controllers/dashboard/GuestController');
 
 // Import authentication middleware
+// El contrato de servicio se sirve desde PublicReservationController porque reusa entero su
+// shaping —chofer, vehículo y asignaciones extra ya resueltos por servicio—, pero se monta AQUÍ y
+// no en publicRoutes: lleva datos de terceros (teléfonos de choferes, placas, direcciones de
+// recogida) y por eso exige sesión de admin, a diferencia de la confirmación y el itinerario.
+const publicReservationController = require('../../application/controllers/PublicReservationController');
 const dashboardAuth = require('../../application/middleware/dashboardAuthMiddleware');
 const { getEndClientCapabilities } = require('../../application/config/endClientCapabilities');
 
@@ -114,6 +119,8 @@ router.get('/admin/experiences/:id', dashboardAuth.requireRole('admin'), (req, r
 router.get('/admin/schedule', dashboardAuth.requireRole('admin'), (req, res) => adminController.schedule(req, res));
 router.get('/admin/bookings', dashboardAuth.requireRole('admin'), (req, res) => adminController.bookings(req, res));
 router.get('/admin/bookings/:id', dashboardAuth.requireRole('admin'), (req, res) => adminController.bookingDetail(req, res));
+router.get('/admin/reservations/:folio/contract', dashboardAuth.requireRole('admin'), (req, res) => publicReservationController.viewReservationContract(req, res));
+router.get('/admin/reservations/:folio/contract/pdf', dashboardAuth.requireRole('admin'), (req, res) => publicReservationController.downloadContractPdf(req, res));
 router.get('/admin/vehicles', dashboardAuth.requireRole('admin'), (req, res) => adminController.vehicles(req, res));
 router.get('/admin/price-settings', dashboardAuth.requireRole('admin'), (req, res) => adminController.priceSettings(req, res));
 router.get('/admin/cash-rounding', dashboardAuth.requireRole('admin'), (req, res) => adminController.cashRounding(req, res));

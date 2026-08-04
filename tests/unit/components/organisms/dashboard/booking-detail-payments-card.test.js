@@ -24,27 +24,62 @@ describe('Booking Detail - Pagos Offcanvas (admin)', () => {
     expect(html).not.toContain('id="paymentsCountBadge"');
   });
 
-  test('existe el Offcanvas nativo de Bootstrap con ancho 760px y breakpoint sm (576px)', () => {
+  // 860px. Se probó bajarlo a 700 y la tabla del historial quedaba en scroll horizontal: con una
+  // referencia larga, quién recibió, quién registró y moneda extranjera pide ~793 px. El vacío del
+  // desglose, que era el motivo para angostarlo, se resuelve limitando ESE bloque.
+  test('existe el Offcanvas nativo de Bootstrap con ancho 860px y breakpoint sm (576px)', () => {
     expect(html).toContain('id="paymentsOffcanvas"');
     expect(html).toContain('offcanvas offcanvas-end');
-    expect(html).toContain('--bs-offcanvas-width: 760px');
+    expect(html).toContain('--bs-offcanvas-width: 860px');
     expect(html).toContain('@media (max-width: 576px)');
   });
 
-  test('el header del Resumen Financiero tiene "Agregar pago" ANTES de "+ Ajuste"', () => {
-    const summaryHeader = html.split('id="financialSummaryBody"')[0];
-    expect(summaryHeader).toContain('id="addPaymentBtn"');
-    expect(summaryHeader).toContain('id="addAdjustmentBtn"');
-    // "Agregar pago" aparece antes que el botón de "Ajuste" en el DOM del header.
-    expect(summaryHeader.indexOf('id="addPaymentBtn"')).toBeLessThan(summaryHeader.indexOf('id="addAdjustmentBtn"'));
+  // "Agregar pago" dejó el header del Resumen Financiero: ahora lo dibuja renderFinancialSummary
+  // DENTRO del hero (y solo si la reservación es editable), así que ya no hay un orden de DOM que
+  // verificar en el cascarón. Lo que sigue importando es que ambos controles existan y que el de
+  // AJUSTE siga siendo admin-only (su endpoint es requireRole(['admin','superadmin'])).
+  // Las dos afordancias se mudaron con el rediseño: "Agregar pago" vivía en el hero de la tarjeta
+  // financiera y ahora está en la barra de cobranza del pie; "+ Agregar ajuste" bajó al carrito,
+  // junto al desglose que modifica. Lo que este test protege es lo mismo: que admin conserve una
+  // forma de registrar un pago y otra de crear un ajuste.
+  test('admin conserva cómo registrar un pago y cómo agregar un ajuste', () => {
+    expect(html).toContain('id="payBarPagarBtn"');
+    expect(html).toContain('id="addAdjustmentBtn"');
   });
 
-  test('el offcanvas contiene los contenedores clave: chips, cobertura, saldo restante, descuento, historial', () => {
-    expect(html).toContain('id="paymentChips"');
-    expect(html).toContain('id="paymentCoverageCard"');
-    expect(html).toContain('id="paymentRemainingByMethod"');
-    expect(html).toContain('id="paymentDiscountEmphasis"');
+  test('la barra de cobranza trae el saldo, el avance y el método, no sólo un botón', () => {
+    expect(html).toContain('id="payBarSaldo"');
+    expect(html).toContain('id="payBarFill"');
+    expect(html).toContain('id="payBarDetalle"');
+    // El método decide CUÁL de los tres precios se está cobrando: sin él, el total de la barra no
+    // dice de cuál habla, y la diferencia entre métodos es de decenas de miles.
+    expect(html).toContain('id="payBarMetodo"');
+  });
+
+  // El desglose dejó de vivir en una tarjeta de la página: sus cinco cifras clave estaban ahí y en
+  // la tarjeta de cobertura del carrito a la vez.
+  test('el desglose ya no se pinta en la página, sino dentro del carrito', () => {
+    expect(html).toContain('id="payDesglose"');
+    expect(html).not.toContain('class="fin-wrap mb-4" id="financialSummaryCard"');
+  });
+
+  test('el offcanvas contiene los contenedores clave: cobertura, comparativo, historial', () => {
+    // Sin pestañas: el panel se lee de corrido y el historial es la última sección.
+    expect(html).not.toContain('id="paymentsTabs"');
+    expect(html).not.toContain('id="tabHistorial"');
+    expect(html).toContain('id="payHistSec"');
+    // Sin cabecera de cobertura: repetía las seis cifras que la barra del pie ya muestra.
+    expect(html).not.toContain('id="paymentCoverageCard"');
+    expect(html).toContain('id="payAviso"');
+    // El comparativo por método vive ahora en su propia sección (#payCmp), no en una tabla aparte.
+    expect(html).toContain('id="payCmp"');
+    expect(html).not.toContain('id="paymentMethodTable"');
     expect(html).toContain('id="paymentsBody"');
+    // Los chips de progreso, el "saldo restante por método" y el bloque de descuento se fusionaron
+    // en la tabla por método: dibujaban las mismas barras dos veces.
+    expect(html).not.toContain('id="paymentChips"');
+    expect(html).not.toContain('id="paymentRemainingByMethod"');
+    expect(html).not.toContain('id="paymentDiscountEmphasis"');
   });
 
   test('solo admin: el formulario de registro y el botón "Registrar pago" viven dentro del offcanvas', () => {

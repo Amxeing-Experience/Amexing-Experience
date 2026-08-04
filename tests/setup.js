@@ -12,13 +12,18 @@ const Parse = require('parse/node');
 // Mock ExcelJS to avoid ESM issues in tests
 jest.mock('exceljs');
 
+// Puerto del Parse de pruebas. Configurable porque el 1339 es un puerto real de la máquina: si otro
+// repo (o una corrida anterior colgada) lo tiene tomado, el arranque falla con "port already in use"
+// y ningún test llega a correr. Con TEST_PARSE_PORT se puede correr en paralelo sin chocar.
+const TEST_PARSE_PORT = Number(process.env.TEST_PARSE_PORT) || 1339;
+
 // Test configuration
 const testConfig = {
   databaseURI: process.env.TEST_DATABASE_URI || process.env.DATABASE_URI || 'mongodb://localhost:27017/AmexingTEST',
   appId: 'test-app-id',
   masterKey: 'test-master-key',
-  serverURL: 'http://localhost:1339/parse',
-  port: 1339,
+  serverURL: `http://localhost:${TEST_PARSE_PORT}/parse`,
+  port: TEST_PARSE_PORT,
   silent: true,
   logLevel: 'error',
   maxUploadSize: '1mb',

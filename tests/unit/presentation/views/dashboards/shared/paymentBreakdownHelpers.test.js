@@ -282,7 +282,7 @@ describe('PaymentBreakdownHelpers.resolveDisplayedBalance (Pregunta 0 — saldo 
   });
 });
 
-describe('PaymentBreakdownHelpers.cheapestAvailableMethod + buildDiscountEmphasis (dirección del descuento)', () => {
+describe('PaymentBreakdownHelpers.cheapestAvailableMethod (dirección del descuento)', () => {
   const services = [{ subconcept: { pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } } }];
 
   it('elige el método disponible más barato', () => {
@@ -290,110 +290,20 @@ describe('PaymentBreakdownHelpers.cheapestAvailableMethod + buildDiscountEmphasi
     expect(H.cheapestAvailableMethod(['transferencia', 'tarjeta'], services, 'MXN')).toBe('transferencia');
     expect(H.cheapestAvailableMethod([], services, 'MXN')).toBeNull();
   });
-
-  it('ancla más cara que TODOS los demás: desglosa un descuento por cada método más barato (no solo el más barato)', () => {
-    const summary = { anchoredMethod: 'tarjeta', availableMethods: ['efectivo', 'transferencia', 'tarjeta'] };
-    const html = H.buildDiscountEmphasis(summary, services, 'MXN');
-    expect(html).toContain('#146c43');
-    expect(html).not.toContain('text-success');
-    // tarjeta=1210 vs efectivo=1000 (ahorro 210) y transferencia=1160 (ahorro 50) — AMBOS deben listarse.
-    expect(html).toContain('Descuento pagando en Efectivo');
-    expect(html).toContain('$210.00');
-    expect(html).toContain('Descuento pagando en Transferencia');
-    expect(html).toContain('$50.00');
-    // Orden de mayor a menor descuento: Efectivo (210) antes que Transferencia (50).
-    expect(html.indexOf('Efectivo')).toBeLessThan(html.indexOf('Transferencia'));
-  });
-
-  it('ancla ya es el más barato (efectivo): NO muestra descuento (regla de dirección)', () => {
-    const summary = { anchoredMethod: 'efectivo', availableMethods: ['efectivo', 'transferencia', 'tarjeta'] };
-    expect(H.buildDiscountEmphasis(summary, services, 'MXN')).toBe('');
-  });
-
-  it('un solo método disponible: sin descuento', () => {
-    expect(H.buildDiscountEmphasis({ anchoredMethod: 'tarjeta', availableMethods: ['tarjeta'] }, services, 'MXN')).toBe('');
-  });
-
-  it('un ancla no reconocida (ni en availableMethods) igual se excluye del desglose, sin romper el cálculo', () => {
-    // anchoredMethod fuera de la lista de métodos disponibles (dato corrupto/legacy): el fallback a
-    // item.total lo hace rendir como "precio de lista" y las 2 filas de descuento se calculan igual.
-    const svc = [{ subconcept: { pricesByType: { efectivo: 100, tarjeta: 200 } }, total: 500 }];
-    const html = H.buildDiscountEmphasis(
-      { anchoredMethod: 'bitcoin', availableMethods: ['efectivo', 'tarjeta'] }, svc, 'MXN'
-    );
-    expect(html).toContain('Descuento pagando en Efectivo');
-    expect(html).toContain('Descuento pagando en Tarjeta');
-  });
 });
 
-describe('PaymentBreakdownHelpers.buildMethodChips (Requisito 3 — % del backend TAL CUAL)', () => {
-  const services = [{ subconcept: { pricesByType: { efectivo: 1000, transferencia: 1160, tarjeta: 1210 } } }];
-
-  it('H3: availableMethods vacío NO crashea — renderiza el aviso, cero chips', () => {
-    const html = H.buildMethodChips({ availableMethods: [] }, services, 'MXN');
-    expect(html).toContain('No hay métodos de pago disponibles para esta reservación.');
-  });
-
-  it('usa coveragePercent del backend TAL CUAL, idéntico en los 3 chips (no re-deriva por método)', () => {
-    const summary = {
-      availableMethods: ['efectivo', 'transferencia', 'tarjeta'], anchoredMethod: 'efectivo',
-      adjustments: 0, coveragePercent: 42.5, remainingPercent: 57.5,
-    };
-    const html = H.buildMethodChips(summary, services, 'MXN');
-    // El mismo 42.5% aparece una vez por chip (3 métodos) — nunca un % distinto por método.
-    const matches = html.match(/42\.5% cubierto/g) || [];
-    expect(matches.length).toBe(3);
-  });
-
-  it('marca el método más barato con el badge "Más barato" cuando el ancla es más cara', () => {
-    const summary = {
-      availableMethods: ['efectivo', 'tarjeta'], anchoredMethod: 'tarjeta',
-      adjustments: 0, coveragePercent: 0,
-    };
-    expect(H.buildMethodChips(summary, services, 'MXN')).toContain('Más barato');
-  });
-
-  it('FIX council (L4F1): un descuento/ajuste mayor al subtotal NO pinta un total negativo (clamp a $0.00)', () => {
-    // Subtotal efectivo 1000 + ajuste -1400 => -400 en el servidor se clampa a 0; la UI debe mostrar $0.00.
-    const summary = {
-      availableMethods: ['efectivo'], anchoredMethod: 'efectivo',
-      adjustments: -1400, coveragePercent: 0,
-    };
-    const html = H.buildMethodChips(summary, services, 'MXN');
-    expect(html).not.toContain('-$');
-    expect(html).toContain('$0.00');
-  });
-
-  it('Fase 2: la propina (plana) se suma igual a los 3 chips; la DIFERENCIA entre métodos no cambia por el tip', () => {
-    const summary = {
-      availableMethods: ['efectivo', 'transferencia', 'tarjeta'], anchoredMethod: 'efectivo',
-      adjustments: 50, tip: 300, coveragePercent: 0,
-    };
-    const html = H.buildMethodChips(summary, services, 'MXN');
-    // Cada chip = subtotal de servicios del método + ajuste (50) + propina (300), PLANA por método.
-    expect(html).toContain('$1,350.00'); // efectivo 1000 + 50 + 300
-    expect(html).toContain('$1,510.00'); // transferencia 1160 + 50 + 300
-    expect(html).toContain('$1,560.00'); // tarjeta 1210 + 50 + 300
-    // PROPERTY: la diferencia tarjeta - efectivo (1560 - 1350 = 210) es EXACTA la de subtotales de
-    // servicios (1210 - 1000), invariante al tip/ajuste (que se suman por igual a todos los chips).
-    const diff = H.computeServicesSubtotalByType(services, 'tarjeta', 'MXN')
-      - H.computeServicesSubtotalByType(services, 'efectivo', 'MXN');
-    expect(diff).toBe(210);
-    expect(1560 - 1350).toBe(diff);
-  });
-});
-
-describe('PaymentBreakdownHelpers.buildCoverageCard + buildRemainingByMethod', () => {
+describe('PaymentBreakdownHelpers.buildCoverageCard', () => {
   it('coverage card muestra la línea de ahorro cuando paid + balance > 0', () => {
     const html = H.buildCoverageCard({ paymentStatus: 'paid', balance: 500, paidAmount: 2000, coveragePercent: 100 }, 'MXN');
     expect(html).toContain('Descuento de $500.00');
-    expect(html).toContain('#146c43');
+    // El verde del descuento vive en la hoja (.pay-cob-ahorro-tit), no en un style en línea.
+    expect(html).toContain('pay-cob-ahorro');
   });
 
-  it('muestra "Cotizado: <método>" junto al Total a pagar', () => {
+  it('muestra el método cotizado como chip junto al Total a pagar', () => {
     const html = H.buildCoverageCard({ anchoredMethod: 'tarjeta', total: 1210, coveragePercent: 0 }, 'MXN');
     expect(html).toContain('Total a pagar');
-    expect(html).toContain('Cotizado');
+    expect(html).toContain('Método cotizado');
     expect(html).toContain('Tarjeta');
   });
 
@@ -405,59 +315,10 @@ describe('PaymentBreakdownHelpers.buildCoverageCard + buildRemainingByMethod', (
     expect(html).not.toContain('"><img');
   });
 
-  it('remaining-by-method vacío cuando ya está pagado', () => {
-    expect(H.buildRemainingByMethod({ paymentStatus: 'paid', availableMethods: ['efectivo'] }, 'MXN')).toBe('');
-  });
-
-  it('remaining-by-method lista montoParaSaldar por método cuando NO está pagado', () => {
-    const summary = {
-      paymentStatus: 'partial', availableMethods: ['efectivo', 'tarjeta'], remainingPercent: 50,
-      montoParaSaldar: { efectivo: 500, tarjeta: 605 },
-    };
-    const html = H.buildRemainingByMethod(summary, 'MXN');
-    expect(html).toContain('$500.00');
-    expect(html).toContain('$605.00');
-    expect(html).toContain('(50%)');
-  });
-});
-
-describe('PaymentBreakdownHelpers.buildPaymentsHistoryTable (solo lectura, agencia/agente)', () => {
-  it('vacío legible cuando no hay pagos', () => {
-    expect(H.buildPaymentsHistoryTable([], 'MXN')).toContain('Sin pagos registrados');
-  });
-
-  it('renderiza filas SIN columna/acciones de editar/eliminar y escapa la referencia (XSS)', () => {
-    const html = H.buildPaymentsHistoryTable([
-      { method: 'efectivo', amount: 1000, reference: '<img src=x onerror=alert(1)>', paidAt: '2026-07-15T00:00:00Z', receivedBy: 'Ana' },
-    ], 'MXN');
-    expect(html).toContain('$1,000.00');
-    expect(html).not.toContain('edit-payment-btn');
-    expect(html).not.toContain('delete-payment-btn');
-    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
-    expect(html).not.toContain('<img src=x');
-  });
-
-  it('tiene la columna "Recibió" y muestra el nombre solo en filas de efectivo', () => {
-    const html = H.buildPaymentsHistoryTable([
-      { method: 'efectivo', amount: 500, receivedBy: 'Ana López', paidAt: '2026-07-15T00:00:00Z' },
-    ], 'MXN');
-    expect(html).toContain('<th>Recibió</th>');
-    expect(html).toContain('Ana López');
-  });
-
-  it('NO muestra receivedBy en un pago que no es efectivo (guion, aunque el dato venga)', () => {
-    const html = H.buildPaymentsHistoryTable([
-      { method: 'tarjeta', amount: 500, receivedBy: 'Ana López', paidAt: '2026-07-15T00:00:00Z' },
-    ], 'MXN');
-    expect(html).not.toContain('Ana López');
-  });
-
-  it('escapa un receivedBy malicioso en efectivo (stored XSS, mismo vector que reference/notes)', () => {
-    const html = H.buildPaymentsHistoryTable([
-      { method: 'efectivo', amount: 500, receivedBy: '<script>alert(1)</script>', paidAt: '2026-07-15T00:00:00Z' },
-    ], 'MXN');
-    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
-    expect(html).not.toContain('<script>alert(1)</script>');
+  it('acepta el hint de ahorro opcional bajo "Total a pagar" y lo omite cuando no se pasa', () => {
+    const summary = { total: 1210, coveragePercent: 0, anchoredMethod: 'tarjeta' };
+    expect(H.buildCoverageCard(summary, 'MXN')).not.toContain('pay-savings-hint');
+    expect(H.buildCoverageCard(summary, 'MXN', '<div class="pay-savings-hint">x</div>')).toContain('pay-savings-hint');
   });
 });
 

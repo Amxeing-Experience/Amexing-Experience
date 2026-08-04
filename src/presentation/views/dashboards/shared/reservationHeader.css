@@ -1,0 +1,31 @@
+/*
+ * Tarjeta de información de la reservación — hoja compartida.
+ *
+ * La usan los detalles de client, department_manager y end_client. Vivía dentro de la plantilla de
+ * client, duplicada en department_manager; end_client tenía en su lugar filas de Bootstrap con otro
+ * conjunto de campos, así que la misma reservación se leía distinta según quién la abriera.
+ */
+
+/* Sin overflow:hidden ni rejilla dibujada: el bloque se lee por su AIRE, no por las cajas. Antes
+   cada dato vivia en una celda con lineas por dos de sus lados —un box-shadow inset— y el conjunto
+   parecia una tabla de base de datos. Ahora el unico trazo es el borde de la tarjeta. */
+.bkg-info{border:1px solid #ece8dd;border-radius:14px;background:#fff;padding:24px 26px 20px;}
+.bkg-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+.bkg-title{font-size:1.35rem;font-weight:700;color:#2b2b2b;line-height:1.2;word-break:break-word;}
+.bkg-status{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+#infoServiceCustomer{font-weight:600;color:#2b2b2b;}
+/* Badges de estado suavizados SOLO en la tarjeta de info (paleta de marca, sin tocar las
+   funciones compartidas getQuoteStatusBadge / getReservationStatusBadge). */
+.bkg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:22px 32px;margin-top:26px;}
+.bkg-tile{min-width:0;}
+@media(max-width:992px){.bkg-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:576px){.bkg-grid{grid-template-columns:1fr;}}
+.bkg-lbl{display:flex;align-items:center;gap:6px;text-transform:uppercase;letter-spacing:.07em;font-size:.72rem;
+  font-weight:700;color:#8a8f78;margin-bottom:6px;}
+.bkg-lbl i{font-size:1.05rem;color:#6E7A50;}
+.bkg-val{font-size:1.08rem;font-weight:600;color:#2b2b2b;word-break:break-word;line-height:1.35;}
+.bkg-link{color:#566040;text-decoration:none;}
+.bkg-link:hover{text-decoration:underline;}
+.bkg-dates{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.bkg-arrow{color:#8a8f78;font-weight:400;}
+.bkg-sub{font-size:.72rem;color:#8a8f78;margin-top:5px;font-style:italic;}

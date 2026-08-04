@@ -10,7 +10,18 @@
  * escapeHtml (paymentBreakdownHelpers.test.js); aquí garantizamos que el dato pasa por ahí.
  */
 
+const fs = require('fs');
+const path = require('path');
 const { renderComponent } = require('../../../../helpers/ejsTestUtils');
+
+// El desglose financiero se extrajo de las plantillas a un módulo compartido, así que el punto de
+// interpolación de adj.description vive ahí. Lo que se protege es lo mismo; cambió dónde vive. Se
+// comprueba además que cada plantilla ENLACE el módulo: sin eso, la garantía se perdería quitando un
+// <script> sin que ningún test se enterara.
+const FUENTE_FINANZAS = fs.readFileSync(
+  path.join(__dirname, '../../../../../src/presentation/views/dashboards/shared/financialSummary.js'),
+  'utf8',
+);
 
 const params = { reservationId: 'test-reservation-id' };
 
@@ -24,9 +35,10 @@ describe('Booking Detail admin - escapa reference/notes/adj.description (XSS)', 
   });
 
   test('la referencia del formulario usa escapeHtml completo (no el .replace parcial de comillas)', () => {
-    // El input de referencia del formulario de pago ahora escapa los 5 metacaracteres, no solo la
-    // comilla doble. (El .replace(/"/g,...) parcial aún existe en buildPersonCard/data-name, fuera
-    // del alcance de pagos — reportado como superficie de la misma clase pendiente de un pase amplio.)
+    // El input de referencia del formulario de pago escapa los 5 metacaracteres, no solo la comilla
+    // doble. La superficie parcial que este comentario reportaba —el .replace(/"/g,...) de
+    // buildPersonCard y de los data-name— ya no existe en admin: buildPersonCard se retiró con el
+    // modal de Customer Support, y los avatares escapan vía PaymentBreakdownHelpers.escapeHtml.
     const refInput = html.split('id="paymentReference"')[1].split('>')[0];
     expect(refInput).toContain("PaymentBreakdownHelpers.escapeHtml(existing?.reference || '')");
     expect(refInput).not.toContain(".replace(");
@@ -57,7 +69,11 @@ describe.each([
   beforeAll(async () => { html = await renderComponent(`dashboards/${role}/booking-detail`, params); });
 
   test('la descripción de ajuste del desglose pasa por escapeHtml (no se interpola cruda)', () => {
-    expect(html).toContain('PaymentBreakdownHelpers.escapeHtml(adj.description)');
-    expect(html).not.toContain('${adj.description}');
+    expect(FUENTE_FINANZAS).toContain('PaymentBreakdownHelpers.escapeHtml(adj.description)');
+    expect(FUENTE_FINANZAS).not.toContain('${adj.description}');
+  });
+
+  test('la plantilla enlaza el módulo, que es lo que hace efectiva esa garantía', () => {
+    expect(html).toContain('/shared/services/financialSummary.js');
   });
 });

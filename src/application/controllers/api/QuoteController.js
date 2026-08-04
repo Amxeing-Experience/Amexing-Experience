@@ -1419,7 +1419,7 @@ class QuoteController {
       });
 
       // Check if user has permission to edit
-      let canEdit = await this.versioningService.canEdit(quoteId, currentUser.id);
+      const canEdit = await this.versioningService.canEdit(quoteId, currentUser.id);
 
       // ADMIN FIX: Handle role pointer to get actual role name
       const rolePointer = currentUser.get('roleId');
@@ -1438,16 +1438,22 @@ class QuoteController {
         }
       }
 
-      // Role override check - allow admin, superadmin, department_manager, and client roles
-      if (!canEdit && (roleName === 'admin' || roleName === 'superadmin' || roleName === 'department_manager' || roleName === 'client')) {
-        logger.info('🔓 Controller-level role override granted', {
-          userId: currentUser.id,
-          roleName,
-          rolePointerId: rolePointer?.id,
-          quoteId,
-        });
-        canEdit = true;
-      }
+      // El override de rol se retira: concedía exactamente lo que canEdit acababa de negar.
+      //
+      // canEdit ya cubre TODOS los casos legítimos por su cuenta (QuoteVersioningService:424-553):
+      // admin/superadmin siempre, un `client` sobre las cotizaciones de su propia organización, el
+      // dueño, y quien tenga acceso de editor. Este bloque solo se evaluaba cuando canEdit había dicho
+      // que NO, y lo volvía sí por el mero nombre del rol — sin mirar de quién era la cotización.
+      //
+      // Era la TERCERA puerta al acceso cruzado entre agencias, y la más ancha: applyChanges
+      // (QuoteVersioningService:647-650) escribe `quote.set(field, value)` para CUALQUIER campo del
+      // cuerpo, sin allowlist. Un agente podía mandar PUT /api/quotes/<id-ajeno> con
+      // { owner: <él mismo> } y volverse dueño de la cotización de otra agencia — y ser dueño da scope
+      // directo sobre la reservación ligada y sus pagos (getClientEligibleQuoteIds consulta
+      // exactamente ese campo). De paso, el mismo endpoint permitía escribir cualquier otro campo.
+      //
+      // Es el mismo patrón por nombre de rol que este PR elimina en canGrantAccess, canRevokeAccess,
+      // canUpdateRole y canTransferOwnership. Dejarlo aquí habría hecho falsa la conclusión del PR.
 
       logger.info('🔍 QuoteController.updateQuote - Permission result', {
         userId: currentUser.id,

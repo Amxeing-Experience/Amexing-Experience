@@ -149,40 +149,43 @@ window.__hasPendingCancellation = <%= (typeof hasPendingCancellation !== "undefi
             </div>
             <% } %>
         </div>
-    </div>
-</div>
 
-<!-- Horizontal Stepper Navigation -->
-<div class="quote-stepper mb-4">
-    <div class="stepper-track">
-        <% steps.forEach(function(step, index) {
-            const isDisabled = isNewQuote && (step.section === 'services' || step.section === 'summary');
-            const isActive = step.section === activeSection;
-            const stepIndex = steps.findIndex(s => s.section === activeSection);
-            const isCompleted = !isNewQuote && index < stepIndex;
-        %>
-            <% if (index > 0) { %>
-                <div class="stepper-connector <%= isCompleted || isActive ? 'completed' : '' %>"></div>
-            <% } %>
+        <!-- Horizontal Stepper Navigation -->
+        <!-- Sin mb-4: el `row mb-3` que envuelve esta cabecera ya aporta la separación con el
+             contenido. Los dos juntos dejaban ~56px muertos entre el stepper y la fila de acciones
+             de la sección, que es mucho para dos filas que además usan solo media pantalla cada una. -->
+        <div class="quote-stepper">
+            <div class="stepper-track">
+                <% steps.forEach(function(step, index) {
+                    const isDisabled = isNewQuote && (step.section === 'services' || step.section === 'summary');
+                    const isActive = step.section === activeSection;
+                    const stepIndex = steps.findIndex(s => s.section === activeSection);
+                    const isCompleted = !isNewQuote && index < stepIndex;
+                %>
+                    <% if (index > 0) { %>
+                        <div class="stepper-connector <%= isCompleted || isActive ? 'completed' : '' %>"></div>
+                    <% } %>
 
-            <% if (isDisabled) { %>
-                <div class="stepper-item disabled" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Primero debes crear la cotización">
-                    <span class="stepper-number"><i class="ti ti-lock" style="font-size: 0.8rem;"></i></span>
-                    <span class="stepper-label"><%= step.label %></span>
-                </div>
-            <% } else { %>
-                <a href="<%= step.href %>" class="stepper-item <%= isActive ? 'active' : '' %> <%= isCompleted ? 'completed' : '' %>">
-                    <span class="stepper-number">
-                        <% if (isCompleted) { %>
-                            <i class="ti ti-check" style="font-size: 0.85rem;"></i>
-                        <% } else { %>
-                            <%= step.number %>
-                        <% } %>
-                    </span>
-                    <span class="stepper-label"><%= step.label %></span>
-                </a>
-            <% } %>
-        <% }); %>
+                    <% if (isDisabled) { %>
+                        <div class="stepper-item disabled" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Primero debes crear la cotización">
+                            <span class="stepper-number"><i class="ti ti-lock" style="font-size: 0.8rem;"></i></span>
+                            <span class="stepper-label"><%= step.label %></span>
+                        </div>
+                    <% } else { %>
+                        <a href="<%= step.href %>" class="stepper-item <%= isActive ? 'active' : '' %> <%= isCompleted ? 'completed' : '' %>">
+                            <span class="stepper-number">
+                                <% if (isCompleted) { %>
+                                    <i class="ti ti-check" style="font-size: 0.85rem;"></i>
+                                <% } else { %>
+                                    <%= step.number %>
+                                <% } %>
+                            </span>
+                            <span class="stepper-label"><%= step.label %></span>
+                        </a>
+                    <% } %>
+                <% }); %>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -294,25 +297,32 @@ window.__hasPendingCancellation = <%= (typeof hasPendingCancellation !== "undefi
 
 <style>
 /* Horizontal Stepper Styles */
+/* El stepper vive DENTRO de la banda del título (misma columna que el folio y el control de
+   estado), no en una tarjeta propia. Antes era una card centrada con padding y sombra: unos 90px
+   de alto para un control de ~40, y centrada mientras el breadcrumb, el título y el contenido van
+   alineados a la izquierda — lo que la hacía leer como adorno en vez de como la navegación que es
+   (cada paso es un <a href> real). */
 .quote-stepper {
-    background: white;
-    border-radius: 0.5rem;
-    padding: 1rem 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e9ecef;
 }
 
 .stepper-track {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start; /* alineado con el título y el resto de la página, no centrado */
     gap: 0;
+    flex-wrap: wrap;
 }
 
 .stepper-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1.25rem;
+    /* Algo más compacto que antes (era 0.5rem 1.25rem): fuera de la tarjeta, la píldora del paso
+       activo pesaba más que el contenido de la sección. */
+    padding: 0.35rem 0.85rem;
     border-radius: 2rem;
     text-decoration: none;
     color: #6c757d;
@@ -527,8 +537,11 @@ window.__hasPendingCancellation = <%= (typeof hasPendingCancellation !== "undefi
         width: 24px;
     }
 
+    /* Ya no es una tarjeta: solo separa del bloque del título. El padding lateral de antes
+       (0.75rem 1rem) lo desalineaba del resto de la columna en móvil. */
     .quote-stepper {
-        padding: 0.75rem 1rem;
+        margin-top: 0.5rem;
+        padding-top: 0.5rem;
     }
 
     .quote-status-header { display: none; }

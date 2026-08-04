@@ -1,0 +1,784 @@
+/*
+ * Lista de servicios de una reservación — hoja compartida.
+ *
+ * La pintan el detalle de admin, el de client y el de department_manager. Vivía solo en la plantilla
+ * de admin, así que las otras dos se quedaron con un layout de dos columnas de hace varias versiones:
+ * cada mejora al detalle había que copiarla a mano o, como pasó, no se copiaba.
+ *
+ * Las reglas del SELECTOR de asignación viajan aquí aunque solo el admin lo abra. Separarlas en dos
+ * hojas obligaría a decidir en cada regla nueva a cuál pertenece, y una regla sin elemento que la
+ * use no cuesta nada; una regla en la hoja equivocada sí.
+ */
+
+/* Panel de Servicios: mismo contenedor que el Resumen Financiero (fin-wrap + fin-section-head) en vez
+   del card-header con gradiente verde, que era el único bloque de la página fuera de la paleta. La
+   lista sangra hasta el borde con margen negativo para que las bandas de día y los separadores de fila
+   sigan corriendo a todo lo ancho, como cuando el card-body llevaba p-0; overflow:hidden recorta la
+   última fila contra la esquina redondeada. */
+.svc-wrap {
+    border: 1px solid #ece8dd;
+    border-radius: 14px;
+    background: #fff;
+    padding: 20px 22px 0;
+    overflow: hidden;
+}
+.svc-wrap #servicesContainer { margin: 0 -22px; }
+/* El botón de exportar venía en btn-light (pensado para el header de color): sobre blanco se perdía. */
+.svc-wrap .btn-outline-secondary { border-color: #dcdccf; color: #6b7256; }
+.svc-wrap .btn-outline-secondary:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
+/* ===== Lista de servicios con la maqueta del itinerario =====
+   Misma línea de tiempo que /reservations/:folio/itinerary: barra de día, riel con ícono circular y
+   el cuerpo del servicio a la derecha. Lo que el itinerario YA acomoda (hora, título, Desde/Hacia)
+   toma su formato; lo que no contempla —detalles del subconcepto, asignaciones, estado, precio y las
+   acciones— se conserva dentro del mismo cuerpo, sin perder nada. */
+/* Misma tipografía que el itinerario: Myriad Pro en el cuerpo y Arpona en la barra de día (allá son
+   las variantes *PDF, incrustadas en base64 para el render de puppeteer; aquí las de /css/fonts.css).
+   Se limita a la lista de servicios: el resto del dashboard va en Inter y mezclar en toda la página
+   sería otro cambio, mucho mayor. */
+.svc-timeline {
+    --svc-pad: 15px;
+    --svc-icon: 56px;
+    --svc-gutter: 22px;
+    font-family: var(--font-myriad, 'Segoe UI', Tahoma, sans-serif);
+}
+/* Barra de día igual que .itin-day-bar del itinerario: franja gris sólida a todo lo ancho, texto
+   blanco, 0.8rem con peso 500 y letter-spacing de 1px. */
+.svc-day-bar {
+    background: #888888;
+    color: #fff;
+    font-family: var(--font-arpona, 'Helvetica Neue', Arial, sans-serif);
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 1px;
+    padding: 3px var(--svc-gutter, 22px);
+}
+.svc-entry {
+    position: relative;
+    display: flex;
+    gap: 14px;
+    padding: var(--svc-pad) var(--svc-gutter);
+}
+/* Sin realce al pasar el mouse: los PNG del riel no tienen canal alfa, así que su recuadro blanco se
+   recortaba contra el tinte de la fila. */
+/* La línea baja del ícono de este servicio al del siguiente: el tramo negativo cruza el relleno que
+   los separa. En el último de cada día no se dibuja, así el riel no cuelga sobre la barra siguiente. */
+.svc-entry:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: calc(var(--svc-gutter) + var(--svc-icon) / 2 - 0.75px);
+    top: calc(var(--svc-pad) + var(--svc-icon));
+    bottom: calc(-1 * var(--svc-pad));
+    width: 1.5px;
+    background: #e4e6d8;
+}
+/* Sin círculo propio: los PNG de /images/icons ya traen el suyo dibujado, así que un borde alrededor
+   duplicaba el aro. La imagen ocupa toda la casilla del riel.
+   El fondo se queda BLANCO —igual que .itin-icon en el itinerario— porque esos PNG no tienen canal
+   alfa: pintan un recuadro opaco. Coincidir con su blanco evita la costura y de paso tapa la línea
+   del riel, que es lo que hace que se vea perforada por cada ícono. */
+.svc-icon {
+    position: relative;
+    z-index: 1;
+    width: var(--svc-icon);
+    height: var(--svc-icon);
+    flex-shrink: 0;
+    background: #fff;
+}
+.svc-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.svc-body { flex: 1; min-width: 0; }
+.svc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.svc-head-main { min-width: 0; flex: 1; }
+/* Misma tipografía que .itin-time del itinerario: 0.95rem, peso 700, en un solo tono — la duración no
+   se distingue de la hora, se lee como una sola línea. */
+.svc-time { font-size: 0.95rem; font-weight: 700; color: #1b1b1b; }
+.svc-title { font-size: 1.02rem; font-weight: 700; color: #2b2b2b; line-height: 1.3; word-break: break-word; }
+.svc-route { margin-top: 2px; font-size: 0.86rem; color: #6b6656; line-height: 1.45; }
+.svc-route b { color: #2b2b2b; font-weight: 600; }
+.svc-route .lbl { color: #8a8f78; }
+/* Personas: línea destacada bajo el título, igual que el .itin-sub en negrita del itinerario. */
+.svc-people { margin-top: 6px; font-size: 0.86rem; color: #6c757d; }
+/* Nombres de las personas: mismo tono que el conteo, sin negrita — el conteo es el dato destacado. */
+.svc-names { margin-top: 2px; font-size: 0.86rem; color: #6c757d; }
+/* Vuelos: misma mini tabla que .itin-flight del itinerario — encabezado chico en gris y el valor en
+   negrita debajo. Con varios vuelos, cada uno añade un renglón de valores bajo el mismo encabezado
+   (el itinerario solo contempla uno). */
+.svc-flight {
+    display: grid;
+    grid-template-columns: repeat(5, auto);
+    justify-content: start;
+    gap: 2px 28px;
+    margin-top: 8px;
+}
+.svc-flight .h { font-size: 0.7rem; color: #8a8a8a; }
+.svc-flight .v { font-size: 0.9rem; color: #1b1b1b; font-weight: 600; }
+/* Notas: mismo tratamiento que .itin-desc — texto corrido justificado, sin caja ni filete de color.
+   El rótulo del canal se conserva en versalitas porque aquí sí hay que distinguir a quién va dirigida
+   cada nota (proveedor / equipo / interna), cosa que el itinerario no necesita.
+
+   El color del rótulo pasó de los cinco tonos de Bootstrap (cian, azul, verde, naranja, morado) a
+   tres de la paleta de marca, y los tres CODIFICAN algo cierto: quién puede leer la nota. Antes eran
+   cinco matices arbitrarios que además peleaban con el olivo del resto de la lista. */
+.svc-note { margin-top: 8px; }
+.svc-note-lbl {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    /* 0.09em, igual que .svc-assign-role: los dos son rótulos en versalitas del mismo nivel. */
+    letter-spacing: 0.09em;
+    color: #8a8f78;
+}
+/* Visible para el cliente. */
+.svc-note-lbl.is-client { color: #6e7a50; }
+/* Operación con terceros: proveedor y equipo. */
+.svc-note-lbl.is-ops { color: #b8894a; }
+/* Solo interno. */
+.svc-note-lbl.is-internal { color: #6b6656; }
+.svc-note-body {
+    margin-top: 2px;
+    color: #555;
+    line-height: 1.55;
+    white-space: pre-line;
+    text-align: justify;
+    word-break: break-word;
+}
+.svc-notes-list { margin: 6px 0 0; padding-left: 1.2em; }
+.svc-notes-list li { list-style: disc; margin: 2px 0; }
+/* .svc-vehicle (el tipo de vehículo bajo el conteo de personas) se retiró: el bloque de
+   asignaciones ya nombra el tipo en cada plaza, asignada o pendiente. */
+.svc-side { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+/* .svc-price se retiró: el dinero vive en el Resumen Financiero y en el carrito de pagos; esta lista
+   es la vista de operación. */
+/* Incluye / no incluye, en dos columnas. Mismo formato que .itin-inc del itinerario: al lector le
+   sirve leer qué sí y qué no de un tiro, no una lista debajo de la otra. */
+.svc-inc { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; margin-top: 0.5rem; }
+.svc-inc-col { min-width: 170px; }
+.svc-inc-lbl {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    color: #8a8f78;
+    margin-bottom: 2px;
+}
+.svc-inc-list { margin: 0; padding: 0; list-style: none; font-size: 0.86rem; }
+.svc-inc-list li { position: relative; padding-left: 15px; line-height: 1.5; color: #6b6656; }
+.svc-inc-list li::before { position: absolute; left: 0; font-weight: 700; }
+/* Glifos de TEXTO (✓ / ×) y no íconos de fuente, igual que en el itinerario. */
+.svc-inc-list.is-yes li::before { content: '\2713'; color: #6f7459; }
+.svc-inc-list.is-no li::before { content: '\00D7'; color: #a09c8d; }
+/* Asignaciones en el formato del itinerario (opción B): un renglón por pareja chofer+vehículo y
+   los roles al final. Sin marco ni filete lateral: los avatares ya forman su propia columna y el
+   bloque queda alineado con el título y la ruta del servicio, como en el itinerario. */
+.svc-assign {
+    margin-top: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+/* Sin renglones no se dibuja el contenedor: un .svc-assign vacío no mide alto pero sí aporta su
+   margin-top, y dejaba un hueco muerto en los servicios que no piden a nadie. */
+/* Cobertura de asignación: no es un control, es una lectura. Letra a 0.86rem —igual que .svc-route y
+   .svc-people— porque a 0.72 se leía como una nota al pie de algo que se consulta a cada rato.
+   Resalta el estado COMPLETO, que hoy es el raro; el incompleto va en gris para no volver a levantar
+   un muro de advertencias en cada renglón. */
+.svc-cov {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: #8a8f78;
+    white-space: nowrap;
+}
+.svc-cov.is-done { color: #4b6b3f; }
+/* Conceptos: ocupan el mismo lugar que la cobertura de los demás servicios y explican por qué no la
+   tienen. Sustituyen a la píldora verde "Lista", que solo quería decir "no está cancelada" —se
+   prendía en los 30 conceptos de la base— y en verde saturado era lo más llamativo del renglón. */
+.svc-cov.is-none { font-weight: 400; color: #a8ac98; font-style: italic; }
+.svc-cov i { font-size: 1.05rem; }
+
+/* El control de estado dice lo que hace. Antes era un círculo sin palabras cuyo ícono y color
+   cambiaban con el estado, pegado a los círculos de asignación y del mismo tamaño: dos lenguajes
+   encimados para cosas de distinta categoría —uno asigna a una persona, el otro declara un hecho
+   operativo—. Y su ícono de "completada" era `ti-circle-check-filled`, que NO existe en este icon
+   font, así que un servicio completado pintaba una caja vacía. */
+.svc-status-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid #dcdccf;
+    background: #fff;
+    color: #6b6656;
+    border-radius: 999px;
+    padding: 0.26rem 0.7rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
+}
+.svc-status-btn:hover { background: #f4f5ef; border-color: #c9cab6; color: #2b2b2b; }
+.svc-status-btn:disabled { opacity: 0.55; cursor: default; }
+.svc-status-btn i { font-size: 0.95rem; }
+/* Revertir va más callado: la píldora "Completada" ya cuenta el estado, esto solo lo deshace. */
+.svc-status-btn.is-revert { border-color: #ece8dd; color: #a09c8d; font-weight: 400; }
+.svc-status-btn.is-revert:hover { color: #6b6656; }
+
+/* Punto de entrada callado: el círculo chico y apagado, y su rótulo escondido hasta que el mouse
+   entra al servicio. En reposo casi no pesa —era la repetición que sobraba—; al querer editar, dice
+   qué es. El rótulo conserva su espacio (opacity y no display) para que no haya salto de layout. */
+.svc-assign-row.is-quiet .svc-av {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+    opacity: 0.3;
+    transition: opacity 0.12s;
+}
+.svc-quiet-lbl {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    color: #a8ac98;
+    opacity: 0;
+    transition: opacity 0.12s;
+    /* El clic es del círculo, como en todos los demás renglones: el rótulo es una pista, no un
+       control, y sin esto se vería pulsable sin serlo. */
+    pointer-events: none;
+}
+.svc-entry:hover .svc-assign-row.is-quiet .svc-av,
+.svc-assign-row.is-quiet .svc-av:hover,
+.svc-assign-row.is-quiet .svc-av:focus-visible { opacity: 1; }
+.svc-entry:hover .svc-quiet-lbl,
+.svc-assign-row.is-quiet:focus-within .svc-quiet-lbl { opacity: 1; }
+.svc-assign-row { display: flex; align-items: center; gap: 0.7rem; }
+.svc-av {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #eef0e8;
+    color: #6f7459;
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+.svc-av img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
+.svc-av-veh { background: #f3f1ea; color: #a89a7a; font-size: 1.35rem; }
+/* Plaza vacía: punteada y sin relleno, para que el hueco se lea sin gritar. */
+.svc-av-pend { background: #fff; border: 1.5px dashed #d4d0c2; color: #b9b5a6; font-size: 1.35rem; }
+/* Los dos avatares se solapan para que la pareja se lea como una sola unidad. El aro blanco que
+   los separa va en box-shadow, NO en border: con border, este selector (más específico) le ganaba
+   a .svc-av-pend y le borraba el punteado al segundo círculo de una plaza vacía. */
+.svc-duo { display: flex; flex-shrink: 0; }
+.svc-duo .svc-av + .svc-av { margin-left: -13px; box-shadow: 0 0 0 2px #fff; }
+.svc-assign-meta { font-size: 0.86rem; line-height: 1.45; color: #6b6656; min-width: 0; }
+.svc-assign-meta .n { font-size: 0.94rem; font-weight: 700; color: #2b2b2b; }
+/* El vehículo es un sujeto igual que la persona, pero una cosa: mismo tamaño de cuerpo y menos peso
+   que el nombre, para que la jerarquía diga "a quién" antes que "en qué". */
+.svc-veh-name { font-weight: 600; color: #2b2b2b; }
+/* Placa: cápsula monoespaciada, como se ven las matrículas. Sustituye a la palabra "Placas" —la
+   forma comunica que es un identificador y funciona igual con "A" que con "EXY-3452-1"—. Ancho de
+   dígito fijo para que varias placas se alineen al recorrer la lista. */
+.svc-plate {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid #dcdccf;
+    border-radius: 5px;
+    background: #fbfaf6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    color: #4a4a44;
+    white-space: nowrap;
+}
+/* Va después de `.n` y con la clase encadenada: si no, `.svc-assign-meta .n` le gana el peso y
+   el color, y el renglón pendiente se vería igual que uno asignado. */
+.svc-assign-meta .svc-pend-txt,
+.svc-assign-meta .n.svc-pend-txt { font-style: italic; font-weight: 400; color: #a09c8d; }
+/* "Opcional" va más callado que "Pendiente": uno es un hueco que hay que llenar y el otro solo una
+   posibilidad. Si se vieran igual, un servicio sin guía contratado se leería como un pendiente. */
+.svc-assign-meta .svc-opt-txt,
+.svc-assign-meta .n.svc-opt-txt { font-style: normal; font-weight: 400; color: #bdbcae; }
+/* De dónde sale la persona del renglón: "de la reservación" o "solo este servicio". */
+.svc-assign-src { font-size: 0.78rem; color: #a09c8d; font-style: italic; }
+/* Variante chica, para el chip del encabezado: ahí 52px se comerían la barra. */
+.svc-av.is-sm { width: 34px; height: 34px; font-size: 0.72rem; }
+.svc-av.is-sm.svc-av-pend { font-size: 0.95rem; }
+.bkg-cs-row { display: inline-flex; align-items: center; gap: 8px; }
+/* El avatar tenue del estado "heredado" se retiró con ese estado: el renglón de Customer Support solo
+   se dibuja cuando DIVERGE del global, así que nunca muestra a alguien no capturado en el servicio. */
+/* El tipo esperado de una plaza vacía: conserva la negrita porque ES el sujeto del renglón, pero
+   apagado para que no compita con un vehículo ya asignado. Sin itálica: es un dato, no un estado.
+   Encadenada por lo mismo que la regla de arriba — `.svc-assign-meta .n` le ganaría el color. */
+.svc-assign-meta .n.svc-pend-name { color: #8a8f78; }
+.svc-assign-role { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 700; color: #8a8f78; }
+.svc-assign-tel { color: #6b6656; text-decoration: none; }
+.svc-assign-tel:hover { color: #566040; text-decoration: underline; }
+.svc-seg-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+/* El CÍRCULO es el punto de asignación: cada avatar representa a una persona o a un vehículo, así
+   que tocar el del chofer para cambiar al chofer es inequívoco, y cada uno abre su propio selector.
+   Al pasar el mouse el círculo se adelanta (z-index): los dos de una pareja se solapan 13px y sin
+   eso la mitad del de la izquierda quedaría debajo y sería difícil de apuntar. */
+.svc-av.is-pick { cursor: pointer; }
+.svc-av.is-pick:hover,
+.svc-av.is-pick:focus-visible {
+    z-index: 2;
+    outline: none;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #6e7a50;
+}
+/* En la segunda mitad de una pareja el aro blanco separador ya vive en box-shadow, y el de hover lo
+   reemplazaría; se declara después para que gane, conservando el aro blanco como primera capa. */
+.svc-duo .svc-av.is-pick + .svc-av.is-pick:hover,
+.svc-duo .svc-av.is-pick + .svc-av.is-pick:focus-visible {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #6e7a50;
+}
+
+/* Selector de asignación.
+   `fixed` y no `absolute`: el que hace scroll en este dashboard es `.dashboard-content`
+   (overflow-y: auto), no la ventana. Con absolute, window.scrollY vale siempre 0 mientras
+   getBoundingClientRect() devuelve coordenadas del viewport, así que el panel aterrizaba al inicio
+   de la página — y ese mismo overflow lo habría recortado. Con fixed las coordenadas del rect se
+   usan tal cual, sin aritmética de scroll y sin importar qué contenedor scrollea. */
+.assign-pop {
+    position: fixed;
+    z-index: 1080;
+    width: 320px;
+    max-width: calc(100vw - 24px);
+    background: #fff;
+    border: 1px solid #dcdccf;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(43, 43, 43, 0.16);
+    overflow: hidden;
+}
+.assign-pop-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid #f0eee7;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    color: #8a8f78;
+}
+.assign-pop-x {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: #8a8f78;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+}
+.assign-pop-x:hover { color: #2b2b2b; }
+.assign-pop-search {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid #f0eee7;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.9rem;
+    outline: none;
+}
+.assign-pop-body { max-height: 320px; overflow-y: auto; padding: 0.35rem; }
+.assign-pop-grp {
+    padding: 0.4rem 0.4rem 0.2rem;
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    font-weight: 700;
+    color: #a8ac98;
+}
+.assign-pop-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0.4rem 0.45rem;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: #2b2b2b;
+}
+.assign-pop-opt:hover { background: #f4f5ef; }
+.assign-pop-opt.is-current { background: #eef0e6; font-weight: 600; }
+.assign-pop-opt .sub { font-size: 0.76rem; color: #8a8f78; }
+.assign-pop-opt .tick { margin-left: auto; color: #6e7a50; }
+.assign-pop-opt.is-clear { color: #a1443a; }
+.assign-pop-empty, .assign-pop-loading { padding: 0.8rem 0.6rem; font-size: 0.86rem; color: #8a8f78; font-style: italic; }
+/* Al elegir, el panel se cierra de inmediato y la espera se muestra EN EL CÍRCULO correspondiente,
+   para poder seguir eligiendo —el chofer, luego el vehículo— sin esperar a que termine el anterior.
+   `.svc-av` ya es position:relative con overflow:hidden, así que el velo cubre justo el círculo. */
+.svc-av.is-saving { pointer-events: none; }
+.svc-av-busy {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.78);
+    color: #6e7a50;
+}
+@media (max-width: 576px) {
+    .svc-timeline { --svc-gutter: 14px; --svc-icon: 44px; }
+    .svc-side { width: 100%; justify-content: flex-end; }
+}
+
+/* Botones del itinerario en la cabecera del panel: ver en pantalla y descargar. Van en un control
+   segmentado porque son la misma acción con dos variantes —el mismo documento—, así que "Exportar"
+   queda implícito en el grupo y cada botón solo nombra lo que entrega. Antes era un control único,
+   así que solo se podía hacer una de las dos cosas. */
+.hdr-seg{display:inline-flex;gap:3px;background:#f1f2ec;border:1px solid #e6e4dd;border-radius:10px;padding:3px;}
+.hdr-seg-btn{display:inline-flex;align-items:center;gap:.35rem;border:none;background:transparent;border-radius:7px;
+  font-size:.8rem;font-weight:600;color:#6b7256;padding:.35rem .75rem;line-height:1.2;white-space:nowrap;
+  text-decoration:none;font-family:inherit;transition:background .12s,color .12s;}
+.hdr-seg-btn:hover{background:#fff;color:#4f5838;}
+.hdr-seg-btn:disabled{color:#b3b7a5;cursor:not-allowed;}
+/* Generando el PDF: el botón deja de aceptar clics y muestra el progreso en su propio lugar. */
+.hdr-seg-btn.is-busy{pointer-events:none;color:#8a8f78;}
+.hdr-seg-btn:disabled:hover{background:transparent;color:#b3b7a5;}
+
+/* Acciones del encabezado: exportar (neutra) y cancelar (la única irreversible, discreta a
+   propósito, que se tiñe al hover). Compartidas por los cuatro detalles. */
+/* Acciones del encabezado. Aquí solo hay una exportación, así que va como botón suelto (en admin,
+   que tiene dos, van en un control segmentado). */
+.hdr-btn{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#6b7256;
+  background:#fff;border:1px solid #dcdccf;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
+  white-space:nowrap;text-decoration:none;font-family:inherit;transition:all .12s ease;}
+.hdr-btn:hover{background:#f1f2ec;border-color:#c9cdbb;color:#4f5838;}
+/* La única acción irreversible NO debe ser lo más llamativo: arranca discreta y se tiñe al hover. */
+.hdr-danger{display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;color:#8a8f78;
+  background:transparent;border:1px solid transparent;border-radius:8px;padding:.4rem .8rem;line-height:1.2;
+  white-space:nowrap;font-family:inherit;cursor:pointer;transition:all .12s ease;}
+.hdr-danger:hover{background:#f7ecea;border-color:#e6c9c4;color:#a1443a;}
+
+/* ---------------------------------------------------------------------------
+   Identidad del documento, al frente del panel de servicios.
+
+   Quién viaja, cuándo, cuántos y cuánto va asignado. Son los mismos datos que encabezan el PDF del
+   itinerario. Vivían como celdas sueltas en la tarjeta de arriba, a media pantalla de los servicios
+   que describen; aquí hacen que el panel se lea como el documento que se manda.
+
+   Va en DOS niveles y no en una frase corrida: el nombre de quien viaja es el sujeto y lo demás es
+   su detalle. En una sola línea con todo del mismo peso, el ojo no sabía dónde empezar y los puntos
+   separadores hacían de todo un enunciado.
+
+   No es una rejilla: en la tarjeta, la celda del lead guest tenía que reservar su lugar aunque
+   estuviera vacía —de ahí .bkg-tile.is-empty— para que el resto no se recorriera. Aquí, lo que no
+   existe simplemente no se escribe.
+   --------------------------------------------------------------------------- */
+.svc-doc {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  /* SIN relleno lateral propio: .svc-wrap ya trae 22 px y esta línea es hija suya, así que uno
+     propio se sumaba al del contenedor y la dejaba metida respecto al título "Servicios" y a los
+     botones. El que sí hace falta es el inferior, para separarla de la barra del día.
+     (La lista de abajo es el caso contrario: #servicesContainer usa margen negativo para SALIRSE
+     del relleno y sangrar a todo lo ancho.) */
+  padding: 0 0 16px;
+  margin-bottom: 0;
+  /* Sin fondo: con él se leía como una tira pegada encima de la lista, compitiendo con la barra del
+     día que va justo debajo. Lo que separa es el aire y el peso de la tipografía, no una caja. */
+  border-bottom: 1px solid #ece8dd;
+}
+.svc-doc-id { min-width: 0; }
+.svc-doc-quien {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: #2b2b2b;
+  line-height: 1.25;
+}
+.svc-doc-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+  font-size: .86rem;
+  color: #6b6656;
+}
+/* El pasajero: renglón propio bajo las fechas, con peso. Iba dentro de .svc-doc-meta, al mismo
+   tamaño y color que las noches y las personas, así que QUIÉN viaja se leía igual que cuántas
+   noches dura. Solo se escribe cuando el título son las fechas: si él es el título, no se repite. */
+.svc-doc-pax {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2b2b2b;
+  line-height: 1.3;
+}
+.svc-doc-pax-icono { margin-right: 8px; color: #8a8f78; font-size: .95em; }
+
+.svc-doc-menor { color: #8a8f78; font-style: italic; }
+.svc-doc-sep { color: #c9cdbb; }
+
+/* Columna derecha del encabezado: exportar arriba, avance abajo. Antes vivían en dos filas
+   distintas —los botones colgaban del título "Servicios" y el avance de la línea del documento—,
+   así que el panel gastaba dos encabezados apilados para dos cosas que caben en uno. */
+.svc-doc-acciones {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+/* El icono del título dice de qué clase es el encabezado: fechas, pasajero o el rótulo genérico. */
+.svc-doc-icono { margin-right: 9px; color: #6E7A50; font-size: .96em; }
+
+/* El avance es el estado del TRABAJO, no parte de la identidad: se separa al extremo opuesto y
+   lleva su propio rótulo, para que no se lea como un dato más del viaje. */
+.svc-doc-avance { flex: none; text-align: right; }
+/* Rótulo y cifra en el mismo renglón: apilados sumaban un tercer nivel a una columna que ya lleva
+   los botones encima, y el encabezado crecía más alto que el dato que encabeza. */
+.svc-doc-avance-linea { display: flex; align-items: baseline; justify-content: flex-end; gap: 9px; }
+.svc-doc-cap {
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #8a8f78;
+  margin-bottom: 2px;
+}
+.svc-doc-cifra { font-size: .95rem; font-weight: 600; color: #2b2b2b; white-space: nowrap; }
+.svc-doc-barra {
+  display: block;
+  width: 132px;
+  height: 5px;
+  margin-top: 6px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: #eceadf;
+  overflow: hidden;
+}
+.svc-doc-barra > span { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .35s ease; }
+@media (max-width: 640px) {
+  .svc-doc-avance { text-align: left; }
+  .svc-doc-barra { margin-left: 0; }
+}
+
+/* ---------------------------------------------------------------------------
+   Barra de cobranza del pie.
+
+   El detalle sirve dos oficios —operar y cobrar— y antes competían por el orden vertical: el dinero
+   se metía entre «quién es esto» y «qué tengo que hacer». Aquí el saldo acompaña sin ocupar un
+   bloque en el flujo, y el desglose completo vive en el carrito, que es donde además se actúa.
+   --------------------------------------------------------------------------- */
+.pay-bar {
+  /* Anclada a la ventana, pero arrancando donde termina el sidebar. `sticky` no sirve aquí: la barra
+     es el último elemento del contenido, así que su contenedor termina justo donde ella empieza y no
+     le queda margen para despegarse — sólo se veía al llegar hasta abajo.
+     El desplazamiento NO es un número escrito a mano: --ancho-sidebar lo declara el layout y vale
+     270 px, 80 px al colapsarlo y 0 en móvil. La barra sólo lo hereda. */
+  position: fixed;
+  left: var(--ancho-sidebar, 0px);
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  background: #fff;
+  border-top: 1px solid #dcdccf;
+  box-shadow: 0 -5px 20px rgba(43, 43, 43, .10);
+  transition: left .3s ease;
+}
+/* El contenido no puede quedar tapado por la barra. */
+.dashboard-content:has(.pay-bar) { padding-bottom: 104px; }
+
+.pay-bar-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.pay-bar-cifra { display: flex; align-items: baseline; gap: 8px; flex: none; }
+.pay-bar-lbl {
+  font-size: .68rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: #8a8f78;
+}
+.pay-bar-val { font-size: 1.65rem; font-weight: 700; color: #b8894a; letter-spacing: -.01em; }
+/* Sin saldo no hay nada que reclamar: deja el ámbar, que es la señal de que falta algo. */
+.pay-bar-val.is-cubierto { color: #4b6b3f; }
+
+.pay-bar-prog { flex: 1 1 200px; min-width: 150px; }
+.pay-bar-track { height: 7px; border-radius: 999px; background: #eceadf; overflow: hidden; }
+.pay-bar-track > span { display: block; height: 100%; width: 0; border-radius: 999px; background: #4b6b3f; transition: width .35s ease; }
+.pay-bar-pie {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  margin-top: 7px; font-size: .84rem; color: #6b6656;
+}
+
+/* El mismo verde que el relleno de la barra: lo pagado y el avance son el mismo dato dicho de dos
+   formas, y el color los ata. Si cambia el verde de la barra, cambia aquí. */
+.pay-bar-pagado { color: #4b6b3f; font-weight: 700; }
+
+.pay-bar-derecha { display: inline-flex; align-items: center; gap: 9px; }
+/* El método va como chip apagado, no como píldora de color: informa cuál de los tres precios se
+   está cobrando, no anuncia un estado. La píldora de al lado sí es estado y debe ganarle.
+   Lo que NO puede cambiar entre ellas es la FORMA: van una junto a la otra, así que este chip copia
+   la métrica de la píldora de estado —.72rem, relleno .4/.8 y line-height 1, los de la paleta
+   consolidada de más abajo—. Antes traía la suya (.72rem pero relleno .3/.7 y sin line-height fijo)
+   y la de estado se veía más gorda: su texto lleva minúsculas con ascendentes, que estiran la caja
+   cuando el alto lo decide la línea de texto. */
+/* La oportunidad de ahorro es un chip APARTE, no una segunda mitad del método: dentro del mismo
+   quedaban dos nombres de método seguidos sin nada que dijera cuál era cuál. Así el de método no
+   cambia nunca —siempre dice qué se cobra— y este solo aparece cuando hay algo que ofrecer.
+   Va del verde del aviso que sale bajo el Total a pagar, que es el mismo dato en otro sitio, y no
+   del ámbar: ese lo lleva la píldora de estado, que va al lado, y dos ámbar contiguos se anulan. */
+.pay-bar-ahorro {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .72rem; font-weight: 700; line-height: 1;
+  color: #3f5a34; background: #e6efe1; border: 1px solid #cfe0c6;
+  border-radius: 999px; padding: .4rem .8rem; white-space: nowrap;
+}
+.pay-bar-ahorro i { font-size: .95rem; }
+.pay-bar-metodo {
+  display: inline-flex; align-items: center;
+  font-size: .72rem; font-weight: 700; line-height: 1;
+  letter-spacing: .07em; text-transform: uppercase;
+  color: #6b6656; background: #f1f2ec; border: 1px solid #e6e4dd;
+  border-radius: 999px; padding: .4rem .8rem; white-space: nowrap;
+}
+
+.pay-bar-acciones { display: flex; gap: 8px; margin-left: auto; }
+.pay-bar-btn {
+  font-size: .82rem; font-weight: 700; letter-spacing: .04em;
+  border: 1px solid #dcdccf; background: #fff; color: #6b7256;
+  border-radius: 9px; padding: .7rem 1.3rem; line-height: 1.2;
+  white-space: nowrap; font-family: inherit; cursor: pointer; transition: all .12s ease;
+}
+.pay-bar-btn:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
+.pay-bar-btn.is-primaria { background: #6E7A50; border-color: #6E7A50; color: #fff; }
+.pay-bar-btn.is-primaria:hover { background: #566040; border-color: #566040; color: #fff; }
+
+/* El carrito se angosta: su contenido es una columna —cobertura, desglose, acción, historial— y a
+   860 px quedaba nadando, con el vacío concentrado abajo. */
+#paymentsOffcanvas { --bs-offcanvas-width: 460px; }
+@media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
+
+.pay-desglose:empty { display: none; }
+
+/* ---------------------------------------------------------------------------
+   Píldoras de estado, en la paleta de marca.
+
+   Bootstrap las pinta en amarillo y verde de semáforo, que en esta interfaz gritan. El suavizado
+   estaba escrito CUATRO veces —una por cada contenedor donde vivía la píldora— así que cada casa
+   nueva heredaba el estilo crudo: fue lo que pasó con la barra de cobranza, que salía amarillo
+   Bootstrap mientras la de arriba salía suave.
+
+   Ahora los colores viven una sola vez y la lista de contenedores es lo único que crece.
+   --------------------------------------------------------------------------- */
+#headerActions .badge,
+.bkg-status .badge,
+.fin-hero-meta .badge,
+.pay-bar .badge {
+  font-weight: 700;
+  font-size: .72rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: .4rem .8rem;
+}
+#headerActions .badge.bg-success,
+.bkg-status .badge.bg-success,
+.fin-hero-meta .badge.bg-success,
+.pay-bar .badge.bg-success { background: #e6efe1 !important; color: #3f5a34 !important; border-color: #cfe0c6; }
+#headerActions .badge.bg-warning,
+.bkg-status .badge.bg-warning,
+.fin-hero-meta .badge.bg-warning,
+.pay-bar .badge.bg-warning { background: #f6efe2 !important; color: #96682f !important; border-color: #e7d6bd; }
+#headerActions .badge.bg-primary,
+.bkg-status .badge.bg-primary,
+.fin-hero-meta .badge.bg-primary,
+.pay-bar .badge.bg-primary { background: #eef0e6 !important; color: #566040 !important; border-color: #dce2d0; }
+#headerActions .badge.bg-info,
+.bkg-status .badge.bg-info,
+.fin-hero-meta .badge.bg-info,
+.pay-bar .badge.bg-info { background: #eaf1f0 !important; color: #3a6b63 !important; border-color: #cfe1dd; }
+#headerActions .badge.bg-secondary,
+.bkg-status .badge.bg-secondary,
+.fin-hero-meta .badge.bg-secondary,
+.pay-bar .badge.bg-secondary { background: #f0eee7 !important; color: #6b6656 !important; border-color: #ded9cb; }
+#headerActions .badge.bg-danger,
+.bkg-status .badge.bg-danger,
+.fin-hero-meta .badge.bg-danger,
+.pay-bar .badge.bg-danger { background: #f7ecea !important; color: #a1443a !important; border-color: #e6c9c4; }
+
+/* Los tres chips de la barra —método, ahorro y estado— van en fila y deben medir lo mismo. El alto
+   lo fija min-height y no el contenido: con relleno vertical, el icono del chip de ahorro (más
+   grande que su texto) lo estiraba a 30 px mientras los otros dos median 26. */
+/* El chip del método es el disparador del comparativo, así que se ofrece al cursor y lleva la
+   flecha de intercambio. Sin nada que comparar vuelve a ser una etiqueta (.no-abre). */
+.pay-bar-met-caja { position: relative; display: inline-flex; }
+.pay-bar-metodo { font-family: inherit; cursor: pointer; gap: 6px;
+  transition: background .12s ease, border-color .12s ease; }
+.pay-bar-metodo::after { content: "\21C5"; font-size: .9em; opacity: .75; }
+.pay-bar-metodo:hover { background: #e6e7de; border-color: #d5d6ca; }
+.pay-bar-metodo[aria-expanded="true"] { background: #dfe1d4; border-color: #c9cbbb; }
+.pay-bar-metodo.no-abre { cursor: default; }
+.pay-bar-metodo.no-abre::after { content: none; }
+.pay-bar-metodo.no-abre:hover { background: #f1f2ec; border-color: #e6e4dd; }
+
+/* El comparativo, anclado al chip. No expande la barra —231 px permanentes para algo que se
+   consulta de vez en cuando— ni obliga a abrir el carrito. Crece hacia la izquierda desde el borde
+   derecho del chip, que es el lado por donde hay sitio. */
+.pay-pop {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: 0;
+  z-index: 50;
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  padding: 18px 20px 14px;
+  background: #fff;
+  border: 1px solid #dcdccf;
+  border-radius: 12px;
+  box-shadow: 0 10px 34px rgba(43, 43, 43, .16);
+  text-align: left;
+  cursor: default;
+}
+.pay-pop::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  right: 34px;
+  border: 7px solid transparent;
+  border-top-color: #fff;
+  filter: drop-shadow(0 1px 0 #dcdccf);
+}
+.pay-pop-cap {
+  text-transform: uppercase; letter-spacing: .1em; font-size: .68rem; font-weight: 700;
+  color: #8a8f78; margin-bottom: 10px;
+}
+
+.pay-bar-metodo,
+.pay-bar-ahorro,
+.pay-bar .badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+/* En la barra la píldora convive con cifras chicas: se achica para no competir con el saldo. */
+

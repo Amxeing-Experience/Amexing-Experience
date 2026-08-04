@@ -1,0 +1,578 @@
+/*
+ * Resumen financiero y carrito de pagos de una reservación — hoja compartida.
+ *
+ * La usan los detalles de client, department_manager y end_client. Vivía dentro de la plantilla de
+ * client, duplicada palabra por palabra en department_manager, y end_client no la tenía: por eso su
+ * resumen seguía siendo filas de Bootstrap sin el total destacado ni el comparativo por método.
+ */
+
+.fin-wrap{border:1px solid #ece8dd;border-radius:14px;background:#fff;padding:20px 22px;}
+.fin-hero{padding-bottom:18px;margin-bottom:16px;border-bottom:1px solid #ece8dd;}
+.fin-hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.fin-hero-lbl{text-transform:uppercase;letter-spacing:.12em;font-size:.64rem;font-weight:700;color:#8a8f78;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.fin-hero-total{font-size:1.9rem;font-weight:700;color:#2b2b2b;line-height:1.1;margin-top:2px;}
+.fin-hero-pct{margin-top:15px;text-align:right;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;}
+.fin-bar{margin:5px 0 12px;height:8px;border-radius:999px;background:#f0e5d0;overflow:hidden;}
+.fin-bar > span{display:block;height:100%;width:0;border-radius:999px;background:#6E7A50;transition:width .35s ease;}
+.fin-hero-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+.fin-hero-meta .fin-status-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
+/* Badge de estado suavizado SOLO en el hero (no toca getPaymentStatusBadge compartido) */
+/* Botón "Agregar pago": pastilla olivo sólida, limpia y on-brand */
+.fin-pay-btn{display:inline-flex;align-items:center;gap:6px;background:#6E7A50;color:#fff;border:1px solid #6E7A50;
+  border-radius:999px;font-size:.8rem;font-weight:600;padding:.42rem .95rem;line-height:1.2;transition:background .12s,border-color .12s;}
+.fin-pay-btn:hover{background:#566040;border-color:#566040;color:#fff;}
+.fin-pay-btn:disabled{opacity:.6;}
+/* Chip de método = disparador del comparativo (collapse INLINE, no dropdown flotante). */
+.fin-hero-method{display:inline-flex;align-items:center;gap:5px;font-size:.68rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;color:#566040;background:#eef0e6;border:1px solid #dce2d0;border-radius:999px;padding:.2rem .6rem;
+  cursor:pointer;font-family:inherit;line-height:1.2;}
+.fin-hero-method:hover{background:#e4e8d8;border-color:#c9d2b8;}
+.fin-hero-method i{font-size:.9rem;}
+.fin-chev{font-size:.9rem;margin-left:2px;}
+.fin-hero-hint{display:inline-flex;align-items:center;gap:5px;margin-top:7px;font-size:.75rem;font-weight:600;color:#4b6b3f;}
+.fin-hero-hint i{font-size:.95rem;}
+/* Comparativo por método de pago */
+.fin-cmp-inline{margin-top:14px;padding:14px;border:1px solid #e6e1d5;border-radius:12px;background:#fbfaf6;}
+.fin-cmp-cap{font-size:.72rem;color:#8a8f78;margin-bottom:8px;}
+.fin-cmp-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;
+  border:1px solid #f0ece2;border-radius:9px;margin-bottom:6px;}
+.fin-cmp-row:last-child{margin-bottom:0;}
+.fin-cmp-row.active{border-color:#c9d2b8;background:#f4f7ee;}
+.fin-cmp-method{display:flex;align-items:center;gap:8px;color:#4a4a44;font-weight:600;}
+.fin-cmp-method i{color:#8a8f78;}
+.fin-cmp-right{display:flex;align-items:center;gap:10px;}
+.fin-cmp-amount{font-weight:700;color:#2b2b2b;}
+.fin-cmp-delta{font-weight:700;font-size:.82rem;white-space:nowrap;}
+.fin-cmp-badge{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:#566040;
+  background:#e7ecdd;border-radius:6px;padding:.16rem .5rem;}
+.fin-cmp-cheap{font-size:.58rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;color:#3f5a34;
+  background:#e6efe1;border:1px solid #cfe0c6;border-radius:6px;padding:.08rem .42rem;}
+.fin-hero-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.fin-hero-foot .lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
+.fin-hero-foot .val{font-weight:700;font-size:1.05rem;line-height:1.2;}
+.fin-savings{margin-top:12px;padding-top:10px;border-top:1px dashed #d8cfb8;color:#4b6b3f;}
+.fin-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f1efe8;}
+.fin-row:last-child{border-bottom:0;}
+.fin-row .lbl{color:#6b6656;display:flex;align-items:center;gap:8px;min-width:0;}
+.fin-row .lbl i{color:#8a8f78;flex-shrink:0;}
+.fin-row .val{font-weight:600;color:#2b2b2b;white-space:nowrap;}
+.fin-tip{color:#8a7d52 !important;}
+
+/* ---------------------------------------------------------------------------
+   Carrito de pagos (offcanvas). Viaja en la misma hoja que el resumen porque son la misma pieza para
+   el usuario: el resumen dice cuánto falta y el carrito, de dónde salió ese número.
+   --------------------------------------------------------------------------- */
+#paymentsOffcanvas { --bs-offcanvas-width: 860px; }
+@media (max-width: 576px) { #paymentsOffcanvas { --bs-offcanvas-width: 100%; } }
+.offcanvas-backdrop.show { background-color: rgba(15,23,32,0.72) !important; opacity: 1 !important; }
+#paymentsOffcanvas .offcanvas-body { background: #f8f9fa; font-size: 1rem; }
+#paymentCoverageCard.payment-coverage-highlight,
+#paymentMethodTable,
+#paymentFormWrap {
+    background: #fff;
+    border: 1px solid #e0e6ed;
+    border-radius: 0.5rem;
+}
+#paymentCoverageCard.payment-coverage-highlight { border-left: 4px solid #969b81; }
+#paymentMethodTable,
+#paymentFormWrap {
+    border-left: 4px solid #c0c3b3;
+}
+/* Tabs del drawer — control segmentado full-width (mismo estilo que el catálogo de servicios) */
+#paymentsTabs.payments-seg { flex-wrap: nowrap; gap: 4px; background: #f1f2ec; border: 1px solid #e6e4dd; border-radius: 12px; padding: 4px; }
+#paymentsTabs.payments-seg .nav-item { flex: 1 1 0; min-width: 0; }
+#paymentsTabs.payments-seg .nav-link { width: 100%; border: none; border-radius: 9px; font-size: 0.92rem; font-weight: 600; padding: 0.55rem 0.4rem; color: #6b7256; background: transparent; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; transition: all 0.12s ease; }
+#paymentsTabs.payments-seg .nav-link:hover { color: #4f5838; background: rgba(110,122,80,0.08); }
+#paymentsTabs.payments-seg .nav-link.active { background: #6E7A50; color: #fff; font-weight: 700; box-shadow: 0 1px 3px rgba(79,88,56,0.25); }
+#paymentsTabs.payments-seg .nav-link.active .badge { background: rgba(255,255,255,0.28) !important; color: #fff !important; }
+/* #paymentsBody NO lleva tarjeta: la tabla del historial ya tiene estructura propia (encabezado,
+   separadores, pie), asi que el panel blanco alrededor solo sumaba un marco de mas. Tampoco lleva
+   `overflow: hidden`: creaba un contenedor de scroll que anulaba el `position: sticky` del encabezado. */
+/* Mismo radio de borde explicito para el bloque de descuento/ahorro (fondo verde claro propio). */
+#paymentCoverageCard .rounded { border-radius: 0.5rem; }
+/* Hint de ahorro bajo "Total a pagar" (mismo estilo que el hint del Resumen Financiero). */
+#paymentsOffcanvas .pay-savings-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 7px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #4b6b3f;
+}
+#paymentsOffcanvas .pay-savings-hint i { font-size: 0.95rem; }
+/* Historial: tabla propia (.pay-hist) en vez de .table-sm.small de Bootstrap. La letra chica de antes
+   era la consecuencia de meter 8 columnas; al fusionar Moneda dentro de Monto, Recibio dentro de la
+   fecha de pago y Comprobante dentro de Acciones quedan 6 y la letra sube sin apretar nada. */
+#paymentsOffcanvas .pay-hist { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+/* Encabezado pegajoso: el contenedor de scroll es .offcanvas-body, asi que ni #paymentsBody ni un
+   wrapper .table-responsive pueden tener overflow propio. El ancho chico se resuelve con la vista de
+   tarjetas de abajo, no con scroll horizontal. */
+#paymentsOffcanvas .pay-hist thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: #8a8f78;
+    background: #f8f9fa;
+    padding: 0.5rem 0.55rem;
+    border-bottom: 1px solid #ddddd2;
+    white-space: nowrap;
+}
+/* Sin panel blanco detras, las filas son transparentes y los separadores pesan un poco mas; el blanco
+   se reserva para el hover y la fila en edicion. */
+#paymentsOffcanvas .pay-hist tbody td { padding: 0.6rem 0.55rem; vertical-align: top; border-top: 1px solid #e6e6da; }
+#paymentsOffcanvas .pay-hist tbody tr:first-child td { border-top: none; }
+#paymentsOffcanvas .pay-hist tbody tr:hover td { background: #fff; }
+/* Columnas PAGO y REGISTRO: mismo patron (fecha arriba, persona abajo). La de pago pesa mas porque es
+   el dato del negocio; la de registro es metadato de auditoria. */
+#paymentsOffcanvas .pay-hist-date { white-space: nowrap; font-weight: 600; color: #2b2b2b; }
+#paymentsOffcanvas .pay-hist-meta { white-space: nowrap; font-size: 0.85rem; color: #6b6656; }
+#paymentsOffcanvas .pay-hist-person {
+    display: flex;
+    align-items: flex-start;
+    gap: 3px;
+    font-size: 0.78rem;
+    color: #8a8f78;
+    margin-top: 3px;
+    white-space: normal;
+    line-height: 1.25;
+}
+#paymentsOffcanvas .pay-hist-person .ti { font-size: 0.85rem; flex: 0 0 auto; margin-top: 1px; }
+#paymentsOffcanvas .pay-hist-ref { word-break: break-word; }
+/* Edicion inline: la fila que se esta editando se marca con el verde de marca y el formulario cuelga
+   de ella. El filete va SOLO en la primera celda: en todas dibujaba una linea vertical por columna. */
+#paymentsOffcanvas .pay-hist tbody tr.is-editing td { background: #fff; }
+#paymentsOffcanvas .pay-hist tbody tr.is-editing td:first-child { box-shadow: inset 3px 0 0 #6E7A50; }
+#paymentsOffcanvas .pay-hist-edit td { padding: 0; border-top: none; }
+#paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit:hover td { background: transparent; }
+/* En escritorio las filas no tienen bordes laterales, asi que enmarcar el formulario como tarjeta
+   dejaba dos lineas verticales sueltas: aqui es un bloque mas de la tabla. */
+#paymentsOffcanvas .pay-hist-form {
+    background: #fff;
+    border-bottom: 1px solid #e6e6da;
+    padding: 0 1rem 0.9rem;
+}
+/* El pie se sale del relleno lateral para que su linea divisoria corte el bloque completo, pero lo
+   recupera por dentro para que los botones sigan alineados con los campos. */
+#paymentsOffcanvas .pay-hist-form .pay-form-actions {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+/* Encabezados ordenables (Pago / Registro / Monto). */
+#paymentsOffcanvas .pay-hist-sort {
+    border: none;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+#paymentsOffcanvas .pay-hist-sort:hover { color: #4f5838; }
+#paymentsOffcanvas .pay-hist-sort .ti { font-size: 0.85rem; opacity: 0.35; }
+#paymentsOffcanvas .pay-hist-sort.is-active { color: #4f5838; }
+#paymentsOffcanvas .pay-hist-sort.is-active .ti { opacity: 1; }
+/* Separador de mes: solo aparece al ordenar por fecha. */
+#paymentsOffcanvas .pay-hist-group td {
+    background: #edeee4;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: #6b7256;
+    padding: 0.4rem 0.7rem;
+}
+#paymentsOffcanvas .pay-hist-group .pay-hist-group-sum { float: right; color: #8a8f78; }
+/* El monto es EL dato de cada renglon. */
+#paymentsOffcanvas .pay-hist-amount { text-align: right; white-space: nowrap; font-weight: 700; font-size: 1.02rem; color: #2b2b2b; }
+#paymentsOffcanvas .pay-hist-curr { font-size: 0.7rem; font-weight: 700; color: #8a8f78; margin-left: 3px; }
+/* Moneda distinta a la de la reservacion: se resalta en ambar con el monto original debajo. */
+#paymentsOffcanvas .pay-hist-curr.is-foreign {
+    background: #f6efe2;
+    color: #96682f;
+    border: 1px solid #e7d6bd;
+    border-radius: 999px;
+    padding: 0.1rem 0.4rem;
+}
+#paymentsOffcanvas .pay-hist-orig { font-size: 0.76rem; font-weight: 600; color: #96682f; margin-top: 2px; }
+/* Pie: total de los pagos listados, para cuadrar contra "Pagado" de la card de cobertura. */
+#paymentsOffcanvas .pay-hist tfoot td {
+    border-top: 2px solid #ddddd2;
+    padding: 0.7rem 0.55rem;
+    font-weight: 700;
+    color: #2b2b2b;
+}
+#paymentsOffcanvas .pay-hist tfoot .pay-hist-foot-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8a8f78; }
+/* Chip de metodo con color propio: permite distinguir efectivo/transferencia/tarjeta de un vistazo. */
+#paymentsOffcanvas .pay-hist-method {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    padding: 0.24rem 0.62rem;
+    white-space: nowrap;
+}
+/* Acciones "fantasma" para que no compitan con el monto; el color aparece en hover. */
+#paymentsOffcanvas .pay-hist-actions { text-align: right; white-space: nowrap; }
+#paymentsOffcanvas .pay-hist-act {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #8a8f78;
+    font-size: 1rem;
+    line-height: 1;
+    text-decoration: none;
+    transition: all 0.12s ease;
+}
+#paymentsOffcanvas .pay-hist-act:hover { background: #f1f2ec; color: #4f5838; border-color: #e0e3d6; }
+#paymentsOffcanvas .pay-hist-act.is-danger:hover { background: #f7ecea; color: #a1443a; border-color: #e6c9c4; }
+#paymentsOffcanvas .pay-hist-act.is-receipt { color: #566040; }
+/* Formulario de pago (alta y edicion inline): etiquetas en versalitas chicas, como los encabezados de
+   la tabla, para que no compitan con los campos. */
+#paymentsOffcanvas .pay-form .form-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    color: #8a8f78;
+    margin-bottom: 0.3rem;
+}
+#paymentsOffcanvas .pay-form .form-control,
+#paymentsOffcanvas .pay-form .form-select,
+#paymentsOffcanvas .pay-form .input-group-text { font-size: 0.9rem; }
+/* El tema le pone border-radius propio a .form-control, asi que dentro de un .input-group el prefijo y
+   el campo se dibujaban como dos cajas sueltas con un hueco. Se fuerza la union a mano. */
+#paymentsOffcanvas .pay-form .input-group { flex-wrap: nowrap; }
+#paymentsOffcanvas .pay-form .input-group > .input-group-text {
+    background: #f7f7f2;
+    color: #8a8f78;
+    font-weight: 700;
+    border-right: 0;
+    border-radius: 0.375rem 0 0 0.375rem;
+}
+#paymentsOffcanvas .pay-form .input-group > .form-control {
+    border-left: 0;
+    border-radius: 0 0.375rem 0.375rem 0;
+    margin-left: 0;
+}
+#paymentsOffcanvas .pay-form textarea.form-control { resize: vertical; }
+/* Altura compartida por la zona de adjunto y el textarea de Notas: son vecinos en el mismo renglon y
+   con alturas distintas dejaban un escalon raro. */
+#paymentsOffcanvas { --pay-attach-h: 96px; }
+#paymentsOffcanvas .pay-form textarea#paymentNotes { height: var(--pay-attach-h); min-height: var(--pay-attach-h); }
+/* El <input type="file"> nativo no se puede estilizar y su texto se recortaba. Se esconde de la vista
+   (sigue en el DOM y accesible por teclado via el label) y se reemplaza por esta zona. */
+#paymentsOffcanvas .pay-drop {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: var(--pay-attach-h);
+    padding: 0.7rem;
+    text-align: center;
+    border: 1.5px dashed #dcdccf;
+    border-radius: 8px;
+    background: #fbfbf7;
+    position: relative;
+    transition: border-color 0.12s ease, background 0.12s ease;
+}
+#paymentsOffcanvas .pay-drop.is-dragover { border-color: #6E7A50; background: #f1f2ec; }
+#paymentsOffcanvas .pay-drop input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+#paymentsOffcanvas .pay-file-row { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+#paymentsOffcanvas .pay-receipt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #566040;
+    background: #eef0e6;
+    border: 1px solid #dce2d0;
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+    text-decoration: none;
+}
+#paymentsOffcanvas .pay-receipt-chip:hover { background: #e4e8d8; color: #4f5838; }
+#paymentsOffcanvas .pay-file-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #a1443a;
+    line-height: 1;
+    cursor: pointer;
+}
+#paymentsOffcanvas .pay-file-clear:hover { background: #f7ecea; }
+#paymentsOffcanvas .pay-file-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4f5838;
+    background: #f1f2ec;
+    border: 1px solid #e0e3d6;
+    border-radius: 8px;
+    padding: 0.36rem 0.7rem;
+    margin: 0;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+#paymentsOffcanvas .pay-file-btn:hover { background: #e7e9df; border-color: #d2d6c4; }
+#paymentsOffcanvas .pay-drop input[type="file"]:focus-visible ~ .pay-file-row .pay-file-btn { outline: 2px solid #6E7A50; outline-offset: 2px; }
+#paymentsOffcanvas .pay-file-name {
+    font-size: 0.82rem;
+    color: #a8ac98;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#paymentsOffcanvas .pay-file-name.has-file { color: #2b2b2b; font-weight: 600; }
+/* Pie de botones: separado del cuerpo y pegajoso, para que "Guardar" nunca quede bajo el pliegue. */
+#paymentsOffcanvas .pay-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid #f1efe8;
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+}
+#paymentsOffcanvas .pay-form-actions .btn {
+    font-size: 0.92rem;
+    font-weight: 600;
+    padding: 0.55rem 1.6rem;
+    border-radius: 8px;
+}
+#paymentsOffcanvas .pay-form-actions .btn-outline-secondary { border-color: #dcdccf; color: #6b7256; }
+#paymentsOffcanvas .pay-form-actions .btn-outline-secondary:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
+/* Etiqueta de contexto en el pie (reemplaza al encabezado del formulario): ocupa el hueco que ya
+   existia a la izquierda de los botones, asi que no suma alto. */
+#paymentsOffcanvas .pay-form-context {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-right: auto;
+    align-self: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #8a8f78;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Bajo 576px el offcanvas es full-width (~360px reales): 6 columnas aprietan, asi que cada pago se
+   apila como tarjeta. Las etiquetas vuelven via data-label, ya que el thead se oculta. */
+@media (max-width: 576px) {
+    #paymentsOffcanvas .pay-hist thead { display: none; }
+    #paymentsOffcanvas .pay-hist,
+    #paymentsOffcanvas .pay-hist tbody,
+    #paymentsOffcanvas .pay-hist tfoot,
+    #paymentsOffcanvas .pay-hist tr,
+    #paymentsOffcanvas .pay-hist td { display: block; width: 100%; }
+    #paymentsOffcanvas .pay-hist tbody tr {
+        background: #fff;
+        border: 1px solid #ece9df;
+        border-radius: 10px;
+        margin-bottom: 0.6rem;
+        overflow: hidden;
+    }
+    #paymentsOffcanvas .pay-hist tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        border-top: 1px solid #f5f3ec;
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+    }
+    #paymentsOffcanvas .pay-hist tbody td::before {
+        content: attr(data-label);
+        flex: 0 0 auto;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-weight: 700;
+        color: #8a8f78;
+        padding-top: 3px;
+    }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-date::before,
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-actions::before { content: none; }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-date { background: #faf9f4; display: block; }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-actions { justify-content: flex-end; }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-amount { text-align: right; }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-meta .pay-hist-stack { text-align: right; }
+    #paymentsOffcanvas .pay-hist tbody td.pay-hist-meta .pay-hist-person { justify-content: flex-end; }
+    /* La fila de edición no es una tarjeta más: se pega a la del pago que está editando. */
+    #paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit { border: none; margin: -0.6rem 0 0.6rem; }
+    #paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit td { display: block; border-top: none; padding: 0; }
+    #paymentsOffcanvas .pay-hist tbody tr.pay-hist-edit td::before { content: none; }
+    #paymentsOffcanvas .pay-hist-form {
+        border: 1px solid #ece9df;
+        border-top: none;
+        border-radius: 0 0 10px 10px;
+    }
+    #paymentsOffcanvas .pay-hist-group td { border-radius: 8px; margin-bottom: 0.4rem; }
+    #paymentsOffcanvas .pay-hist-group .pay-hist-group-sum { float: none; margin-left: 6px; }
+    #paymentsOffcanvas .pay-hist tfoot td { display: flex; justify-content: space-between; border-radius: 10px; }
+    /* Botones a todo el ancho y "Guardar" arriba (column-reverse: va último en el DOM). */
+    #paymentsOffcanvas .pay-form-actions { flex-direction: column-reverse; gap: 8px; }
+    #paymentsOffcanvas .pay-form-actions .btn { width: 100%; }
+    #paymentsOffcanvas .pay-form-context { display: none; }
+}
+/* Esqueleto de carga del carrito: el panel se puede abrir mientras GET .../payments sigue en vuelo,
+   asi que mostramos barras "shimmer" con la forma del contenido real en vez de dejarlo vacio. */
+#paymentsOffcanvas .pay-skel {
+    background: linear-gradient(90deg, #eceee6 25%, #f7f8f3 50%, #eceee6 75%);
+    background-size: 200% 100%;
+    animation: paySkelShimmer 1.2s ease-in-out infinite;
+    border-radius: 6px;
+}
+@keyframes paySkelShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #paymentsOffcanvas .pay-skel { animation: none; }
+}
+/* Panel de Servicios: mismo contenedor que el Resumen Financiero (fin-wrap + fin-section-head) en vez
+   del card-header con gradiente verde, que era el único bloque de la página fuera de la paleta. La
+   lista sangra hasta el borde con margen negativo para que las bandas de día y los separadores de fila
+   sigan corriendo a todo lo ancho, como cuando el card-body llevaba p-0; overflow:hidden recorta la
+   última fila contra la esquina redondeada. */
+.svc-wrap {
+    border: 1px solid #ece8dd;
+    border-radius: 14px;
+    background: #fff;
+    padding: 20px 22px 0;
+    overflow: hidden;
+}
+.svc-wrap #servicesContainer { margin: 0 -22px; }
+/* El botón de exportar venía en btn-light (pensado para el header de color): sobre blanco se perdía. */
+.svc-wrap .btn-outline-secondary { border-color: #dcdccf; color: #6b7256; }
+.svc-wrap .btn-outline-secondary:hover { background: #f1f2ec; border-color: #c9cdbb; color: #4f5838; }
+.service-row {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.15s;
+}
+.service-row:hover {
+    background-color: #f8f9fa;
+}
+.service-row:last-child {
+    border-bottom: none;
+}
+.day-header {
+    background-color: #f8f9fa;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    border-bottom: 2px solid #e9ecef;
+}
+.assignment-badge {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+}
+.detail-tag {
+    font-size: 0.9rem;
+    padding: 0.15rem 0.4rem;
+    font-weight: 500;
+}
+
+/* ---------------------------------------------------------------------------
+   Cobertura del carrito de pagos (buildCoverageCard).
+   Era una tarjeta blanca con filete de acento flotando sobre un fondo gris,
+   dentro de un panel que ya es una superficie: marco dentro de marco. Ahora lo
+   que separa es la jerarquía —rótulo en versalitas, cifra grande, barra—.
+   --------------------------------------------------------------------------- */
+.pay-cob-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.pay-cob-cap{display:flex;align-items:center;gap:8px;flex-wrap:wrap;text-transform:uppercase;
+  letter-spacing:.1em;font-size:.72rem;font-weight:700;color:#8a8f78;}
+.pay-cob-total{font-size:2.05rem;font-weight:700;color:#2b2b2b;line-height:1.1;margin-top:5px;}
+.pay-cob-metodo{display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.05em;color:#566040;background:#eef0e6;
+  border:1px solid #dce2d0;border-radius:999px;padding:.26rem .66rem;}
+.pay-cob-estado{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;
+  border-radius:999px;padding:.44rem .85rem;white-space:nowrap;}
+.pay-cob-punto{width:8px;height:8px;border-radius:50%;background:currentColor;}
+.pay-cob-estado.is-neutro{background:#f0eee7;color:#6b6656;border:1px solid #ded9cb;}
+.pay-cob-estado.is-parcial{background:#f6efe2;color:#96682f;border:1px solid #e7d6bd;}
+.pay-cob-estado.is-pagado{background:#e6efe1;color:#3f5a34;border:1px solid #cfe0c6;}
+.pay-cob-estado.is-favor{background:#eaf1f0;color:#3a6b63;border:1px solid #cfe1dd;}
+.pay-cob-barra{height:11px;border-radius:999px;background:#f0e5d0;overflow:hidden;margin:14px 0 0;}
+.pay-cob-barra > span{display:block;height:100%;border-radius:999px;background:#4b6b3f;}
+.pay-cob-pct{text-align:right;font-size:.82rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;color:#8a8f78;margin-top:7px;}
+.pay-cob-par{display:flex;justify-content:space-between;gap:12px;margin-top:16px;}
+.pay-cob-der{text-align:right;}
+.pay-cob-cap-sm{font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;color:#8a8f78;font-weight:700;}
+.pay-cob-cifra{font-weight:700;font-size:1.55rem;color:#b8894a;}
+.pay-cob-cifra.is-pagado,.pay-cob-cifra.is-cubierto{color:#4b6b3f;}
+.pay-cob-ahorro{margin-top:14px;}
+.pay-cob-ahorro-tit{font-weight:600;color:#146c43;display:flex;align-items:center;gap:6px;}
+.pay-cob-ahorro-sub{font-size:.85rem;color:#146c43;}
+
+/* Secciones del carrito: un rótulo en versalitas y un filete arriba, en vez de una tarjeta cada una. */
+.pay-sec{margin-top:26px;padding-top:22px;border-top:1px solid #e6e1d5;}
+.pay-cap{text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;font-weight:700;
+  color:#8a8f78;margin-bottom:12px;}
+
+/* Comparativo por método: nombre, total y la diferencia contra el actual. Sin caja y sin columnas
+   de Cubierto/Restante —esas cifras solo importan del método vigente, y ese ya va arriba—. */
+/* Cuatro columnas: el método, cuánto suma en él, cuánto de eso ya está cubierto —con su
+   porcentaje, que es distinto en cada método porque el total lo es— y cuánto falta.
+   La rejilla la define el CONTENEDOR y cada renglón la hereda con subgrid. Cuando cada renglón
+   traía su propio grid, cada uno medía sus columnas contra su propio contenido: $99,317.13 y
+   $124,882.44 no ocupan lo mismo, así que las cifras no caían bajo su encabezado. */
+#payCmp{display:grid;grid-template-columns:1fr auto auto auto;}
+.pay-cmp-row{display:grid;grid-column:1 / -1;grid-template-columns:subgrid;align-items:center;
+  column-gap:26px;padding:11px 10px;border-radius:8px;}
+.pay-cmp-row.is-actual{background:#f1f2ec;}
+/* Sin subgrid el renglón se quedaría sin columnas y las celdas se apilarían. Anchos fijos como
+   red: alinean igual, solo que sin ajustarse al monto más largo. */
+@supports not (grid-template-columns: subgrid) {
+  .pay-cmp-row{grid-template-columns:1fr 120px 120px 120px;}
+}
+.pay-cmp-row.is-cabeza{padding-bottom:7px;text-transform:uppercase;letter-spacing:.07em;
+  font-size:.66rem;font-weight:700;color:#8a8f78;border-bottom:1px solid #ece8dd;border-radius:0;}
+.pay-cmp-row.is-cabeza > span:not(:first-child){text-align:right;}
+.pay-cmp-met{display:flex;align-items:center;gap:8px;color:#4a4a44;font-weight:600;min-width:0;}
+.pay-cmp-met i{color:#8a8f78;}
+.pay-cmp-monto{font-weight:600;color:#6b6656;white-space:nowrap;text-align:right;}
+/* Lo cubierto en verde, como el resto del panel: es lo que ya entró. */
+.pay-cmp-cubierto{font-weight:700;color:#4b6b3f;white-space:nowrap;text-align:right;line-height:1.2;}
+.pay-cmp-pct{display:block;font-size:.76rem;font-weight:600;color:#8a8f78;}
+.pay-cmp-saldo{font-weight:700;color:#2b2b2b;white-space:nowrap;text-align:right;}
+.pay-cmp-dif.is-actual{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;
+  color:#566040;background:#e9ece0;border-radius:5px;padding:.1rem .4rem;}
+.pay-cmp-barato{font-size:.58rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;
+  color:#3f5a34;background:#e6efe1;border:1px solid #cfe0c6;border-radius:6px;padding:.08rem .42rem;}

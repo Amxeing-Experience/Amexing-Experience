@@ -1,0 +1,67 @@
+/*
+ * Botón flotante para descargar el PDF — hoja compartida.
+ *
+ * Lo usan las dos vistas PÚBLICAS de una reservación: la confirmación y el itinerario. Vive DENTRO
+ * del documento porque quien recibe el link no entra al detalle: sin esto su única forma de obtener
+ * el PDF sería imprimir desde el navegador.
+ *
+ * Fijo y no pegado al encabezado: estos documentos son de varias páginas y la decisión de
+ * descargarlos suele tomarse después de leerlos, no antes. Con etiqueta y no un ícono pelón: un
+ * glifo de descarga solo, sobre un documento de viaje, se puede leer como cualquier cosa.
+ */
+
+.pdf-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: #6f7459;
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 6px 20px rgba(43, 43, 43, 0.22);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.pdf-fab:hover { background: #566040; color: #fff; transform: translateY(-1px); }
+.pdf-fab:focus-visible { outline: 3px solid #b7c39a; outline-offset: 2px; }
+.pdf-fab.is-busy { pointer-events: none; background: #8a8f78; }
+.pdf-fab i { font-size: 1.1rem; }
+/* Girito propio, sin depender de que Bootstrap haya cargado.
+   `display: inline-block` es obligatorio: es un <span>, y width/height NO aplican a un elemento
+   inline —colapsaba a la altura de la línea y se veía como una tirita vertical—. `flex: none`
+   para que el contenedor flex tampoco lo comprima. */
+.pdf-fab-spin {
+  display: inline-block;
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  animation: pdf-fab-spin-kf 0.7s linear infinite;
+}
+/* El contenedor del ícono también es un <span> inline: en flex se comporta bien, pero se declara
+   para que el spinner quede centrado igual que el ícono al que sustituye. */
+.pdf-fab-ico { display: inline-flex; align-items: center; }
+@keyframes pdf-fab-spin-kf { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .pdf-fab { transition: none; }
+  .pdf-fab:hover { transform: none; }
+}
+/* En pantallas angostas se queda solo el ícono, para no tapar el documento. */
+@media (max-width: 560px) {
+  .pdf-fab-txt { display: none; }
+  .pdf-fab { padding: 14px; right: 14px; bottom: 14px; }
+}
+/* NUNCA en el PDF: esta misma plantilla es la que imprime puppeteer. */
+/* Para la impresión del NAVEGADOR. El PDF del servidor NO se protege con esto: PdfRenderService
+   emula media `screen` a propósito, así que quien lo excluye de la exportación es la bandera esPdf
+   de la plantilla. Esta regla es el caso de alguien que imprime la página con Ctrl+P. */
+@media print { .pdf-fab { display: none !important; } }

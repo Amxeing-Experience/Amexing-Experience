@@ -638,34 +638,70 @@ const e = __isRes ? 'reservación' : 'cotización';
     .pdf-export-mode .service-item > img,
     .pdf-export-mode .service-item .ratio img { display: none; }
     .pdf-export-mode .summary-banner-logo img { max-width: 180px; }
+
+    /* Barra de acciones fija al fondo. El resumen es un documento largo que se revisa antes de
+       mandarlo, así que las acciones tienen que seguir alcanzables después de bajar. En móvil,
+       además, el borde inferior es la zona del pulgar. */
+    /* position: fixed y NO sticky. Sticky sería más limpio (heredaría la columna sin números
+       mágicos), pero está ROTO en todo el dashboard, no solo aquí.
+       La causa, medida: `main.dashboard-content` declara `overflow-y: auto` (dashboard.ejs:95) sin
+       tener altura acotada. Eso lo convierte en el contenedor de scroll de referencia para
+       cualquier `position: sticky` de adentro, pero como no está acotado nunca scrollea él mismo —
+       scrollea la ventana. El elemento sticky queda amarrado a un contenedor que no se mueve y se
+       va con la página. Verificado: la barra terminaba 4229px por debajo del viewport, y el
+       `.days-sidebar` de la sección Servicios (que también se declara sticky) tampoco pega.
+       Con fixed hay que espejar a mano el margen de .main-content, que tiene TRES estados
+       (dashboard.ejs): 270px normal, 80px con el sidebar colapsado, y 0 en móvil. Si esos valores
+       cambian allá, hay que actualizarlos aquí. */
+    .summary-action-bar {
+        position: fixed;
+        left: 270px;
+        right: 0;
+        bottom: 0;
+        z-index: 1030; /* por debajo de los modales de Bootstrap (1055) */
+        background: #fff;
+        border-top: 1px solid #e5e7eb;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+        padding: 0.75rem 1.25rem;
+    }
+    /* Sidebar colapsado: la clase la lleva .main-content, y la barra es descendiente suya. */
+    @media (min-width: 992px) {
+        .main-content.sidebar-collapsed .summary-action-bar { left: 80px; }
+    }
+    /* Móvil: el sidebar deja de ocupar espacio. */
+    @media (max-width: 991.98px) {
+        .summary-action-bar { left: 0; }
+    }
+    .summary-action-bar-inner {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    /* Reserva el alto de la barra para que la última fila del resumen (los totales) no quede
+       tapada. Es el bug clásico de las barras fijas y nadie lo nota hasta que falta un total. */
+    .summary-action-bar-spacer { height: 76px; }
+
+    /* DOS exclusiones, y hacen falta las dos:
+       - @media print / d-print-none cubre el Ctrl+P del navegador.
+       - .pdf-export-mode cubre el PDF del servidor, que es puppeteer renderizando ESTA misma
+         página (/quotes/:folio?pdf=1). Un position:fixed sin esto se repetiría en TODAS las
+         páginas del PDF. */
+    .pdf-export-mode .summary-action-bar,
+    .pdf-export-mode .summary-action-bar-spacer { display: none !important; }
+    @media print {
+        .summary-action-bar,
+        .summary-action-bar-spacer { display: none !important; }
+    }
 </style>
 
+<!-- Sin card-header: el título ("Resumen de la Reservación/Cotización") era redundante con el
+     encabezado del propio documento, y las acciones se movieron a la barra fija del fondo
+     (#summaryActionBar, al cierre de esta tarjeta). Un header vacío habría dejado su padding y su
+     border-bottom como una línea suelta arriba del contenido.
+     "Cancelar Reserva" ya vivía en el segmented control de estado de quote-detail.ejs. -->
 <div class="card border-0">
-    <div class="card-header bg-white border-bottom d-print-none">
-        <div class="d-flex justify-content-between align-items-center">
-            <% if (!locals.isPublicView) { %>
-            <h5 class="card-title mb-0">
-                <i class="ti ti-file-description me-2"></i>Resumen de la <%= E %>
-            </h5>
-            <% } else { %>
-            <span></span>
-            <% } %>
-            <div class="d-flex gap-2">
-                <button id="shareLinkBtn" class="btn btn-success" style="display: none;">
-                    <i class="ti ti-share me-2"></i>Compartir
-                </button>
-                <button id="sendEmailBtn" class="btn btn-outline-primary" style="display: none;">
-                    <i class="ti ti-mail me-2"></i>Enviar por correo
-                </button>
-                <button id="exportPdfBtn" class="btn btn-primary" style="display: none;">
-                    <i class="ti ti-download me-2"></i>Exportar a PDF
-                </button>
-                <!-- "Cancelar Reserva" se movió al segmented control de estado
-                     (Estado de la Reservación → Cancelada) en quote-detail.ejs. -->
-            </div>
-        </div>
-    </div>
-
     <div class="card-body">
         <!-- Loading State -->
         <div id="summaryLoading" class="text-center py-5">
@@ -813,6 +849,61 @@ const e = __isRes ? 'reservación' : 'cotización';
             <div class="summary-footer">
                 THANK YOU FOR YOUR PREFERENCE!
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reserva el alto de la barra fija para que los totales no queden tapados. -->
+<div class="summary-action-bar-spacer" aria-hidden="true"></div>
+
+<!-- Barra de acciones FIJA al fondo.
+     Vive FUERA de #summaryContent a propósito: el fallback de html2pdf renderiza ese contenedor, y
+     el PDF del servidor es puppeteer sobre esta MISMA página (/quotes/:folio?pdf=1), donde un
+     position:fixed se repetiría en todas las páginas. De ahí d-print-none + la regla de
+     .pdf-export-mode en el <style> de arriba.
+     Los botones nacen DESHABILITADOS y se habilitan al terminar la carga: los tres dependen de datos
+     (id de la cotización, el objeto completo para el correo, el folio para el PDF), así que
+     mostrarlos activos antes de tiempo los haría reventar. Deshabilitados y no ocultos para que no
+     haya salto de layout y se vea desde el inicio qué se va a poder hacer. -->
+<div id="summaryActionBar" class="summary-action-bar d-print-none">
+    <div class="summary-action-bar-inner">
+        <% if (!locals.isPublicView) { %>
+        <!-- Compartir y Enviar solo existen para el staff; en la vista pública ni se renderizan
+             (antes se ocultaban con display:none, pero deshabilitados para siempre sería peor). -->
+        <button id="shareLinkBtn" class="btn btn-outline-secondary" disabled>
+            <i class="ti ti-share me-2"></i>Compartir
+        </button>
+        <button id="sendEmailBtn" class="btn btn-outline-secondary" disabled>
+            <i class="ti ti-mail me-2"></i>Enviar por correo
+        </button>
+        <% } %>
+        <!-- Split button: el botón principal exporta el documento propio de la vista (itinerario en
+             reservación, cotización en cotización) y el caret permite elegir explícitamente el otro
+             estilo. Es la acción MÁS usada, por eso es el único sólido y va al extremo derecho: la
+             posición más cercana al borde y la más fácil de alcanzar. El caret solo se muestra a
+             staff de Amexing y solo cuando existen los DOS documentos. -->
+        <div class="btn-group dropup" id="exportPdfGroup">
+            <button id="exportPdfBtn" class="btn btn-primary" disabled>
+                <i class="ti ti-download me-2"></i>Exportar a PDF
+            </button>
+            <button type="button" id="exportPdfDropdownToggle"
+                    class="btn btn-primary dropdown-toggle dropdown-toggle-split"
+                    data-bs-toggle="dropdown" aria-expanded="false" style="display: none;" disabled>
+                <span class="visually-hidden">Más opciones de exportación</span>
+            </button>
+            <!-- dropup: la barra vive pegada al fondo, así que el menú tiene que abrir hacia arriba. -->
+            <ul class="dropdown-menu dropdown-menu-end" id="exportPdfMenu">
+                <li>
+                    <button class="dropdown-item" type="button" data-export-kind="reservation">
+                        <i class="ti ti-route me-2"></i>Como reservación <span class="text-muted">(itinerario)</span>
+                    </button>
+                </li>
+                <li>
+                    <button class="dropdown-item" type="button" data-export-kind="quote">
+                        <i class="ti ti-file-text me-2"></i>Como cotización
+                    </button>
+                </li>
+            </ul>
         </div>
     </div>
 </div>
@@ -1227,6 +1318,10 @@ const e = __isRes ? 'reservación' : 'cotización';
                 ? window.__reservationFolio
                 : (quote.folio || quote.id || 'N/A');
             document.getElementById('summaryFolio').textContent = __folioLabel;
+            // Se guarda el folio de la COTIZACIÓN aparte: en vista de reservación #summaryFolio
+            // muestra el folio de la RESERVA, así que exportar "como cotización" desde ahí no puede
+            // leerlo del DOM. Mismo fallback que arriba (una cotización sin folio usa su id).
+            window.__quoteFolio = quote.folio || quote.id || '';
             // Green banner shows the document type word (the folio is already
             // displayed in its own "Folio" row below).
             document.getElementById('summaryFolioHeader').textContent = __isReservationView
@@ -1437,28 +1532,60 @@ const e = __isRes ? 'reservación' : 'cotización';
             document.getElementById('summaryLoading').style.display = 'none';
             document.getElementById('summaryContent').style.display = 'block';
 
-            // Show and attach Export PDF button (visible in both admin and public views)
+            // Los botones de la barra fija ya están en pantalla desde el primer render; lo que
+            // cambia al terminar la carga es que dejan de estar deshabilitados (ya hay datos con
+            // qué trabajar). Visible en admin y en la vista pública.
             const exportBtn = document.getElementById('exportPdfBtn');
-            exportBtn.style.display = 'inline-block';
             const newExportBtn = exportBtn.cloneNode(true);
+            newExportBtn.disabled = false;
             exportBtn.parentNode.replaceChild(newExportBtn, exportBtn);
-            newExportBtn.addEventListener('click', exportToPdf);
+            // Sin argumento: el botón principal exporta el documento propio de la vista.
+            newExportBtn.addEventListener('click', () => exportToPdf());
+
+            // El caret con las dos opciones pide TRES condiciones, y las tres importan:
+            //  1) que existan los DOS documentos (una cotización sin reservación no tiene
+            //     itinerario, y el endpoint daría 404);
+            //  2) que sea staff de Amexing: elegir el estilo del PDF es una decisión interna, así
+            //     que agencia y cliente siguen exportando solo el itinerario de la reservación,
+            //     exactamente como hasta ahora;
+            //  3) que no sea la vista pública (ahí no hay window.currentUser).
+            // Los no-admin no pierden nada: el botón principal ya exporta el documento propio de su
+            // vista, así que su comportamiento es idéntico al de antes de este cambio.
+            const __exportRole = (window.currentUser && window.currentUser.role) || '';
+            const __isAmexingStaff = __exportRole === 'admin' || __exportRole === 'superadmin';
+            const canChooseExportKind = !!(
+                window.__isReservation && window.__reservationFolio && __isAmexingStaff
+            );
+            const exportToggle = document.getElementById('exportPdfDropdownToggle');
+            if (exportToggle) {
+                exportToggle.style.display = canChooseExportKind ? 'inline-block' : 'none';
+                exportToggle.disabled = false;
+            }
+            const exportMenu = document.getElementById('exportPdfMenu');
+            // Delegación + guarda de cableado: loadSummary puede correr varias veces y el <ul> no se
+            // clona como el botón, así que sin esto los listeners se apilarían.
+            if (exportMenu && exportMenu.dataset.wired !== '1') {
+                exportMenu.dataset.wired = '1';
+                exportMenu.addEventListener('click', (ev) => {
+                    const item = ev.target.closest('[data-export-kind]');
+                    if (!item) return;
+                    exportToPdf(item.dataset.exportKind);
+                });
+            }
 
             // Share / Email / Cancel buttons are admin-only
             <% if (!locals.isPublicView) { %>
-            // Show and attach share button
+            // Enable and attach share button (ya visible; solo dependía de tener quote.id)
             const shareBtn = document.getElementById('shareLinkBtn');
-            shareBtn.style.display = 'inline-block';
-
-            // Attach share event listener
             const newShareBtn = shareBtn.cloneNode(true);
+            newShareBtn.disabled = false;
             shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
             newShareBtn.addEventListener('click', () => generateShareLink(quote.id));
 
-            // Show and attach send email button
+            // Enable and attach send email button (dependía del objeto `quote` completo)
             const emailBtn = document.getElementById('sendEmailBtn');
-            emailBtn.style.display = 'inline-block';
             const newEmailBtn = emailBtn.cloneNode(true);
+            newEmailBtn.disabled = false;
             emailBtn.parentNode.replaceChild(newEmailBtn, emailBtn);
             newEmailBtn.addEventListener('click', () => showSendEmailModal(quote));
 
@@ -1826,24 +1953,44 @@ const e = __isRes ? 'reservación' : 'cotización';
 
     // Export to PDF via server-side puppeteer (vector text, native page breaks).
     // Falls back to client-side html2pdf if the server endpoint fails.
-    async function exportToPdf() {
-        const folio = (document.getElementById('summaryFolio')?.textContent || '').trim();
+    async function exportToPdf(kindOverride) {
+        // `kindOverride` ('quote' | 'reservation') viene del dropdown; sin él se exporta el
+        // documento propio de la vista. El DEFAULT lo define el flag autoritativo del servidor, NO
+        // el prefijo del folio: una cotización SIN folio cae al fallback quote.id (sin prefijo
+        // "QTE-"), y con la heurística /^QTE-/ se exportaba por error como reservación.
+        const isQuote = kindOverride
+            ? kindOverride === 'quote'
+            : !window.__isReservation;
+
+        // Cada estilo tiene su propio folio, y en vista de reservación NO son el mismo: #summaryFolio
+        // muestra el de la reserva. Tomar el folio del DOM para el PDF de cotización habría pedido
+        // /quotes/<folio-de-reserva>/pdf.
+        const domFolio = (document.getElementById('summaryFolio')?.textContent || '').trim();
+        const folio = isQuote
+            ? (window.__quoteFolio || (window.__isReservation ? '' : domFolio))
+            : (window.__reservationFolio || (window.__isReservation ? domFolio : ''));
         if (!folio) {
-            alert('No se pudo determinar el folio para exportar.');
+            alert(isQuote
+                ? 'No se pudo determinar el folio de la cotización para exportar.'
+                : 'Esta cotización no tiene una reservación asociada, así que no hay itinerario que exportar.');
             return;
         }
-        // El tipo de documento lo define el flag autoritativo del servidor, NO el prefijo del
-        // folio. Una cotización SIN folio cae al fallback quote.id (sin prefijo "QTE-"), y con la
-        // heurística /^QTE-/ se exportaba por error como reservación.
-        const isQuote = !window.__isReservation;
         // Pass the exact quote id (?q=) so the PDF resolves the same record even
         // when folios are duplicated. Reservations are unaffected.
         const qParam = (isQuote && window.__quoteId) ? `?q=${encodeURIComponent(window.__quoteId)}` : '';
+        // Una reservación tiene DOS documentos públicos y cada uno con su ruta: la confirmación en
+        // /reservations/:folio/pdf y el itinerario en /reservations/:folio/itinerary/pdf. Desde aquí
+        // se exporta el ITINERARIO, que es lo que se manda al pasajero; la confirmación se descarga
+        // desde su propia vista, con el flotante que vive ahí.
         const endpoint = isQuote
             ? `/quotes/${encodeURIComponent(folio)}/pdf${qParam}`
-            : `/reservations/${encodeURIComponent(folio)}/pdf`;
-        const docKind = isQuote ? 'Cotizacion' : 'Reservacion';
-        const filename = `${folio.replace(/\s+/g, '_')}.pdf`;
+            : `/reservations/${encodeURIComponent(folio)}/itinerary/pdf`;
+        const docKind = isQuote ? 'Cotizacion' : 'Itinerario';
+        // El sufijo evita que el itinerario y la confirmación de la misma reservación se pisen en la
+        // carpeta de descargas.
+        const filename = isQuote
+            ? `${folio.replace(/\s+/g, '_')}.pdf`
+            : `${folio.replace(/\s+/g, '_')}-itinerario.pdf`;
 
         const btn = document.getElementById('exportPdfBtn');
         const originalText = btn ? btn.innerHTML : '';
@@ -1867,7 +2014,7 @@ const e = __isRes ? 'reservación' : 'cotización';
         } catch (err) {
             console.error('Server PDF export failed, falling back to client-side html2pdf:', err);
             if (typeof html2pdf !== 'undefined') {
-                exportWithHtml2Pdf();
+                exportWithHtml2Pdf(filename);
             } else {
                 alert('No se pudo generar el PDF en el servidor. Intente nuevamente.');
             }
@@ -1880,7 +2027,11 @@ const e = __isRes ? 'reservación' : 'cotización';
     }
 
     // Simple html2pdf export - restored to working state
-    function exportWithHtml2Pdf() {
+    // `preferredFilename` lo pasa exportToPdf para que el archivo se llame según el estilo que se
+    // pidió. OJO: este fallback renderiza el resumen TAL COMO ESTÁ EN PANTALLA, así que no puede
+    // cambiar de estilo — si el servidor falla al pedir "como cotización" desde una reservación, el
+    // PDF sale con lo que se ve. Es un respaldo de último recurso, no un segundo generador.
+    function exportWithHtml2Pdf(preferredFilename) {
         if (typeof html2pdf === 'undefined') {
             alert('No se pudo cargar la librería de PDF. Por favor recargue la página.');
             return;
@@ -1888,8 +2039,7 @@ const e = __isRes ? 'reservación' : 'cotización';
 
         const element = document.getElementById('summaryContent');
         const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
-        const docKind = /^QTE-/i.test(folio) ? 'Cotizacion' : 'Reservacion';
-        const filename = `${folio.replace(/\s+/g, '_')}.pdf`;
+        const filename = preferredFilename || `${folio.replace(/\s+/g, '_')}.pdf`;
 
         // Check if element exists
         if (!element) {
