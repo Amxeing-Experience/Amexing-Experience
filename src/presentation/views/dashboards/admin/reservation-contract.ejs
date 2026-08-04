@@ -329,8 +329,11 @@ function bloqueAsignacion(sc) {
                 const rotuloHora = esAeropuerto
                     ? (esSalida ? 'Hora de recolección' : 'Hora de llegada')
                     : 'Hora';
-                const horaServicio = sc.time || sc.startTime || '';
-                const horaVuelo = sc.flightDepartureTimeSuggested || '';
+                // Las horas se leen a distancia y en una hoja llena de números —fechas, teléfonos,
+                // placas—: la unidad las separa del resto de un vistazo.
+                const conHrs = (v) => (v ? `${v} hrs` : '');
+                const horaServicio = conHrs(sc.time || sc.startTime || '');
+                const horaVuelo = conHrs(sc.flightDepartureTimeSuggested || '');
             %>
             <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(it.fecha) || '—' %></span></div>
             <div class="rc-tc rc-c3"><span class="rc-label"><%= rotuloHora %></span><span class="rc-value"><%= horaServicio || '—' %></span></div>
