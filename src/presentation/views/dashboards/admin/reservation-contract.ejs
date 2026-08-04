@@ -89,9 +89,25 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
 
         /* Conmutador de corte: es un control de pantalla, no parte del documento. */
         .ctr-corte { max-width:820px; margin:0 auto 14px; display:flex; justify-content:flex-end; gap:6px; }
-        .ctr-corte a { font-size:12px; font-weight:600; text-decoration:none; color:#6b6b5f;
-                       border:1px solid #cfcfc4; background:#fff; border-radius:999px; padding:5px 14px; }
+        .ctr-corte a { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600;
+                       text-decoration:none; color:#6b6b5f; border:1px solid #cfcfc4; background:#fff;
+                       border-radius:999px; padding:5px 14px; }
         .ctr-corte a.is-actual { background:#8a8c6e; border-color:#8a8c6e; color:#fff; }
+        /* Cambiar de corte recarga la página, y armarla lleva su tiempo: el servidor vuelve a
+           resolver los servicios con sus choferes y vehículos. Sin señal, el clic parecía no hacer
+           nada y se pulsaba otra vez. El enlace pulsado se apaga y saca su rueda; los demás quedan
+           inertes para que no se acumulen navegaciones. */
+        .ctr-corte a.is-cargando::before {
+            content:""; width:11px; height:11px; border-radius:50%;
+            border:2px solid currentColor; border-top-color:transparent;
+            animation:ctr-giro .6s linear infinite;
+        }
+        .ctr-corte.is-ocupado a { pointer-events:none; opacity:.55; }
+        .ctr-corte.is-ocupado a.is-cargando { opacity:1; }
+        @keyframes ctr-giro { to { transform:rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) {
+            .ctr-corte a.is-cargando::before { animation:none; border-top-color:currentColor; opacity:.5; }
+        }
     </style>
 </head>
 <body>
@@ -182,10 +198,20 @@ const CORTE = (typeof corte === 'string' && corte === 'chofer') ? 'chofer' : 'se
 %>
 
 <% if (!ES_PDF) { %>
-<div class="ctr-corte">
+<div class="ctr-corte" id="ctrCorte">
     <a href="?corte=servicio" class="<%= CORTE === 'servicio' ? 'is-actual' : '' %>">Una hoja por servicio</a>
     <a href="?corte=chofer" class="<%= CORTE === 'chofer' ? 'is-actual' : '' %>">Una hoja por chofer</a>
 </div>
+<script>
+    // El corte que ya está puesto no navega: recargaría la misma página para nada.
+    document.getElementById('ctrCorte').addEventListener('click', function (e) {
+        var a = e.target.closest('a');
+        if (!a) return;
+        if (a.classList.contains('is-actual')) { e.preventDefault(); return; }
+        a.classList.add('is-cargando');
+        this.classList.add('is-ocupado');
+    });
+</script>
 <% } %>
 
 <%
