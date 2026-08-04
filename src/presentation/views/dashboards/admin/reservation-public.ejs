@@ -71,6 +71,10 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
             var days = svc.days || [];
             var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
             var DIAS_SEM = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+            // Las horas llevan su unidad: el documento está lleno de números y así se distingue de
+            // un vistazo cuál es una hora del reloj. La usan los cuatro tipos de servicio.
+            function conHrs(v) { return v ? v + ' hrs' : ''; }
+
             function fmtFecha(v) {
                 if (!v) return '';
                 var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v));
@@ -184,14 +188,21 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                                 var ptDest = sc.dropoffAddress || sc.destination || '';
                                 var vehName = sc.vehicleTypeName || 'Por asignar';
                                 var hasFlightInfo = sc.airline || sc.flightNumber;
-                                var horaLabel = isAirport ? (isDeparture ? 'Hora de recolección' : 'Hora de llegada del vuelo') : 'Hora';
+                                // En una SALIDA a aeropuerto, `time` es la hora del VUELO y
+                                // flightDepartureTimeSuggested es cuándo pasar por el pasajero: el campo
+                                // donde se captura lo dice —"Hora de salida sugerida… confírmala como
+                                // hora de pick-up"— y de los 18 servicios que traen las dos, la sugerida
+                                // es anterior en 13. Estaban intercambiadas.
+                                var horaLabel = isAirport
+                                    ? (isDeparture ? 'Hora del vuelo' : 'Hora de llegada del vuelo')
+                                    : 'Hora';
                             %>
                             <div class="rc-tbl">
                                 <div class="rc-tc rc-c6"><span class="rc-label">Nombre del servicio</span><span class="rc-value"><%= svcName %></span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Vehículo</span><span class="rc-value"><%= vehName %></span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Clase</span><span class="rc-value"><%= sc.categoryName || '—' %></span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
-                                <div class="rc-tc rc-c3"><span class="rc-label"><%= horaLabel %></span><span class="rc-value"><%= sc.time || '—' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label"><%= horaLabel %></span><span class="rc-value"><%= conHrs(sc.time) || '—' %></span></div>
                                 <% if (isAirport && !isDeparture) { %>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Aeropuerto</span><span class="rc-value"><%= sc.originName || '' %></span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Lugar de llegada</span><span class="rc-value"><%= sc.destination || sc.dropoffAddress || '' %></span></div>
@@ -208,7 +219,7 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                                 <% } else if (isAirport && isDeparture && (hasFlightInfo || sc.flightDepartureTimeSuggested)) { %>
                                 <div class="rc-tc rc-c2"><span class="rc-label">Aerolínea</span><span class="rc-value"><%= sc.airline || '' %></span></div>
                                 <div class="rc-tc rc-c2"><span class="rc-label">Vuelo #</span><span class="rc-value"><%= sc.flightNumber || '' %></span></div>
-                                <div class="rc-tc rc-c2"><span class="rc-label">Hora del vuelo</span><span class="rc-value"><%= sc.flightDepartureTimeSuggested || '' %></span></div>
+                                <div class="rc-tc rc-c2"><span class="rc-label">Hora de recolección</span><span class="rc-value"><%= conHrs(sc.flightDepartureTimeSuggested) %></span></div>
                                 <% } %>
                                 <% if (paxStr) { %>
                                 <div class="rc-tc rc-c6"><span class="rc-label">Pasajeros</span><span class="rc-value"><%= paxStr %></span></div>
@@ -220,7 +231,7 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                             <div class="rc-tbl">
                                 <div class="rc-tc rc-c6"><span class="rc-label">Tour</span><span class="rc-value"><%= sc.concept || 'Tour' %></span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
-                                <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= sc.time || '' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= conHrs(sc.time) %></span></div>
                                 <% if (duracion) { %>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Duración</span><span class="rc-value"><%= duracion %> hrs</span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Clase</span><span class="rc-value"><%= sc.categoryName || '—' %></span></div>
@@ -239,7 +250,7 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                             <div class="rc-tbl">
                                 <div class="rc-tc rc-c6"><span class="rc-label">Experiencia</span><span class="rc-value"><%= sc.concept || 'Experiencia' %></span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
-                                <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= sc.time || '' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= conHrs(sc.time) %></span></div>
                                 <% if (includes) { %>
                                 <div class="rc-tc rc-c6"><span class="rc-label">Incluye</span><span class="rc-value"><%= includes %></span></div>
                                 <% } %>
@@ -254,7 +265,7 @@ const MYRIAD_EMBED_CSS = typeof myriadEmbedCss === 'string' ? myriadEmbedCss : '
                                 <div class="rc-tc rc-c3"><span class="rc-label">Vehículo</span><span class="rc-value"><%= sc.vehicleTypeName || '' %></span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Clase</span><span class="rc-value"><%= sc.categoryName || '—' %></span></div>
                                 <div class="rc-tc rc-c3"><span class="rc-label">Fecha</span><span class="rc-value"><%= fmtFecha(day.date) %></span></div>
-                                <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= sc.time || '' %></span></div>
+                                <div class="rc-tc rc-c3"><span class="rc-label">Hora</span><span class="rc-value"><%= conHrs(sc.time) %></span></div>
                                 <% if (sc.hours) { %>
                                 <div class="rc-tc rc-c6"><span class="rc-label">Horas contratadas</span><span class="rc-value"><%= sc.hours %> hrs</span></div>
                                 <% } %>
