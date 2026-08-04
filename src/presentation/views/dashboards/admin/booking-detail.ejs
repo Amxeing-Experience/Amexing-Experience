@@ -2489,8 +2489,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (coverage) {
             // Sin el hint de ahorro: la sección "Total según el método" ya está a la vista y dice lo
             // mismo —cuál cuesta menos y cuánto—, con la cifra en vez de una frase.
+            // Sin píldora de estado: "Pago parcial" ya lo dicen el porcentaje, lo pagado y el saldo
+            // de este mismo bloque —y la barra del pie, que es de donde se abre el panel—. Su esquina
+            // la toma el chip del método, que ahí se lee como lo que es: un control.
             coverage.innerHTML = PaymentBreakdownHelpers.buildCoverageCard(latestSummary, curr, null,
-                { metodoInteractivo: hayComparativo() });
+                { metodoInteractivo: hayComparativo(), ocultarEstado: true });
         }
     }
 

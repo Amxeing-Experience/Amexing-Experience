@@ -317,6 +317,7 @@ const PaymentBreakdownHelpers = (() => {
    * @param {string} [savingsHintHtml] - HTML opcional a insertar bajo "Total a pagar".
    * @param {object} [opciones] - Ajustes de la vista.
    * @param {boolean} [opciones.metodoInteractivo] - El chip del método abre el comparativo.
+   * @param {boolean} [opciones.ocultarEstado] - Sin píldora de estado; el chip toma su esquina.
    * @returns {string} HTML de la card de cobertura.
    * @example
    * buildCoverageCard(summary, 'MXN')
@@ -339,7 +340,12 @@ const PaymentBreakdownHelpers = (() => {
       'bg-info text-white': 'is-favor',
     };
     const sm = PAYMENT_STATUS_MAP[s.paymentStatus] || { label: s.paymentStatus, cls: 'bg-secondary text-white' };
-    const statusPill = `<span class="pay-cob-estado ${tonos[sm.cls] || 'is-neutro'}"><span class="pay-cob-punto"></span>${escapeHtml(sm.label)}</span>`;
+    // La píldora se calla donde el estado ya se dice de otras formas —el porcentaje, lo pagado, el
+    // saldo, y en admin además la barra del pie, que es de donde se abre este panel—.
+    const sinEstado = Boolean(opciones && opciones.ocultarEstado);
+    const statusPill = sinEstado
+      ? ''
+      : `<span class="pay-cob-estado ${tonos[sm.cls] || 'is-neutro'}"><span class="pay-cob-punto"></span>${escapeHtml(sm.label)}</span>`;
     // Método cotizado como chip a un lado de "Total a pagar". Donde hay un comparativo que abrir
     // (hoy solo admin) el chip es el botón que lo despliega: queda pegado a lo que explica.
     const interactivo = Boolean(opciones && opciones.metodoInteractivo);
@@ -352,11 +358,11 @@ const PaymentBreakdownHelpers = (() => {
     // una caja. El porcentaje baja DEBAJO de la barra: es su lectura, no un dato aparte.
     return `<div class="pay-cob-top">
         <div>
-          <div class="pay-cob-cap">Total a pagar ${methodChip}</div>
+          <div class="pay-cob-cap">Total a pagar${sinEstado ? '' : ` ${methodChip}`}</div>
           <div class="pay-cob-total">${formatMoney(round2(s.total), currency)}</div>
           ${savingsHintHtml || ''}
         </div>
-        ${statusPill}
+        ${sinEstado ? methodChip : statusPill}
       </div>
       <div class="pay-cob-barra" role="progressbar" aria-valuenow="${coverageWidth}" aria-valuemin="0" aria-valuemax="100">
         <span style="width:${coverageWidth}%"></span>
