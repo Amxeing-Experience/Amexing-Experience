@@ -1551,7 +1551,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
 
     document.getElementById('payBarPagarBtn')?.addEventListener('click', () => {
-        pendingAddForm = true;
         paymentsOffcanvasInstance()?.show();
     });
 
@@ -2289,9 +2288,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     let editingPaymentId = null;
     // Formulario de alta abierto (el del tab "Pago"). Su par de edición es editingPaymentId.
     let addPaymentFormOpen = false;
-    // El carrito solo se abre desde "Agregar pago", así que la intención al abrirlo es siempre registrar
-    // uno: el formulario se despliega solo. Esta bandera se levanta al pedir la apertura y se baja
-    // cuando el formulario ya se pudo dibujar (o cuando resulta que no se puede).
+    // El carrito solo se abre desde "Agregar pago", así que la intención al abrirlo es siempre
+    // registrar uno: el formulario se despliega solo, se haya llegado por donde se haya llegado. La
+    // bandera se levanta al abrir el panel y se baja cuando el formulario ya se pudo dibujar (o
+    // cuando resulta que no se puede). Si quien lo abrió lo cierra con "Cancelar", no vuelve solo:
+    // la bandera solo se levanta en la apertura del panel, no en cada render.
     let pendingAddForm = false;
 
     // El formulario necesita availableMethods del summary AMPLIO para poblar el select de método; si se
@@ -2898,6 +2899,14 @@ document.addEventListener('DOMContentLoaded', async function() {
         renderPaymentForm(null);
     });
     // Cerrar el carrito (backdrop-click / Escape / botón) descarta el formulario en silencio (H5).
+    // El alta sale desplegada al abrir el panel: no hay más razón para abrirlo. El intento se repite
+    // al llegar el summary (applyPaymentSummary), porque el formulario necesita availableMethods para
+    // poblar el select de método y sin él saldría vacío y con el guardado bloqueado.
+    document.getElementById('paymentsOffcanvas')?.addEventListener('shown.bs.offcanvas', () => {
+        pendingAddForm = true;
+        maybeOpenAddForm();
+    });
+
     document.getElementById('paymentsOffcanvas')?.addEventListener('hidden.bs.offcanvas', () => {
         // Cerrar con el summary aún en vuelo dejaría la bandera levantada y el formulario se abriría solo
         // la próxima vez, sin que nadie lo pidiera.
