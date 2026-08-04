@@ -378,12 +378,10 @@
 /* Este panel es casi todo cifras y estaban en tipografía proporcional: $110,190.00 y $99,317.13 no
    ocupaban lo mismo, así que las columnas de montos bailaban aunque estuvieran alineadas a la
    derecha. tabular-nums le da el mismo ancho a cada dígito. */
-/* La cobertura y el desglose son pares etiqueta/cifra: a todo lo ancho del panel quedan separados
-   por un vacío que la vista tiene que recorrer en cada renglón. Se limitan; la tabla del historial
-   y el comparativo NO, que ahí el ancho es lo que hace que sus columnas quepan. */
-#paymentsOffcanvas #paymentCoverageCard,
-#paymentsOffcanvas .pay-desglose,
-#paymentsOffcanvas #paymentFormWrap { max-width: 660px; }
+/* Todos los bloques al MISMO ancho. Se probó limitar la cobertura, el desglose y el alta a 660 px
+   para acortar la distancia entre etiqueta y cifra, pero la tabla del historial necesita el ancho
+   completo y no puede limitarse: el panel quedaba con dos márgenes derechos distintos y se leía
+   desalineado. Un borde común vale más que una línea corta. */
 
 #paymentsOffcanvas .pay-cob-total,
 #paymentsOffcanvas .pay-cob-cifra,
