@@ -385,7 +385,9 @@
     border: 1px solid #ece8dd;
     border-radius: 0.5rem;
     padding: 1rem;
-    margin-bottom: 1rem;
+    /* El alta arranca pegada a "Agregar ajuste", que es el final de la sección de arriba: sin este
+       aire los dos bloques se leían como uno. Mismo respiro que separa las secciones del carrito. */
+    margin: 1.4rem 0 1rem;
 }
 /* #paymentsBody NO lleva tarjeta: la tabla del historial ya tiene estructura propia (encabezado,
    separadores, pie), asi que el panel blanco alrededor solo sumaba un marco de mas. Se apoya directo
