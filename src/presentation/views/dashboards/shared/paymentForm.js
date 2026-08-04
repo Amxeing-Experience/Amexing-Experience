@@ -529,6 +529,13 @@ danger: true,
        * form.requestAddForm()
        */
       requestAddForm: () => { pendingAddForm = true; },
+      /**
+       * Retira la petición de abrir el alta (al cerrar el panel con el summary en vuelo).
+       * @returns {void} Nada.
+       * @example
+       * form.cancelAddForm()
+       */
+      cancelAddForm: () => { pendingAddForm = false; },
     };
   }
 

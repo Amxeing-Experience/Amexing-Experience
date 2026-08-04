@@ -2536,6 +2536,22 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Tabla "Por método de pago": un renglón por método con Total y Restante (reemplaza los chips con
 
 
+    // ¿Hay un método más barato que el cotizado? Devuelve { metodo, ahorro } o null. Lo consulta el
+    // chip verde de la barra del pie. Los totales por método son los mismos del comparativo del
+    // globo —subtotal del método + ajustes + propina—, así que las dos cifras no pueden discrepar.
+    function ahorroMasBarato(summary, services, curr) {
+        const H = PaymentBreakdownHelpers;
+        const s = summary || {};
+        const methods = Array.isArray(s.availableMethods) ? s.availableMethods : [];
+        const anchor = s.anchoredMethod || (reservationData && reservationData.paymentType);
+        const cheapest = H.cheapestAvailableMethod(methods, services, curr);
+        if (!cheapest || !anchor || cheapest === anchor) return null;
+        const extras = H.round2(s.adjustments) + H.round2(s.tip);
+        const totalFor = (m) => Math.max(0, H.round2(H.computeServicesSubtotalByType(services, m, curr) + extras));
+        const ahorro = H.round2(totalFor(anchor) - totalFor(cheapest));
+        return ahorro < 0.005 ? null : { metodo: cheapest, ahorro };
+    }
+
     function renderPaymentsOffcanvas() {
         if (!latestSummary) return;
         // Ya no pinta cabecera: solo retira el esqueleto o el error de carga, porque el contenido

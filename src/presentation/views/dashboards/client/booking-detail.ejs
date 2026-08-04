@@ -833,9 +833,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     });
     // Cerrar el carrito (backdrop-click / Escape / botón) descarta el formulario en silencio (H5).
     document.getElementById('paymentsOffcanvas')?.addEventListener('hidden.bs.offcanvas', () => {
-        // Cerrar con el summary aún en vuelo dejaría la bandera levantada y el formulario se abriría solo
-        // la próxima vez, sin que nadie lo pidiera.
-        pendingAddForm = false;
+        // Cerrar con el summary aún en vuelo dejaría la bandera levantada y el formulario se abriría
+        // solo la próxima vez, sin que nadie lo pidiera. La bandera vive DENTRO de paymentForm.js:
+        // asignarla desde aquí no la tocaba —creaba otra suelta— y el formulario se seguía abriendo.
+        paymentForm.cancelAddForm();
         closePaymentForm();
     });
 

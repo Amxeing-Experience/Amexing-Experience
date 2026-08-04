@@ -553,6 +553,28 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     const PAYMENT_METHOD_LABELS = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' };
 
+    function formatThousandsInput(el) {
+        const raw = el.value;
+        const caret = el.selectionStart || 0;
+        const digitsBeforeCaret = (raw.slice(0, caret).match(/\d/g) || []).length;
+        let clean = raw.replace(/[^\d.]/g, '');
+        const dot = clean.indexOf('.');
+        if (dot !== -1) clean = clean.slice(0, dot + 1) + clean.slice(dot + 1).replace(/\./g, '');
+        let [intPart = '', decPart] = clean.split('.');
+        intPart = intPart.replace(/^0+(?=\d)/, '');
+        const grouped = intPart ? Number(intPart).toLocaleString('en-US') : '';
+        let out = grouped;
+        if (decPart !== undefined) out += `.${decPart.slice(0, 2)}`;
+        el.value = out;
+        let pos = 0;
+        let seen = 0;
+        while (pos < out.length && seen < digitsBeforeCaret) {
+            if (/\d/.test(out[pos])) seen += 1;
+            pos += 1;
+        }
+        el.setSelectionRange(pos, pos);
+    }
+
     function attachThousands(el) {
         if (!el) return;
         el.addEventListener('input', () => formatThousandsInput(el));
